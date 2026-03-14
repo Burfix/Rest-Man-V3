@@ -43,7 +43,7 @@ function Row({
   sub?:        string;
 }) {
   return (
-    <div className="flex items-center justify-between py-2.5 border-b border-stone-100 last:border-0">
+    <div className="flex items-center justify-between py-2.5 border-b border-stone-100 dark:border-stone-800 last:border-0">
       <span className="text-[11px] font-medium text-stone-500">{label}</span>
       <div className="text-right">
         <span className={cn("text-xs font-semibold", valueColor)}>{value}</span>
@@ -89,11 +89,11 @@ export default function TodayOpsPanel({
     : null;
 
   return (
-    <div className="flex flex-col rounded-xl border border-stone-200 bg-white overflow-hidden">
+    <div className="flex flex-col rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-        <h2 className="text-xs font-semibold text-stone-700">Today at Venue</h2>
-        <Link href="/dashboard/bookings" className="text-[11px] text-stone-400 hover:text-stone-700 transition-colors">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800">
+        <h2 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Today at Venue</h2>
+        <Link href="/dashboard/bookings" className="text-[11px] text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors">
           All bookings →
         </Link>
       </div>
@@ -159,9 +159,9 @@ export default function TodayOpsPanel({
       </div>
 
       {/* Footer total */}
-      <div className="border-t border-stone-100 px-5 py-3 flex items-center justify-between">
-        <span className="text-[11px] text-stone-500">Total today</span>
-        <span className="text-xs font-semibold text-stone-800">
+      <div className="border-t border-stone-100 dark:border-stone-800 px-5 py-3 flex items-center justify-between">
+        <span className="text-[11px] text-stone-500 dark:text-stone-500">Total today</span>
+        <span className="text-xs font-semibold text-stone-800 dark:text-stone-200">
           {today.total} bookings · {today.totalCovers} covers
         </span>
       </div>

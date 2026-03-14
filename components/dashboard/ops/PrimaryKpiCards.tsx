@@ -67,15 +67,15 @@ function KpiCard({
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border bg-white overflow-hidden",
-        urgency === "critical" ? "border-red-200"   :
-        urgency === "warning"  ? "border-amber-200" :
-        "border-stone-200"
+        "flex flex-col rounded-xl border bg-white dark:bg-stone-900 overflow-hidden",
+        urgency === "critical" ? "border-red-200 dark:border-red-900"     :
+        urgency === "warning"  ? "border-amber-200 dark:border-amber-900" :
+        "border-stone-200 dark:border-stone-800"
       )}
     >
       {/* Header — plain white, no tinted background */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
-        <span className="text-xs font-semibold text-stone-700">{title}</span>
+      <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800">
+        <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">{title}</span>
         {chip && chipVariant && (
           <StatusChip variant={chipVariant} size="xs" dot>
             {chip}
@@ -88,20 +88,20 @@ function KpiCard({
 
       {/* Footer summary line */}
       {footer && (
-        <div className="border-t border-stone-100 px-5 py-3">
+        <div className="border-t border-stone-100 dark:border-stone-800 px-5 py-3">
           {footer}
         </div>
       )}
 
       {/* CTA */}
-      <div className="border-t border-stone-100 px-5 py-3">
+      <div className="border-t border-stone-100 dark:border-stone-800 px-5 py-3">
         <Link
           href={ctaHref}
           className={cn(
             "text-xs font-medium hover:underline transition-colors",
             urgency === "critical" ? "text-red-700" :
             urgency === "warning"  ? "text-amber-700" :
-            "text-stone-600 hover:text-stone-900"
+            "text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
           )}
         >
           {cta}
@@ -117,19 +117,19 @@ function StatStrip({ items }: {
   items: { label: string; value: string | number; highlight?: "red" | "amber" | "green" }[]
 }) {
   return (
-    <div className="mt-4 grid grid-cols-4 gap-px border border-stone-100 rounded-lg overflow-hidden">
+    <div className="mt-4 grid grid-cols-4 gap-px border border-stone-100 dark:border-stone-800 rounded-lg overflow-hidden">
       {items.map((item) => (
-        <div key={item.label} className="bg-stone-50 px-3 py-2.5 text-center">
+        <div key={item.label} className="bg-stone-50 dark:bg-stone-800 px-3 py-2.5 text-center">
           <p className={cn(
             "text-sm font-bold tabular-nums",
             item.highlight === "red"   ? "text-red-600"     :
             item.highlight === "amber" ? "text-amber-600"   :
             item.highlight === "green" ? "text-emerald-600" :
-            "text-stone-800"
+            "text-stone-800 dark:text-stone-200"
           )}>
             {item.value}
           </p>
-          <p className="text-[9px] text-stone-400 leading-tight mt-0.5 uppercase tracking-wide">
+          <p className="text-[9px] text-stone-400 dark:text-stone-600 leading-tight mt-0.5 uppercase tracking-wide">
             {item.label}
           </p>
         </div>
@@ -197,10 +197,10 @@ function ComplianceCard({ compliance }: { compliance: ComplianceSummary }) {
             <span className={cn("text-5xl font-bold tabular-nums leading-none", scoreColor)}>
               {compliance.compliance_pct}%
             </span>
-            <span className="text-xs text-stone-400">compliant</span>
+            <span className="text-xs text-stone-400 dark:text-stone-600">compliant</span>
           </div>
 
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
             <div
               className={cn("h-1.5 rounded-full transition-all", barColor)}
               style={{ width: `${compliance.compliance_pct}%` }}
@@ -269,10 +269,10 @@ function MaintenanceCard({ maintenance }: { maintenance: MaintenanceSummary }) {
             <span className={cn("text-5xl font-bold tabular-nums leading-none", scoreColor)}>
               {totalOpen}
             </span>
-            <span className="text-xs text-stone-400">open issues</span>
+            <span className="text-xs text-stone-400 dark:text-stone-600">open issues</span>
           </div>
 
-          <p className="mt-1 text-[11px] text-stone-400">
+          <p className="mt-1 text-[11px] text-stone-400 dark:text-stone-600">
             {maintenance.totalEquipment} units tracked
           </p>
 

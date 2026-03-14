@@ -47,8 +47,8 @@ const SEVERITY: Record<
     pulse:     false,
   },
   low: {
-    accent:    "border-l-stone-300",
-    badge:     "bg-stone-100 text-stone-500 ring-1 ring-stone-200",
+    accent:    "border-l-stone-300 dark:border-l-stone-600",
+    badge:     "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 ring-1 ring-stone-200 dark:ring-stone-700",
     badgeText: "Low",
     label:     "Low",
     pulse:     false,
@@ -102,12 +102,12 @@ export default function OperationalAlertsPanel({ initialAlerts }: Props) {
   if (alerts.length === 0) return null;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <section className="overflow-hidden rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900">
       {/* Header */}
-      <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-5 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-stone-100 dark:border-stone-800 px-5 py-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-xs font-semibold text-stone-900">Active Alerts</h2>
-          <span className="rounded-full bg-stone-100 px-2 py-px text-[10px] font-semibold text-stone-600 tabular-nums">
+          <h2 className="text-xs font-semibold text-stone-900 dark:text-stone-100">Active Alerts</h2>
+          <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-px text-[10px] font-semibold text-stone-600 dark:text-stone-400 tabular-nums">
             {alerts.length}
           </span>
         </div>
@@ -127,7 +127,7 @@ export default function OperationalAlertsPanel({ initialAlerts }: Props) {
       </div>
 
       {/* Alert rows */}
-      <div className="divide-y divide-stone-100">
+      <div className="divide-y divide-stone-100 dark:divide-stone-800">
         {alerts.map((alert) => (
           <AlertRow
             key={alert.id}
@@ -162,7 +162,7 @@ function AlertRow({
   return (
     <div
       className={cn(
-        "flex items-start gap-3 border-l-2 px-5 py-3.5 hover:bg-stone-50 transition-colors",
+        "flex items-start gap-3 border-l-2 px-5 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors",
         cfg.accent
       )}
     >
@@ -183,7 +183,7 @@ function AlertRow({
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-semibold text-stone-800 leading-tight">
+            <p className="text-xs font-semibold text-stone-800 dark:text-stone-200 leading-tight">
               {typeCfg.title}
               {alert.location && (
                 <span className="font-normal text-stone-500"> · {alert.location}</span>
@@ -198,19 +198,19 @@ function AlertRow({
           <div className="flex items-center gap-1.5 shrink-0 mt-px">
             <a
               href={typeCfg.href}
-              className="text-[11px] font-medium text-stone-600 hover:text-stone-900 whitespace-nowrap transition-colors"
+              className="text-[11px] font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 whitespace-nowrap transition-colors"
             >
               {typeCfg.cta}
             </a>
-            <span className="text-stone-300">·</span>
+            <span className="text-stone-300 dark:text-stone-700">·</span>
             <button
               onClick={() => onResolve(alert.id)}
               disabled={resolving}
               className={cn(
                 "text-[11px] font-medium whitespace-nowrap transition-colors",
                 resolving
-                  ? "text-stone-300 cursor-not-allowed"
-                  : "text-stone-400 hover:text-stone-700"
+                  ? "text-stone-300 dark:text-stone-600 cursor-not-allowed"
+                  : "text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300"
               )}
             >
               {resolving ? "Resolving…" : "Dismiss"}
@@ -219,7 +219,7 @@ function AlertRow({
         </div>
 
         {/* Timestamp */}
-        <time className="mt-1 block text-[10px] text-stone-400" dateTime={alert.created_at}>
+          <time className="mt-1 block text-[10px] text-stone-400 dark:text-stone-600" dateTime={alert.created_at}>
           {formatDistanceToNowStrict(parseISO(alert.created_at), { addSuffix: true })}
         </time>
       </div>

@@ -164,18 +164,18 @@ export default function OperationalHealth({
   const bars = buildBars(compliance, maintenance, forecast, reviews);
 
   return (
-    <div className="flex flex-col rounded-xl border border-stone-200 bg-white overflow-hidden">
+    <div className="flex flex-col rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-stone-100">
-        <h2 className="text-xs font-semibold text-stone-700">Operational Health</h2>
+      <div className="px-5 py-4 border-b border-stone-100 dark:border-stone-800">
+        <h2 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Operational Health</h2>
       </div>
 
       {/* Bars */}
-      <div className="flex-1 divide-y divide-stone-100">
+      <div className="flex-1 divide-y divide-stone-100 dark:divide-stone-800">
         {bars.map((bar) => (
           <div key={bar.label} className="px-5 py-3.5">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] font-medium text-stone-600">{bar.label}</span>
+              <span className="text-[11px] font-medium text-stone-600 dark:text-stone-400">{bar.label}</span>
               <div className="flex items-center gap-2">
                 <span className={cn("text-[11px] font-medium", bar.textClr)}>
                   {bar.status}
@@ -185,7 +185,7 @@ export default function OperationalHealth({
                 </span>
               </div>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-stone-100 overflow-hidden">
+            <div className="h-1.5 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
               <div
                 className={cn("h-1.5 rounded-full transition-all duration-500", bar.color)}
                 style={{ width: `${bar.pct}%` }}

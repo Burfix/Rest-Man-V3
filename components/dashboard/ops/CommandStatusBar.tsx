@@ -176,22 +176,22 @@ export default function CommandStatusBar({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white overflow-hidden",
-        hasRisk ? "border-red-200" : "border-stone-200"
+        "rounded-xl border bg-white dark:bg-stone-900 overflow-hidden",
+        hasRisk ? "border-red-200 dark:border-red-900" : "border-stone-200 dark:border-stone-800"
       )}
     >
       {/* ── Row 1: Identity + period + date + alerts ──────────────────── */}
-      <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-stone-100">
+      <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-stone-100 dark:border-stone-800">
         <div className="flex items-center gap-3 min-w-0">
           <div className="hidden sm:flex h-6 w-6 items-center justify-center rounded-md bg-stone-900 shrink-0">
             <span className="text-[10px] text-white font-bold tracking-tight">OE</span>
           </div>
           <div className="min-w-0 flex items-center gap-2">
-            <p className="text-sm font-semibold text-stone-900 leading-none truncate">
+            <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-none truncate">
               Ops Engine
             </p>
-            <span className="text-stone-300 text-xs hidden sm:inline">·</span>
-            <p className="hidden sm:block text-xs text-stone-500 leading-none truncate">
+            <span className="text-stone-300 dark:text-stone-700 text-xs hidden sm:inline">·</span>
+            <p className="hidden sm:block text-xs text-stone-500 dark:text-stone-500 leading-none truncate">
               Operations Command
             </p>
           </div>
@@ -199,13 +199,13 @@ export default function CommandStatusBar({
 
         <div className="flex items-center gap-2.5 shrink-0">
           {/* Service period */}
-          <span className="hidden sm:inline-flex items-center rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] font-medium text-stone-600 bg-stone-50">
+          <span className="hidden sm:inline-flex items-center rounded-full border border-stone-200 dark:border-stone-700 px-2.5 py-0.5 text-[11px] font-medium text-stone-600 dark:text-stone-400 bg-stone-50 dark:bg-stone-800">
             {servicePeriod}
           </span>
           {/* Separator */}
-          <span className="hidden md:inline text-stone-300 text-xs">·</span>
+          <span className="hidden md:inline text-stone-300 dark:text-stone-700 text-xs">·</span>
           {/* Date */}
-          <span className="hidden md:inline text-[11px] text-stone-500">
+          <span className="hidden md:inline text-[11px] text-stone-500 dark:text-stone-500">
             {fmtDate(date)}
           </span>
           {/* Alert pill */}
@@ -225,7 +225,7 @@ export default function CommandStatusBar({
       </div>
 
       {/* ── Row 2: 5 status columns ───────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y divide-stone-100">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y divide-stone-100 dark:divide-stone-800">
         {cells.map((cell) => {
           const isCritical = cell.variant === "critical";
           const isWarning  = cell.variant === "warning";
@@ -253,9 +253,9 @@ export default function CommandStatusBar({
             <Link
               key={cell.id}
               href={cell.href}
-              className="flex flex-col gap-1 px-4 py-3.5 hover:bg-stone-50 transition-colors group"
+              className="flex flex-col gap-1 px-4 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors group"
             >
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-500">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 group-hover:text-stone-500 dark:group-hover:text-stone-400">
                 {cell.label}
               </span>
               <p className={cn("text-sm font-bold leading-tight tabular-nums truncate", metricColor)}>

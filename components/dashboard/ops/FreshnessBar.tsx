@@ -19,10 +19,10 @@ function FreshnessChip({ item }: { item: FreshnessItem }) {
     <a
       href={item.href}
       title={item.stale ? item.actionLabel : `${item.label}: last updated ${label}`}
-      className={`inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-medium transition-colors hover:bg-stone-100 ${
+      className={`inline-flex items-center gap-1 rounded border px-1.5 py-px text-[10px] font-medium transition-colors hover:bg-stone-100 dark:hover:bg-stone-800 ${
         item.stale
           ? "border-red-200 text-red-600 bg-red-50"
-          : "border-stone-200 text-stone-500 bg-transparent"
+          : "border-stone-200 dark:border-stone-700 text-stone-500 dark:text-stone-400 bg-transparent"
       }`}
     >
       <span
@@ -52,10 +52,10 @@ export default function FreshnessBar({ freshness }: Props) {
       aria-label="Data freshness status"
       className="flex items-center gap-2 flex-wrap"
     >
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 shrink-0">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 shrink-0">
         Freshness
       </span>
-      <span className="text-stone-200 text-xs shrink-0">·</span>
+      <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
       {items.map((item) => (
         <FreshnessChip key={item.label} item={item} />
       ))}

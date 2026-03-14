@@ -91,7 +91,7 @@ function NavList({
       {NAV.map((group, gi) => (
         <div key={gi}>
           {group.group && (
-            <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-widest text-stone-400">
+            <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
               {group.group}
             </p>
           )}
@@ -113,8 +113,8 @@ function NavList({
                     item.soon
                       ? "cursor-default opacity-40"
                       : isActive
-                      ? "bg-stone-100 text-stone-900"
-                      : "text-stone-500 hover:bg-stone-50 hover:text-stone-800"
+                      ? "bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100"
+                      : "text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800/60 hover:text-stone-800 dark:hover:text-stone-200"
                   )}
                 >
                   <div className="flex items-center gap-2.5">
@@ -122,7 +122,7 @@ function NavList({
                     <span className="text-[13px] font-medium leading-none">{item.label}</span>
                   </div>
                   {item.soon && (
-                    <span className="rounded bg-stone-200 px-1 py-px text-[9px] font-semibold text-stone-500 tracking-wide">
+                    <span className="rounded bg-stone-200 dark:bg-stone-700 px-1 py-px text-[9px] font-semibold text-stone-500 dark:text-stone-400 tracking-wide">
                       SOON
                     </span>
                   )}
@@ -155,17 +155,17 @@ export default function Sidebar({ footer }: Props) {
   return (
     <>
       {/* ── Desktop sidebar ─────────────────────────────────────────── */}
-      <aside className="hidden lg:flex lg:w-56 flex-col border-r border-stone-200 bg-white shrink-0">
+      <aside className="hidden lg:flex lg:w-56 flex-col border-r border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 shrink-0">
         {/* Brand header */}
-        <div className="flex h-14 items-center gap-3 px-4 border-b border-stone-100 shrink-0">
+        <div className="flex h-14 items-center gap-3 px-4 border-b border-stone-100 dark:border-stone-800 shrink-0">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-900 shrink-0">
             <span className="text-xs font-bold text-white">OE</span>
           </div>
           <div className="min-w-0">
-            <p className="text-[13px] font-semibold text-stone-900 leading-tight truncate">
+            <p className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 leading-tight truncate">
               Ops Engine
             </p>
-            <p className="text-[10px] text-stone-400 leading-none">Operations</p>
+            <p className="text-[10px] text-stone-400 dark:text-stone-600 leading-none">Operations</p>
           </div>
         </div>
 
@@ -174,20 +174,20 @@ export default function Sidebar({ footer }: Props) {
       </aside>
 
       {/* ── Mobile top bar ───────────────────────────────────────────── */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 flex h-14 items-center justify-between border-b border-stone-200 bg-white px-4">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-30 flex h-14 items-center justify-between border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 px-4">
         <div className="flex items-center gap-2.5">
           <div className="h-6 w-6 flex items-center justify-center rounded-md bg-stone-900">
             <span className="text-[10px] font-bold text-white">OE</span>
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-stone-900 leading-tight">Ops Engine</p>
-            <p className="text-[9px] text-stone-400 leading-none">Operations</p>
+            <p className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 leading-tight">Ops Engine</p>
+            <p className="text-[9px] text-stone-400 dark:text-stone-600 leading-none">Operations</p>
           </div>
         </div>
         <button
           onClick={() => setOpen(true)}
           aria-label="Open navigation menu"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 hover:bg-stone-100"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800"
         >
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <rect y="3" width="20" height="2" rx="1" />
@@ -201,21 +201,21 @@ export default function Sidebar({ footer }: Props) {
       {open && (
         <div className="lg:hidden fixed inset-0 z-40 flex" role="dialog" aria-modal="true" aria-label="Navigation menu">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <div className="relative z-50 flex w-72 max-w-[85vw] flex-col bg-white shadow-xl">
-            <div className="flex h-14 items-center justify-between border-b border-stone-100 px-4 shrink-0">
+          <div className="relative z-50 flex w-72 max-w-[85vw] flex-col bg-white dark:bg-stone-950 shadow-xl dark:shadow-stone-900">
+            <div className="flex h-14 items-center justify-between border-b border-stone-100 dark:border-stone-800 px-4 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="h-6 w-6 flex items-center justify-center rounded-md bg-stone-900">
                   <span className="text-[10px] font-bold text-white">OE</span>
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-stone-900">Ops Engine</p>
-                  <p className="text-[9px] text-stone-400">Operations</p>
+                  <p className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">Ops Engine</p>
+                  <p className="text-[9px] text-stone-400 dark:text-stone-600">Operations</p>
                 </div>
               </div>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close navigation menu"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 dark:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M3.22 3.22a.75.75 0 0 1 1.06 0L8 6.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L9.06 8l3.72 3.72a.75.75 0 1 1-1.06 1.06L8 9.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L6.94 8 3.22 4.28a.75.75 0 0 1 0-1.06Z" />
