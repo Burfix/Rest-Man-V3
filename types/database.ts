@@ -227,6 +227,10 @@ export interface Database {
           resolved_by: string | null;
           created_at: string;
           updated_at: string;
+          // Added by migration 012
+          site_id: string | null;
+          zone_id: string | null;
+          ticket_type: string;
         };
         Insert: {
           id?: string;
@@ -242,6 +246,9 @@ export interface Database {
           resolved_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          site_id?: string | null;
+          zone_id?: string | null;
+          ticket_type?: string;
         };
         Update: {
           id?: string;
@@ -257,6 +264,9 @@ export interface Database {
           resolved_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          site_id?: string | null;
+          zone_id?: string | null;
+          ticket_type?: string;
         };
         Relationships: [];
       };
@@ -696,6 +706,438 @@ export interface Database {
           uploaded_at?: string;
         };
         Relationships: [];
+      };
+      // ── Universal model (migrations 012 & 013) ──────────────────────────
+      sites: {
+        Row: {
+          id: string;
+          name: string;
+          site_type: string;
+          address: string | null;
+          city: string | null;
+          country: string;
+          timezone: string;
+          is_active: boolean;
+          metadata_json: Record<string, unknown>;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          site_type?: string;
+          address?: string | null;
+          city?: string | null;
+          country?: string;
+          timezone?: string;
+          is_active?: boolean;
+          metadata_json?: Record<string, unknown>;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          name?: string;
+          site_type?: string;
+          address?: string | null;
+          city?: string | null;
+          country?: string;
+          timezone?: string;
+          is_active?: boolean;
+          metadata_json?: Record<string, unknown>;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      zones: {
+        Row: {
+          id: string;
+          site_id: string;
+          name: string;
+          zone_type: string;
+          description: string | null;
+          display_order: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          name: string;
+          zone_type?: string;
+          description?: string | null;
+          display_order?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string;
+          name?: string;
+          zone_type?: string;
+          description?: string | null;
+          display_order?: number;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [{ foreignKeyName: "zones_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] }];
+      };
+      contractors: {
+        Row: {
+          id: string;
+          company_name: string;
+          contact_name: string | null;
+          phone: string | null;
+          email: string | null;
+          specialisation: string[] | null;
+          is_preferred: boolean;
+          is_active: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          company_name: string;
+          contact_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          specialisation?: string[] | null;
+          is_preferred?: boolean;
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          company_name?: string;
+          contact_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          specialisation?: string[] | null;
+          is_preferred?: boolean;
+          is_active?: boolean;
+          notes?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      obligations: {
+        Row: {
+          id: string;
+          site_id: string;
+          zone_id: string | null;
+          asset_id: string | null;
+          label: string;
+          obligation_type: string;
+          compliance_item_id: string | null;
+          recurrence: string;
+          status: string;
+          last_completed_at: string | null;
+          next_due_at: string | null;
+          responsible_party: string | null;
+          priority: string;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          zone_id?: string | null;
+          asset_id?: string | null;
+          label: string;
+          obligation_type?: string;
+          compliance_item_id?: string | null;
+          recurrence?: string;
+          status?: string;
+          last_completed_at?: string | null;
+          next_due_at?: string | null;
+          responsible_party?: string | null;
+          priority?: string;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string;
+          zone_id?: string | null;
+          asset_id?: string | null;
+          label?: string;
+          obligation_type?: string;
+          compliance_item_id?: string | null;
+          recurrence?: string;
+          status?: string;
+          last_completed_at?: string | null;
+          next_due_at?: string | null;
+          responsible_party?: string | null;
+          priority?: string;
+          notes?: string | null;
+          is_active?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "obligations_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] },
+          { foreignKeyName: "obligations_zone_id_fkey"; columns: ["zone_id"]; referencedRelation: "zones"; referencedColumns: ["id"] },
+          { foreignKeyName: "obligations_compliance_item_id_fkey"; columns: ["compliance_item_id"]; referencedRelation: "compliance_items"; referencedColumns: ["id"] }
+        ];
+      };
+      documents: {
+        Row: {
+          id: string;
+          site_id: string;
+          document_type: string;
+          obligation_id: string | null;
+          asset_id: string | null;
+          ticket_id: string | null;
+          compliance_doc_id: string | null;
+          file_name: string;
+          file_url: string;
+          file_size: number | null;
+          uploaded_by: string | null;
+          notes: string | null;
+          valid_from: string | null;
+          valid_until: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          document_type?: string;
+          obligation_id?: string | null;
+          asset_id?: string | null;
+          ticket_id?: string | null;
+          compliance_doc_id?: string | null;
+          file_name: string;
+          file_url: string;
+          file_size?: number | null;
+          uploaded_by?: string | null;
+          notes?: string | null;
+          valid_from?: string | null;
+          valid_until?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string;
+          document_type?: string;
+          obligation_id?: string | null;
+          asset_id?: string | null;
+          ticket_id?: string | null;
+          compliance_doc_id?: string | null;
+          file_name?: string;
+          file_url?: string;
+          file_size?: number | null;
+          uploaded_by?: string | null;
+          notes?: string | null;
+          valid_from?: string | null;
+          valid_until?: string | null;
+        };
+        Relationships: [
+          { foreignKeyName: "documents_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] }
+        ];
+      };
+      workflow_logs: {
+        Row: {
+          id: string;
+          entity_type: string;
+          entity_id: string;
+          site_id: string | null;
+          action: string;
+          from_value: string | null;
+          to_value: string | null;
+          triggered_by: string | null;
+          channel: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entity_type: string;
+          entity_id: string;
+          site_id?: string | null;
+          action: string;
+          from_value?: string | null;
+          to_value?: string | null;
+          triggered_by?: string | null;
+          channel?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entity_type?: string;
+          entity_id?: string;
+          site_id?: string | null;
+          action?: string;
+          from_value?: string | null;
+          to_value?: string | null;
+          triggered_by?: string | null;
+          channel?: string | null;
+          notes?: string | null;
+        };
+        Relationships: [];
+      };
+      risk_scores: {
+        Row: {
+          id: string;
+          site_id: string;
+          zone_id: string | null;
+          ticket_score: number;
+          obligation_score: number;
+          asset_score: number;
+          event_conflict_score: number;
+          composite_score: number;
+          status: string;
+          open_ticket_count: number;
+          overdue_obligation_count: number;
+          oos_asset_count: number;
+          active_event_count: number;
+          computed_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          zone_id?: string | null;
+          ticket_score?: number;
+          obligation_score?: number;
+          asset_score?: number;
+          event_conflict_score?: number;
+          composite_score?: number;
+          status?: string;
+          open_ticket_count?: number;
+          overdue_obligation_count?: number;
+          oos_asset_count?: number;
+          active_event_count?: number;
+          computed_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string;
+          zone_id?: string | null;
+          ticket_score?: number;
+          obligation_score?: number;
+          asset_score?: number;
+          event_conflict_score?: number;
+          composite_score?: number;
+          status?: string;
+          open_ticket_count?: number;
+          overdue_obligation_count?: number;
+          oos_asset_count?: number;
+          active_event_count?: number;
+          computed_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "risk_scores_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] },
+          { foreignKeyName: "risk_scores_zone_id_fkey"; columns: ["zone_id"]; referencedRelation: "zones"; referencedColumns: ["id"] }
+        ];
+      };
+      zone_snapshots: {
+        Row: {
+          id: string;
+          site_id: string;
+          zone_id: string | null;
+          zone_name: string;
+          status: string;
+          composite_score: number;
+          primary_risk: string | null;
+          secondary_risk: string | null;
+          ticket_count: number;
+          obligation_count: number;
+          oos_count: number;
+          snapped_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          zone_id?: string | null;
+          zone_name: string;
+          status: string;
+          composite_score?: number;
+          primary_risk?: string | null;
+          secondary_risk?: string | null;
+          ticket_count?: number;
+          obligation_count?: number;
+          oos_count?: number;
+          snapped_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string;
+          zone_id?: string | null;
+          zone_name?: string;
+          status?: string;
+          composite_score?: number;
+          primary_risk?: string | null;
+          secondary_risk?: string | null;
+          ticket_count?: number;
+          obligation_count?: number;
+          oos_count?: number;
+          snapped_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "zone_snapshots_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] },
+          { foreignKeyName: "zone_snapshots_zone_id_fkey"; columns: ["zone_id"]; referencedRelation: "zones"; referencedColumns: ["id"] }
+        ];
+      };
+      asset_service_history: {
+        Row: {
+          id: string;
+          asset_id: string;
+          site_id: string;
+          service_type: string;
+          service_date: string;
+          description: string | null;
+          performed_by: string | null;
+          contractor_id: string | null;
+          cost: number | null;
+          next_service_due: string | null;
+          document_url: string | null;
+          equipment_repair_id: string | null;
+          maintenance_log_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          asset_id: string;
+          site_id: string;
+          service_type?: string;
+          service_date: string;
+          description?: string | null;
+          performed_by?: string | null;
+          contractor_id?: string | null;
+          cost?: number | null;
+          next_service_due?: string | null;
+          document_url?: string | null;
+          equipment_repair_id?: string | null;
+          maintenance_log_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          asset_id?: string;
+          site_id?: string;
+          service_type?: string;
+          service_date?: string;
+          description?: string | null;
+          performed_by?: string | null;
+          contractor_id?: string | null;
+          cost?: number | null;
+          next_service_due?: string | null;
+          document_url?: string | null;
+          equipment_repair_id?: string | null;
+          maintenance_log_id?: string | null;
+        };
+        Relationships: [
+          { foreignKeyName: "ash_asset_id_fkey"; columns: ["asset_id"]; referencedRelation: "equipment"; referencedColumns: ["id"] },
+          { foreignKeyName: "ash_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] }
+        ];
       };
     };
     Views: Record<string, never>;
