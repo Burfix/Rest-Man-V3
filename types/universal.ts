@@ -264,6 +264,7 @@ export interface ZoneSummary {
   oos_assets: number;
   active_event_conflicts: number;
   primary_risk: string | null;
+  secondary_risk?: string | null;
   last_computed_at: string | null;
 }
 

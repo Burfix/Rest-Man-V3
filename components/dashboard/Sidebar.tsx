@@ -32,6 +32,7 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/compliance",  label: "Compliance",    icon: "📋" },
       { href: "/dashboard/maintenance", label: "Maintenance",   icon: "🔧" },
       { href: "/dashboard/operations",  label: "Daily Ops",     icon: "📊" },
+      { href: "/dashboard/heatmap",     label: "Zone Heatmap",  icon: "🗺️" },
       { href: "#",                      label: "Incidents",     icon: "🚨", soon: true },
       { href: "#",                      label: "Audit Actions", icon: "✅", soon: true },
     ],
