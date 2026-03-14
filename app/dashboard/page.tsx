@@ -15,20 +15,15 @@ import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getActiveAlerts } from "@/services/alerts/engine";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 
-import AlertsSection from "@/components/dashboard/ops/AlertsSection";
-import FreshnessBar from "@/components/dashboard/ops/FreshnessBar";
+import FreshnessBar         from "@/components/dashboard/ops/FreshnessBar";
 import OperationalAlertsPanel from "@/components/dashboard/ops/OperationalAlertsPanel";
-
-import CommandStatusBar        from "@/components/dashboard/ops/CommandStatusBar";
-import PrimaryKpiCards         from "@/components/dashboard/ops/PrimaryKpiCards";
-import AttentionPanel          from "@/components/dashboard/ops/AttentionPanel";
-import TodayOpsPanel           from "@/components/dashboard/ops/TodayOpsPanel";
-import MaintenanceBoardPreview from "@/components/dashboard/ops/MaintenanceBoardPreview";
-import ComplianceTimeline      from "@/components/dashboard/ops/ComplianceTimeline";
-import SecondaryInsights       from "@/components/dashboard/SecondaryInsights";
+import CommandStatusBar     from "@/components/dashboard/ops/CommandStatusBar";
+import PrimaryKpiCards      from "@/components/dashboard/ops/PrimaryKpiCards";
+import TodayOpsPanel        from "@/components/dashboard/ops/TodayOpsPanel";
+import OperationalHealth    from "@/components/dashboard/ops/OperationalHealth";
+import SecondaryInsights    from "@/components/dashboard/SecondaryInsights";
 
 import {
-  buildPriorityActions,
   getServicePeriod,
 } from "@/lib/commandCenter";
 
@@ -156,19 +151,10 @@ export default async function OperationsDashboard() {
   // ─── Command Center computations ────────────────────────────────────────
   const today_iso      = todayISO();
   const servicePeriod  = getServicePeriod("Africa/Johannesburg");
-  const actions        = buildPriorityActions({
-    compliance: complianceSummary,
-    maintenance,
-    forecast,
-    dailyOps,
-    reviews,
-    events,
-    today: today_iso,
-  });
 
   return (
-    <div className="space-y-6">
-      {/* ── Command Status Bar ── */}
+    <div className="space-y-5">
+      {/* ── 1. Command Header ── */}
       <CommandStatusBar
         date={today_iso}
         servicePeriod={servicePeriod}
@@ -181,7 +167,7 @@ export default async function OperationsDashboard() {
         opsAlerts={opsAlerts}
       />
 
-      {/* ── Data freshness bar ── */}
+      {/* ── 2. System Freshness Row ── */}
       {freshness && <FreshnessBar freshness={freshness} />}
 
       {/* ── DB errors (non-fatal) ── */}
@@ -196,13 +182,10 @@ export default async function OperationsDashboard() {
         </div>
       )}
 
-      {/* ── Operational Alerts ── */}
+      {/* ── 3. Critical Alerts ── */}
       <OperationalAlertsPanel initialAlerts={opsAlerts} />
 
-      {/* ── Priority Alerts ── */}
-      <AlertsSection alerts={alerts} />
-
-      {/* ── Primary KPI Cards ── */}
+      {/* ── 4. Primary Control Grid (Compliance + Maintenance) ── */}
       <PrimaryKpiCards
         compliance={complianceSummary}
         maintenance={maintenance}
@@ -213,25 +196,25 @@ export default async function OperationsDashboard() {
         date={today_iso}
       />
 
-      {/* ── Attention Panel ── */}
-      <AttentionPanel actions={actions} />
+      {/* ── 5. Secondary Operations Grid ── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <TodayOpsPanel
+          today={today}
+          events={events}
+          dailyOps={dailyOps}
+          maintenance={maintenance}
+          date={today_iso}
+          forecast={forecast}
+        />
+        <OperationalHealth
+          compliance={complianceSummary}
+          maintenance={maintenance}
+          forecast={forecast}
+          reviews={reviews}
+        />
+      </div>
 
-      {/* ── Today's Operations Panel ── */}
-      <TodayOpsPanel
-        today={today}
-        events={events}
-        dailyOps={dailyOps}
-        maintenance={maintenance}
-        date={today_iso}
-      />
-
-      {/* ── Maintenance Board Preview ── */}
-      <MaintenanceBoardPreview maintenance={maintenance} />
-
-      {/* ── Compliance Timeline ── */}
-      <ComplianceTimeline compliance={complianceSummary} />
-
-      {/* ── Secondary Intelligence ── */}
+      {/* ── Secondary Intelligence (below fold) ── */}
       <SecondaryInsights
         reviews={reviews}
         sales={sales}

@@ -3,16 +3,11 @@
 /**
  * OperationalAlertsPanel
  *
- * Client component — displays active operational alerts with severity colour
- * coding, recommendation text, timestamp, and an inline resolve button.
+ * Linear-style flat list of active operational alerts.
+ * Each row: severity badge · type label · message · timestamp · CTA button
  *
- * Props:
- *   initialAlerts — pre-fetched on the server; hydrated immediately.
- *
- * UX:
- *   • Resolving an alert calls POST /api/alerts/[id]/resolve,
- *     then optimistically removes it from the local list.
- *   • Critical/high alerts render with a pulsing attention dot.
+ * No colored card backgrounds — severity conveyed via left accent border,
+ * badge colour, and text colour only.
  */
 
 import { useState, useTransition } from "react";
@@ -28,62 +23,53 @@ interface Props {
 
 const SEVERITY: Record<
   OperationalAlertSeverity,
-  { card: string; badge: string; dot: string; label: string; pulse: boolean }
+  { accent: string; badge: string; badgeText: string; label: string; pulse: boolean }
 > = {
   critical: {
-    card:  "border-red-300 bg-red-50",
-    badge: "bg-red-600 text-white",
-    dot:   "bg-red-600",
-    label: "CRITICAL",
-    pulse: true,
+    accent:    "border-l-red-600",
+    badge:     "bg-red-600 text-white",
+    badgeText: "Critical",
+    label:     "Critical",
+    pulse:     true,
   },
   high: {
-    card:  "border-red-200 bg-red-50",
-    badge: "bg-red-100 text-red-700 ring-1 ring-red-300",
-    dot:   "bg-red-500",
-    label: "HIGH",
-    pulse: true,
+    accent:    "border-l-red-400",
+    badge:     "bg-red-100 text-red-700 ring-1 ring-red-200",
+    badgeText: "High",
+    label:     "High",
+    pulse:     true,
   },
   medium: {
-    card:  "border-amber-200 bg-amber-50",
-    badge: "bg-amber-100 text-amber-700 ring-1 ring-amber-300",
-    dot:   "bg-amber-500",
-    label: "MEDIUM",
-    pulse: false,
+    accent:    "border-l-amber-400",
+    badge:     "bg-amber-100 text-amber-700 ring-1 ring-amber-200",
+    badgeText: "Medium",
+    label:     "Medium",
+    pulse:     false,
   },
   low: {
-    card:  "border-stone-200 bg-stone-50",
-    badge: "bg-stone-100 text-stone-600 ring-1 ring-stone-200",
-    dot:   "bg-stone-400",
-    label: "LOW",
-    pulse: false,
+    accent:    "border-l-stone-300",
+    badge:     "bg-stone-100 text-stone-500 ring-1 ring-stone-200",
+    badgeText: "Low",
+    label:     "Low",
+    pulse:     false,
   },
 };
 
-const TYPE_ICON: Record<OperationalAlert["alert_type"], string> = {
-  revenue_risk:                "📉",
-  labor_cost_risk:             "💰",
-  margin_risk:                 "📊",
-  maintenance_risk:            "🔧",
-  reputation_risk:             "⭐",
-  compliance_expired:          "📋",
-  compliance_due_soon:         "📋",
-  equipment_warranty_expiring: "🛡️",
-  equipment_service_due:       "🔧",
-  equipment_overdue_attention: "⚠️",
-};
-
-const TYPE_LABEL: Record<OperationalAlert["alert_type"], string> = {
-  revenue_risk:                "Revenue Risk",
-  labor_cost_risk:             "Labor Cost Risk",
-  margin_risk:                 "Margin Risk",
-  maintenance_risk:            "Maintenance Risk",
-  reputation_risk:             "Reputation Risk",
-  compliance_expired:          "Compliance Expired",
-  compliance_due_soon:         "Compliance Due Soon",
-  equipment_warranty_expiring: "Warranty Expiring",
-  equipment_service_due:       "Service Due",
-  equipment_overdue_attention: "Equipment Overdue",
+// Map alert type → human-readable title + specific CTA text
+const TYPE_CONFIG: Record<
+  OperationalAlert["alert_type"],
+  { title: string; cta: string; href: string }
+> = {
+  compliance_expired:          { title: "Certificate expired",        cta: "View compliance →",  href: "/dashboard/compliance" },
+  compliance_due_soon:         { title: "Certificate due soon",       cta: "View compliance →",  href: "/dashboard/compliance" },
+  maintenance_risk:            { title: "Maintenance risk",           cta: "Open ticket →",      href: "/dashboard/maintenance" },
+  equipment_warranty_expiring: { title: "Warranty expiring",          cta: "Inspect issue →",    href: "/dashboard/maintenance" },
+  equipment_service_due:       { title: "Service due",                cta: "Inspect issue →",    href: "/dashboard/maintenance" },
+  equipment_overdue_attention: { title: "Equipment overdue",          cta: "Inspect issue →",    href: "/dashboard/maintenance" },
+  revenue_risk:                { title: "Revenue risk",               cta: "Review targets →",   href: "/dashboard/settings/targets" },
+  labor_cost_risk:             { title: "Labour cost elevated",       cta: "Review ops →",       href: "/dashboard/operations" },
+  margin_risk:                 { title: "Margin risk",                cta: "Review ops →",       href: "/dashboard/operations" },
+  reputation_risk:             { title: "Reputation risk",            cta: "Review items →",     href: "/dashboard/reviews" },
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -113,69 +99,51 @@ export default function OperationalAlertsPanel({ initialAlerts }: Props) {
   const critical = alerts.filter((a) => a.severity === "critical").length;
   const high     = alerts.filter((a) => a.severity === "high").length;
 
+  if (alerts.length === 0) return null;
+
   return (
     <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
       {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-5 py-4">
+      <div className="flex items-center justify-between gap-3 border-b border-stone-100 px-5 py-3">
         <div className="flex items-center gap-2">
-          <span className="text-base leading-none">🚦</span>
-          <div>
-            <h2 className="text-sm font-bold text-stone-900">
-              Operational Alerts
-            </h2>
-            <p className="text-[10px] text-stone-400">
-              Automated threshold monitoring
-            </p>
-          </div>
+          <h2 className="text-xs font-semibold text-stone-900">Active Alerts</h2>
+          <span className="rounded-full bg-stone-100 px-2 py-px text-[10px] font-semibold text-stone-600 tabular-nums">
+            {alerts.length}
+          </span>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex items-center gap-2">
           {critical > 0 && (
-            <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-              {critical} CRITICAL
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-px text-[10px] font-semibold text-white">
+              <span className="h-1 w-1 rounded-full bg-white animate-pulse" />
+              {critical} critical
             </span>
           )}
           {high > 0 && (
-            <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-[10px] font-semibold text-red-700 ring-1 ring-red-200">
-              {high} HIGH
-            </span>
-          )}
-          {alerts.length === 0 && (
-            <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[10px] font-semibold text-green-700">
-              ✓ All clear
+            <span className="rounded-full bg-red-100 px-2 py-px text-[10px] font-semibold text-red-700 ring-1 ring-red-200">
+              {high} high
             </span>
           )}
         </div>
       </div>
 
-      {/* Alerts list */}
-      {alerts.length === 0 ? (
-        <div className="px-5 py-8 text-center">
-          <p className="text-sm font-medium text-green-700">
-            ✓ No active operational alerts
-          </p>
-          <p className="mt-1 text-xs text-stone-400">
-            All systems within normal thresholds.
-          </p>
-        </div>
-      ) : (
-        <div className="divide-y divide-stone-100">
-          {alerts.map((alert) => (
-            <AlertCard
-              key={alert.id}
-              alert={alert}
-              resolving={resolvingId === alert.id}
-              onResolve={handleResolve}
-            />
-          ))}
-        </div>
-      )}
+      {/* Alert rows */}
+      <div className="divide-y divide-stone-100">
+        {alerts.map((alert) => (
+          <AlertRow
+            key={alert.id}
+            alert={alert}
+            resolving={resolvingId === alert.id}
+            onResolve={handleResolve}
+          />
+        ))}
+      </div>
     </section>
   );
 }
 
-// ── AlertCard ─────────────────────────────────────────────────────────────────
+// ── AlertRow ──────────────────────────────────────────────────────────────────
 
-function AlertCard({
+function AlertRow({
   alert,
   resolving,
   onResolve,
@@ -184,86 +152,76 @@ function AlertCard({
   resolving: boolean;
   onResolve: (id: string) => void;
 }) {
-  const cfg = SEVERITY[alert.severity];
+  const cfg     = SEVERITY[alert.severity];
+  const typeCfg = TYPE_CONFIG[alert.alert_type] ?? {
+    title: alert.alert_type.replace(/_/g, " "),
+    cta:   "View →",
+    href:  "#",
+  };
 
   return (
-    <div className={cn("px-5 py-4", cfg.card)}>
-      <div className="flex items-start gap-3">
-        {/* Attention dot */}
-        <div className="mt-1 flex-shrink-0">
-          <span
-            className={cn(
-              "block h-2 w-2 rounded-full",
-              cfg.dot,
-              cfg.pulse && "animate-pulse"
-            )}
-          />
-        </div>
+    <div
+      className={cn(
+        "flex items-start gap-3 border-l-2 px-5 py-3.5 hover:bg-stone-50 transition-colors",
+        cfg.accent
+      )}
+    >
+      {/* Severity badge */}
+      <span
+        className={cn(
+          "mt-px shrink-0 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wider leading-none",
+          cfg.badge
+        )}
+      >
+        {cfg.label}
+        {cfg.pulse && (
+          <span className="ml-1 inline-block h-1 w-1 rounded-full bg-current align-middle opacity-80 animate-pulse" />
+        )}
+      </span>
 
-        {/* Icon + content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2 mb-1">
-            <span className="text-sm leading-none">
-              {TYPE_ICON[alert.alert_type]}
-            </span>
-            <span
-              className={cn(
-                "rounded px-1.5 py-0.5 text-[9px] font-bold leading-none tracking-wider uppercase",
-                cfg.badge
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-stone-800 leading-tight">
+              {typeCfg.title}
+              {alert.location && (
+                <span className="font-normal text-stone-500"> · {alert.location}</span>
               )}
-            >
-              {cfg.label}
-            </span>
-            <span className="text-xs font-semibold text-stone-700">
-              {TYPE_LABEL[alert.alert_type]}
-            </span>
-            {alert.location && (
-              <span className="text-[10px] text-stone-400">
-                · {alert.location}
-              </span>
-            )}
+            </p>
+            <p className="mt-0.5 text-[11px] text-stone-500 leading-snug line-clamp-2">
+              {alert.message}
+            </p>
           </div>
 
-          {/* Message */}
-          <p className="text-sm text-stone-800 leading-snug">{alert.message}</p>
-
-          {/* Recommendation */}
-          {alert.recommendation && (
-            <div className="mt-2 flex items-start gap-1.5">
-              <span className="text-[11px] font-semibold text-stone-500 shrink-0 mt-0.5">
-                REC:
-              </span>
-              <p className="text-[11px] text-stone-600 leading-relaxed">
-                {alert.recommendation}
-              </p>
-            </div>
-          )}
-
-          {/* Footer: timestamp + resolve button */}
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <time
-              className="text-[10px] text-stone-400"
-              dateTime={alert.created_at}
+          {/* Actions */}
+          <div className="flex items-center gap-1.5 shrink-0 mt-px">
+            <a
+              href={typeCfg.href}
+              className="text-[11px] font-medium text-stone-600 hover:text-stone-900 whitespace-nowrap transition-colors"
             >
-              {formatDistanceToNowStrict(parseISO(alert.created_at), {
-                addSuffix: true,
-              })}
-            </time>
-
+              {typeCfg.cta}
+            </a>
+            <span className="text-stone-300">·</span>
             <button
               onClick={() => onResolve(alert.id)}
               disabled={resolving}
               className={cn(
-                "rounded-md border px-3 py-1 text-xs font-semibold transition-colors",
+                "text-[11px] font-medium whitespace-nowrap transition-colors",
                 resolving
-                  ? "border-stone-200 bg-stone-100 text-stone-400 cursor-not-allowed"
-                  : "border-stone-300 bg-white text-stone-600 hover:border-stone-400 hover:text-stone-900"
+                  ? "text-stone-300 cursor-not-allowed"
+                  : "text-stone-400 hover:text-stone-700"
               )}
             >
-              {resolving ? "Resolving…" : "Mark resolved"}
+              {resolving ? "Resolving…" : "Dismiss"}
             </button>
           </div>
         </div>
+
+        {/* Timestamp */}
+        <time className="mt-1 block text-[10px] text-stone-400" dateTime={alert.created_at}>
+          {formatDistanceToNowStrict(parseISO(alert.created_at), { addSuffix: true })}
+        </time>
       </div>
     </div>
   );

@@ -1,17 +1,16 @@
 /**
  * CommandStatusBar
  *
- * Full-width command status bar.
+ * Full-width command status bar — OS-style horizontal header.
  * Row 1 — venue identity + service period + date + live alert count
- * Row 2 — 5 status cells: Compliance · Maintenance · Revenue · Staff · Events
+ * Row 2 — 5 compact status columns: Compliance · Maintenance · Revenue · Staff · Events
  *
- * Each cell shows icon, label, key metric, and a severity chip.
- * Cells with risk are highlighted in red; warnings in amber.
+ * Each column shows a primary metric (large) + one supporting status line.
+ * No colored cell backgrounds — status conveyed purely through typography and dots.
  */
 
 import Link from "next/link";
 import { cn, formatCurrency } from "@/lib/utils";
-import StatusChip from "@/components/ui/StatusChip";
 import type { StatusVariant } from "@/components/ui/StatusChip";
 import type {
   ComplianceSummary,
@@ -53,14 +52,12 @@ function fmtDate(iso: string): string {
 // ── Status cell configs ───────────────────────────────────────────────────────
 
 interface StatusCell {
-  id:       string;
-  icon:     string;
-  label:    string;
-  metric:   string;
-  chip:     string;
-  variant:  StatusVariant;
-  href:     string;
-  bg?:      string;
+  id:      string;
+  label:   string;
+  metric:  string;   // primary value shown large
+  support: string;   // one-line support / status text
+  variant: StatusVariant;
+  href:    string;
 }
 
 function buildCells(
@@ -76,82 +73,82 @@ function buildCells(
   const compVar: StatusVariant =
     compliance.expired > 0   ? "critical" :
     compliance.due_soon > 0  ? "warning"  : "ok";
-  const compChip =
-    compliance.expired > 0
-      ? `${compliance.expired} expired`
-      : compliance.due_soon > 0
-      ? `${compliance.due_soon} due soon`
-      : `${compliance.compliance_pct}% compliant`;
   const compMetric =
-    compliance.total > 0
-      ? `${compliance.compliance_pct}% compliant`
-      : "No records";
+    compliance.total > 0 ? `${compliance.compliance_pct}%` : "—";
+  const compSupport =
+    compliance.expired > 0  ? `${compliance.expired} certificate${compliance.expired > 1 ? "s" : ""} expired` :
+    compliance.due_soon > 0 ? `${compliance.due_soon} due within 30d` :
+    compliance.total > 0    ? "All current" :
+    "No records";
 
   // ── Maintenance ───────────────────────────────────────────────────────────
   const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
   const maintVar: StatusVariant =
     maintenance.outOfService > 0 ? "critical" :
     totalOpen > 0               ? "warning"  : "ok";
-  const maintChip =
+  const maintMetric =
+    maintenance.totalEquipment > 0 ? `${totalOpen} open` : "—";
+  const maintSupport =
     maintenance.outOfService > 0
       ? `${maintenance.outOfService} out of service`
       : totalOpen > 0
-      ? `${totalOpen} open issue${totalOpen > 1 ? "s" : ""}`
-      : "All operational";
-  const maintMetric =
-    maintenance.totalEquipment > 0
-      ? `${maintenance.totalEquipment} unit${maintenance.totalEquipment > 1 ? "s" : ""}`
+      ? `${maintenance.totalEquipment} units tracked`
+      : maintenance.totalEquipment > 0
+      ? "All operational"
       : "No equipment";
 
   // ── Revenue ───────────────────────────────────────────────────────────────
-  const gapPct  = forecast?.sales_gap_pct ?? null;
+  const gapPct = forecast?.sales_gap_pct ?? null;
   const revVar: StatusVariant =
-    !forecast                 ? "neutral" :
-    (gapPct ?? 0) < -20       ? "critical" :
-    (gapPct ?? 0) < 0         ? "warning"  : "ok";
-  const revChip =
-    !forecast
-      ? "No forecast"
-      : gapPct != null && gapPct < 0
-      ? `▼ ${Math.abs(gapPct).toFixed(1)}% vs target`
-      : gapPct != null && gapPct >= 0
-      ? `▲ on target`
-      : "Target not set";
-  const revMetric = forecast
-    ? formatCurrency(forecast.forecast_sales)
-    : "No data";
+    !forecast           ? "neutral" :
+    (gapPct ?? 0) < -20 ? "critical" :
+    (gapPct ?? 0) < 0   ? "warning"  : "ok";
+  const revMetric = forecast ? formatCurrency(forecast.forecast_sales) : "—";
+  const revSupport =
+    !forecast                ? "No forecast set" :
+    gapPct != null && gapPct < 0
+      ? `▼ ${Math.abs(gapPct).toFixed(1)}% below target` :
+    gapPct != null
+      ? "On track" :
+    "Target not set";
 
   // ── Staff ─────────────────────────────────────────────────────────────────
   const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
   const staffVar: StatusVariant =
-    laborPct == null        ? "neutral"  :
-    laborPct > 45           ? "critical" :
-    laborPct > 35           ? "warning"  : "ok";
-  const staffChip =
-    laborPct != null ? `${laborPct.toFixed(1)}% labour` : "No data";
+    laborPct == null  ? "neutral"  :
+    laborPct > 45     ? "critical" :
+    laborPct > 35     ? "warning"  : "ok";
   const staffMetric =
-    laborPct != null ? `${laborPct.toFixed(1)}% labour cost` : "Upload ops report";
+    laborPct != null ? `${laborPct.toFixed(1)}%` : `${today.total} bkgs`;
+  const staffSupport =
+    laborPct != null
+      ? "labour cost"
+      : today.total > 0
+      ? `${today.totalCovers} covers today`
+      : "Upload ops report";
 
   // ── Events ────────────────────────────────────────────────────────────────
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
   const eventVar: StatusVariant =
-    todayEvent ? "info" :
+    todayEvent      ? "info" :
     today.total > 0 ? "neutral" : "muted";
-  const eventChip =
-    todayEvent   ? todayEvent.name.slice(0, 18) + (todayEvent.name.length > 18 ? "…" : "") :
-    today.total > 0 ? `${today.total} bookings` :
-    "No events";
   const eventMetric =
     todayEvent
-      ? `${today.total} bookings + event`
-      : `${today.total} booking${today.total !== 1 ? "s" : ""}`;
+      ? todayEvent.name.slice(0, 16) + (todayEvent.name.length > 16 ? "…" : "")
+      : `${today.total} bookings`;
+  const eventSupport =
+    todayEvent
+      ? `${today.total} booking${today.total !== 1 ? "s" : ""} today`
+      : today.total > 0
+      ? `${today.totalCovers} covers`
+      : "No events today";
 
   return [
-    { id: "compliance",  icon: "📋", label: "Compliance",  metric: compMetric,   chip: compChip,   variant: compVar,  href: "/dashboard/compliance" },
-    { id: "maintenance", icon: "🔧", label: "Maintenance", metric: maintMetric,  chip: maintChip,  variant: maintVar, href: "/dashboard/maintenance" },
-    { id: "revenue",     icon: "📈", label: "Revenue",     metric: revMetric,    chip: revChip,    variant: revVar,   href: "/dashboard/settings/targets" },
-    { id: "staff",       icon: "👥", label: "Staff",       metric: staffMetric,  chip: staffChip,  variant: staffVar, href: "/dashboard/operations" },
-    { id: "events",      icon: "🎉", label: "Events",      metric: eventMetric,  chip: eventChip,  variant: eventVar, href: "/dashboard/events" },
+    { id: "compliance",  label: "Compliance",  metric: compMetric,  support: compSupport,  variant: compVar,  href: "/dashboard/compliance" },
+    { id: "maintenance", label: "Maintenance", metric: maintMetric, support: maintSupport, variant: maintVar, href: "/dashboard/maintenance" },
+    { id: "revenue",     label: "Revenue",     metric: revMetric,   support: revSupport,   variant: revVar,   href: "/dashboard/settings/targets" },
+    { id: "staff",       label: "Staff",       metric: staffMetric, support: staffSupport, variant: staffVar, href: "/dashboard/operations" },
+    { id: "events",      label: "Events",      metric: eventMetric, support: eventSupport, variant: eventVar, href: "/dashboard/events" },
   ];
 }
 
@@ -179,84 +176,97 @@ export default function CommandStatusBar({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-white overflow-hidden shadow-sm",
+        "rounded-xl border bg-white overflow-hidden",
         hasRisk ? "border-red-200" : "border-stone-200"
       )}
     >
-      {/* ── Row 1: Identity + date + alerts ──────────────────────────── */}
+      {/* ── Row 1: Identity + period + date + alerts ──────────────────── */}
       <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-stone-100">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="hidden sm:flex h-7 w-7 items-center justify-center rounded-lg bg-stone-900 shrink-0">
-            <span className="text-xs text-white font-bold">OE</span>
+          <div className="hidden sm:flex h-6 w-6 items-center justify-center rounded-md bg-stone-900 shrink-0">
+            <span className="text-[10px] text-white font-bold tracking-tight">OE</span>
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex items-center gap-2">
             <p className="text-sm font-semibold text-stone-900 leading-none truncate">
               Ops Engine
             </p>
-            <p className="text-[11px] text-stone-400 mt-px leading-none">
-              Operations Dashboard
+            <span className="text-stone-300 text-xs hidden sm:inline">·</span>
+            <p className="hidden sm:block text-xs text-stone-500 leading-none truncate">
+              Operations Command
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           {/* Service period */}
-          <span className="hidden sm:inline-flex rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-semibold text-stone-700">
+          <span className="hidden sm:inline-flex items-center rounded-full border border-stone-200 px-2.5 py-0.5 text-[11px] font-medium text-stone-600 bg-stone-50">
             {servicePeriod}
           </span>
+          {/* Separator */}
+          <span className="hidden md:inline text-stone-300 text-xs">·</span>
           {/* Date */}
-          <span className="hidden md:inline text-xs text-stone-500">
+          <span className="hidden md:inline text-[11px] text-stone-500">
             {fmtDate(date)}
           </span>
-          {/* Alert count */}
+          {/* Alert pill */}
           {activeAlerts > 0 && (
             <span
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold",
+                "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold",
                 criticalCount > 0
                   ? "bg-red-600 text-white"
                   : "bg-amber-500 text-white"
               )}
             >
-              🔔 {activeAlerts}
+              ● {activeAlerts} alert{activeAlerts > 1 ? "s" : ""}
             </span>
           )}
         </div>
       </div>
 
-      {/* ── Row 2: Status cells ───────────────────────────────────────── */}
+      {/* ── Row 2: 5 status columns ───────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y divide-stone-100">
         {cells.map((cell) => {
           const isCritical = cell.variant === "critical";
           const isWarning  = cell.variant === "warning";
+          const isOk       = cell.variant === "ok";
+
+          const metricColor =
+            isCritical ? "text-red-700" :
+            isWarning  ? "text-amber-700" :
+            isOk       ? "text-emerald-700" :
+            "text-stone-800";
+
+          const supportColor =
+            isCritical ? "text-red-500" :
+            isWarning  ? "text-amber-600" :
+            isOk       ? "text-emerald-600" :
+            "text-stone-400";
+
+          const dot =
+            isCritical ? "bg-red-500" :
+            isWarning  ? "bg-amber-400" :
+            isOk       ? "bg-emerald-400" :
+            "bg-stone-300";
 
           return (
             <Link
               key={cell.id}
               href={cell.href}
-              className={cn(
-                "flex flex-col gap-1.5 px-4 py-3 transition-colors hover:bg-stone-50 group",
-                isCritical && "bg-red-50/50 hover:bg-red-50",
-                isWarning  && "bg-amber-50/30 hover:bg-amber-50/60"
-              )}
+              className="flex flex-col gap-1 px-4 py-3.5 hover:bg-stone-50 transition-colors group"
             >
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm">{cell.icon}</span>
-                <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 group-hover:text-stone-600">
-                  {cell.label}
-                </span>
-              </div>
-              <p className={cn(
-                "text-xs font-semibold leading-snug truncate",
-                isCritical ? "text-red-800" :
-                isWarning  ? "text-amber-800" :
-                "text-stone-700"
-              )}>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 group-hover:text-stone-500">
+                {cell.label}
+              </span>
+              <p className={cn("text-sm font-bold leading-tight tabular-nums truncate", metricColor)}>
                 {cell.metric}
               </p>
-              <StatusChip variant={cell.variant} size="xs" dot>
-                {cell.chip}
-              </StatusChip>
+              <div className="flex items-center gap-1.5">
+                <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", dot)} />
+                <span className={cn("text-[11px] leading-none truncate", supportColor)}>
+                  {cell.support}
+                </span>
+              </div>
             </Link>
           );
         })}

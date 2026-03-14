@@ -1,22 +1,18 @@
 /**
- * TodayOpsPanel — Today's Operating Context
+ * TodayOpsPanel — "Today at Venue" compact card
  *
- * Compact two-column panel showing:
- * Left:  Lunch service / Dinner service breakdown
- * Right: Events tonight + operational highlights
- *
- * Plus a row of "operational notes" derived from live data.
+ * Left card of the secondary operations grid.
+ * Compact rows: Lunch · Dinner · Event · Labour cost · Escalations
  */
 
 import Link from "next/link";
 import { cn, formatCurrency } from "@/lib/utils";
-import StatusChip from "@/components/ui/StatusChip";
 import type {
   TodayBookingsSummary,
   VenueEvent,
   DailyOperationsDashboardSummary,
-  DailyOperationsReport,
   MaintenanceSummary,
+  RevenueForecast,
 } from "@/types";
 
 interface Props {
@@ -25,6 +21,7 @@ interface Props {
   dailyOps:    DailyOperationsDashboardSummary;
   maintenance: MaintenanceSummary;
   date:        string; // YYYY-MM-DD
+  forecast?:   RevenueForecast | null;
 }
 
 function fmtTime(time: string): string {
@@ -33,16 +30,39 @@ function fmtTime(time: string): string {
   return `${h % 12 || 12}:${String(m ?? 0).padStart(2, "0")}${ampm}`;
 }
 
+// A single compact data row
+function Row({
+  label,
+  value,
+  valueColor = "text-stone-800",
+  sub,
+}: {
+  label:       string;
+  value:       string;
+  valueColor?: string;
+  sub?:        string;
+}) {
+  return (
+    <div className="flex items-center justify-between py-2.5 border-b border-stone-100 last:border-0">
+      <span className="text-[11px] font-medium text-stone-500">{label}</span>
+      <div className="text-right">
+        <span className={cn("text-xs font-semibold", valueColor)}>{value}</span>
+        {sub && <p className="text-[10px] text-stone-400 leading-none mt-px">{sub}</p>}
+      </div>
+    </div>
+  );
+}
+
 export default function TodayOpsPanel({
   today,
   events,
   dailyOps,
   maintenance,
   date,
+  forecast,
 }: Props) {
-  const todayEvent    = events.find((e) => e.event_date === date && !e.cancelled);
-  const nextEvent     = events.find((e) => e.event_date > date && !e.cancelled);
-  const report        = dailyOps.latestReport;
+  const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
+  const report     = dailyOps.latestReport;
 
   // Split bookings by service period
   const lunchBkgs  = today.bookings.filter((b) => {
@@ -56,261 +76,94 @@ export default function TodayOpsPanel({
   const lunchCovers  = lunchBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
   const dinnerCovers = dinnerBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
 
-  // Derive operational notes from real data
-  const notes: { text: string; severity: "red" | "amber" | "green" | "blue" }[] = [];
+  const laborPct   = report?.labor_cost_percent ?? null;
+  const laborColor =
+    laborPct == null   ? "text-stone-400" :
+    laborPct > 45      ? "text-red-600"   :
+    laborPct > 35      ? "text-amber-600" :
+    "text-emerald-700";
 
-  if (maintenance.outOfService > 0) {
-    const unit = maintenance.urgentIssues.find((i) => i.repair_status === "open");
-    notes.push({
-      text:     `${maintenance.outOfService} equipment unit${maintenance.outOfService > 1 ? "s" : ""} out of service${unit ? ` — ${unit.unit_name}` : ""}`,
-      severity: "red",
-    });
-  }
-  if (today.escalationsToday > 0) {
-    notes.push({
-      text:     `${today.escalationsToday} booking escalation${today.escalationsToday > 1 ? "s" : ""} require manager attention`,
-      severity: "red",
-    });
-  }
-  if (todayEvent) {
-    notes.push({
-      text:     `Event tonight: ${todayEvent.name}${todayEvent.start_time ? ` at ${fmtTime(todayEvent.start_time)}` : ""}. Brief front-of-house before service.`,
-      severity: "blue",
-    });
-  }
-  if (today.largeBookings > 0) {
-    notes.push({
-      text:     `${today.largeBookings} large group booking${today.largeBookings > 1 ? "s" : ""} — confirm seating arrangements.`,
-      severity: "amber",
-    });
-  }
-  if (report?.labor_cost_percent != null && report.labor_cost_percent > 35) {
-    notes.push({
-      text:     `Labour cost at ${report.labor_cost_percent.toFixed(1)}% — review shift coverage before service.`,
-      severity: "amber",
-    });
-  }
-  if (!report) {
-    notes.push({
-      text:     "Daily operations report not uploaded — labour and margin data unavailable.",
-      severity: "amber",
-    });
-  }
-  if (report && notes.filter((n) => n.severity === "red" || n.severity === "amber").length === 0) {
-    notes.push({
-      text:     "All systems normal. No operational issues flagged.",
-      severity: "green",
-    });
-  }
+  // Revenue walk-in need
+  const walkIn     = forecast?.sales_gap != null && forecast.sales_gap < 0
+    ? Math.abs(forecast.sales_gap)
+    : null;
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+    <div className="flex flex-col rounded-xl border border-stone-200 bg-white overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-stone-100 bg-stone-50">
-        <div className="flex items-center gap-2.5">
-          <span className="text-sm">📋</span>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-stone-700">
-            Today&apos;s Operations
-          </span>
-        </div>
-        <Link href="/dashboard/bookings" className="text-xs text-stone-400 hover:text-stone-700">
-          Full view →
+      <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100">
+        <h2 className="text-xs font-semibold text-stone-700">Today at Venue</h2>
+        <Link href="/dashboard/bookings" className="text-[11px] text-stone-400 hover:text-stone-700 transition-colors">
+          All bookings →
         </Link>
       </div>
 
-      <div className="p-5">
-        {/* ── Service periods + events grid ──────────────────────────── */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <ServicePeriodCell
-            title="Lunch Service"
-            range="12:00 – 15:00"
-            bookings={lunchBkgs.length}
-            covers={lunchCovers}
-            href="/dashboard/bookings"
+      {/* Rows */}
+      <div className="flex-1 px-5">
+        <Row
+          label="Lunch"
+          value={`${lunchBkgs.length} bookings`}
+          sub={`${lunchCovers} covers · 12:00–15:00`}
+          valueColor={lunchBkgs.length > 0 ? "text-stone-800" : "text-stone-400"}
+        />
+        <Row
+          label="Dinner"
+          value={`${dinnerBkgs.length} bookings`}
+          sub={`${dinnerCovers} covers · 18:00–22:00`}
+          valueColor={dinnerBkgs.length > 0 ? "text-stone-800" : "text-stone-400"}
+        />
+        <Row
+          label="Event tonight"
+          value={
+            todayEvent
+              ? todayEvent.name.slice(0, 22) + (todayEvent.name.length > 22 ? "…" : "")
+              : "None scheduled"
+          }
+          sub={
+            todayEvent?.start_time
+              ? `Starts ${fmtTime(todayEvent.start_time)}`
+              : undefined
+          }
+          valueColor={todayEvent ? "text-stone-800" : "text-stone-400"}
+        />
+        <Row
+          label="Labour cost"
+          value={laborPct != null ? `${laborPct.toFixed(1)}%` : "—"}
+          sub={laborPct != null ? "of revenue" : "Upload ops report"}
+          valueColor={laborColor}
+        />
+        {walkIn != null && (
+          <Row
+            label="Walk-in need"
+            value={formatCurrency(walkIn)}
+            sub="to hit today's target"
+            valueColor="text-amber-600"
           />
-          <ServicePeriodCell
-            title="Dinner Service"
-            range="18:00 – 22:00"
-            bookings={dinnerBkgs.length}
-            covers={dinnerCovers}
-            href="/dashboard/bookings"
-          />
-          <EventCell
-            title="Tonight's Event"
-            event={todayEvent ?? null}
-          />
-          <FinanceCell report={report} />
-        </div>
-
-        {/* ── Operational notes ─────────────────────────────────────── */}
-        <div className="mt-4 space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2">
-            Operational Notes
-          </p>
-          {notes.map((note, i) => (
-            <div
-              key={i}
-              className={cn(
-                "flex items-start gap-2 rounded-lg px-3 py-2",
-                note.severity === "red"   ? "bg-red-50" :
-                note.severity === "amber" ? "bg-amber-50" :
-                note.severity === "green" ? "bg-emerald-50" :
-                "bg-blue-50"
-              )}
-            >
-              <span className="shrink-0 mt-px">
-                {note.severity === "red"   ? "🔴" :
-                 note.severity === "amber" ? "⚠️" :
-                 note.severity === "green" ? "✅" : "ℹ️"}
-              </span>
-              <p className={cn(
-                "text-xs leading-relaxed",
-                note.severity === "red"   ? "text-red-800" :
-                note.severity === "amber" ? "text-amber-800" :
-                note.severity === "green" ? "text-emerald-800" :
-                "text-blue-800"
-              )}>
-                {note.text}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Sub-components ─────────────────────────────────────────────────────────────
-
-function ServicePeriodCell({
-  title,
-  range,
-  bookings,
-  covers,
-  href,
-}: {
-  title:    string;
-  range:    string;
-  bookings: number;
-  covers:   number;
-  href:     string;
-}) {
-  return (
-    <Link
-      href={href}
-      className="block rounded-lg border border-stone-100 bg-stone-50 px-4 py-3 hover:bg-stone-100 transition-colors group"
-    >
-      <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400 group-hover:text-stone-600">
-        {title}
-      </p>
-      <p className="text-[10px] text-stone-400 mt-px">{range}</p>
-      <div className="mt-3">
-        <p className="text-2xl font-bold text-stone-900 tabular-nums">{bookings}</p>
-        <p className="text-xs text-stone-500 mt-0.5">bookings · {covers} covers</p>
-      </div>
-      {bookings === 0 && (
-        <p className="mt-1 text-[10px] text-stone-300 italic">None booked</p>
-      )}
-    </Link>
-  );
-}
-
-function EventCell({ title, event }: { title: string; event: { name: string; start_time: string | null; end_time: string | null; is_special_event: boolean } | null }) {
-  return (
-    <div className={cn(
-      "rounded-lg border px-4 py-3",
-      event ? "border-purple-200 bg-purple-50" : "border-stone-100 bg-stone-50"
-    )}>
-      <p className={cn(
-        "text-[10px] font-bold uppercase tracking-wider",
-        event ? "text-purple-500" : "text-stone-400"
-      )}>
-        {title}
-      </p>
-      {event ? (
-        <>
-          <p className="mt-2 text-sm font-bold text-purple-900 leading-snug">{event.name}</p>
-          {event.start_time && (
-            <p className="text-xs text-purple-600 mt-1">
-              {fmtTime(event.start_time)}
-              {event.end_time ? ` – ${fmtTime(event.end_time)}` : ""}
-            </p>
-          )}
-          {event.is_special_event && (
-            <StatusChip variant="info" size="xs" className="mt-2">Special</StatusChip>
-          )}
-        </>
-      ) : (
-        <p className="mt-3 text-sm text-stone-400 italic">No events scheduled</p>
-      )}
-    </div>
-  );
-}
-
-function FinanceCell({ report }: { report: DailyOperationsReport | null }) {
-  const r = report;
-  if (!r) {
-    return (
-      <div className="rounded-lg border border-stone-100 bg-stone-50 px-4 py-3">
-        <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-          Labour &amp; Margin
-        </p>
-        <p className="mt-3 text-xs text-stone-300 italic">Upload daily ops report</p>
-      </div>
-    );
-  }
-
-  const labor  = r.labor_cost_percent;
-  const margin = r.margin_percent;
-
-  return (
-    <div className="rounded-lg border border-stone-100 bg-stone-50 px-4 py-3">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-stone-400">
-        Labour &amp; Margin
-      </p>
-      <div className="mt-2 space-y-1.5">
-        {labor != null && (
-          <div>
-            <div className="flex justify-between text-xs">
-              <span className="text-stone-500">Labour</span>
-              <span className={cn(
-                "font-bold",
-                labor > 45 ? "text-red-600" :
-                labor > 35 ? "text-amber-600" :
-                "text-emerald-600"
-              )}>
-                {labor.toFixed(1)}%
-              </span>
-            </div>
-            <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-stone-200">
-              <div
-                className={cn("h-1 rounded-full", labor > 45 ? "bg-red-500" : labor > 35 ? "bg-amber-400" : "bg-emerald-500")}
-                style={{ width: `${Math.min(labor, 100)}%` }}
-              />
-            </div>
-          </div>
         )}
-        {margin != null && (
-          <div>
-            <div className="flex justify-between text-xs">
-              <span className="text-stone-500">Margin</span>
-              <span className={cn(
-                "font-bold",
-                margin < 20 ? "text-red-600" :
-                margin < 35 ? "text-amber-600" :
-                "text-emerald-600"
-              )}>
-                {margin.toFixed(1)}%
-              </span>
-            </div>
-            <div className="mt-0.5 h-1 w-full overflow-hidden rounded-full bg-stone-200">
-              <div
-                className={cn("h-1 rounded-full", margin < 20 ? "bg-red-500" : margin < 35 ? "bg-amber-400" : "bg-emerald-500")}
-                style={{ width: `${Math.min(margin, 100)}%` }}
-              />
-            </div>
-          </div>
+        {today.escalationsToday > 0 && (
+          <Row
+            label="Escalations"
+            value={`${today.escalationsToday}`}
+            sub="require attention"
+            valueColor="text-red-600"
+          />
         )}
+        {maintenance.outOfService > 0 && (
+          <Row
+            label="Equipment"
+            value={`${maintenance.outOfService} out of SVC`}
+            sub={maintenance.urgentIssues[0]?.unit_name}
+            valueColor="text-red-600"
+          />
+        )}
+      </div>
+
+      {/* Footer total */}
+      <div className="border-t border-stone-100 px-5 py-3 flex items-center justify-between">
+        <span className="text-[11px] text-stone-500">Total today</span>
+        <span className="text-xs font-semibold text-stone-800">
+          {today.total} bookings · {today.totalCovers} covers
+        </span>
       </div>
     </div>
   );
