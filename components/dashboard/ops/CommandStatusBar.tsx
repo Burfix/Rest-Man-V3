@@ -187,14 +187,14 @@ export default function CommandStatusBar({
       <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-stone-100">
         <div className="flex items-center gap-3 min-w-0">
           <div className="hidden sm:flex h-7 w-7 items-center justify-center rounded-lg bg-stone-900 shrink-0">
-            <span className="text-xs text-white font-bold">SC</span>
+            <span className="text-xs text-white font-bold">OE</span>
           </div>
           <div className="min-w-0">
             <p className="text-sm font-semibold text-stone-900 leading-none truncate">
-              Si Cantina Sociale
+              Ops Engine
             </p>
             <p className="text-[11px] text-stone-400 mt-px leading-none">
-              V&amp;A Waterfront · Cape Town
+              Operations Dashboard
             </p>
           </div>
         </div>

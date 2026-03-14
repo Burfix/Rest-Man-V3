@@ -35,7 +35,7 @@ function formatTime(hhmm: string): string {
   return `${String(hour12).padStart(2, "0")}:${String(m ?? 0).padStart(2, "0")} ${suffix}`;
 }
 
-function venueName()  { return process.env.VENUE_NAME    ?? "Si Cantina Sociale"; }
+function venueName()  { return process.env.VENUE_NAME    ?? "Your Venue"; }
 function venuePhone() { return process.env.VENUE_PHONE   ?? ""; }
 function venueAddr()  { return process.env.VENUE_ADDRESS ?? ""; }
 

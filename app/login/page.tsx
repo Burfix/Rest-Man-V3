@@ -9,7 +9,7 @@ import { createSessionClient } from "@/lib/supabase/session";
 import { LoginForm } from "./LoginForm";
 
 export const metadata = {
-  title: "Sign In — Si Cantina Sociale Operations",
+  title: "Sign In — Ops Engine",
 };
 
 interface Props {
@@ -43,7 +43,7 @@ export default async function LoginPage({ searchParams }: Props) {
       <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between bg-stone-900 px-12 py-14">
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-amber-400">
-            Si Cantina Sociale
+            Ops Engine
           </p>
           <h1 className="mt-6 text-4xl font-bold leading-tight text-white">
             Operations
@@ -52,8 +52,7 @@ export default async function LoginPage({ searchParams }: Props) {
           </h1>
           <p className="mt-4 text-base leading-relaxed text-stone-400">
             Manage bookings, reviews, sales, maintenance, and daily
-            operations — all from one dashboard built for the Si Cantina
-            management team.
+            operations — all from one unified dashboard.
           </p>
         </div>
 
@@ -76,7 +75,7 @@ export default async function LoginPage({ searchParams }: Props) {
         {/* Mobile brand header */}
         <div className="mb-8 text-center lg:hidden">
           <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
-            Si Cantina Sociale
+            Ops Engine
           </p>
           <h1 className="mt-1 text-2xl font-bold text-stone-900">
             Operations Centre
@@ -95,7 +94,7 @@ export default async function LoginPage({ searchParams }: Props) {
           </div>
 
           <p className="mt-5 text-center text-xs text-stone-400">
-            Si Cantina Sociale · V&A Waterfront · Cape Town
+            Ops Engine · Operations Platform
           </p>
         </div>
       </div>

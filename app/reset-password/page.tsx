@@ -69,7 +69,7 @@ export default function ResetPasswordPage() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <p className="text-xs font-bold uppercase tracking-widest text-amber-600">
-            Si Cantina Sociale
+            Ops Engine
           </p>
           <h1 className="mt-2 text-2xl font-bold text-stone-900">
             Set new password

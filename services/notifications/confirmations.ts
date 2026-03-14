@@ -54,7 +54,7 @@ export async function sendBookingConfirmationWhatsApp(
 
   if (!phone_number || phone_number === "website-no-phone") return false;
 
-  const venueName = process.env.VENUE_NAME ?? "Si Cantina Sociale";
+  const venueName = process.env.VENUE_NAME ?? "Your Venue";
   const venuePhone = process.env.VENUE_PHONE ?? "";
   const venueAddress = process.env.VENUE_ADDRESS ?? "";
 
@@ -116,7 +116,7 @@ export async function sendBookingConfirmationEmail(
   }
 
   const resend = new Resend(apiKey);
-  const venueName = process.env.VENUE_NAME ?? "Si Cantina Sociale";
+  const venueName = process.env.VENUE_NAME ?? "Your Venue";
   const fromAddress = process.env.SMTP_FROM ?? `${venueName} <onboarding@resend.dev>`;
 
   const { customer_name, booking_date, booking_time, guest_count, event_name, special_notes, phone_number } = reservation;

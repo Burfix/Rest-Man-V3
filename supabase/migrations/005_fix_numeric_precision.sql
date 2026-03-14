@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Fix numeric precision on ops tables
+-- Ops Engine — Fix numeric precision on ops tables
 -- Migration: 005_fix_numeric_precision.sql
 --
 -- numeric(8,6) only allows 2 digits before the decimal point

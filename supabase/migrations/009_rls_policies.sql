@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Row Level Security Baseline
+-- Ops Engine — Row Level Security Baseline
 -- Migration: 009_rls_policies.sql
 --
 -- Enables RLS on every application table so that the public

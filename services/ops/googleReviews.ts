@@ -14,7 +14,7 @@
 import { findPlaceId, getPlaceDetails, GoogleReview } from "@/lib/google-places";
 
 /** Venue query used for Place ID discovery if GOOGLE_PLACE_ID is not set. */
-const SEARCH_QUERY = "Si Cantina Sociale Cape Town";
+const SEARCH_QUERY = process.env.VENUE_NAME ? `${process.env.VENUE_NAME} Cape Town` : "Your Venue";
 
 export interface GoogleLiveReviews {
   placeName: string;

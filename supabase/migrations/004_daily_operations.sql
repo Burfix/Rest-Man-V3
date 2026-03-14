@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Daily Operations Report Tables
+-- Ops Engine — Daily Operations Report Tables
 -- Migration: 004_daily_operations.sql
 -- Adds: daily_operations_reports, daily_operations_labor,
 --       daily_operations_revenue_centers

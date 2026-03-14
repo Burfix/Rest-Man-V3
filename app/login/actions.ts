@@ -57,7 +57,7 @@ export async function forgotPassword(
   const cookieStore = cookies();
   const supabase = createSessionClient(cookieStore);
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://si-cantina-concierge.vercel.app";
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://ops-engine.vercel.app";
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${siteUrl}/reset-password`,

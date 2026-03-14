@@ -46,7 +46,7 @@ export default async function CompliancePage() {
           <div>
             <h1 className="text-xl font-bold text-stone-900">Compliance Hub</h1>
             <p className="text-sm text-stone-500">
-              Track certificates, inspections, and legal obligations for Si Cantina Sociale.
+              Track certificates, inspections, and legal obligations for your venue.
             </p>
           </div>
         </div>

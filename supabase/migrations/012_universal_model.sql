@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Ops — Universal Operational Data Model
+-- Ops Engine — Universal Operational Data Model
 -- Migration: 012_universal_model.sql
 --
 -- ARCHITECTURE GOAL
@@ -30,7 +30,7 @@
 
 -- ── 1. sites ──────────────────────────────────────────────────────────────────
 -- One row per physical operating location.
--- Si Cantina Sociale is a single site. Future: airports, malls, etc.
+-- The default site is seeded below. Future: airports, malls, etc.
 
 create table if not exists sites (
   id            uuid        primary key default gen_random_uuid(),
@@ -54,7 +54,7 @@ create or replace trigger trg_sites_updated_at
   before update on sites
   for each row execute procedure set_updated_at();
 
--- Seed Si Cantina Sociale as the default site
+-- Seed the default site
 insert into sites (id, name, site_type, address, city, timezone)
 values (
   '00000000-0000-0000-0000-000000000001',
@@ -91,7 +91,7 @@ create or replace trigger trg_zones_updated_at
   before update on zones
   for each row execute procedure set_updated_at();
 
--- Seed the standard zones for Si Cantina Sociale
+-- Seed the standard zones for the default site
 insert into zones (site_id, name, zone_type, display_order) values
   ('00000000-0000-0000-0000-000000000001', 'Kitchen',      'kitchen',      1),
   ('00000000-0000-0000-0000-000000000001', 'Bar',          'bar',          2),
@@ -117,7 +117,7 @@ alter table equipment
 create index if not exists idx_equipment_site on equipment (site_id);
 create index if not exists idx_equipment_zone on equipment (zone_id);
 
--- Backfill: link all existing equipment to the Si Cantina site
+-- Backfill: link all existing equipment to the default site
 update equipment
 set site_id = '00000000-0000-0000-0000-000000000001'
 where site_id is null;
@@ -259,7 +259,7 @@ create index if not exists idx_maint_site on maintenance_logs (site_id);
 create index if not exists idx_maint_zone on maintenance_logs (zone_id);
 create index if not exists idx_maint_type on maintenance_logs (ticket_type);
 
--- Backfill: link all maintenance tickets to the Si Cantina site
+-- Backfill: link all maintenance tickets to the default site
 update maintenance_logs
 set site_id = '00000000-0000-0000-0000-000000000001'
 where site_id is null;

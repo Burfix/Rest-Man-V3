@@ -159,11 +159,11 @@ export default function Sidebar({ footer }: Props) {
         {/* Brand header */}
         <div className="flex h-14 items-center gap-3 px-4 border-b border-stone-100 shrink-0">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-900 shrink-0">
-            <span className="text-xs font-bold text-white">SC</span>
+            <span className="text-xs font-bold text-white">OE</span>
           </div>
           <div className="min-w-0">
             <p className="text-[13px] font-semibold text-stone-900 leading-tight truncate">
-              Si Cantina Sociale
+              Ops Engine
             </p>
             <p className="text-[10px] text-stone-400 leading-none">Operations</p>
           </div>
@@ -177,10 +177,10 @@ export default function Sidebar({ footer }: Props) {
       <header className="lg:hidden fixed top-0 left-0 right-0 z-30 flex h-14 items-center justify-between border-b border-stone-200 bg-white px-4">
         <div className="flex items-center gap-2.5">
           <div className="h-6 w-6 flex items-center justify-center rounded-md bg-stone-900">
-            <span className="text-[10px] font-bold text-white">SC</span>
+            <span className="text-[10px] font-bold text-white">OE</span>
           </div>
           <div>
-            <p className="text-[13px] font-semibold text-stone-900 leading-tight">Si Cantina Sociale</p>
+            <p className="text-[13px] font-semibold text-stone-900 leading-tight">Ops Engine</p>
             <p className="text-[9px] text-stone-400 leading-none">Operations</p>
           </div>
         </div>
@@ -205,10 +205,10 @@ export default function Sidebar({ footer }: Props) {
             <div className="flex h-14 items-center justify-between border-b border-stone-100 px-4 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="h-6 w-6 flex items-center justify-center rounded-md bg-stone-900">
-                  <span className="text-[10px] font-bold text-white">SC</span>
+                  <span className="text-[10px] font-bold text-white">OE</span>
                 </div>
                 <div>
-                  <p className="text-[13px] font-semibold text-stone-900">Si Cantina Sociale</p>
+                  <p className="text-[13px] font-semibold text-stone-900">Ops Engine</p>
                   <p className="text-[9px] text-stone-400">Operations</p>
                 </div>
               </div>

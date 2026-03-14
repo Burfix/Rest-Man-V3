@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Operations Dashboard Tables
+-- Ops Engine — Operations Dashboard Tables
 -- Migration: 003_ops_tables.sql
 -- Adds: reviews, sales_uploads, sales_items, equipment, maintenance_logs
 -- set_updated_at() trigger already created in 001_initial_schema.sql

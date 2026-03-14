@@ -281,5 +281,5 @@ export interface SiteSummary {
 
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
-/** Default site UUID — Si Cantina Sociale (matches migration 012 seed) */
+/** Default site UUID — matches migration 012 seed */
 export const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001" as const;

@@ -62,7 +62,7 @@ export default function CommandHeader({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 bg-stone-50 px-5 py-3">
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold uppercase tracking-widest text-stone-400">
-            Si Cantina Sociale
+            Ops Engine
           </span>
           <span className="h-3 w-px bg-stone-300" />
           <span className="text-xs font-medium text-stone-500">

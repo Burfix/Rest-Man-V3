@@ -44,7 +44,7 @@ export default async function SettingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-stone-900">Venue Settings</h1>
         <p className="mt-1 text-sm text-stone-500">
-          Contact Si Cantina administration to update these settings.
+          Contact your administrator to update these settings.
         </p>
       </div>
 

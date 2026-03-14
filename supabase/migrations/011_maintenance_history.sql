@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Asset Maintenance History
+-- Ops Engine — Asset Maintenance History
 -- Migration: 011_maintenance_history.sql
 --
 -- Extends the equipment table with asset profile fields.

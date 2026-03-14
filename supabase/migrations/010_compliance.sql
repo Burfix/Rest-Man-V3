@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Compliance Hub
+-- Ops Engine — Compliance Hub
 -- Migration: 010_compliance.sql
 --
 -- Tracks regulatory & legal compliance categories:

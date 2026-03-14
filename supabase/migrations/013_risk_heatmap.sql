@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Ops — Risk Engine & Zone Heatmap Support
+-- Ops Engine — Risk Engine & Zone Heatmap Support
 -- Migration: 013_risk_heatmap.sql
 --
 -- Adds tables to support:

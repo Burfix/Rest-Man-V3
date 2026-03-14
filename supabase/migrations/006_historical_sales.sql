@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Historical daily sales
+-- Ops Engine — Historical daily sales
 -- Migration: 006_historical_sales.sql
 --
 -- One row per calendar day. Used for year-on-year comparison

@@ -37,7 +37,7 @@ export function LoginForm({ next }: { next: string }) {
           autoComplete="email"
           required
           className="mt-1.5 w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm text-stone-900 placeholder-stone-400 focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-500"
-          placeholder="manager@sicantina.co.za"
+          placeholder="manager@venue.co.za"
         />
       </div>
 

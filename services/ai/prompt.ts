@@ -1,7 +1,7 @@
 import { VENUE_NAME, VENUE_LOCATION, OPENING_HOURS_LABEL, SERVICE_CHARGE_THRESHOLD, MAX_TABLE_SIZE } from "@/lib/constants";
 
 // ============================================================
-// System prompt for the Si Cantina Sociale AI concierge
+// System prompt for the Ops Engine AI concierge
 // ============================================================
 
 export function buildSystemPrompt(contextBlock: string): string {

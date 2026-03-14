@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Initial Schema
+-- Ops Engine — Initial Schema
 -- Migration: 001_initial_schema.sql
 -- ============================================================
 

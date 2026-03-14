@@ -1,5 +1,5 @@
 -- ============================================================
--- Si Cantina Sociale — Revenue Intelligence Engine
+-- Ops Engine — Revenue Intelligence Engine
 -- Migration: 007_revenue_intelligence.sql
 --
 -- sales_targets    : manager-set revenue / covers goals per date

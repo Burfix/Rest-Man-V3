@@ -2,7 +2,7 @@
 // Application-wide constants
 // ============================================================
 
-export const VENUE_NAME = "Si Cantina Sociale";
+export const VENUE_NAME = process.env.VENUE_NAME ?? "Your Venue";
 export const VENUE_LOCATION = "V&A Waterfront, Silo District, Cape Town";
 
 export const MAX_CAPACITY = 200;

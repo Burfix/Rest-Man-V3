@@ -172,7 +172,7 @@ export async function getCachedZoneSummaries(
  */
 export async function getSiteSummary(
   siteId: string,
-  siteName = "Si Cantina Sociale"
+  siteName = process.env.VENUE_NAME ?? "Your Venue"
 ): Promise<SiteSummary> {
   const supabase = createServerClient();
 

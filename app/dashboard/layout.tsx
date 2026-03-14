@@ -2,7 +2,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import UserProfile from "@/components/dashboard/UserProfile";
 
 export const metadata = {
-  title: "Dashboard — Si Cantina Sociale",
+  title: "Dashboard — Ops Engine",
 };
 
 export default function DashboardLayout({
