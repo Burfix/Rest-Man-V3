@@ -308,6 +308,10 @@ export interface RevenueForecast {
   forecast_avg_spend:     number;
   target_sales:           number | null;
   target_covers:          number | null;
+  /** "manual" = set in sales_targets table; "auto" = derived last-year +10%; null = unavailable */
+  target_source:          "manual" | "auto" | null;
+  /** Actual same-day last year gross sales used to derive the auto target */
+  last_year_sales:        number | null;
   sales_gap:              number | null; // forecast_sales - target_sales (negative = below)
   sales_gap_pct:          number | null; // as % of target
   covers_gap:             number | null;

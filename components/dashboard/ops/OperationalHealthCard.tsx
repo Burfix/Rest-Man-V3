@@ -54,18 +54,25 @@ export default function OperationalHealthCard({
   const hasForecast = !!forecast;
   const hasTarget   = forecast?.target_sales != null;
   const hasOpsData  = !!dailyOps.latestReport;
+  const isAutoTarget = forecast?.target_source === "auto";
 
-  // Revenue bar: three states — no forecast, no target, scored
+  // Revenue bar: three states — no forecast, no target (and no auto-derivable), scored
   const revIsSetup  = hasForecast && hasTarget;
-  const revLabel    =
-    !hasForecast ? "No forecast data"      :
-    !hasTarget   ? "Target not set"        :
-    breakdown.revenue >= 85 ? "On track"   :
+  const revLabel =
+    !hasForecast ? "No forecast data" :
+    !hasTarget   ? "Target unavailable" :
+    isAutoTarget && breakdown.revenue >= 85 ? "Ahead of target" :
+    isAutoTarget && breakdown.revenue >= 70 ? "On track" :
+    isAutoTarget && breakdown.revenue >= 50 ? "Behind target" :
+    isAutoTarget                            ? "Well behind target" :
+    breakdown.revenue >= 85 ? "On track" :
     breakdown.revenue >= 70 ? "Slightly below" :
-    breakdown.revenue >= 50 ? "Below target"   :
+    breakdown.revenue >= 50 ? "Below target" :
     "Significantly below";
   const revValue    =
-    !hasForecast || !hasTarget ? "Needs setup" : `${breakdown.revenue}%`;
+    !hasForecast ? "No data" :
+    !hasTarget   ? "No target" :
+    `${breakdown.revenue}%`;
   const revBarColor =
     !revIsSetup                ? "bg-stone-200 dark:bg-stone-700"      :
     breakdown.revenue >= 70    ? "bg-emerald-500"                      :
@@ -115,7 +122,7 @@ export default function OperationalHealthCard({
       dimmed:   maintenance.totalEquipment === 0,
     },
     {
-      label:    "Revenue",
+      label:    isAutoTarget ? "Revenue (target: same day +10%)" : "Revenue",
       value:    revValue,
       status:   revLabel,
       barColor: revBarColor,

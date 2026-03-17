@@ -88,19 +88,22 @@ export default function DashboardTopBar({
 
   // ── Revenue tile ─────────────────────────────────────────────────────────
   const revMetric = forecast ? compactZAR(forecast.forecast_sales) : "—";
+  const isAutoTarget = forecast?.target_source === "auto";
   const revSub =
-    !forecast                              ? "No forecast available"  :
-    !forecast.target_sales                 ? "Target not set"         :
-    (forecast.sales_gap_pct ?? 0) >= 0     ? "On target"             :
+    !forecast                              ? "No forecast available"     :
+    !forecast.target_sales                 ? "Target unavailable"        :
+    (forecast.sales_gap_pct ?? 0) >= 5     ? "Ahead of target"          :
+    (forecast.sales_gap_pct ?? 0) >= 0     ? "On target"                :
     Math.abs(forecast.sales_gap_pct ?? 0) >= 20
-      ? `${Math.abs(forecast.sales_gap_pct ?? 0).toFixed(0)}% below target`
-      : `${Math.abs(forecast.sales_gap_pct ?? 0).toFixed(0)}% below target`;
+      ? `${Math.abs(forecast.sales_gap_pct ?? 0).toFixed(0)}% behind target`
+      : `${Math.abs(forecast.sales_gap_pct ?? 0).toFixed(0)}% behind target`;
   const revSubColor =
     !forecast                              ? "text-stone-400 dark:text-stone-600" :
-    !forecast.target_sales                 ? "text-amber-600 dark:text-amber-400" :
+    !forecast.target_sales                 ? "text-stone-400 dark:text-stone-600" :
     (forecast.sales_gap_pct ?? 0) >= 0     ? "text-emerald-600 dark:text-emerald-500" :
     Math.abs(forecast.sales_gap_pct ?? 0) >= 20 ? "text-red-600 dark:text-red-400" :
     "text-amber-600 dark:text-amber-400";
+  const revSubNote = isAutoTarget ? "Target based on same day last year +10%" : undefined;
 
   // ── Labour tile ───────────────────────────────────────────────────────────
   const labourMetric = laborPct != null ? `${laborPct.toFixed(1)}%` : "—";
@@ -147,6 +150,7 @@ export default function DashboardTopBar({
       metric:     revMetric,
       sub:        revSub,
       subColor:   revSubColor,
+      note:       revSubNote,
       href:       "/dashboard/settings/targets",
     },
     {
@@ -227,6 +231,11 @@ export default function DashboardTopBar({
             <span className={cn("text-[11px] font-medium leading-tight truncate", kpi.subColor)}>
               {kpi.sub}
             </span>
+            {kpi.note && (
+              <span className="text-[10px] text-stone-400 dark:text-stone-600 leading-tight truncate">
+                {kpi.note}
+              </span>
+            )}
           </a>
         ))}
       </div>

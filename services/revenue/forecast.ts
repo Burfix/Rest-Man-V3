@@ -528,7 +528,24 @@ export async function generateRevenueForecast(
       : resolvedAvgSpend;
 
   // Gap analysis
-  const targetSales  = toNum(target?.target_sales);
+  // ── Target resolution: manual → auto (last-year +10%) → weekday-avg fallback ──
+  const manualTargetSales = toNum(target?.target_sales);
+  let targetSales: number | null = manualTargetSales;
+  let targetSource: "manual" | "auto" | null = manualTargetSales != null ? "manual" : null;
+
+  if (targetSales == null) {
+    // 1. Same calendar day last year × 1.10
+    if (lastYearSales != null && lastYearSales > 0) {
+      targetSales  = Math.round(lastYearSales * 1.10);
+      targetSource = "auto";
+    // 2. Recent weekday average × 1.10 (same weekday, last 8 weeks)
+    } else if (recentWeekdaySales != null && recentWeekdaySales > 0) {
+      targetSales  = Math.round(recentWeekdaySales * 1.10);
+      targetSource = "auto";
+    }
+    // 3. Still null → leave targetSales = null, targetSource = null
+  }
+
   const targetCovers = toNum(target?.target_covers);
 
   const salesGap    = targetSales != null ? forecastSales - targetSales : null;
@@ -580,6 +597,8 @@ export async function generateRevenueForecast(
     forecast_avg_spend:    forecastAvgSpend,
     target_sales:          targetSales,
     target_covers:         targetCovers,
+    target_source:         targetSource,
+    last_year_sales:       lastYearSales,
     sales_gap:             salesGap,
     sales_gap_pct:         salesGapPct,
     covers_gap:            coversGap,

@@ -53,9 +53,16 @@ export default function ServiceBriefCard({
   const dinnerCovers = dinnerBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
 
   const hasTarget  = forecast?.target_sales != null;
+  const isAutoTarget = forecast?.target_source === "auto";
   const gapPos     = forecast?.sales_gap != null && forecast.sales_gap >= 0;
   const gapNeg     = forecast?.sales_gap != null && forecast.sales_gap < 0;
   const walkInNeed = gapNeg && forecast?.sales_gap != null ? Math.abs(forecast.sales_gap) : null;
+
+  // Progress toward target (forecast as % of target)
+  const progressPct =
+    hasTarget && forecast?.target_sales && forecast.target_sales > 0
+      ? Math.min(100, Math.round((forecast.forecast_sales / forecast.target_sales) * 100))
+      : null;
 
   const topRec    = (forecast?.recommendations ?? [])[0] ?? null;
   const recCount  = (forecast?.recommendations ?? []).length;
@@ -85,23 +92,26 @@ export default function ServiceBriefCard({
           <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-2">
             Revenue
           </p>
-          <div className="flex items-start justify-between gap-3">
+
+          {/* Forecast headline */}
+          <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <p className="text-sm font-bold text-stone-900 dark:text-stone-100">
                 {forecast ? formatCurrency(forecast.forecast_sales) : "No forecast available"}
               </p>
-              <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-500">
-                {!hasTarget
-                  ? "Revenue target not set for today"
-                  : gapPos
-                  ? `R ${Math.abs(forecast?.sales_gap ?? 0).toFixed(0)} ahead of target`
-                  : gapNeg
-                  ? `R ${Math.abs(forecast?.sales_gap ?? 0).toFixed(0)} below target`
-                  : "On target"}
-              </p>
-              {walkInNeed != null && (
-                <p className="mt-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
-                  Walk-in need: {formatCurrency(walkInNeed)} to close gap
+              {hasTarget && (
+                <p className={cn(
+                  "mt-0.5 text-[11px] font-medium",
+                  gapPos  ? "text-emerald-600 dark:text-emerald-400"
+                          : gapNeg && Math.abs(forecast?.sales_gap_pct ?? 0) >= 20
+                            ? "text-red-600 dark:text-red-400"
+                            : "text-amber-600 dark:text-amber-400"
+                )}>
+                  {gapPos
+                    ? `Ahead of target · +${formatCurrency(forecast?.sales_gap ?? 0)}`
+                    : gapNeg
+                    ? `Behind target · −${formatCurrency(Math.abs(forecast?.sales_gap ?? 0))}`
+                    : "On target"}
                 </p>
               )}
             </div>
@@ -114,6 +124,68 @@ export default function ServiceBriefCard({
               </Link>
             )}
           </div>
+
+          {/* Last year baseline + today's target */}
+          <div className="space-y-1 mb-3">
+            {forecast?.last_year_sales != null ? (
+              <div className="flex justify-between text-[11px]">
+                <span className="text-stone-400 dark:text-stone-600">Last year (same day)</span>
+                <span className="font-medium text-stone-600 dark:text-stone-400">
+                  {formatCurrency(forecast.last_year_sales)}
+                </span>
+              </div>
+            ) : null}
+            {hasTarget && (
+              <div className="flex justify-between text-[11px]">
+                <span className="text-stone-400 dark:text-stone-600">
+                  Today's target
+                  {isAutoTarget && (
+                    <span className="ml-1 text-stone-300 dark:text-stone-700">(same day +10%)</span>
+                  )}
+                </span>
+                <span className="font-medium text-stone-600 dark:text-stone-400">
+                  {formatCurrency(forecast!.target_sales!)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Progress bar toward target */}
+          {progressPct != null && (
+            <div>
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className="text-stone-400 dark:text-stone-600">Forecast progress</span>
+                <span className={cn(
+                  "font-semibold",
+                  progressPct >= 100 ? "text-emerald-600 dark:text-emerald-400"
+                  : progressPct >= 75 ? "text-sky-600 dark:text-sky-400"
+                  : progressPct >= 50 ? "text-amber-600 dark:text-amber-400"
+                  : "text-red-600 dark:text-red-400"
+                )}>
+                  {progressPct}% of target reached
+                </span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    progressPct >= 100 ? "bg-emerald-500"
+                    : progressPct >= 75 ? "bg-sky-500"
+                    : progressPct >= 50 ? "bg-amber-400"
+                    : "bg-red-500"
+                  )}
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Walk-in gap warning */}
+          {walkInNeed != null && (
+            <p className="mt-2 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+              Walk-in need: {formatCurrency(walkInNeed)} to close gap
+            </p>
+          )}
         </div>
 
         {/* ── Bookings ── */}
