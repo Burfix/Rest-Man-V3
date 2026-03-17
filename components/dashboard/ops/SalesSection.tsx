@@ -20,7 +20,7 @@ export default function SalesSection({ summary }: Props) {
   return (
     <section>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-base font-semibold text-stone-900">
+        <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
           Weekly Sales
         </h2>
         <a
@@ -32,18 +32,19 @@ export default function SalesSection({ summary }: Props) {
       </div>
 
       {!summary.upload ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-8 text-center">
-          <p className="text-sm font-medium text-stone-500">
-            No sales data uploaded yet
+        <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-stone-50 dark:bg-stone-800/50 px-5 py-5">
+          <p className="text-sm font-semibold text-stone-600 dark:text-stone-300">
+            No sales data — weekly performance tracking inactive
           </p>
-          <p className="mt-1 text-xs text-stone-400">
-            Upload a weekly POS export to track sales performance.
+          <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+            Upload a weekly POS export to track top items, revenue trends and
+            category performance.
           </p>
           <a
             href="/dashboard/sales"
-            className="mt-3 inline-block rounded-lg bg-stone-900 px-4 py-2 text-xs font-semibold text-white hover:bg-stone-700"
+            className="mt-3 inline-block rounded-lg bg-stone-900 dark:bg-stone-100 px-4 py-1.5 text-xs font-semibold text-white dark:text-stone-900 hover:bg-stone-700 dark:hover:bg-stone-200 transition-colors"
           >
-            Upload Sales Data
+            Upload sales data
           </a>
         </div>
       ) : (

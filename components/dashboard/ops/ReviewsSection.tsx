@@ -9,21 +9,33 @@ export default function ReviewsSection({ summary }: Props) {
   return (
     <section>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-base font-semibold text-stone-900">
-          Last 5 Reviews
+        <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">
+          Reviews
         </h2>
         <a
           href="/dashboard/reviews"
-          className="text-xs font-medium text-stone-400 hover:text-stone-700"
+          className="text-xs font-medium text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300"
         >
           All reviews →
         </a>
       </div>
 
       {summary.totalReviews === 0 ? (
-        <p className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-6 text-center text-sm text-stone-400">
-          No reviews recorded yet.
-        </p>
+        <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-5 py-5">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Reviews not synced — reputation visibility gap
+          </p>
+          <p className="mt-1 text-xs text-amber-700 dark:text-amber-500">
+            Without guest reviews, sentiment trends and reputation risks are invisible.
+            Connect Google Reviews or log manually.
+          </p>
+          <a
+            href="/dashboard/reviews"
+            className="mt-3 inline-block rounded-lg bg-stone-900 dark:bg-stone-100 px-4 py-1.5 text-xs font-semibold text-white dark:text-stone-900 hover:bg-stone-700 dark:hover:bg-stone-200 transition-colors"
+          >
+            Sync reviews
+          </a>
+        </div>
       ) : (
         <div className="space-y-4">
           {/* Platform cards */}
@@ -97,9 +109,9 @@ function PlatformCard({
       : "text-red-700";
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
+    <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-4 py-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-stone-700">{platformLabel}</p>
+        <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">{platformLabel}</p>
         {stats.count === 0 ? (
           <span className="text-xs text-stone-300">No reviews</span>
         ) : (
@@ -159,7 +171,7 @@ function FlaggedReviewRow({ review }: { review: Review }) {
       : "bg-amber-100 text-amber-700";
 
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-stone-100 bg-stone-50 px-3 py-3">
+    <div className="flex items-start gap-3 rounded-lg border border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-800/50 px-3 py-3">
       <span
         className={cn(
           "mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-xs font-bold",

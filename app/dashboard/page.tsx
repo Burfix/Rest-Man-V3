@@ -1,6 +1,13 @@
 /**
- * Operations Command Dashboard — the primary manager landing page.
- * "Mission Control" layout with 5 prioritised zones.
+ * Operations Command Dashboard — GM daily operations command center.
+ *
+ * Layout (7 zones, top-to-bottom priority order):
+ *   1. DashboardTopBar     — identity + service period + 5 KPI tiles
+ *   2. FreshnessBar        — data recency indicators
+ *   3. CriticalActionsPanel — ranked morning briefing (action-first)
+ *   4. Risk + Brief grid   — OperationalRiskCard | ServiceBriefCard
+ *   5. Today + Health grid — TodayAtVenueCard   | OperationalHealthCard
+ *   6. SecondaryInsights   — reviews, sales, ops analytics (below fold)
  */
 
 import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
@@ -8,35 +15,33 @@ import { getSevenDayReviewSummary } from "@/services/ops/reviewsSummary";
 import { getLatestSalesSummary } from "@/services/ops/salesSummary";
 import { getMaintenanceSummary } from "@/services/ops/maintenanceSummary";
 import { getUpcomingEvents } from "@/services/ops/eventsSummary";
-import { getPriorityAlerts } from "@/services/ops/priorityAlerts";
 import { getDailyOperationsDashboardSummary } from "@/services/ops/dailyOperationsSummary";
 import { getDataFreshnessSummary } from "@/services/ops/dataFreshness";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
-import { getActiveAlerts } from "@/services/alerts/engine";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 
-import FreshnessBar         from "@/components/dashboard/ops/FreshnessBar";
-import OperationalAlertsPanel from "@/components/dashboard/ops/OperationalAlertsPanel";
-import CommandStatusBar     from "@/components/dashboard/ops/CommandStatusBar";
-import PrimaryKpiCards      from "@/components/dashboard/ops/PrimaryKpiCards";
-import TodayOpsPanel        from "@/components/dashboard/ops/TodayOpsPanel";
-import OperationalHealth    from "@/components/dashboard/ops/OperationalHealth";
-import SecondaryInsights    from "@/components/dashboard/SecondaryInsights";
+import FreshnessBar          from "@/components/dashboard/ops/FreshnessBar";
+import DashboardTopBar       from "@/components/dashboard/ops/DashboardTopBar";
+import CriticalActionsPanel  from "@/components/dashboard/ops/CriticalActionsPanel";
+import OperationalRiskCard   from "@/components/dashboard/ops/OperationalRiskCard";
+import ServiceBriefCard      from "@/components/dashboard/ops/ServiceBriefCard";
+import TodayAtVenueCard      from "@/components/dashboard/ops/TodayAtVenueCard";
+import OperationalHealthCard from "@/components/dashboard/ops/OperationalHealthCard";
+import SecondaryInsights     from "@/components/dashboard/SecondaryInsights";
 
 import {
   getServicePeriod,
+  buildPriorityActions,
 } from "@/lib/commandCenter";
 
-import {
+import type {
   TodayBookingsSummary,
   SevenDayReviewSummary,
   SalesSummary,
   MaintenanceSummary,
   VenueEvent,
-  PriorityAlert,
   DailyOperationsDashboardSummary,
   RevenueForecast,
-  OperationalAlert,
   ComplianceSummary,
 } from "@/types";
 import { todayISO } from "@/lib/utils";
@@ -112,11 +117,9 @@ export default async function OperationsDashboard() {
     salesResult,
     maintenanceResult,
     eventsResult,
-    alertsResult,
     dailyOpsResult,
     freshnessResult,
     forecastResult,
-    opsAlertsResult,
     complianceResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
@@ -124,38 +127,49 @@ export default async function OperationsDashboard() {
     getLatestSalesSummary(),
     getMaintenanceSummary(),
     getUpcomingEvents(),
-    getPriorityAlerts(),
     getDailyOperationsDashboardSummary(),
     getDataFreshnessSummary(),
     generateRevenueForecast(todayISO()),
-    getActiveAlerts(),
     getComplianceSummary(),
   ]);
 
-  const { value: today, error: todayErr } = settled(todayResult, EMPTY_TODAY);
-  const { value: reviews, error: reviewsErr } = settled(reviewsResult, EMPTY_REVIEWS);
-  const { value: sales, error: salesErr } = settled(salesResult, EMPTY_SALES);
+  const { value: today, error: todayErr }           = settled(todayResult, EMPTY_TODAY);
+  const { value: reviews, error: reviewsErr }       = settled(reviewsResult, EMPTY_REVIEWS);
+  const { value: sales, error: salesErr }           = settled(salesResult, EMPTY_SALES);
   const { value: maintenance, error: maintenanceErr } = settled(maintenanceResult, EMPTY_MAINTENANCE);
-  const { value: events, error: eventsErr } = settled(eventsResult, [] as VenueEvent[]);
-  const { value: alerts, error: alertsErr } = settled(alertsResult, [] as PriorityAlert[]);
-  const { value: dailyOps, error: dailyOpsErr } = settled(dailyOpsResult, EMPTY_DAILY_OPS);
-  const { value: freshness } = settled(freshnessResult, null);
-  const { value: forecast } = settled(forecastResult, null as RevenueForecast | null);
-  const { value: opsAlerts } = settled(opsAlertsResult, [] as OperationalAlert[]);
-  const { value: complianceSummary } = settled(complianceResult, EMPTY_COMPLIANCE);
+  const { value: events, error: eventsErr }         = settled(eventsResult, [] as VenueEvent[]);
+  const { value: dailyOps, error: dailyOpsErr }     = settled(dailyOpsResult, EMPTY_DAILY_OPS);
+  const { value: freshness }                        = settled(freshnessResult, null);
+  const { value: forecast }                         = settled(forecastResult, null as RevenueForecast | null);
+  const { value: complianceSummary }                = settled(complianceResult, EMPTY_COMPLIANCE);
 
-  const errors = [todayErr, reviewsErr, salesErr, maintenanceErr, eventsErr, alertsErr, dailyOpsErr].filter(
-    Boolean
-  ) as string[];
+  const errors = [todayErr, reviewsErr, salesErr, maintenanceErr, eventsErr, dailyOpsErr]
+    .filter(Boolean) as string[];
 
-  // ─── Command Center computations ────────────────────────────────────────
-  const today_iso      = todayISO();
-  const servicePeriod  = getServicePeriod("Africa/Johannesburg");
+  // ─── Command Center computations ─────────────────────────────────────────
+  const today_iso     = todayISO();
+  const servicePeriod = getServicePeriod("Africa/Johannesburg");
+
+  // Ranked priority actions from all operational signals
+  const priorityActions = buildPriorityActions({
+    compliance:  complianceSummary,
+    maintenance,
+    forecast,
+    dailyOps,
+    reviews,
+    events,
+    today:       today_iso,
+  });
+
+  const totalAlerts = priorityActions.filter(
+    (a) => a.severity === "critical" || a.severity === "urgent"
+  ).length;
 
   return (
     <div className="space-y-5">
-      {/* ── 1. Command Header ── */}
-      <CommandStatusBar
+
+      {/* ── 1. Operations Command Bar ── */}
+      <DashboardTopBar
         date={today_iso}
         servicePeriod={servicePeriod}
         compliance={complianceSummary}
@@ -164,15 +178,15 @@ export default async function OperationsDashboard() {
         dailyOps={dailyOps}
         events={events}
         today={today}
-        opsAlerts={opsAlerts}
+        totalAlerts={totalAlerts}
       />
 
-      {/* ── 2. System Freshness Row ── */}
+      {/* ── 2. Data Freshness Row ── */}
       {freshness && <FreshnessBar freshness={freshness} />}
 
-      {/* ── DB errors (non-fatal) ── */}
+      {/* ── Non-fatal DB errors ── */}
       {errors.length > 0 && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           <p className="font-semibold">Some sections could not load:</p>
           <ul className="mt-1 list-inside list-disc text-xs">
             {errors.map((e, i) => (
@@ -182,23 +196,28 @@ export default async function OperationsDashboard() {
         </div>
       )}
 
-      {/* ── 3. Critical Alerts ── */}
-      <OperationalAlertsPanel initialAlerts={opsAlerts} />
+      {/* ── 3. Critical Actions — GM Morning Briefing ── */}
+      <CriticalActionsPanel actions={priorityActions} />
 
-      {/* ── 4. Primary Control Grid (Compliance + Maintenance) ── */}
-      <PrimaryKpiCards
-        compliance={complianceSummary}
-        maintenance={maintenance}
-        forecast={forecast}
-        today={today}
-        events={events}
-        dailyOps={dailyOps}
-        date={today_iso}
-      />
+      {/* ── 4. Operational Risk + Service Brief ── */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <OperationalRiskCard
+          compliance={complianceSummary}
+          maintenance={maintenance}
+        />
+        <ServiceBriefCard
+          today={today}
+          events={events}
+          forecast={forecast}
+          dailyOps={dailyOps}
+          date={today_iso}
+          servicePeriod={servicePeriod}
+        />
+      </div>
 
-      {/* ── 5. Secondary Operations Grid ── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TodayOpsPanel
+      {/* ── 5. Today at Venue + Operational Health ── */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <TodayAtVenueCard
           today={today}
           events={events}
           dailyOps={dailyOps}
@@ -206,15 +225,16 @@ export default async function OperationsDashboard() {
           date={today_iso}
           forecast={forecast}
         />
-        <OperationalHealth
+        <OperationalHealthCard
           compliance={complianceSummary}
           maintenance={maintenance}
           forecast={forecast}
           reviews={reviews}
+          dailyOps={dailyOps}
         />
       </div>
 
-      {/* ── Secondary Intelligence (below fold) ── */}
+      {/* ── 6. Secondary Intelligence (below fold) ── */}
       <SecondaryInsights
         reviews={reviews}
         sales={sales}
@@ -225,6 +245,9 @@ export default async function OperationsDashboard() {
         hasReviews={reviews.totalReviews > 0}
         hasDailyOps={dailyOps.latestReport !== null}
       />
+
     </div>
   );
 }
+
+
