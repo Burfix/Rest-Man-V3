@@ -336,6 +336,13 @@ export type RepairStatus =
   | "awaiting_parts"
   | "resolved"
   | "closed";
+export type MaintenanceImpactLevel =
+  | "none"
+  | "minor"
+  | "service_disruption"
+  | "revenue_loss"
+  | "compliance_risk"
+  | "food_safety_risk";
 
 export interface Equipment {
   id: string;
@@ -377,9 +384,29 @@ export interface MaintenanceLog {
   issue_description: string | null;
   priority: MaintenancePriority;
   repair_status: RepairStatus;
+  /** Business impact classification */
+  impact_level: MaintenanceImpactLevel;
   date_reported: string;         // YYYY-MM-DD
+  date_acknowledged: string | null;
+  /** Canonical fix date — use this for MTTR/analytics */
+  date_fixed: string | null;
+  /** Legacy alias for date_fixed; preserved for backward compat */
   date_resolved: string | null;
+  reported_by: string | null;
+  /** Canonical "who fixed it" */
+  fixed_by: string | null;
+  fixed_by_type: "contractor" | "internal_staff" | "supplier" | "unknown" | null;
+  contractor_name: string | null;
+  contractor_contact: string | null;
+  downtime_minutes: number | null;
+  estimated_cost: number | null;
+  actual_cost: number | null;
+  resolution_notes: string | null;
+  /** Legacy alias for fixed_by; preserved for backward compat */
   resolved_by: string | null;
+  root_cause: string | null;
+  follow_up_required: boolean;
+  follow_up_notes: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -427,6 +454,20 @@ export interface MaintenanceSummary {
   awaitingParts: number;
   outOfService: number;
   urgentIssues: MaintenanceLog[];
+  /** Issues resolved in the past 7 days */
+  resolvedThisWeek: number;
+  /** Mean time to repair across recently resolved issues (days) */
+  avgFixTimeDays: number | null;
+  /** Sum of actual_cost for issues resolved this month */
+  monthlyActualCost: number | null;
+  /** Asset name with most issues in last 30 days */
+  topProblemAsset: string | null;
+  /** Open issues with impact_level = food_safety_risk */
+  foodSafetyRisks: number;
+  /** Open issues with impact_level = service_disruption */
+  serviceDisruptions: number;
+  /** Open issues with impact_level = compliance_risk */
+  complianceRisks: number;
 }
 
 // ============================================================

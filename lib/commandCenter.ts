@@ -101,6 +101,42 @@ export function buildPriorityActions(params: {
   }
 
   // ── Maintenance ───────────────────────────────────────────────────────────
+
+  // 1. Food safety risks → always critical
+  if (maintenance.foodSafetyRisks > 0) {
+    const issue = maintenance.urgentIssues.find(
+      (i) => i.impact_level === "food_safety_risk"
+    ) ?? maintenance.urgentIssues[0];
+    actions.push({
+      severity:       "critical",
+      category:       "maintenance",
+      title:          `Food safety risk — ${maintenance.foodSafetyRisks} unresolved issue${maintenance.foodSafetyRisks > 1 ? "s" : ""}`,
+      message:        issue
+        ? `${issue.unit_name}: ${issue.issue_title} — reported ${Math.round((Date.now() - new Date(issue.date_reported + "T12:00:00Z").getTime()) / 86_400_000)} day(s) ago.`
+        : "Active food safety maintenance issue requires immediate attention.",
+      recommendation: "Resolve immediately — food safety issues risk service shutdown.",
+      href:           "/dashboard/maintenance",
+    });
+  }
+
+  // 2. Service disruption issues → urgent
+  if (maintenance.serviceDisruptions > 0 && maintenance.foodSafetyRisks === 0) {
+    const issue = maintenance.urgentIssues.find(
+      (i) => i.impact_level === "service_disruption"
+    );
+    actions.push({
+      severity:       "urgent",
+      category:       "maintenance",
+      title:          `Service disruption — ${maintenance.serviceDisruptions} active issue${maintenance.serviceDisruptions > 1 ? "s" : ""}`,
+      message:        issue
+        ? `${issue.unit_name}: ${issue.issue_title}`
+        : "Open maintenance issue is disrupting service operations.",
+      recommendation: "Prioritise fix before next service period.",
+      href:           "/dashboard/maintenance",
+    });
+  }
+
+  // 3. Units out of service (not already covered by food safety / service disruption)
   if (maintenance.outOfService > 0) {
     const unitNames = maintenance.urgentIssues
       .filter((i) => i.repair_status === "open")
@@ -119,13 +155,32 @@ export function buildPriorityActions(params: {
     });
   }
 
-  if (maintenance.openRepairs > 0) {
+  // 4. Open repairs (catch-all when no higher-priority issue fired)
+  const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
+  if (
+    maintenance.openRepairs > 0 &&
+    maintenance.foodSafetyRisks === 0 &&
+    maintenance.serviceDisruptions === 0 &&
+    maintenance.outOfService === 0
+  ) {
     actions.push({
       severity:       "action",
       category:       "maintenance",
       title:          `${maintenance.openRepairs} open repair issue${maintenance.openRepairs > 1 ? "s" : ""}`,
-      message:        `${maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts} total open/in-progress — review before service.`,
+      message:        `${totalOpen} total open/in-progress — review before service.`,
       recommendation: "Assign responsible staff and update repair status.",
+      href:           "/dashboard/maintenance",
+    });
+  }
+
+  // 5. Compliance risk from maintenance (e.g. extraction system, fire suppression)
+  if (maintenance.complianceRisks > 0) {
+    actions.push({
+      severity:       "urgent",
+      category:       "maintenance",
+      title:          `Compliance risk — ${maintenance.complianceRisks} maintenance issue${maintenance.complianceRisks > 1 ? "s" : ""}`,
+      message:        "Open maintenance issue flagged as compliance risk.",
+      recommendation: "Resolve or escalate before inspection deadlines.",
       href:           "/dashboard/maintenance",
     });
   }

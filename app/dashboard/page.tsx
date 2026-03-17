@@ -106,6 +106,13 @@ const EMPTY_MAINTENANCE: MaintenanceSummary = {
   awaitingParts: 0,
   outOfService: 0,
   urgentIssues: [],
+  resolvedThisWeek: 0,
+  avgFixTimeDays: null,
+  monthlyActualCost: null,
+  topProblemAsset: null,
+  foodSafetyRisks: 0,
+  serviceDisruptions: 0,
+  complianceRisks: 0,
 };
 
 // ─── Page ────────────────────────────────────────────────────────────────────

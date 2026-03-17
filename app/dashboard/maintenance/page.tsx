@@ -14,6 +14,13 @@ import {
 } from "@/services/ops/maintenanceSummary";
 import { Equipment, MaintenanceLog } from "@/types";
 import { cn, formatShortDate } from "@/lib/utils";
+import {
+  calcMTTR,
+  getTopFailingAssets,
+  getContractorPerformance,
+  getBusinessImpactSummary,
+  detectRepeatAssets,
+} from "@/lib/maintenance-utils";
 import MaintenanceActions from "@/components/dashboard/maintenance/MaintenanceActions";
 import Link from "next/link";
 
@@ -103,8 +110,8 @@ export default async function MaintenancePage() {
         </p>
       </div>
 
-      {/* Action buttons — add equipment / log issue */}
-      <MaintenanceActions equipment={equipment} />
+      {/* Action buttons — add equipment / log issue / resolve issue */}
+      <MaintenanceActions equipment={equipment} openLogs={openLogs} />
 
       {loadError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -236,6 +243,104 @@ export default async function MaintenancePage() {
           )}
         </div>
       )}
+
+      {/* Maintenance Intelligence Panel */}
+      {logs.length > 0 && (() => {
+        const mttr       = calcMTTR(logs);
+        const topAssets  = getTopFailingAssets(logs, 90).slice(0, 5);
+        const contractors = getContractorPerformance(logs);
+        const impact     = getBusinessImpactSummary(logs);
+        const repeats    = detectRepeatAssets(logs, 45, 2);
+        const hasData    = mttr != null || topAssets.length > 0 || contractors.length > 0 || repeats.length > 0;
+        if (!hasData) return null;
+        return (
+          <div className="rounded-lg border border-stone-200 bg-white px-5 py-5 space-y-4">
+            <h2 className="text-sm font-semibold text-stone-900">Maintenance Intelligence</h2>
+
+            {/* KPI row */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {mttr != null && (
+                <div className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2.5">
+                  <p className="text-xs text-stone-400">Avg Fix Time (MTTR)</p>
+                  <p className="mt-0.5 text-xl font-bold text-stone-800">{mttr.toFixed(1)}<span className="ml-1 text-xs font-normal text-stone-400">days</span></p>
+                </div>
+              )}
+              {impact.foodSafetyRisks > 0 && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2.5">
+                  <p className="text-xs text-red-500">Food Safety Risks</p>
+                  <p className="mt-0.5 text-xl font-bold text-red-700">{impact.foodSafetyRisks}</p>
+                </div>
+              )}
+              {impact.serviceDisruptions > 0 && (
+                <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2.5">
+                  <p className="text-xs text-orange-500">Service Disruptions</p>
+                  <p className="mt-0.5 text-xl font-bold text-orange-700">{impact.serviceDisruptions}</p>
+                </div>
+              )}
+              {impact.complianceRisks > 0 && (
+                <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5">
+                  <p className="text-xs text-amber-600">Compliance Risks</p>
+                  <p className="mt-0.5 text-xl font-bold text-amber-700">{impact.complianceRisks}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Repeat issues alert */}
+            {repeats.length > 0 && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2.5">
+                <p className="text-xs font-semibold text-amber-800">⚠ Recurring issues (last 45 days)</p>
+                <p className="mt-1 text-sm text-amber-700">{repeats.join(", ")} — consider preventive maintenance or replacement.</p>
+              </div>
+            )}
+
+            {/* Top failing assets */}
+            {topAssets.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Top Failing Assets (90 days)</p>
+                <div className="space-y-1">
+                  {topAssets.map((a) => (
+                    <div key={a.asset_name} className="flex items-center justify-between rounded-md bg-stone-50 px-3 py-2 text-sm">
+                      <span className="font-medium text-stone-700">{a.asset_name}</span>
+                      <span className={cn("text-xs font-semibold", a.hasOpenIssue ? "text-red-600" : "text-stone-400")}>
+                        {a.count} issue{a.count > 1 ? "s" : ""}{a.hasOpenIssue ? " · open" : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Contractor performance */}
+            {contractors.length > 0 && (
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Contractor Performance</p>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs font-medium text-stone-400">
+                        <th className="pb-1 pr-4">Contractor</th>
+                        <th className="pb-1 pr-4">Issues</th>
+                        <th className="pb-1 pr-4">Avg Fix</th>
+                        <th className="pb-1">Avg Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {contractors.map((c) => (
+                        <tr key={c.name}>
+                          <td className="py-1.5 pr-4 font-medium text-stone-700">{c.name}</td>
+                          <td className="py-1.5 pr-4 text-stone-500">{c.issuesHandled}</td>
+                          <td className="py-1.5 pr-4 text-stone-500">{c.avgFixTimeDays != null ? `${c.avgFixTimeDays.toFixed(1)}d` : "—"}</td>
+                          <td className="py-1.5 text-stone-500">{c.avgCost != null ? `R ${c.avgCost.toFixed(0)}` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Open issues */}
       <div>
@@ -383,10 +488,10 @@ function LogRow({ log }: { log: MaintenanceLog }) {
         {formatShortDate(log.date_reported)}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-400">
-        {log.date_resolved ? formatShortDate(log.date_resolved) : "—"}
+        {(log.date_fixed ?? log.date_resolved) ? formatShortDate((log.date_fixed ?? log.date_resolved)!) : "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500">
-        {log.resolved_by ?? "—"}
+        {log.fixed_by ?? log.resolved_by ?? "—"}
       </td>
     </tr>
   );

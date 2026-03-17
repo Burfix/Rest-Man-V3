@@ -22,35 +22,43 @@ const statusConfig = {
 
 export default function MaintenanceSection({ summary }: Props) {
   const totalOpen = summary.openRepairs + summary.inProgress + summary.awaitingParts;
-  const hasRisk = summary.outOfService > 0 || summary.openRepairs > 0;
+
+  // Food safety: always trumps everything else visually
+  const hasFoodSafety = (summary.foodSafetyRisks ?? 0) > 0;
 
   // Risk level banner
-  const riskBanner =
-    summary.outOfService > 0
-      ? {
-          bg: "bg-red-50 border border-red-200",
-          text: "text-red-700",
-          icon: "🔴",
-          message:
-            summary.outOfService === 1
-              ? `1 unit out of service${summary.openRepairs > 0 ? ` · ${summary.openRepairs} open repair${summary.openRepairs > 1 ? "s" : ""}` : ""}.`
-              : `${summary.outOfService} units out of service${summary.openRepairs > 0 ? ` · ${summary.openRepairs} open repair${summary.openRepairs > 1 ? "s" : ""}` : ""}.`,
-        }
-      : summary.openRepairs > 0
-      ? {
-          bg: "bg-amber-50 border border-amber-200",
-          text: "text-amber-700",
-          icon: "🟡",
-          message: `${totalOpen} open issue${totalOpen > 1 ? "s" : ""} — no units currently out of service.`,
-        }
-      : summary.totalEquipment > 0
-      ? {
-          bg: "bg-emerald-50 border border-emerald-200",
-          text: "text-emerald-700",
-          icon: "🟢",
-          message: "All equipment operational — no open issues.",
-        }
-      : null;
+  const riskBanner = hasFoodSafety
+    ? {
+        bg: "bg-red-50 border border-red-200",
+        text: "text-red-700",
+        icon: "⚠️",
+        message: `Food safety risk — ${summary.foodSafetyRisks} unresolved issue${summary.foodSafetyRisks !== 1 ? "s" : ""}. Requires immediate action.`,
+      }
+    : summary.outOfService > 0
+    ? {
+        bg: "bg-red-50 border border-red-200",
+        text: "text-red-700",
+        icon: "🔴",
+        message:
+          summary.outOfService === 1
+            ? `1 unit out of service${summary.openRepairs > 0 ? ` · ${summary.openRepairs} open repair${summary.openRepairs > 1 ? "s" : ""}` : ""}.`
+            : `${summary.outOfService} units out of service${summary.openRepairs > 0 ? ` · ${summary.openRepairs} open repair${summary.openRepairs > 1 ? "s" : ""}` : ""}.`,
+      }
+    : summary.openRepairs > 0
+    ? {
+        bg: "bg-amber-50 border border-amber-200",
+        text: "text-amber-700",
+        icon: "🟡",
+        message: `${totalOpen} open issue${totalOpen > 1 ? "s" : ""} — no units currently out of service.`,
+      }
+    : summary.totalEquipment > 0
+    ? {
+        bg: "bg-emerald-50 border border-emerald-200",
+        text: "text-emerald-700",
+        icon: "🟢",
+        message: "All equipment operational — no open issues.",
+      }
+    : null;
 
   return (
     <section>
@@ -88,6 +96,24 @@ export default function MaintenanceSection({ summary }: Props) {
           highlight={summary.outOfService > 0 ? "red" : undefined}
         />
       </div>
+
+      {/* Intelligence stats row */}
+      {(summary.resolvedThisWeek > 0 || summary.avgFixTimeDays != null || summary.monthlyActualCost != null || summary.topProblemAsset) && (
+        <div className="mb-4 flex flex-wrap gap-x-4 gap-y-1 rounded-lg border border-stone-100 bg-stone-50 px-4 py-2.5 text-xs text-stone-500">
+          {summary.resolvedThisWeek > 0 && (
+            <span>Resolved this week: <span className="font-semibold text-green-700">{summary.resolvedThisWeek}</span></span>
+          )}
+          {summary.avgFixTimeDays != null && (
+            <span>Avg fix time: <span className="font-semibold text-stone-700">{summary.avgFixTimeDays.toFixed(1)} days</span></span>
+          )}
+          {summary.monthlyActualCost != null && summary.monthlyActualCost > 0 && (
+            <span>Monthly cost: <span className="font-semibold text-stone-700">R {summary.monthlyActualCost.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
+          )}
+          {summary.topProblemAsset && (
+            <span>Top issue: <span className="font-semibold text-amber-700">{summary.topProblemAsset}</span></span>
+          )}
+        </div>
+      )}
 
       {summary.totalEquipment === 0 ? (
         <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-8 text-center">

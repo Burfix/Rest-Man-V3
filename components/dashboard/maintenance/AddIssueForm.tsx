@@ -39,6 +39,8 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
           issue_title: fd.get("issue_title"),
           issue_description: fd.get("issue_description") || undefined,
           priority: fd.get("priority"),
+          impact_level: fd.get("impact_level") || "none",
+          reported_by: fd.get("reported_by") || undefined,
           repair_status: fd.get("repair_status") || "open",
           date_reported: fd.get("date_reported") || undefined,
         }),
@@ -141,14 +143,47 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             disabled={isSubmitting}
             className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
           >
-            <option value="" disabled>
-              Select…
-            </option>
+            <option value="" disabled>Select…</option>
             <option value="urgent">Urgent</option>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
+        </div>
+
+        {/* Business impact */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Business Impact <span className="text-red-500">*</span>
+          </label>
+          <select
+            name="impact_level"
+            required
+            defaultValue="none"
+            disabled={isSubmitting}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+          >
+            <option value="none">No operational impact</option>
+            <option value="minor">Minor impact</option>
+            <option value="service_disruption">Service disruption</option>
+            <option value="revenue_loss">Revenue loss</option>
+            <option value="compliance_risk">Compliance risk</option>
+            <option value="food_safety_risk">⚠ Food safety risk</option>
+          </select>
+        </div>
+
+        {/* Reported by */}
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-gray-700 mb-1">
+            Reported by
+          </label>
+          <input
+            name="reported_by"
+            type="text"
+            placeholder="e.g. Marco, FOH Manager"
+            disabled={isSubmitting}
+            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+          />
         </div>
 
         {/* Repair status */}

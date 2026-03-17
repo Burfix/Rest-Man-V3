@@ -4,40 +4,91 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { Equipment, EquipmentRepair, MaintenanceLog, MaintenanceSummary } from "@/types";
+import { calcMTTR, getTopFailingAssets } from "@/lib/maintenance-utils";
 
 const OPEN_STATUSES = ["open", "in_progress", "awaiting_parts"] as const;
 
 export async function getMaintenanceSummary(): Promise<MaintenanceSummary> {
   const supabase = createServerClient();
 
-  const [equipResult, openResult] = await Promise.all([
-    supabase.from("equipment").select("id, status"),
-    supabase
-      .from("maintenance_logs")
-      .select("*")
-      .in("repair_status", [...OPEN_STATUSES])
-      .order("date_reported", { ascending: false }),
-  ]);
+  const sevenDaysAgo  = new Date(Date.now() - 7  * 86_400_000).toISOString().slice(0, 10);
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+  const monthStart    = new Date(
+    new Date().getFullYear(), new Date().getMonth(), 1
+  ).toISOString().slice(0, 10);
 
-  if (equipResult.error) {
-    throw new Error(`[OpsSvc/Maintenance] Equipment: ${equipResult.error.message}`);
-  }
-  if (openResult.error) {
-    throw new Error(`[OpsSvc/Maintenance] Logs: ${openResult.error.message}`);
-  }
+  const [equipResult, openResult, recentResolvedResult, last30Result] =
+    await Promise.all([
+      supabase.from("equipment").select("id, status"),
+      supabase
+        .from("maintenance_logs")
+        .select("*")
+        .in("repair_status", [...OPEN_STATUSES])
+        .order("date_reported", { ascending: false }),
+      // Recently resolved — for MTTR + "resolved this week"
+      supabase
+        .from("maintenance_logs")
+        .select("*")
+        .in("repair_status", ["resolved", "closed"])
+        .gte("updated_at", sevenDaysAgo + "T00:00:00Z")
+        .limit(100),
+      // Last 30 days all issues — for top problem asset + monthly cost
+      supabase
+        .from("maintenance_logs")
+        .select("*")
+        .gte("date_reported", thirtyDaysAgo)
+        .limit(200),
+    ]);
 
-  const equipment = (equipResult.data ?? []) as Pick<Equipment, "id" | "status">[];
-  const openIssues = (openResult.data ?? []) as MaintenanceLog[];
+  const equipment        = (equipResult.data        ?? []) as Pick<Equipment, "id" | "status">[];
+  const openIssues       = (openResult.data          ?? []) as MaintenanceLog[];
+  const recentResolved   = (recentResolvedResult.data ?? []) as MaintenanceLog[];
+  const last30           = (last30Result.data         ?? []) as MaintenanceLog[];
+
+  // ── MTTR: use last 30 days of all logs (open + resolved) ─────────────
+  const allLast30 = [...last30];
+  const mttr = calcMTTR(allLast30);
+
+  // ── Resolved this week ────────────────────────────────────────────────
+  const resolvedThisWeek = recentResolved.filter((l) => {
+    const fixed = l.date_fixed ?? l.date_resolved;
+    return fixed != null && fixed >= sevenDaysAgo;
+  }).length + recentResolved.filter((l) => !l.date_fixed && !l.date_resolved).length;
+  // fallback: any with updated_at in window counts as resolved this week if no explicit date
+
+  // ── Monthly actual cost ───────────────────────────────────────────────
+  const monthlyActualCost = last30
+    .filter((l) => {
+      const d = l.date_fixed ?? l.date_resolved ?? l.date_reported;
+      return d >= monthStart && l.actual_cost != null;
+    })
+    .reduce((s, l) => s + (l.actual_cost ?? 0), 0) || null;
+
+  // ── Top problem asset (last 30 days) ─────────────────────────────────
+  const topAssets        = getTopFailingAssets(last30, 30);
+  const topProblemAsset  = topAssets[0]?.asset_name ?? null;
+
+  // ── Business impact counts from open issues ───────────────────────────
+  const foodSafetyRisks   = openIssues.filter((l) => l.impact_level === "food_safety_risk").length;
+  const serviceDisruptions = openIssues.filter((l) => l.impact_level === "service_disruption").length;
+  const complianceRisks   = openIssues.filter((l) => l.impact_level === "compliance_risk").length;
 
   return {
-    totalEquipment: equipment.length,
-    openRepairs: openIssues.filter((l) => l.repair_status === "open").length,
-    inProgress: openIssues.filter((l) => l.repair_status === "in_progress").length,
-    awaitingParts: openIssues.filter((l) => l.repair_status === "awaiting_parts").length,
-    outOfService: equipment.filter((e) => e.status === "out_of_service").length,
-    urgentIssues: openIssues.filter(
+    totalEquipment:  equipment.length,
+    openRepairs:     openIssues.filter((l) => l.repair_status === "open").length,
+    inProgress:      openIssues.filter((l) => l.repair_status === "in_progress").length,
+    awaitingParts:   openIssues.filter((l) => l.repair_status === "awaiting_parts").length,
+    outOfService:    equipment.filter((e) => e.status === "out_of_service").length,
+    urgentIssues:    openIssues.filter(
       (l) => l.priority === "urgent" || l.priority === "high"
     ),
+    resolvedThisWeek,
+    avgFixTimeDays:  mttr,
+    monthlyActualCost: monthlyActualCost && monthlyActualCost > 0 ? monthlyActualCost : null,
+    topProblemAsset,
+    foodSafetyRisks,
+    serviceDisruptions,
+    complianceRisks,
   };
 }
 
