@@ -6,39 +6,27 @@
  */
 
 import ReviewsSection    from "@/components/dashboard/ops/ReviewsSection";
-import SalesSection      from "@/components/dashboard/ops/SalesSection";
-import DailyOpsSection   from "@/components/dashboard/ops/DailyOpsSection";
 import MaintenanceSection from "@/components/dashboard/ops/MaintenanceSection";
 import SetupProgressSection from "@/components/dashboard/ops/SetupProgressSection";
 import type {
   SevenDayReviewSummary,
-  SalesSummary,
-  DailyOperationsDashboardSummary,
   MaintenanceSummary,
 } from "@/types";
 
 interface Props {
   reviews:     SevenDayReviewSummary;
-  sales:       SalesSummary;
-  dailyOps:    DailyOperationsDashboardSummary;
   maintenance: MaintenanceSummary;
   hasEquipment: boolean;
-  hasSales:     boolean;
   hasReviews:   boolean;
-  hasDailyOps:  boolean;
 }
 
 export default function SecondaryInsights({
   reviews,
-  sales,
-  dailyOps,
   maintenance,
   hasEquipment,
-  hasSales,
   hasReviews,
-  hasDailyOps,
 }: Props) {
-  const allSetup = hasEquipment && hasSales && hasReviews && hasDailyOps;
+  const allSetup = hasEquipment && hasReviews;
 
   return (
     <div>
@@ -59,14 +47,8 @@ export default function SecondaryInsights({
               ? "Below: 7-day review snapshot. Flagged reviews require attention."
               : "Reviews not synced — connect a source to monitor guest sentiment."}
           </p>
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <ReviewsSection  summary={reviews}  />
-            <SalesSection    summary={sales}    />
-          </div>
+          <ReviewsSection summary={reviews} />
         </div>
-
-        {/* Daily Ops full-width */}
-        <DailyOpsSection summary={dailyOps} />
 
         {/* Maintenance full-width */}
         <MaintenanceSection summary={maintenance} />
@@ -75,9 +57,9 @@ export default function SecondaryInsights({
         {!allSetup && (
           <SetupProgressSection
             hasEquipment={hasEquipment}
-            hasSales={hasSales}
+            hasSales={false}
             hasReviews={hasReviews}
-            hasDailyOps={hasDailyOps}
+            hasDailyOps={false}
           />
         )}
       </div>

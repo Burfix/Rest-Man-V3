@@ -237,13 +237,9 @@ export default async function OperationsDashboard() {
       {/* ── 6. Secondary Intelligence (below fold) ── */}
       <SecondaryInsights
         reviews={reviews}
-        sales={sales}
-        dailyOps={dailyOps}
         maintenance={maintenance}
         hasEquipment={maintenance.totalEquipment > 0}
-        hasSales={sales.upload !== null}
         hasReviews={reviews.totalReviews > 0}
-        hasDailyOps={dailyOps.latestReport !== null}
       />
 
     </div>
