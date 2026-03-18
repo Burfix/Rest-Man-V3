@@ -22,6 +22,7 @@ import {
   detectRepeatAssets,
 } from "@/lib/maintenance-utils";
 import MaintenanceActions from "@/components/dashboard/maintenance/MaintenanceActions";
+import EditStatusButton from "@/components/dashboard/maintenance/EditStatusButton";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -498,10 +499,6 @@ function LogRow({ log }: { log: MaintenanceLog }) {
 }
 
 function EquipmentRow({ equipment: e, id }: { equipment: Equipment; id: string }) {
-  const sts =
-    statusConfig[e.status as keyof typeof statusConfig] ??
-    statusConfig.operational;
-
   return (
     <tr className={cn("hover:bg-stone-50", e.status === "out_of_service" && "bg-red-50")}>
       <td className="whitespace-nowrap px-4 py-3 font-medium text-stone-800">
@@ -514,14 +511,7 @@ function EquipmentRow({ equipment: e, id }: { equipment: Equipment; id: string }
         {e.location ?? "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
-        <span
-          className={cn(
-            "rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-            sts.badge
-          )}
-        >
-          {sts.label}
-        </span>
+        <EditStatusButton equipmentId={id} currentStatus={e.status} />
       </td>
       <td className="px-4 py-3 max-w-[200px] text-xs text-stone-400">
         {e.notes ? (
