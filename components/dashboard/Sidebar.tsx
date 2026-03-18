@@ -23,18 +23,18 @@ const NAV: NavGroup[] = [
   {
     group: "",
     items: [
-      { href: "/dashboard", label: "Command Center", icon: "⚡" },
+      { href: "/dashboard",         label: "Command Center", icon: "⚡" },
+      { href: "/dashboard/actions", label: "Actions",        icon: "✅" },
     ],
   },
   {
     group: "Operations",
     items: [
-      { href: "/dashboard/compliance",  label: "Compliance",    icon: "📋" },
-      { href: "/dashboard/maintenance", label: "Maintenance",   icon: "🔧" },
-      { href: "/dashboard/operations",  label: "Daily Ops",     icon: "📊" },
-      { href: "/dashboard/heatmap",     label: "Zone Heatmap",  icon: "🗺️" },
-      { href: "#",                      label: "Incidents",     icon: "🚨", soon: true },
-      { href: "#",                      label: "Audit Actions", icon: "✅", soon: true },
+      { href: "/dashboard/compliance",  label: "Compliance",   icon: "📋" },
+      { href: "/dashboard/maintenance", label: "Maintenance",  icon: "🔧" },
+      { href: "/dashboard/operations",  label: "Daily Ops",    icon: "📊" },
+      { href: "/dashboard/heatmap",     label: "Zone Heatmap", icon: "🗺️" },
+      { href: "#",                      label: "Incidents",    icon: "🚨", soon: true },
     ],
   },
   {

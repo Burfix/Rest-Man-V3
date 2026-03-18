@@ -1451,6 +1451,110 @@ export interface Database {
           { foreignKeyName: "mld_connection_id_fkey"; columns: ["connection_id"]; referencedRelation: "micros_connections"; referencedColumns: ["id"] }
         ];
       };
+
+      actions: {
+        Row: {
+          id:            string;
+          title:         string;
+          description:   string | null;
+          impact_weight: string;
+          status:        string;
+          source_type:   string | null;
+          source_id:     string | null;
+          assigned_to:   string | null;
+          site_id:       string | null;
+          zone_id:       string | null;
+          created_at:    string;
+          updated_at:    string;
+          started_at:    string | null;
+          completed_at:  string | null;
+          archived_at:   string | null;
+        };
+        Insert: {
+          id?:           string;
+          title:         string;
+          description?:  string | null;
+          impact_weight?: string;
+          status?:       string;
+          source_type?:  string | null;
+          source_id?:    string | null;
+          assigned_to?:  string | null;
+          site_id?:      string | null;
+          zone_id?:      string | null;
+          created_at?:   string;
+          updated_at?:   string;
+          started_at?:   string | null;
+          completed_at?: string | null;
+          archived_at?:  string | null;
+        };
+        Update: {
+          id?:           string;
+          title?:        string;
+          description?:  string | null;
+          impact_weight?: string;
+          status?:       string;
+          source_type?:  string | null;
+          source_id?:    string | null;
+          assigned_to?:  string | null;
+          site_id?:      string | null;
+          zone_id?:      string | null;
+          created_at?:   string;
+          updated_at?:   string;
+          started_at?:   string | null;
+          completed_at?: string | null;
+          archived_at?:  string | null;
+        };
+        Relationships: [];
+      };
+
+      action_daily_stats: {
+        Row: {
+          id:                     string;
+          site_id:                string | null;
+          stat_date:              string;
+          total_created:          number;
+          total_completed:        number;
+          total_carried_forward:  number;
+          completion_rate_pct:    number;
+          avg_resolution_minutes: number | null;
+          critical_completed:     number;
+          high_completed:         number;
+          medium_completed:       number;
+          low_completed:          number;
+          created_at:             string;
+        };
+        Insert: {
+          id?:                     string;
+          site_id?:                string | null;
+          stat_date:               string;
+          total_created?:          number;
+          total_completed?:        number;
+          total_carried_forward?:  number;
+          completion_rate_pct?:    number;
+          avg_resolution_minutes?: number | null;
+          critical_completed?:     number;
+          high_completed?:         number;
+          medium_completed?:       number;
+          low_completed?:          number;
+          created_at?:             string;
+        };
+        Update: {
+          id?:                     string;
+          site_id?:                string | null;
+          stat_date?:              string;
+          total_created?:          number;
+          total_completed?:        number;
+          total_carried_forward?:  number;
+          completion_rate_pct?:    number;
+          avg_resolution_minutes?: number | null;
+          critical_completed?:     number;
+          high_completed?:         number;
+          medium_completed?:       number;
+          low_completed?:          number;
+          created_at?:             string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
