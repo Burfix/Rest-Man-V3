@@ -1,28 +1,14 @@
 /**
  * Today's bookings summary — used by the Operations Command Dashboard.
+ * Data source: sicantinasociale.co.za website API (live).
  */
 
-import { createServerClient } from "@/lib/supabase/server";
 import { Reservation, TodayBookingsSummary } from "@/types";
-import { todayISO } from "@/lib/utils";
 import { SERVICE_CHARGE_THRESHOLD } from "@/lib/constants";
+import { getTodayWebsiteReservations } from "@/services/bookings/websiteService";
 
 export async function getTodayBookingsSummary(): Promise<TodayBookingsSummary> {
-  const supabase = createServerClient();
-  const today = todayISO();
-
-  const { data, error } = await supabase
-    .from("reservations")
-    .select("*")
-    .eq("booking_date", today)
-    .neq("status", "cancelled")
-    .order("booking_time", { ascending: true });
-
-  if (error) {
-    throw new Error(`[OpsSvc/Bookings] ${error.message}`);
-  }
-
-  const bookings = (data ?? []) as Reservation[];
+  const bookings = await getTodayWebsiteReservations();
 
   return {
     total: bookings.length,

@@ -2,17 +2,17 @@
  * Upcoming bookings — all future reservations
  */
 
-import { getUpcomingReservations } from "@/services/bookings/service";
+import { getUpcomingWebsiteReservations } from "@/services/bookings/websiteService";
 import BookingsPageClient from "@/components/dashboard/BookingsPageClient";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function BookingsPage() {
-  let reservations: Awaited<ReturnType<typeof getUpcomingReservations>> = [];
+  let reservations: Awaited<ReturnType<typeof getUpcomingWebsiteReservations>> = [];
   let dbError = false;
   try {
-    reservations = await getUpcomingReservations();
+    reservations = await getUpcomingWebsiteReservations();
   } catch {
     dbError = true;
   }

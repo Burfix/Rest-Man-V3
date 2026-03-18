@@ -23,7 +23,7 @@ export interface Reservation {
   updated_at: string;
 }
 
-export type ReservationStatus = "pending" | "confirmed" | "cancelled";
+export type ReservationStatus = "pending" | "confirmed" | "completed" | "cancelled";
 
 export interface VenueEvent {
   id: string;
