@@ -10,6 +10,7 @@ import {
   getRepairsByEquipmentId,
 } from "@/services/ops/maintenanceSummary";
 import RepairHistoryPanel from "@/components/dashboard/maintenance/RepairHistoryPanel";
+import EditStatusButton from "@/components/dashboard/maintenance/EditStatusButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -72,9 +73,7 @@ export default async function EquipmentDetailPage({ params }: PageProps) {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={cn("rounded-full px-3 py-1 text-sm font-semibold", cfg.badge)}>
-              {cfg.label}
-            </span>
+            <EditStatusButton equipmentId={equipment.id} currentStatus={equipment.status} />
             {warrantyBadge(equipment.warranty_expiry)}
           </div>
         </div>
