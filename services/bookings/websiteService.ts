@@ -63,10 +63,7 @@ function mapWebsiteReservation(r: WebsiteReservation): Reservation {
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 export async function getAllWebsiteReservations(): Promise<Reservation[]> {
-  const res = await fetch(WEBSITE_RESERVATIONS_URL, {
-    cache: "no-store",
-    next: { revalidate: 0 },
-  });
+  const res = await fetch(WEBSITE_RESERVATIONS_URL, { cache: "no-store" });
   if (!res.ok) {
     throw new Error(
       `[WebsiteBookings] Failed to fetch reservations: HTTP ${res.status}`

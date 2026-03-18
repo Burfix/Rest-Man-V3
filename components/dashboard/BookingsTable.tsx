@@ -15,9 +15,12 @@ interface Props {
 const COLUMNS = ["Name", "Phone", "Date", "Time", "Guests", "Event", "Status", "Flags", "Notes", "Actions"];
 
 export default function BookingsTable({ reservations, showDateGroups = true }: Props) {
-  // Filter out test/dummy entries before rendering
+  // Filter out test/dummy entries (WhatsApp/dashboard test bookings).
+  // Website-sourced bookings (source_channel === 'website') skip this filter.
   const filtered = reservations.filter(
-    (r) => !isTestEntry({ name: r.customer_name, phone: r.phone_number })
+    (r) =>
+      r.source_channel === "website" ||
+      !isTestEntry({ name: r.customer_name, phone: r.phone_number })
   );
 
   // Build ordered date-group map

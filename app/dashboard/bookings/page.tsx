@@ -10,11 +10,11 @@ export const revalidate = 0;
 
 export default async function BookingsPage() {
   let reservations: Awaited<ReturnType<typeof getUpcomingWebsiteReservations>> = [];
-  let dbError = false;
+  let fetchError: string | null = null;
   try {
     reservations = await getUpcomingWebsiteReservations();
-  } catch {
-    dbError = true;
+  } catch (err) {
+    fetchError = err instanceof Error ? err.message : "Unknown error";
   }
 
   return (
@@ -26,13 +26,13 @@ export default async function BookingsPage() {
         </p>
       </div>
 
-      {dbError && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          ⚠ Unable to load bookings. Please contact your system administrator if this persists.
+      {fetchError && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          ⚠ Could not load bookings from the website API: <code className="font-mono">{fetchError}</code>
         </div>
       )}
 
-      {!dbError && <BookingsPageClient reservations={reservations} />}
+      {!fetchError && <BookingsPageClient reservations={reservations} />}
     </div>
   );
 }
