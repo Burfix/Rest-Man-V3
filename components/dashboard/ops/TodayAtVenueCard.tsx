@@ -7,6 +7,9 @@
 
 import Link from "next/link";
 import { cn, formatCurrency } from "@/lib/utils";
+import SourceBadge from "@/components/ui/SourceBadge";
+import type { SourceType } from "@/components/ui/SourceBadge";
+import { generateLabourInsight } from "@/lib/commandCenter";
 import type {
   TodayBookingsSummary,
   VenueEvent,
@@ -16,12 +19,14 @@ import type {
 } from "@/types";
 
 interface Props {
-  today:       TodayBookingsSummary;
-  events:      VenueEvent[];
-  dailyOps:    DailyOperationsDashboardSummary;
-  maintenance: MaintenanceSummary;
-  date:        string;
-  forecast?:   RevenueForecast | null;
+  today:          TodayBookingsSummary;
+  events:         VenueEvent[];
+  dailyOps:       DailyOperationsDashboardSummary;
+  maintenance:    MaintenanceSummary;
+  date:           string;
+  forecast?:      RevenueForecast | null;
+  microsSource?:  SourceType | null;
+  microsSyncedAt?: string | null;
 }
 
 function fmtTime(t: string): string {
@@ -77,6 +82,8 @@ export default function TodayAtVenueCard({
   maintenance,
   date,
   forecast,
+  microsSource,
+  microsSyncedAt,
 }: Props) {
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
   const report     = dailyOps.latestReport;
@@ -106,19 +113,40 @@ export default function TodayAtVenueCard({
       ? { text: "Elevated", cls: "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400" }
     : undefined;
 
+  // Labour intelligence
+  const labourInsight = laborPct != null
+    ? generateLabourInsight({ laborPct, serviceFraction: 0.5 })
+    : null;
+
   const walkIn =
     forecast?.sales_gap != null && forecast.sales_gap < 0
       ? Math.abs(forecast.sales_gap)
       : null;
+
+  // Source badge for revenue data
+  let revenueSource: SourceType | null = null;
+  let revenueAgeLabel: string | undefined;
+  if (microsSource === "micros_live" && microsSyncedAt) {
+    revenueSource = "micros_live";
+    const mins = Math.floor((Date.now() - new Date(microsSyncedAt).getTime()) / 60_000);
+    revenueAgeLabel = mins < 1 ? "now" : mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`;
+  } else if (forecast) {
+    revenueSource = "forecast";
+  }
 
   return (
     <div className="flex flex-col rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
 
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-700 dark:text-stone-300">
-          Today at Venue
-        </h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-stone-700 dark:text-stone-300">
+            Today at Venue
+          </h2>
+          {revenueSource && (
+            <SourceBadge source={revenueSource} ageLabel={revenueAgeLabel} />
+          )}
+        </div>
         <Link
           href="/dashboard/bookings"
           className="text-[11px] text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
@@ -154,10 +182,27 @@ export default function TodayAtVenueCard({
         <DataRow
           label="Labour cost"
           value={laborPct != null ? `${laborPct.toFixed(1)}%` : "—"}
-          sub={laborPct != null ? "of revenue" : "Upload daily ops report"}
+          sub={
+            labourInsight
+              ? labourInsight.interpretation
+              : laborPct != null ? "of revenue" : "Upload daily ops report"
+          }
           valueColor={laborColor}
           badge={laborBadge}
         />
+        {labourInsight?.recommendation && (
+          <div className="flex items-start gap-2 py-2.5 border-b border-stone-100 dark:border-stone-800">
+            <span className="mt-0.5 h-1 w-1 rounded-full bg-amber-400 shrink-0" />
+            <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
+              {labourInsight.recommendation}
+              {labourInsight.projectedClose && (
+                <span className="ml-1 text-stone-400 dark:text-stone-600">
+                  — projected close {labourInsight.projectedClose.toFixed(1)}%
+                </span>
+              )}
+            </p>
+          </div>
+        )}
         {walkIn != null && (
           <DataRow
             label="Walk-in need"

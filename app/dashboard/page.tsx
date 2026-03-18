@@ -22,6 +22,7 @@ import { getComplianceSummary } from "@/services/ops/complianceSummary";
 import { getMicrosStatus } from "@/services/micros/status";
 
 import FreshnessBar          from "@/components/dashboard/ops/FreshnessBar";
+import CommandHeadlineBanner from "@/components/dashboard/ops/CommandHeadlineBanner";
 import DashboardTopBar       from "@/components/dashboard/ops/DashboardTopBar";
 import CriticalActionsPanel  from "@/components/dashboard/ops/CriticalActionsPanel";
 import OperationalRiskCard   from "@/components/dashboard/ops/OperationalRiskCard";
@@ -33,6 +34,7 @@ import SecondaryInsights     from "@/components/dashboard/SecondaryInsights";
 import {
   getServicePeriod,
   buildPriorityActions,
+  generateCommandHeadline,
 } from "@/lib/commandCenter";
 
 import type {
@@ -173,6 +175,15 @@ export default async function OperationsDashboard() {
     today:       today_iso,
   });
 
+  const commandHeadline = generateCommandHeadline({
+    compliance:    complianceSummary,
+    maintenance,
+    forecast,
+    dailyOps,
+    today:         { total: today.total, totalCovers: today.totalCovers },
+    servicePeriod,
+  });
+
   const totalAlerts = priorityActions.filter(
     (a) => a.severity === "critical" || a.severity === "urgent"
   ).length;
@@ -191,10 +202,18 @@ export default async function OperationsDashboard() {
         events={events}
         today={today}
         totalAlerts={totalAlerts}
+        microsStatus={microsStatus ? {
+          isConfigured:    (microsStatus as MicrosStatusSummary).isConfigured,
+          minutesSinceSync: (microsStatus as MicrosStatusSummary).minutesSinceSync ?? null,
+          lastSyncError:   (microsStatus as MicrosStatusSummary).connection?.last_sync_error ?? null,
+        } : null}
       />
 
       {/* ── 2. Data Freshness Row ── */}
       {freshness && <FreshnessBar freshness={freshness} />}
+
+      {/* ── Command Headline ── */}
+      <CommandHeadlineBanner headline={commandHeadline} />
 
       {/* ── MICROS live revenue strip — shown only when synced today ── */}
       {(() => {
@@ -261,6 +280,8 @@ export default async function OperationsDashboard() {
           maintenance={maintenance}
           date={today_iso}
           forecast={forecast}
+          microsSource={(microsStatus as MicrosStatusSummary | null)?.isConfigured ? "micros_live" : null}
+          microsSyncedAt={(microsStatus as MicrosStatusSummary | null)?.connection?.last_sync_at ?? null}
         />
         <OperationalHealthCard
           compliance={complianceSummary}
@@ -268,6 +289,15 @@ export default async function OperationsDashboard() {
           forecast={forecast}
           reviews={reviews}
           dailyOps={dailyOps}
+          microsStatus={microsStatus ? {
+            isConfigured:     (microsStatus as MicrosStatusSummary).isConfigured,
+            minutesSinceSync: (microsStatus as MicrosStatusSummary).minutesSinceSync ?? null,
+            lastSyncError:    (microsStatus as MicrosStatusSummary).connection?.last_sync_error ?? null,
+          } : undefined}
+          freshness={freshness ? {
+            sales:  freshness.sales  ? { lastUpdated: freshness.sales.lastUpdatedAt,  stale: freshness.sales.stale }  : null,
+            labour: freshness.dailyOps ? { lastUpdated: freshness.dailyOps.lastUpdatedAt, stale: freshness.dailyOps.stale } : null,
+          } : undefined}
         />
       </div>
 

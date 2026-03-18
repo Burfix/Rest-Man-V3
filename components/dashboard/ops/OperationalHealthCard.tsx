@@ -4,6 +4,8 @@
  * Headline score (0–100) with a status label, then 4 sub-dimension bars:
  *   Compliance · Maintenance · Revenue Readiness · Service Readiness
  *
+ * Below the score: top risk driver, fastest fix, and data freshness note.
+ *
  * Revenue and Service bars handle missing-data gracefully — never show 0%
  * as though something is broken when data simply hasn't been set up yet.
  *
@@ -21,11 +23,20 @@ import type {
 } from "@/types";
 
 interface Props {
-  compliance:  ComplianceSummary;
-  maintenance: MaintenanceSummary;
-  forecast:    RevenueForecast | null;
-  reviews:     SevenDayReviewSummary;
-  dailyOps:    DailyOperationsDashboardSummary;
+  compliance:   ComplianceSummary;
+  maintenance:  MaintenanceSummary;
+  forecast:     RevenueForecast | null;
+  reviews:      SevenDayReviewSummary;
+  dailyOps:     DailyOperationsDashboardSummary;
+  microsStatus?: {
+    minutesSinceSync: number | null;
+    isConfigured:     boolean;
+    lastSyncError?:   string | null;
+  } | null;
+  freshness?: {
+    sales:   { lastUpdated: string | null; stale: boolean } | null;
+    labour?: { lastUpdated: string | null; stale: boolean } | null;
+  } | null;
 }
 
 export default function OperationalHealthCard({
@@ -34,6 +45,8 @@ export default function OperationalHealthCard({
   forecast,
   reviews,
   dailyOps,
+  microsStatus,
+  freshness,
 }: Props) {
   const { total, status, breakdown } = computeHealthScore({
     compliance,
@@ -42,6 +55,49 @@ export default function OperationalHealthCard({
     dailyOps,
     reviews,
   });
+
+  // ── Guidance: top risk driver + fastest fix ────────────────────────────
+  let topRiskDriver: string | null = null;
+  let fastestFix:    string | null = null;
+
+  if (compliance.expired > 0) {
+    topRiskDriver = `${compliance.expired} compliance certificate${compliance.expired > 1 ? "s" : ""} expired`;
+    fastestFix    = "Upload renewed certificates to Compliance Hub";
+  } else if (maintenance.foodSafetyRisks > 0) {
+    topRiskDriver = `Food safety issue — ${maintenance.urgentIssues[0]?.unit_name ?? "equipment"}`;
+    fastestFix    = "Resolve food safety issue before next service";
+  } else if (maintenance.outOfService > 0) {
+    topRiskDriver = `${maintenance.outOfService} equipment unit${maintenance.outOfService > 1 ? "s" : ""} out of service`;
+    fastestFix    = "Assign repair or source replacement unit";
+  } else if (forecast?.sales_gap_pct && forecast.sales_gap_pct < -20) {
+    const gap = Math.abs(Math.round(forecast.sales_gap ?? 0));
+    topRiskDriver = `Revenue pace ${Math.abs(forecast.sales_gap_pct).toFixed(0)}% behind target`;
+    fastestFix    = gap > 0
+      ? `Need R${gap.toLocaleString()} additional covers at current average spend`
+      : "Push walk-ins and confirm open bookings";
+  } else if (maintenance.openRepairs > 0) {
+    topRiskDriver = `${maintenance.openRepairs} open repair issue${maintenance.openRepairs > 1 ? "s" : ""}`;
+    fastestFix    = "Assign staff and update repair status before service";
+  } else if (compliance.due_soon > 0) {
+    topRiskDriver = `${compliance.due_soon} certificate${compliance.due_soon > 1 ? "s" : ""} expiring within 30 days`;
+    fastestFix    = "Begin renewal — allow 2–4 weeks for authority processing";
+  }
+
+  // ── Freshness / confidence note ────────────────────────────────────────
+  const freshnessNotes: string[] = [];
+  if (microsStatus?.isConfigured && microsStatus.minutesSinceSync != null) {
+    const m = microsStatus.minutesSinceSync;
+    freshnessNotes.push(`MICROS synced ${m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`}`);
+  } else if (microsStatus?.isConfigured && microsStatus.lastSyncError) {
+    freshnessNotes.push("MICROS sync error — showing last known values");
+  }
+  if (freshness?.sales?.lastUpdated) {
+    const d = Math.round((Date.now() - new Date(freshness.sales.lastUpdated).getTime()) / 86_400_000);
+    if (d > 0) freshnessNotes.push(`Sales data ${d}d old`);
+  }
+  if (freshnessNotes.length === 0 && !microsStatus?.isConfigured) {
+    freshnessNotes.push("Connect MICROS for live confidence scoring");
+  }
 
   const statusCfg = {
     "Strong":           { color: "text-emerald-600 dark:text-emerald-400", bar: "bg-emerald-500", ring: "border-emerald-200 dark:border-emerald-800" },
@@ -216,6 +272,41 @@ export default function OperationalHealthCard({
           );
         })}
       </div>
+
+      {/* Guidance panel — top risk driver + fastest fix */}
+      {(topRiskDriver || fastestFix || freshnessNotes.length > 0) && (
+        <div className="border-t border-stone-100 dark:border-stone-800 px-5 py-3.5 space-y-2">
+          {topRiskDriver && (
+            <div className="flex items-start gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Top risk driver</p>
+                <p className="text-[11px] text-stone-700 dark:text-stone-300 font-medium leading-snug mt-px">{topRiskDriver}</p>
+              </div>
+            </div>
+          )}
+          {fastestFix && (
+            <div className="flex items-start gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Fastest fix</p>
+                <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-snug mt-px">{fastestFix}</p>
+              </div>
+            </div>
+          )}
+          {freshnessNotes.length > 0 && (
+            <div className="flex items-start gap-2">
+              <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Confidence</p>
+                <p className="text-[11px] text-stone-500 dark:text-stone-500 leading-snug mt-px">
+                  {freshnessNotes.join(" · ")}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

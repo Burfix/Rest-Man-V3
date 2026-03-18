@@ -9,6 +9,7 @@
  */
 
 import { cn, formatDisplayDate } from "@/lib/utils";
+import SourceBadge from "@/components/ui/SourceBadge";
 import type {
   ComplianceSummary,
   MaintenanceSummary,
@@ -19,15 +20,20 @@ import type {
 } from "@/types";
 
 interface Props {
-  date:          string;
-  servicePeriod: string;
-  compliance:    ComplianceSummary;
-  maintenance:   MaintenanceSummary;
-  forecast:      RevenueForecast | null;
-  dailyOps:      DailyOperationsDashboardSummary;
-  events:        VenueEvent[];
-  today:         TodayBookingsSummary;
-  totalAlerts:   number;
+  date:           string;
+  servicePeriod:  string;
+  compliance:     ComplianceSummary;
+  maintenance:    MaintenanceSummary;
+  forecast:       RevenueForecast | null;
+  dailyOps:       DailyOperationsDashboardSummary;
+  events:         VenueEvent[];
+  today:          TodayBookingsSummary;
+  totalAlerts:    number;
+  microsStatus?:  {
+    isConfigured:     boolean;
+    minutesSinceSync: number | null;
+    lastSyncError?:   string | null;
+  } | null;
 }
 
 const PERIOD_STYLE: Record<string, string> = {
@@ -55,6 +61,7 @@ export default function DashboardTopBar({
   dailyOps,
   today,
   totalAlerts,
+  microsStatus,
 }: Props) {
   const laborPct  = dailyOps.latestReport?.labor_cost_percent ?? null;
   const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
@@ -129,6 +136,15 @@ export default function DashboardTopBar({
       ? "text-stone-500 dark:text-stone-500"
       : "text-amber-600 dark:text-amber-400";
 
+  // ── MICROS source badge for Revenue/Labour tiles ─────────────────────────
+  const microsLive    = microsStatus?.isConfigured && microsStatus.minutesSinceSync != null;
+  const microsStale   = microsStatus?.isConfigured && microsStatus.lastSyncError != null;
+  let microsAgeLabel: string | undefined;
+  if (microsStatus?.minutesSinceSync != null) {
+    const m = microsStatus.minutesSinceSync;
+    microsAgeLabel = m < 1 ? "now" : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`;
+  }
+
   const kpis = [
     {
       label:      "Compliance",
@@ -152,6 +168,8 @@ export default function DashboardTopBar({
       subColor:   revSubColor,
       note:       revSubNote,
       href:       "/dashboard/settings/targets",
+      sourceType: microsLive ? "micros_live" as const : microsStale ? "stale" as const : forecast ? "forecast" as const : undefined,
+      sourceAge:  microsLive ? microsAgeLabel : undefined,
     },
     {
       label:      "Labour",
@@ -159,6 +177,8 @@ export default function DashboardTopBar({
       sub:        labourSub,
       subColor:   labourSubColor,
       href:       "/dashboard/operations",
+      sourceType: microsLive ? "labour_sync" as const : dailyOps.latestReport ? "csv_upload" as const : undefined,
+      sourceAge:  microsLive ? microsAgeLabel : undefined,
     },
     {
       label:      "Today",
@@ -235,6 +255,9 @@ export default function DashboardTopBar({
               <span className="text-[10px] text-stone-400 dark:text-stone-600 leading-tight truncate">
                 {kpi.note}
               </span>
+            )}
+            {"sourceType" in kpi && kpi.sourceType && (
+              <SourceBadge source={kpi.sourceType} ageLabel={kpi.sourceAge} className="mt-0.5" />
             )}
           </a>
         ))}

@@ -6,6 +6,9 @@
  *
  * This is the first major focus zone on the dashboard — it must feel urgent,
  * decisive and immediately actionable. The GM's digital pre-shift briefing.
+ *
+ * Each row now surfaces a contextual primary action button inline (right side)
+ * with optional secondary actions. Actions depend on the action type.
  */
 
 import Link from "next/link";
@@ -150,13 +153,31 @@ export default function CriticalActionsPanel({ actions }: Props) {
                 )}
               </div>
 
-              {/* CTA */}
-              <Link
-                href={action.href}
-                className="shrink-0 mt-0.5 text-[11px] font-semibold text-stone-500 dark:text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 whitespace-nowrap transition-colors"
-              >
-                View →
-              </Link>
+              {/* CTA — contextual primary action or generic View */}
+              <div className="shrink-0 mt-0.5 flex items-center gap-2">
+                {action.primaryAction ? (
+                  <Link
+                    href={action.primaryAction.href}
+                    className={cn(
+                      "rounded px-2.5 py-1.5 text-[11px] font-semibold leading-none whitespace-nowrap transition-colors",
+                      action.severity === "critical"
+                        ? "bg-red-600 text-white hover:bg-red-700"
+                        : action.severity === "urgent"
+                        ? "bg-amber-500 text-white hover:bg-amber-600"
+                        : "bg-stone-900 text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900 dark:hover:bg-white"
+                    )}
+                  >
+                    {action.primaryAction.label}
+                  </Link>
+                ) : (
+                  <Link
+                    href={action.href}
+                    className="shrink-0 text-[11px] font-semibold text-stone-500 dark:text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 whitespace-nowrap transition-colors"
+                  >
+                    View →
+                  </Link>
+                )}
+              </div>
             </div>
           );
         })}

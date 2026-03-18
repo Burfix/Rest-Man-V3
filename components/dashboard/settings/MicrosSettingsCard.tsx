@@ -309,6 +309,49 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
             <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-stone-400">
               Sync Status
             </h3>
+
+            {/* Sync health indicator */}
+            {(() => {
+              const hasError  = !!connection.last_sync_error;
+              const lastSync  = connection.last_successful_sync_at;
+              const minsAgo   = lastSync
+                ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 60_000)
+                : null;
+              let healthLabel = "Unknown";
+              let healthColor = "bg-stone-400";
+              let healthText  = "No sync data available.";
+              if (hasError) {
+                healthLabel = "Sync error";
+                healthColor = "bg-red-500";
+                healthText  = connection.last_sync_error!;
+              } else if (minsAgo == null) {
+                healthLabel = "Not synced";
+                healthColor = "bg-stone-400";
+                healthText  = "No successful sync recorded.";
+              } else if (minsAgo < 10) {
+                healthLabel = "Healthy";
+                healthColor = "bg-emerald-500";
+                healthText  = `Last synced ${minsAgo < 1 ? "just now" : `${minsAgo}m ago`}. Data is fresh.`;
+              } else if (minsAgo < 60) {
+                healthLabel = "Recent";
+                healthColor = "bg-sky-500";
+                healthText  = `Last synced ${minsAgo}m ago.`;
+              } else {
+                healthLabel = "Stale";
+                healthColor = "bg-amber-500";
+                healthText  = `Last synced ${Math.floor(minsAgo / 60)}h ago. Consider triggering a manual sync.`;
+              }
+              return (
+                <div className="mb-4 flex items-start gap-3 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3">
+                  <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${healthColor}`} />
+                  <div>
+                    <p className="text-xs font-semibold text-stone-700">{healthLabel}</p>
+                    <p className="mt-0.5 text-xs text-stone-500">{healthText}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
               <div>
                 <dt className="text-xs text-stone-500">Last successful sync</dt>
