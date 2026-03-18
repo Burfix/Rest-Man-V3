@@ -33,13 +33,28 @@ export default function EditStatusButton({
 }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [dropPos, setDropPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  function handleToggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      // position:fixed is viewport-relative — no scroll offset needed
+      setDropPos({ top: rect.bottom + 4, left: rect.left });
+    }
+    setOpen((v) => !v);
+  }
 
   // Close on outside click
   useEffect(() => {
     function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        btnRef.current && !btnRef.current.contains(target) &&
+        dropRef.current && !dropRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     }
@@ -69,11 +84,12 @@ export default function EditStatusButton({
   const current = STATUS_OPTIONS.find((s) => s.value === currentStatus);
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <>
       <button
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={handleToggle}
         disabled={saving}
-        title="Change status"
+        title="Click to change status"
         className={cn(
           "rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-opacity",
           current?.badge ?? "bg-stone-100 text-stone-500 ring-stone-200",
@@ -85,8 +101,12 @@ export default function EditStatusButton({
         {!saving && <span className="ml-1 opacity-50">▾</span>}
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full z-50 mt-1 w-44 rounded-lg border border-stone-200 bg-white shadow-lg">
+      {open && dropPos && (
+        <div
+          ref={dropRef}
+          style={{ position: "fixed", top: dropPos.top, left: dropPos.left, zIndex: 9999 }}
+          className="w-44 rounded-lg border border-stone-200 bg-white shadow-lg"
+        >
           {STATUS_OPTIONS.map((opt) => (
             <button
               key={opt.value}
@@ -111,6 +131,6 @@ export default function EditStatusButton({
           ))}
         </div>
       )}
-    </div>
+    </>
   );
 }
