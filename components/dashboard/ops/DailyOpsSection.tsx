@@ -1,16 +1,24 @@
 import { DailyOperationsDashboardSummary } from "@/types";
 import DailyOpsSummaryCard from "@/components/dashboard/DailyOpsSummaryCard";
+import MicrosSourcePill   from "@/components/ui/MicrosSourcePill";
 import Link from "next/link";
 
 interface Props {
-  summary: DailyOperationsDashboardSummary;
+  summary:          DailyOperationsDashboardSummary;
+  microsSource?:    "micros_live" | "csv_upload" | null;
+  microsSyncedAt?:  string | null;
 }
 
-export default function DailyOpsSection({ summary }: Props) {
+export default function DailyOpsSection({ summary, microsSource, microsSyncedAt }: Props) {
   return (
     <section>
       <div className="mb-3 flex items-baseline justify-between">
-        <h2 className="text-base font-semibold text-stone-900">Daily Operations</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-semibold text-stone-900">Daily Operations</h2>
+          {microsSource && (
+            <MicrosSourcePill source={microsSource} syncedAt={microsSyncedAt} />
+          )}
+        </div>
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/operations/history"

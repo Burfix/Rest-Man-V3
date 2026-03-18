@@ -5,10 +5,14 @@
 
 import type { DataFreshnessSummary, FreshnessItem } from "@/services/ops/dataFreshness";
 
-function FreshnessChip({ item }: { item: FreshnessItem }) {
+function FreshnessChip({ item, minuteMode }: { item: FreshnessItem; minuteMode?: boolean }) {
   const label =
     item.daysAgo === null
       ? "—"
+      : minuteMode
+      ? item.daysAgo === 0
+        ? "now"
+        : `${item.daysAgo}m`
       : item.daysAgo === 0
       ? "Today"
       : item.daysAgo === 1
@@ -40,12 +44,15 @@ interface Props {
 }
 
 export default function FreshnessBar({ freshness }: Props) {
-  const items = [
+  const items: FreshnessItem[] = [
     freshness.dailyOps,
     freshness.sales,
     freshness.reviews,
     freshness.maintenance,
   ];
+
+  // Only show MICROS chip if it is configured or stale (i.e. relevant to the operator)
+  const showMicros = freshness.micros.configured || freshness.micros.stale;
 
   return (
     <div
@@ -59,6 +66,12 @@ export default function FreshnessBar({ freshness }: Props) {
       {items.map((item) => (
         <FreshnessChip key={item.label} item={item} />
       ))}
+      {showMicros && (
+        <>
+          <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+          <FreshnessChip item={freshness.micros} minuteMode />
+        </>
+      )}
     </div>
   );
 }

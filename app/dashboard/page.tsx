@@ -19,6 +19,7 @@ import { getDailyOperationsDashboardSummary } from "@/services/ops/dailyOperatio
 import { getDataFreshnessSummary } from "@/services/ops/dataFreshness";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
+import { getMicrosStatus } from "@/services/micros/status";
 
 import FreshnessBar          from "@/components/dashboard/ops/FreshnessBar";
 import DashboardTopBar       from "@/components/dashboard/ops/DashboardTopBar";
@@ -44,6 +45,7 @@ import type {
   RevenueForecast,
   ComplianceSummary,
 } from "@/types";
+import type { MicrosStatusSummary } from "@/types/micros";
 import { todayISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -128,6 +130,7 @@ export default async function OperationsDashboard() {
     freshnessResult,
     forecastResult,
     complianceResult,
+    microsResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getSevenDayReviewSummary(),
@@ -138,6 +141,7 @@ export default async function OperationsDashboard() {
     getDataFreshnessSummary(),
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
+    getMicrosStatus(),
   ]);
 
   const { value: today, error: todayErr }           = settled(todayResult, EMPTY_TODAY);
@@ -149,6 +153,7 @@ export default async function OperationsDashboard() {
   const { value: freshness }                        = settled(freshnessResult, null);
   const { value: forecast }                         = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }                = settled(complianceResult, EMPTY_COMPLIANCE);
+  const { value: microsStatus }                     = settled(microsResult, null);
 
   const errors = [todayErr, reviewsErr, salesErr, maintenanceErr, eventsErr, dailyOpsErr]
     .filter(Boolean) as string[];
@@ -190,6 +195,31 @@ export default async function OperationsDashboard() {
 
       {/* ── 2. Data Freshness Row ── */}
       {freshness && <FreshnessBar freshness={freshness} />}
+
+      {/* ── MICROS live revenue strip — shown only when synced today ── */}
+      {(() => {
+        const ms = microsStatus as MicrosStatusSummary | null;
+        const ld = ms?.latestDailySales;
+        const todayDate = today_iso;
+        if (!ld || ld.business_date !== todayDate) return null;
+        const mins = ms?.minutesSinceSync;
+        const ageLabel = mins == null ? "" : mins < 1 ? " · now" : mins < 60 ? ` · ${mins}m ago` : ` · ${Math.floor(mins / 60)}h ago`;
+        return (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs">
+            <span className="flex items-center gap-1 font-semibold text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+              MICROS Live{ageLabel}
+            </span>
+            <span className="text-stone-400">·</span>
+            <span className="text-stone-600">Sales: <span className="font-semibold text-stone-900">R {ld.net_sales.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
+            <span className="text-stone-600">Covers: <span className="font-semibold text-stone-900">{ld.guest_count}</span></span>
+            <span className="text-stone-600">Checks: <span className="font-semibold text-stone-900">{ld.check_count}</span></span>
+            {ld.labor_pct > 0 && (
+              <span className="text-stone-600">Labour: <span className={`font-semibold ${ld.labor_pct > 50 ? "text-amber-700" : "text-stone-900"}`}>{ld.labor_pct.toFixed(1)}%</span></span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── Non-fatal DB errors ── */}
       {errors.length > 0 && (

@@ -1139,6 +1139,318 @@ export interface Database {
           { foreignKeyName: "ash_site_id_fkey"; columns: ["site_id"]; referencedRelation: "sites"; referencedColumns: ["id"] }
         ];
       };
+      micros_connections: {
+        Row: {
+          id: string;
+          location_name: string;
+          loc_ref: string;
+          auth_server_url: string;
+          app_server_url: string;
+          client_id: string;
+          org_identifier: string;
+          access_token: string | null;
+          token_expires_at: string | null;
+          status: string;
+          last_sync_at: string | null;
+          last_sync_error: string | null;
+          last_successful_sync_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          location_name?: string;
+          loc_ref?: string;
+          auth_server_url: string;
+          app_server_url: string;
+          client_id: string;
+          org_identifier: string;
+          access_token?: string | null;
+          token_expires_at?: string | null;
+          status?: string;
+          last_sync_at?: string | null;
+          last_sync_error?: string | null;
+          last_successful_sync_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          location_name?: string;
+          loc_ref?: string;
+          auth_server_url?: string;
+          app_server_url?: string;
+          client_id?: string;
+          org_identifier?: string;
+          access_token?: string | null;
+          token_expires_at?: string | null;
+          status?: string;
+          last_sync_at?: string | null;
+          last_sync_error?: string | null;
+          last_successful_sync_at?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      micros_sync_runs: {
+        Row: {
+          id: string;
+          connection_id: string;
+          sync_type: string;
+          started_at: string;
+          completed_at: string | null;
+          status: string;
+          records_fetched: number;
+          records_inserted: number;
+          error_message: string | null;
+          metadata: Record<string, unknown>;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          sync_type: string;
+          started_at?: string;
+          completed_at?: string | null;
+          status?: string;
+          records_fetched?: number;
+          records_inserted?: number;
+          error_message?: string | null;
+          metadata?: Record<string, unknown>;
+        };
+        Update: {
+          id?: string;
+          connection_id?: string;
+          sync_type?: string;
+          started_at?: string;
+          completed_at?: string | null;
+          status?: string;
+          records_fetched?: number;
+          records_inserted?: number;
+          error_message?: string | null;
+          metadata?: Record<string, unknown>;
+        };
+        Relationships: [
+          { foreignKeyName: "msr_connection_id_fkey"; columns: ["connection_id"]; referencedRelation: "micros_connections"; referencedColumns: ["id"] }
+        ];
+      };
+      micros_sales_daily: {
+        Row: {
+          id: string;
+          connection_id: string;
+          loc_ref: string;
+          business_date: string;
+          net_sales: number;
+          gross_sales: number;
+          tax_collected: number;
+          service_charges: number;
+          discounts: number;
+          voids: number;
+          returns: number;
+          check_count: number;
+          guest_count: number;
+          avg_check_value: number;
+          avg_guest_spend: number;
+          labor_cost: number;
+          labor_pct: number;
+          synced_at: string;
+          raw_response: Record<string, unknown> | null;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          loc_ref: string;
+          business_date: string;
+          net_sales?: number;
+          gross_sales?: number;
+          tax_collected?: number;
+          service_charges?: number;
+          discounts?: number;
+          voids?: number;
+          returns?: number;
+          check_count?: number;
+          guest_count?: number;
+          avg_check_value?: number;
+          avg_guest_spend?: number;
+          labor_cost?: number;
+          labor_pct?: number;
+          synced_at?: string;
+          raw_response?: Record<string, unknown> | null;
+        };
+        Update: {
+          id?: string;
+          connection_id?: string;
+          loc_ref?: string;
+          business_date?: string;
+          net_sales?: number;
+          gross_sales?: number;
+          tax_collected?: number;
+          service_charges?: number;
+          discounts?: number;
+          voids?: number;
+          returns?: number;
+          check_count?: number;
+          guest_count?: number;
+          avg_check_value?: number;
+          avg_guest_spend?: number;
+          labor_cost?: number;
+          labor_pct?: number;
+          synced_at?: string;
+          raw_response?: Record<string, unknown> | null;
+        };
+        Relationships: [
+          { foreignKeyName: "msd_connection_id_fkey"; columns: ["connection_id"]; referencedRelation: "micros_connections"; referencedColumns: ["id"] }
+        ];
+      };
+      micros_sales_intervals: {
+        Row: {
+          id: string;
+          connection_id: string;
+          loc_ref: string;
+          business_date: string;
+          interval_start: string;
+          interval_end: string;
+          net_sales: number;
+          check_count: number;
+          guest_count: number;
+          synced_at: string;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          loc_ref: string;
+          business_date: string;
+          interval_start: string;
+          interval_end: string;
+          net_sales?: number;
+          check_count?: number;
+          guest_count?: number;
+          synced_at?: string;
+        };
+        Update: {
+          id?: string;
+          connection_id?: string;
+          loc_ref?: string;
+          business_date?: string;
+          interval_start?: string;
+          interval_end?: string;
+          net_sales?: number;
+          check_count?: number;
+          guest_count?: number;
+          synced_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "msi_connection_id_fkey"; columns: ["connection_id"]; referencedRelation: "micros_connections"; referencedColumns: ["id"] }
+        ];
+      };
+      micros_guest_checks: {
+        Row: {
+          id: string;
+          connection_id: string;
+          loc_ref: string;
+          check_number: string;
+          business_date: string;
+          opened_at: string | null;
+          closed_at: string | null;
+          table_number: string | null;
+          server_name: string | null;
+          guest_count: number;
+          net_total: number;
+          gross_total: number;
+          discounts: number;
+          gratuity: number;
+          payment_method: string | null;
+          status: string;
+          synced_at: string;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          loc_ref: string;
+          check_number: string;
+          business_date: string;
+          opened_at?: string | null;
+          closed_at?: string | null;
+          table_number?: string | null;
+          server_name?: string | null;
+          guest_count?: number;
+          net_total?: number;
+          gross_total?: number;
+          discounts?: number;
+          gratuity?: number;
+          payment_method?: string | null;
+          status?: string;
+          synced_at?: string;
+        };
+        Update: {
+          id?: string;
+          connection_id?: string;
+          loc_ref?: string;
+          check_number?: string;
+          business_date?: string;
+          opened_at?: string | null;
+          closed_at?: string | null;
+          table_number?: string | null;
+          server_name?: string | null;
+          guest_count?: number;
+          net_total?: number;
+          gross_total?: number;
+          discounts?: number;
+          gratuity?: number;
+          payment_method?: string | null;
+          status?: string;
+          synced_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "mgc_connection_id_fkey"; columns: ["connection_id"]; referencedRelation: "micros_connections"; referencedColumns: ["id"] }
+        ];
+      };
+      micros_labor_daily: {
+        Row: {
+          id: string;
+          connection_id: string;
+          loc_ref: string;
+          business_date: string;
+          job_code: string;
+          job_name: string | null;
+          employee_count: number;
+          regular_hours: number;
+          overtime_hours: number;
+          total_hours: number;
+          labor_cost: number;
+          synced_at: string;
+        };
+        Insert: {
+          id?: string;
+          connection_id: string;
+          loc_ref: string;
+          business_date: string;
+          job_code?: string;
+          job_name?: string | null;
+          employee_count?: number;
+          regular_hours?: number;
+          overtime_hours?: number;
+          total_hours?: number;
+          labor_cost?: number;
+          synced_at?: string;
+        };
+        Update: {
+          id?: string;
+          connection_id?: string;
+          loc_ref?: string;
+          business_date?: string;
+          job_code?: string;
+          job_name?: string | null;
+          employee_count?: number;
+          regular_hours?: number;
+          overtime_hours?: number;
+          total_hours?: number;
+          labor_cost?: number;
+          synced_at?: string;
+        };
+        Relationships: [
+          { foreignKeyName: "mld_connection_id_fkey"; columns: ["connection_id"]; referencedRelation: "micros_connections"; referencedColumns: ["id"] }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

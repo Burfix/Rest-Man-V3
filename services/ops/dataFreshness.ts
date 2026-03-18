@@ -21,6 +21,8 @@ export interface DataFreshnessSummary {
   reviews: FreshnessItem;
   dailyOps: FreshnessItem;
   maintenance: FreshnessItem;
+  /** MICROS BI sync — null = not configured (shown as neutral, never stale) */
+  micros: FreshnessItem & { configured: boolean };
 }
 
 function daysAgo(isoDate: string | null): number | null {
@@ -32,7 +34,7 @@ function daysAgo(isoDate: string | null): number | null {
 export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
   const supabase = createServerClient();
 
-  const [salesRes, reviewsRes, dailyOpsRes, maintRes] = await Promise.all([
+  const [salesRes, reviewsRes, dailyOpsRes, maintRes, microsRes] = await Promise.all([
     supabase
       .from("sales_uploads")
       .select("uploaded_at")
@@ -60,12 +62,22 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
       .order("updated_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+
+    supabase
+      .from("micros_connections")
+      .select("last_successful_sync_at, status, auth_server_url")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   const salesDate = (salesRes.data as { uploaded_at: string } | null)?.uploaded_at ?? null;
   const reviewDate = (reviewsRes.data as { created_at: string } | null)?.created_at ?? null;
   const dailyOpsDate = (dailyOpsRes.data as { created_at: string } | null)?.created_at ?? null;
   const maintDate = (maintRes.data as { updated_at: string } | null)?.updated_at ?? null;
+  const microsRow = microsRes.data as { last_successful_sync_at: string | null; status: string; auth_server_url: string } | null;
+  const microsDate = microsRow?.last_successful_sync_at ?? null;
+  const microsConfigured = !!(microsRow?.auth_server_url);
 
   return {
     sales: {
@@ -100,5 +112,24 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
       href: "/dashboard/maintenance",
       actionLabel: "Log equipment or repair",
     },
+    micros: {
+      label: "MICROS",
+      lastUpdatedAt: microsDate,
+      daysAgo: minutesAgo(microsDate),
+      // Only flag stale when configured AND last sync > 6 hours ago
+      stale: microsConfigured && (microsDate === null || (minutesAgo(microsDate) ?? 999) > 360),
+      href: "/dashboard/settings/integrations",
+      actionLabel: microsConfigured ? "MICROS sync overdue" : "Set up MICROS integration",
+      configured: microsConfigured,
+    },
   };
+}
+
+/**
+ * Returns minutes since the given ISO date (null = never synced).
+ * Reused for MICROS which syncs in minutes not days.
+ */
+function minutesAgo(isoDate: string | null): number | null {
+  if (!isoDate) return null;
+  return Math.floor((Date.now() - new Date(isoDate).getTime()) / 60_000);
 }
