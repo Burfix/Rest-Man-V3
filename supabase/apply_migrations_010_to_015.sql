@@ -72,9 +72,11 @@ create trigger trg_compliance_updated_at
 alter table compliance_items      enable row level security;
 alter table compliance_documents  enable row level security;
 
+drop policy if exists "authenticated_all" on compliance_items;
 create policy "authenticated_all" on compliance_items
   for all to authenticated using (true) with check (true);
 
+drop policy if exists "authenticated_all" on compliance_documents;
 create policy "authenticated_all" on compliance_documents
   for all to authenticated using (true) with check (true);
 
@@ -188,6 +190,7 @@ create index if not exists idx_equipment_repairs_equipment_id
 
 alter table equipment_repairs enable row level security;
 
+drop policy if exists "authenticated_all" on equipment_repairs;
 create policy "authenticated_all" on equipment_repairs
   for all to authenticated using (true) with check (true);
 -- ============================================================
@@ -394,6 +397,7 @@ create index if not exists idx_obligations_asset       on obligations (asset_id)
 create index if not exists idx_obligations_compliance  on obligations (compliance_item_id) where compliance_item_id is not null;
 
 alter table obligations enable row level security;
+drop policy if exists "authenticated_all" on obligations;
 create policy "authenticated_all" on obligations
   for all to authenticated using (true) with check (true);
 
@@ -497,6 +501,7 @@ create index if not exists idx_documents_asset      on documents (asset_id)     
 create index if not exists idx_documents_ticket     on documents (ticket_id)    where ticket_id    is not null;
 
 alter table documents enable row level security;
+drop policy if exists "authenticated_all" on documents;
 create policy "authenticated_all" on documents
   for all to authenticated using (true) with check (true);
 
@@ -535,6 +540,7 @@ create index if not exists idx_workflow_site_date on workflow_logs (site_id, cre
 create index if not exists idx_workflow_action    on workflow_logs (action, created_at desc);
 
 alter table workflow_logs enable row level security;
+drop policy if exists "authenticated_all" on workflow_logs;
 create policy "authenticated_all" on workflow_logs
   for all to authenticated using (true) with check (true);
 
@@ -544,12 +550,15 @@ alter table sites       enable row level security;
 alter table zones       enable row level security;
 alter table contractors enable row level security;
 
+drop policy if exists "authenticated_all" on sites;
 create policy "authenticated_all" on sites
   for all to authenticated using (true) with check (true);
 
+drop policy if exists "authenticated_all" on zones;
 create policy "authenticated_all" on zones
   for all to authenticated using (true) with check (true);
 
+drop policy if exists "authenticated_all" on contractors;
 create policy "authenticated_all" on contractors
   for all to authenticated using (true) with check (true);
 -- ============================================================
@@ -608,6 +617,7 @@ create index if not exists idx_risk_scores_computed   on risk_scores (computed_a
 create index if not exists idx_risk_scores_site_zone  on risk_scores (site_id, zone_id);
 
 alter table risk_scores enable row level security;
+drop policy if exists "authenticated_all" on risk_scores;
 create policy "authenticated_all" on risk_scores
   for all to authenticated using (true) with check (true);
 
@@ -642,6 +652,7 @@ create index if not exists idx_zone_snap_zone_time   on zone_snapshots (zone_id,
 create index if not exists idx_zone_snap_status      on zone_snapshots (status, snapped_at desc);
 
 alter table zone_snapshots enable row level security;
+drop policy if exists "authenticated_all" on zone_snapshots;
 create policy "authenticated_all" on zone_snapshots
   for all to authenticated using (true) with check (true);
 
@@ -692,6 +703,7 @@ create index if not exists idx_ash_repair_link  on asset_service_history (equipm
 create index if not exists idx_ash_maint_link   on asset_service_history (maintenance_log_id) where maintenance_log_id is not null;
 
 alter table asset_service_history enable row level security;
+drop policy if exists "authenticated_all" on asset_service_history;
 create policy "authenticated_all" on asset_service_history
   for all to authenticated using (true) with check (true);
 
@@ -957,6 +969,7 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_micros_connections_updated_at ON micros_connections;
 CREATE TRIGGER trg_micros_connections_updated_at
   BEFORE UPDATE ON micros_connections
   FOR EACH ROW EXECUTE FUNCTION update_micros_connections_updated_at();
@@ -973,26 +986,32 @@ ALTER TABLE micros_labor_daily    ENABLE ROW LEVEL SECURITY;
 -- Service role (used by all server-side API routes) has full access.
 -- Anon/authenticated roles have NO access — all reads go through API routes.
 
+DROP POLICY IF EXISTS "micros_service_role_all" ON micros_connections;
 CREATE POLICY "micros_service_role_all" ON micros_connections
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "micros_service_role_all" ON micros_sync_runs;
 CREATE POLICY "micros_service_role_all" ON micros_sync_runs
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "micros_service_role_all" ON micros_sales_daily;
 CREATE POLICY "micros_service_role_all" ON micros_sales_daily
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "micros_service_role_all" ON micros_sales_intervals;
 CREATE POLICY "micros_service_role_all" ON micros_sales_intervals
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "micros_service_role_all" ON micros_guest_checks;
 CREATE POLICY "micros_service_role_all" ON micros_guest_checks
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
 
+DROP POLICY IF EXISTS "micros_service_role_all" ON micros_labor_daily;
 CREATE POLICY "micros_service_role_all" ON micros_labor_daily
   USING (auth.role() = 'service_role')
   WITH CHECK (auth.role() = 'service_role');
