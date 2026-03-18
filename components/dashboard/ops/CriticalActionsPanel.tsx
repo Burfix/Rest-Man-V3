@@ -13,6 +13,7 @@
 
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import ImpactTag from "@/components/ui/ImpactTag";
 import type { DashboardAction, ActionSeverity, ActionCategory } from "@/lib/commandCenter";
 
 interface Props {
@@ -142,6 +143,9 @@ export default function CriticalActionsPanel({ actions }: Props) {
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 leading-tight">
                   {action.title}
+                  {action.impactWeight && (
+                    <ImpactTag weight={action.impactWeight} className="ml-1.5 align-middle" />
+                  )}
                 </p>
                 <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-500 leading-snug">
                   {action.message}

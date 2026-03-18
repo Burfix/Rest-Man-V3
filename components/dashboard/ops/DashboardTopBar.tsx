@@ -10,6 +10,7 @@
 
 import { cn, formatDisplayDate } from "@/lib/utils";
 import SourceBadge from "@/components/ui/SourceBadge";
+import TrendIndicator from "@/components/ui/TrendIndicator";
 import type {
   ComplianceSummary,
   MaintenanceSummary,
@@ -18,6 +19,7 @@ import type {
   VenueEvent,
   TodayBookingsSummary,
 } from "@/types";
+import type { TrendSignal } from "@/lib/commandCenter";
 
 interface Props {
   date:           string;
@@ -34,6 +36,8 @@ interface Props {
     minutesSinceSync: number | null;
     lastSyncError?:   string | null;
   } | null;
+  revenueTrend?:  TrendSignal | null;
+  labourTrend?:   TrendSignal | null;
 }
 
 const PERIOD_STYLE: Record<string, string> = {
@@ -62,6 +66,8 @@ export default function DashboardTopBar({
   today,
   totalAlerts,
   microsStatus,
+  revenueTrend,
+  labourTrend,
 }: Props) {
   const laborPct  = dailyOps.latestReport?.labor_cost_percent ?? null;
   const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
@@ -170,6 +176,7 @@ export default function DashboardTopBar({
       href:       "/dashboard/settings/targets",
       sourceType: microsLive ? "micros_live" as const : microsStale ? "stale" as const : forecast ? "forecast" as const : undefined,
       sourceAge:  microsLive ? microsAgeLabel : undefined,
+      trend:      revenueTrend ?? undefined,
     },
     {
       label:      "Labour",
@@ -179,6 +186,7 @@ export default function DashboardTopBar({
       href:       "/dashboard/operations",
       sourceType: microsLive ? "labour_sync" as const : dailyOps.latestReport ? "csv_upload" as const : undefined,
       sourceAge:  microsLive ? microsAgeLabel : undefined,
+      trend:      labourTrend ?? undefined,
     },
     {
       label:      "Today",
@@ -255,6 +263,14 @@ export default function DashboardTopBar({
               <span className="text-[10px] text-stone-400 dark:text-stone-600 leading-tight truncate">
                 {kpi.note}
               </span>
+            )}
+            {"trend" in kpi && kpi.trend && (
+              <TrendIndicator
+                direction={kpi.trend.direction}
+                tone={kpi.trend.tone}
+                label={kpi.trend.label}
+                className="mt-0.5"
+              />
             )}
             {"sourceType" in kpi && kpi.sourceType && (
               <SourceBadge source={kpi.sourceType} ageLabel={kpi.sourceAge} className="mt-0.5" />

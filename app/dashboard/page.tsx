@@ -25,6 +25,7 @@ import FreshnessBar          from "@/components/dashboard/ops/FreshnessBar";
 import CommandHeadlineBanner from "@/components/dashboard/ops/CommandHeadlineBanner";
 import DashboardTopBar       from "@/components/dashboard/ops/DashboardTopBar";
 import CriticalActionsPanel  from "@/components/dashboard/ops/CriticalActionsPanel";
+import TwoHourOutlookPanel   from "@/components/dashboard/ops/TwoHourOutlook";
 import OperationalRiskCard   from "@/components/dashboard/ops/OperationalRiskCard";
 import ServiceBriefCard      from "@/components/dashboard/ops/ServiceBriefCard";
 import TodayAtVenueCard      from "@/components/dashboard/ops/TodayAtVenueCard";
@@ -35,6 +36,10 @@ import {
   getServicePeriod,
   buildPriorityActions,
   generateCommandHeadline,
+  generateConfidenceSummary,
+  generateTwoHourOutlook,
+  computeRevenueTrend,
+  computeLabourTrend,
 } from "@/lib/commandCenter";
 
 import type {
@@ -184,6 +189,28 @@ export default async function OperationsDashboard() {
     servicePeriod,
   });
 
+  const ms = microsStatus as MicrosStatusSummary | null;
+
+  const confidenceSummary = generateConfidenceSummary({
+    microsStatus: ms ? {
+      isConfigured:     ms.isConfigured,
+      minutesSinceSync: ms.minutesSinceSync ?? null,
+      lastSyncError:    ms.connection?.last_sync_error ?? null,
+    } : null,
+    dailyOps,
+    today: today_iso,
+  });
+
+  const twoHourOutlook = generateTwoHourOutlook({
+    forecast,
+    dailyOps,
+    today:         { total: today.total, totalCovers: today.totalCovers },
+    servicePeriod,
+  });
+
+  const revenueTrend = computeRevenueTrend(forecast);
+  const labourTrend  = computeLabourTrend(dailyOps.latestReport?.labor_cost_percent ?? null);
+
   const totalAlerts = priorityActions.filter(
     (a) => a.severity === "critical" || a.severity === "urgent"
   ).length;
@@ -202,18 +229,23 @@ export default async function OperationsDashboard() {
         events={events}
         today={today}
         totalAlerts={totalAlerts}
-        microsStatus={microsStatus ? {
-          isConfigured:    (microsStatus as MicrosStatusSummary).isConfigured,
-          minutesSinceSync: (microsStatus as MicrosStatusSummary).minutesSinceSync ?? null,
-          lastSyncError:   (microsStatus as MicrosStatusSummary).connection?.last_sync_error ?? null,
+        microsStatus={ms ? {
+          isConfigured:     ms.isConfigured,
+          minutesSinceSync: ms.minutesSinceSync ?? null,
+          lastSyncError:    ms.connection?.last_sync_error ?? null,
         } : null}
+        revenueTrend={revenueTrend}
+        labourTrend={labourTrend}
       />
 
       {/* ── 2. Data Freshness Row ── */}
       {freshness && <FreshnessBar freshness={freshness} />}
 
       {/* ── Command Headline ── */}
-      <CommandHeadlineBanner headline={commandHeadline} />
+      <CommandHeadlineBanner headline={commandHeadline} confidence={confidenceSummary} />
+
+      {/* ── Two-Hour Outlook ── */}
+      <TwoHourOutlookPanel outlook={twoHourOutlook} />
 
       {/* ── MICROS live revenue strip — shown only when synced today ── */}
       {(() => {
@@ -280,8 +312,8 @@ export default async function OperationsDashboard() {
           maintenance={maintenance}
           date={today_iso}
           forecast={forecast}
-          microsSource={(microsStatus as MicrosStatusSummary | null)?.isConfigured ? "micros_live" : null}
-          microsSyncedAt={(microsStatus as MicrosStatusSummary | null)?.connection?.last_sync_at ?? null}
+          microsSource={ms?.isConfigured ? "micros_live" : null}
+          microsSyncedAt={ms?.connection?.last_sync_at ?? null}
         />
         <OperationalHealthCard
           compliance={complianceSummary}
@@ -289,10 +321,10 @@ export default async function OperationsDashboard() {
           forecast={forecast}
           reviews={reviews}
           dailyOps={dailyOps}
-          microsStatus={microsStatus ? {
-            isConfigured:     (microsStatus as MicrosStatusSummary).isConfigured,
-            minutesSinceSync: (microsStatus as MicrosStatusSummary).minutesSinceSync ?? null,
-            lastSyncError:    (microsStatus as MicrosStatusSummary).connection?.last_sync_error ?? null,
+          microsStatus={ms ? {
+            isConfigured:     ms.isConfigured,
+            minutesSinceSync: ms.minutesSinceSync ?? null,
+            lastSyncError:    ms.connection?.last_sync_error ?? null,
           } : undefined}
           freshness={freshness ? {
             sales:  freshness.sales  ? { lastUpdated: freshness.sales.lastUpdatedAt,  stale: freshness.sales.stale }  : null,
