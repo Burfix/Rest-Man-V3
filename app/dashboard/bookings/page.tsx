@@ -22,7 +22,9 @@ export default async function BookingsPage() {
       <div>
         <h1 className="text-2xl font-bold text-stone-900">Upcoming Bookings</h1>
         <p className="mt-1 text-sm text-stone-500">
-          All confirmed and pending reservations from today onward.
+          {reservations.length > 0
+            ? `${reservations.length} reservation${reservations.length === 1 ? "" : "s"} from today onward.`
+            : "All confirmed and pending reservations from today onward."}
         </p>
       </div>
 

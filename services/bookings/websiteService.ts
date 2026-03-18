@@ -63,14 +63,23 @@ function mapWebsiteReservation(r: WebsiteReservation): Reservation {
 // ── Fetch helpers ─────────────────────────────────────────────────────────────
 
 export async function getAllWebsiteReservations(): Promise<Reservation[]> {
-  const res = await fetch(WEBSITE_RESERVATIONS_URL, { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(
-      `[WebsiteBookings] Failed to fetch reservations: HTTP ${res.status}`
-    );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(WEBSITE_RESERVATIONS_URL, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(
+        `[WebsiteBookings] Failed to fetch reservations: HTTP ${res.status}`
+      );
+    }
+    const raw: WebsiteReservation[] = await res.json();
+    return raw.map(mapWebsiteReservation);
+  } finally {
+    clearTimeout(timer);
   }
-  const raw: WebsiteReservation[] = await res.json();
-  return raw.map(mapWebsiteReservation);
 }
 
 /** Upcoming reservations: today onwards, excluding cancelled. */
