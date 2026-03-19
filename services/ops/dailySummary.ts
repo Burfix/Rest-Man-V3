@@ -9,6 +9,12 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { getOperatingScore } from "./operatingScore";
 import type { OperatingScore } from "./operatingScore";
+import { getStreaks } from "./streaks";
+import type { StreakSummary } from "./streaks";
+import { getConsequences } from "./consequences";
+import type { ConsequenceSummary } from "./consequences";
+import { getGMPerformance } from "./gmPerformance";
+import type { GMPerformance } from "./gmPerformance";
 
 const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -33,10 +39,11 @@ export interface DailyHistoryRow {
 }
 
 export interface MorningBrief {
-  mode:  "morning";
-  date:  string;
-  top3:  ActionPriority[];
+  mode:       "morning";
+  date:       string;
+  top3:       ActionPriority[];
   total_open: number;
+  streaks:    StreakSummary;
 }
 
 export interface EveningDebrief {
@@ -46,6 +53,9 @@ export interface EveningDebrief {
   missed_today:    number;
   ops_score:       OperatingScore | null;
   history:         DailyHistoryRow[];
+  streaks:         StreakSummary;
+  consequences:    ConsequenceSummary;
+  gm:              GMPerformance;
 }
 
 export type DailyOpsSummary = MorningBrief | EveningDebrief;
@@ -100,18 +110,23 @@ async function getMorningBrief(today: string): Promise<MorningBrief> {
     return (IMPACT_ORDER[a.impact_weight] ?? 4) - (IMPACT_ORDER[b.impact_weight] ?? 4);
   });
 
+  const streakResult = await getStreaks().catch(() => ({
+    streaks: [], best_score: 0, avg_score: null,
+  } satisfies StreakSummary));
+
   return {
     mode:       "morning",
     date:       today,
     top3:       sorted.slice(0, 3),
     total_open: all.length,
+    streaks:    streakResult,
   };
 }
 
 async function getEveningDebrief(today: string): Promise<EveningDebrief> {
   const supabase = createServerClient();
 
-  const [completedRes, missedRes, historyRes, scoreRes] = await Promise.allSettled([
+  const [completedRes, missedRes, historyRes, scoreRes, streaksRes, consequencesRes, gmRes] = await Promise.allSettled([
     // Completed today
     supabase
       .from("actions")
@@ -135,7 +150,19 @@ async function getEveningDebrief(today: string): Promise<EveningDebrief> {
 
     // Live operating score
     getOperatingScore(DEFAULT_SITE_ID),
+
+    // Streaks, consequences, GM performance
+    getStreaks(),
+    getConsequences(),
+    getGMPerformance(),
   ]);
+
+  const fallbackStreaks: StreakSummary     = { streaks: [], best_score: 0, avg_score: null };
+  const fallbackConseq: ConsequenceSummary = { consequences: [], has_critical: false };
+  const fallbackGM: GMPerformance          = {
+    today_score: null, today_grade: null, weekly_scores: [],
+    weekly_avg: null, week_over_week: null, trend: null,
+  };
 
   return {
     mode:            "evening",
@@ -146,5 +173,8 @@ async function getEveningDebrief(today: string): Promise<EveningDebrief> {
     history:         historyRes.status   === "fulfilled"
       ? ((historyRes.value.data ?? []) as DailyHistoryRow[])
       : [],
+    streaks:         streaksRes.status      === "fulfilled" ? streaksRes.value      : fallbackStreaks,
+    consequences:    consequencesRes.status === "fulfilled" ? consequencesRes.value : fallbackConseq,
+    gm:              gmRes.status           === "fulfilled" ? gmRes.value           : fallbackGM,
   };
 }

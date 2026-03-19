@@ -1,12 +1,15 @@
 /**
  * DailyOpsSummaryPanel — server component
  *
- * Morning (before 14:00 SAST): top 3 priorities for the day
- * Evening (14:00+ SAST):       completed / missed / score + 7-day history
+ * Morning (before 14:00 SAST): top 3 priorities + active streaks
+ * Evening (14:00+ SAST):       consequences → streak bar → KPIs → score bars → history → GM panel
  */
 
 import { getDailyOpsSummary } from "@/services/ops/dailySummary";
 import type { ScoreGrade } from "@/services/ops/operatingScore";
+import type { Streak } from "@/services/ops/streaks";
+import type { Consequence, ConsequenceSeverity } from "@/services/ops/consequences";
+import type { GMPerformance } from "@/services/ops/gmPerformance";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +43,148 @@ function fmtDate(dateStr: string): string {
   });
 }
 
+// ── Streak bar ────────────────────────────────────────────────────────────────
+
+function StreakBar({ streaks }: { streaks: Streak[] }) {
+  if (streaks.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      {streaks.map((s) => (
+        <span
+          key={s.type}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset ${
+            s.active
+              ? "bg-amber-50 text-amber-700 ring-amber-200"
+              : "bg-stone-50 text-stone-500 ring-stone-200"
+          }`}
+        >
+          {s.emoji} {s.count} day{s.count === 1 ? "" : "s"} {s.label}
+          {!s.active && <span className="text-stone-400 font-normal">(ended)</span>}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ── Consequence banners ───────────────────────────────────────────────────────
+
+const SEVERITY_STYLES: Record<ConsequenceSeverity, string> = {
+  critical: "border-red-300   bg-red-50   text-red-800",
+  warning:  "border-amber-300 bg-amber-50 text-amber-900",
+  watch:    "border-sky-300   bg-sky-50   text-sky-900",
+};
+
+const SEVERITY_BADGE: Record<ConsequenceSeverity, string> = {
+  critical: "bg-red-100   text-red-700   ring-red-200",
+  warning:  "bg-amber-100 text-amber-700 ring-amber-200",
+  watch:    "bg-sky-100   text-sky-700   ring-sky-200",
+};
+
+function ConsequenceBanners({ consequences }: { consequences: Consequence[] }) {
+  if (consequences.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {consequences.map((c) => (
+        <div
+          key={c.id}
+          className={`rounded-lg border px-4 py-3 ${SEVERITY_STYLES[c.severity]}`}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-semibold ring-1 ring-inset uppercase tracking-wide ${SEVERITY_BADGE[c.severity]}`}
+                >
+                  {c.severity}
+                </span>
+                <p className="text-sm font-semibold leading-snug">{c.headline}</p>
+              </div>
+              <p className="text-xs mt-1 opacity-80">{c.detail}</p>
+              <p className="text-xs font-medium mt-1.5 opacity-90">→ {c.call_to_action}</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── GM Performance panel ──────────────────────────────────────────────────────
+
+const TREND_META: Record<string, { emoji: string; label: string; cls: string }> = {
+  up:   { emoji: "↑", label: "Improving",   cls: "text-green-600" },
+  down: { emoji: "↓", label: "Declining",   cls: "text-red-500"   },
+  flat: { emoji: "→", label: "Stable",      cls: "text-stone-500" },
+};
+
+function GMPanel({ gm }: { gm: GMPerformance }) {
+  const trend = gm.trend ? TREND_META[gm.trend] : null;
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white p-4 space-y-3">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+        👤 GM Performance
+      </h3>
+
+      {/* Score + trend row */}
+      <div className="flex items-center gap-4">
+        {gm.today_score !== null ? (
+          <div className="text-center">
+            <p className="text-3xl font-bold text-stone-800">
+              {gm.today_score}
+              <span className="text-xs font-normal text-stone-400">/100</span>
+            </p>
+            <p className="text-xs text-stone-500 mt-0.5">
+              Today{gm.today_grade ? ` — Grade ${gm.today_grade}` : ""}
+            </p>
+          </div>
+        ) : (
+          <div className="text-center">
+            <p className="text-3xl font-bold text-stone-300">—</p>
+            <p className="text-xs text-stone-400 mt-0.5">No score yet</p>
+          </div>
+        )}
+
+        <div className="flex-1 space-y-1">
+          {/* 7-day sparkline — simple bar chart */}
+          {gm.weekly_scores.length > 0 && (
+            <div className="flex items-end gap-0.5 h-8">
+              {[...gm.weekly_scores].reverse().map((d, i) => {
+                const h = d.score != null ? Math.max(4, Math.round((d.score / 100) * 32)) : 4;
+                const cls =
+                  d.score == null              ? "bg-stone-100" :
+                  d.score >= 80               ? "bg-green-400"  :
+                  d.score >= 60               ? "bg-amber-400"  :
+                                               "bg-red-400";
+                return (
+                  <div
+                    key={i}
+                    title={d.date + ": " + (d.score ?? "—")}
+                    className={`flex-1 rounded-sm ${cls}`}
+                    style={{ height: `${h}px` }}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {/* WoW delta */}
+          {gm.week_over_week !== null && trend && (
+            <p className={`text-xs font-semibold ${trend.cls}`}>
+              {trend.emoji} {Math.abs(gm.week_over_week).toFixed(1)} pts vs last week — {trend.label}
+            </p>
+          )}
+          {gm.weekly_avg !== null && (
+            <p className="text-xs text-stone-400">
+              7-day avg: <span className="font-semibold text-stone-600">{gm.weekly_avg.toFixed(0)}</span>
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default async function DailyOpsSummaryPanel() {
@@ -68,6 +213,13 @@ export default async function DailyOpsSummaryPanel() {
             </span>
           </div>
         </div>
+
+        {/* Streak bar (morning) */}
+        {summary.streaks.streaks.length > 0 && (
+          <div className="mb-4">
+            <StreakBar streaks={summary.streaks.streaks} />
+          </div>
+        )}
 
         {summary.top3.length === 0 ? (
           <div className="rounded-lg border border-dashed border-stone-200 py-6 text-center">
@@ -149,6 +301,16 @@ export default async function DailyOpsSummaryPanel() {
           Today&apos;s Summary
         </span>
       </div>
+
+      {/* Consequence banners — highest stakes, shown first */}
+      {summary.consequences.consequences.length > 0 && (
+        <ConsequenceBanners consequences={summary.consequences.consequences} />
+      )}
+
+      {/* Streak bar */}
+      {summary.streaks.streaks.length > 0 && (
+        <StreakBar streaks={summary.streaks.streaks} />
+      )}
 
       {/* KPI tiles */}
       <div className="grid grid-cols-3 gap-3">
@@ -282,6 +444,9 @@ export default async function DailyOpsSummaryPanel() {
           No history yet — run daily reset to start recording
         </p>
       )}
+
+      {/* GM Performance panel */}
+      <GMPanel gm={summary.gm} />
     </div>
   );
 }
