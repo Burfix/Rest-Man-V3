@@ -17,6 +17,10 @@
  *
  * Optional:
  *   MICROS_ENABLED            "true" | "false"  (default: "false")
+ *   MICROS_AUTH_TOKEN_PATH    Override for the OAuth token endpoint path
+ *                             (default: /oauth2/v1/token)
+ *   MICROS_AUTH_SCOPE         Override for the OAuth scope parameter.
+ *                             Omit to let the server grant default scopes.
  */
 
 export interface MicrosEnvConfig {

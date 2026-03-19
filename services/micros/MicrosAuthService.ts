@@ -127,37 +127,61 @@ class MicrosAuthServiceImpl {
   }
 
   /**
-   * Executes the OAuth client_credentials token exchange against Oracle IDCS.
-   * Throws on non-2xx or missing access_token.
+   * Executes the OAuth client_credentials token exchange against Oracle IDCS /
+   * Oracle MSAF IDM.
+   *
+   * Oracle's IDM server (including ors-idm.msaf.oraclerestaurants.com) requires
+   * RFC 6749 §2.3.1 client authentication: credentials in the
+   * `Authorization: Basic` header, NOT in the request body.  Placing
+   * client_id / client_secret in the body causes the Jetty default servlet to
+   * intercept the request and return HTTP 405.
+   *
+   * Additionally Oracle IDM requires:
+   *   - `x-requested-by: XMLHttpRequest`  (CSRF guard bypass for API clients)
+   *   - scope omitted or set to a meaningful value — we default to omitting it
+   *     so the server grants its default scopes; override via MICROS_AUTH_SCOPE.
+   *
+   * The token path can be overridden via MICROS_AUTH_TOKEN_PATH env var
+   * (default: /oauth2/v1/token).
+   *
    * @internal
    */
   private async requestToken(): Promise<_OracleTokenResponse> {
     const cfg = assertMicrosConfigured();
 
-    const tokenUrl = `${cfg.authServer}/oauth2/v1/token`;
+    const tokenPath = process.env.MICROS_AUTH_TOKEN_PATH?.trim() || "/oauth2/v1/token";
+    const tokenUrl  = `${cfg.authServer}${tokenPath}`;
 
-    const body = new URLSearchParams({
-      grant_type:    "client_credentials",
-      client_id:     cfg.clientId,
-      client_secret: cfg.clientSecret,      // secret never leaves this function
-      scope:         cfg.orgIdentifier
-        ? `${cfg.orgIdentifier}.micros`
-        : "micros",
-    });
+    // RFC 6749 §2.3.1 — credentials in Authorization: Basic header
+    const basicCred = Buffer.from(`${cfg.clientId}:${cfg.clientSecret}`, "utf-8").toString("base64");
+
+    // Body: grant_type only; scope is optional and often causes 400 on Oracle MSAF
+    const bodyParams: Record<string, string> = { grant_type: "client_credentials" };
+    const customScope = process.env.MICROS_AUTH_SCOPE?.trim();
+    if (customScope) bodyParams.scope = customScope;
 
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
+
+    // Oracle IDM requires x-requested-by to bypass CSRF protection.
+    // Oracle Simphony BI API documentation specifies "Oracle" as the value.
+    // Override via MICROS_AUTH_REQUESTED_BY env var if your deployment differs.
+    const requestedBy = process.env.MICROS_AUTH_REQUESTED_BY?.trim() || "Oracle";
 
     let res: Response;
     try {
       res = await fetch(tokenUrl, {
         method:  "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body:    body.toString(),
-        signal:  controller.signal,
+        headers: {
+          "Content-Type":   "application/x-www-form-urlencoded",
+          "Authorization":  `Basic ${basicCred}`,
+          // Oracle IDM CSRF guard — required for non-browser API clients
+          "x-requested-by": requestedBy,
+        },
+        body:   new URLSearchParams(bodyParams).toString(),
+        signal: controller.signal,
       });
     } catch (err) {
-      // Network error — sanitize before rethrowing
       throw new Error(
         `[MicrosAuth] Network error reaching auth server: ${
           err instanceof Error && err.name === "AbortError"
@@ -170,7 +194,26 @@ class MicrosAuthServiceImpl {
     }
 
     if (!res.ok) {
-      // Don't log response body — it might reflect the credentials
+      // For 401/403 the body might echo credential info — don't include it.
+      // For 404/405 (routing errors) the body is a generic server error page
+      // and is safe to include for diagnostics.
+      if (res.status === 405) {
+        throw new Error(
+          `[MicrosAuth] Auth server returned HTTP 405 (Method Not Allowed) for POST ${tokenUrl}. ` +
+          `This typically means the token endpoint path is blocked for this source IP. ` +
+          `Oracle MSAF restricts API access to whitelisted IPs. ` +
+          `Contact Oracle support to whitelist your server's outbound IP, or check ` +
+          `MICROS_AUTH_TOKEN_PATH is correct (default: /oauth2/v1/token).`,
+        );
+      }
+      if (res.status === 404) {
+        throw new Error(
+          `[MicrosAuth] Auth server returned HTTP 404 for POST ${tokenUrl}. ` +
+          `The token endpoint path may be incorrect. ` +
+          `Check MICROS_AUTH_TOKEN_PATH (current: ${tokenPath}) or MICROS_AUTH_SERVER.`,
+        );
+      }
+      // For other failures (401, 403, 5xx) keep it terse — body may echo credentials
       throw new Error(`[MicrosAuth] Auth server returned HTTP ${res.status}.`);
     }
 
