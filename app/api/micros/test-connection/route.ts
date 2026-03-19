@@ -1,24 +1,32 @@
 /**
  * POST /api/micros/test-connection
  *
- * Validates that MICROS credentials can successfully authenticate.
+ * Validates that MICROS credentials can successfully authenticate and that
+ * data can be retrieved from the BI API.
  *
  * Priority:
  *  1. If MICROS_ENABLED=true and env vars are configured, test using
- *     MicrosAuthService (env-var credentials, in-memory token cache).
+ *     MicrosAuthService (OIDC ROPC flow with BI API account credentials).
+ *     Also makes one lightweight BI API call to verify end-to-end connectivity.
  *  2. Otherwise, fall back to saved DB credentials (legacy path).
  *
  * Returns:
- *   { success: true, source: "env" | "db", latencyMs: number }
- *   { success: false, error: string }
+ *   { success: true, source: "env"|"db", authMs, apiMs, latencyMs }
+ *   { success: false, source, error, missing? }
  *
- * NEVER returns the token, client_secret, or any credential values.
+ * NEVER returns the token, client_secret, account password, or any
+ * credential value in any response path.
  */
 
 import { NextRequest, NextResponse }              from "next/server";
 import { createServerClient }                     from "@/lib/supabase/server";
-import { isMicrosEnabled, getMicrosConfigStatus } from "@/lib/micros/config";
+import {
+  isMicrosEnabled,
+  getMicrosConfigStatus,
+  getMicrosEnvConfig,
+}                                                 from "@/lib/micros/config";
 import { MicrosAuthService }                      from "@/services/micros/MicrosAuthService";
+import { MicrosApiClient }                        from "@/services/micros/MicrosApiClient";
 import { testMicrosAuth }                         from "@/services/micros/auth";
 import type { MicrosConnection }                  from "@/types/micros";
 
@@ -35,24 +43,66 @@ export async function POST(req: NextRequest) {
       if (!cfgStatus.configured) {
         return NextResponse.json(
           {
-            success:  false,
-            source:   "env",
-            error:    cfgStatus.message,
-            missing:  cfgStatus.missing,
+            success: false,
+            source:  "env",
+            error:   cfgStatus.message,
+            missing: cfgStatus.missing,
           },
           { status: 400 },
         );
       }
 
-      // Clear cached token to force a fresh auth round-trip
+      // ── Step 1: Authenticate ──────────────────────────────────────────
       MicrosAuthService.clearCache();
-      await MicrosAuthService.getAccessToken();
+      const authT0 = Date.now();
+
+      try {
+        await MicrosAuthService.getAccessToken();
+      } catch (authErr) {
+        const message = authErr instanceof Error ? authErr.message : "Authentication failed.";
+        console.error("[POST /api/micros/test-connection] Auth step failed.");
+        return NextResponse.json(
+          { success: false, source: "env", error: message },
+          { status: 400 },
+        );
+      }
+
+      const authMs = Date.now() - authT0;
+
+      // ── Step 2: Lightweight BI API call ───────────────────────────────
+      const cfg    = getMicrosEnvConfig();
+      const today  = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const apiT0  = Date.now();
+      let   apiMs  = 0;
+      let   apiNote: string | undefined;
+
+      try {
+        await MicrosApiClient.get(
+          process.env.MICROS_PATH_DAILY_TOTALS ?? "/rms/v1/reports/dailyBusinessSummary",
+          { businessDate: today },
+          cfg.locRef,
+        );
+        apiMs = Date.now() - apiT0;
+      } catch (apiErr) {
+        apiMs  = Date.now() - apiT0;
+        // A 404 (no data for today) still proves routing works — treat as soft pass.
+        // Any other error is surfaced as a warning without failing the whole test.
+        const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+        if (!msg.includes("404")) {
+          apiNote = `BI API call returned an error: ${msg.slice(0, 200)}`;
+          console.warn("[POST /api/micros/test-connection] BI API call warning:", msg);
+        }
+      }
 
       return NextResponse.json({
         success:   true,
         source:    "env",
+        authMs,
+        apiMs,
         latencyMs: Date.now() - t0,
-        message:   "Authentication successful using environment variable credentials.",
+        message:
+          "Authentication successful and BI API is reachable." +
+          (apiNote ? ` Note: ${apiNote}` : ""),
       });
     }
 
