@@ -17,7 +17,7 @@ import type {
 
 // ── Action types ─────────────────────────────────────────────────────────────
 
-export type ActionSeverity = "critical" | "urgent" | "action" | "monitor";
+export type ActionSeverity = "critical" | "urgent" | "action" | "watch";
 export type ActionCategory =
   | "compliance"
   | "maintenance"
@@ -55,6 +55,12 @@ export interface DashboardAction {
   /** Impact weight tag — helps GM prioritise at a glance */
   impactWeight?:    ImpactWeight;
   impactLabel?:     string;
+  /** HIGH RISK banner — shown above action list */
+  isHighRisk?:      boolean;
+  /** Specific recovery target — e.g. "Need +12 covers at R450 avg" */
+  recoveryMetric?:  string;
+  /** Minutes remaining in current service window. Drives urgency countdown. */
+  serviceWindowMinutes?: number;
 }
 
 // ── Command Headline ──────────────────────────────────────────────────────────
@@ -232,7 +238,7 @@ export function generateTwoHourOutlook(params: {
   const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
 
   if (!forecast) {
-    return { text: "Limited live data — monitor manually", confidence: "none" };
+    return { text: "Limited live data — manual check required", confidence: "none" };
   }
 
   const gapAbs      = forecast.sales_gap ?? null;
@@ -283,12 +289,12 @@ export function generateTwoHourOutlook(params: {
   // Moderate shortfall
   if (gapPct != null && gapPct < -5) {
     return {
-      text: `Revenue behind — walk-in focus ${walkPhrase} required to recover`,
+      text: `Revenue at risk — walk-in focus ${walkPhrase} required to recover`,
       confidence: forecast.confidence,
     };
   }
 
-  return { text: "No material deviations at current pace — continue monitoring", confidence: "medium" };
+  return { text: "No material deviations at current pace — stay alert through close", confidence: "medium" };
 }
 
 /**
@@ -401,8 +407,8 @@ export function generateCommandHeadline(params: {
     const tp = getTimePressurePhrase("labour_high");
     return {
       severity:     "warning",
-      text:         `Labour elevated at ${laborPct?.toFixed(1)}% — monitor through service`,
-      subtext:      `Within elevated range. Avoid adding extra shifts ${tp}.`,
+      text:         `Labour elevated at ${laborPct?.toFixed(1)}% — requires attention`,
+      subtext:      `Above target range. No new shifts ${tp}.`,
       timePressure: tp,
     };
   }
@@ -455,7 +461,7 @@ export function generateCommandHeadline(params: {
   // Default stable
   return {
     severity: "good",
-    text:     "Operations stable — continue monitoring through service",
+    text:     "Operations stable — maintain pace through service",
     subtext:  "No critical alerts. Review all sections before pre-shift briefing.",
   };
 }
@@ -538,12 +544,23 @@ export function generateLabourInsight(params: {
   };
 }
 
+// ── Service window countdown ──────────────────────────────────────────────────
+
+export function minutesToServiceClose(): number {
+  const s    = new Date().toLocaleString("en-ZA", { timeZone: "Africa/Johannesburg" });
+  const date = new Date(s);
+  const close = new Date(date);
+  close.setHours(22, 0, 0, 0);
+  if (date >= close) return 0;
+  return Math.round((close.getTime() - date.getTime()) / 60_000);
+}
+
 // Severity ordering weight (lower = higher priority)
 const SEVERITY_WEIGHT: Record<ActionSeverity, number> = {
   critical: 0,
   urgent:   1,
   action:   2,
-  monitor:  3,
+  watch:    3,
 };
 
 // Category ordering weight (tie-break after severity)
@@ -717,23 +734,34 @@ export function buildPriorityActions(params: {
 
   // ── Revenue ───────────────────────────────────────────────────────────────
   if (forecast && forecast.target_sales && forecast.sales_gap != null && forecast.sales_gap < 0) {
-    const gapPct = Math.abs(forecast.sales_gap_pct ?? 0).toFixed(1);
-    const severity: ActionSeverity =
-      Math.abs(forecast.sales_gap_pct ?? 0) >= 20 ? "urgent" : "action";
+    const gapPctNum = Math.abs(forecast.sales_gap_pct ?? 0);
+    const gapPct    = gapPctNum.toFixed(1);
+    const gapAbs    = Math.abs(Math.round(forecast.sales_gap));
+    const severity: ActionSeverity = gapPctNum >= 20 ? "urgent" : "action";
+    const isHighRisk = gapPctNum >= 15;
+    const extraCovers = forecast.required_extra_covers ?? 0;
+    const avgSpend    = Math.round(forecast.forecast_avg_spend ?? 0);
+    const recoveryMetric =
+      extraCovers > 0 && avgSpend > 0
+        ? `Need +${extraCovers} cover${extraCovers > 1 ? "s" : ""} at R${avgSpend} avg to recover`
+        : `Requires R${gapAbs.toLocaleString("en-ZA")} additional revenue today`;
     actions.push({
       severity,
-      category:       "revenue",
-      title:          `Revenue forecast ${gapPct}% below target`,
-      message:        `Forecast is R${Math.abs(forecast.sales_gap).toFixed(0)} below today's target — ${forecast.risk_level} risk.`,
-      recommendation: forecast.recommendations?.[0]?.description ?? "Promote walk-ins and confirm open bookings.",
-      href:           "/dashboard/settings/targets",
-      primaryAction:   { label: "Add booking", href: "/dashboard/bookings" },
-      secondaryActions: [
+      category:          "revenue",
+      title:             `Revenue at risk — ${gapPct}% below target`,
+      message:           `Forecast R${gapAbs.toLocaleString("en-ZA")} short of today's target. ${forecast.risk_level === "high" ? "High-risk close." : "Recovery required."}`,
+      recommendation:    forecast.recommendations?.[0]?.description ?? "Promote walk-ins and confirm open bookings.",
+      href:              "/dashboard/settings/targets",
+      primaryAction:     { label: "Add booking", href: "/dashboard/bookings" },
+      secondaryActions:  [
         { label: "Trigger promotion", href: "/dashboard/settings/targets" },
         { label: "View revenue plan", href: "/dashboard/settings/targets" },
       ],
-      impactWeight:   "high_impact",
-      impactLabel:    IMPACT_LABELS["high_impact"],
+      impactWeight:      "high_impact",
+      impactLabel:       IMPACT_LABELS["high_impact"],
+      isHighRisk,
+      recoveryMetric,
+      serviceWindowMinutes: minutesToServiceClose(),
     });
   }
 
@@ -744,13 +772,18 @@ export function buildPriorityActions(params: {
     actions.push({
       severity,
       category:       "staffing",
-      title:          `Labor cost running at ${laborPct.toFixed(1)}%`,
-      message:        "Labor cost exceeds 35% threshold — staffing pressure is high.",
+      title:          `Labour cost at ${laborPct.toFixed(1)}% — requires action`,
+      message:        "Labour cost exceeds 35% threshold — margin pressure is high.",
       recommendation: "Review shift coverage and reduce overlap before next service.",
       href:           "/dashboard/operations",
       primaryAction:   { label: "Review staffing", href: "/dashboard/operations" },
-      impactWeight:   laborPct > 50 ? "high_impact" : "monitor",
-      impactLabel:    IMPACT_LABELS[laborPct > 50 ? "high_impact" : "monitor"],
+      impactWeight:   laborPct > 50 ? "high_impact" : "quick_win",
+      impactLabel:    IMPACT_LABELS[laborPct > 50 ? "high_impact" : "quick_win"],
+      isHighRisk:     laborPct > 50,
+      recoveryMetric: laborPct > 50
+        ? `Cut 1 FOH position immediately to bring labour below 40%`
+        : `Avoid adding shifts until labour drops below 35%`,
+      serviceWindowMinutes: minutesToServiceClose(),
     });
   }
 
@@ -777,31 +810,31 @@ export function buildPriorityActions(params: {
     );
     if (ageDays > 2) {
       actions.push({
-        severity:       "monitor",
+        severity:       "watch",
         category:       "data",
-        title:          `Daily ops report ${ageDays} days old`,
-        message:        `Last report was for ${dailyOps.latestReport.report_date}. Data may not reflect current operations.`,
+        title:          `Daily ops report ${ageDays} days old — requires update`,
+        message:        `Last report was for ${dailyOps.latestReport.report_date}. Operational data may be stale.`,
         recommendation: "Upload the latest Daily Operations CSV from Toast.",
         href:           "/dashboard/operations",
         primaryAction:   { label: "Upload report", href: "/dashboard/operations" },
-        impactWeight:   "monitor",
-        impactLabel:    IMPACT_LABELS["monitor"],
+        impactWeight:   "quick_win",
+        impactLabel:    IMPACT_LABELS["quick_win"],
       });
     }
   }
 
   if (reviews.totalReviews === 0) {
     actions.push({
-      severity:       "monitor",
+      severity:       "watch",
       category:       "data",
-      title:          "Reviews not synced",
-      message:        "No reviews on record — reputation monitoring is inactive.",
+      title:          "Reviews not synced — requires action",
+      message:        "No reviews on record — reputation tracking is inactive.",
       recommendation: "Connect Google Reviews or log reviews manually.",
       href:           "/dashboard/reviews",
       primaryAction:   { label: "Connect source", href: "/dashboard/reviews" },
       secondaryActions: [{ label: "Log manually", href: "/dashboard/reviews" }],
-      impactWeight:   "monitor",
-      impactLabel:    IMPACT_LABELS["monitor"],
+      impactWeight:   "quick_win",
+      impactLabel:    IMPACT_LABELS["quick_win"],
     });
   }
 
@@ -809,15 +842,15 @@ export function buildPriorityActions(params: {
   const todayEvent = events.find((e) => e.event_date === today && !e.cancelled);
   if (todayEvent) {
     actions.push({
-      severity:       "monitor",
+      severity:       "watch",
       category:       "events",
       title:          `Event tonight: ${todayEvent.name}`,
-      message:        `${todayEvent.start_time ? `Starts at ${todayEvent.start_time}. ` : ""}Expect higher traffic and booking enquiries.`,
+      message:        `${todayEvent.start_time ? `Starts at ${todayEvent.start_time}. ` : ""}Expect higher traffic — confirm staffing now.`,
       recommendation: "Brief front-of-house and confirm staff levels for event service.",
       href:           "/dashboard/events",
       primaryAction:   { label: "View event", href: "/dashboard/events" },
-      impactWeight:   "monitor",
-      impactLabel:    IMPACT_LABELS["monitor"],
+      impactWeight:   "quick_win",
+      impactLabel:    IMPACT_LABELS["quick_win"],
     });
   }
 

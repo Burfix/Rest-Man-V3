@@ -76,7 +76,7 @@ export default function CommandHeadlineBanner({ headline, confidence }: Props) {
             {headline.subtext}
           </p>
         )}
-        {confidence && (
+        {confidence && confidence.level !== "low" && (
           <p className={cn("mt-1.5 text-[10px] leading-none", cfg.conf)}>
             Confidence: <span className="font-semibold">{CONFIDENCE_LEVEL_LABEL[confidence.level]}</span>
             {" "}({confidence.detail})

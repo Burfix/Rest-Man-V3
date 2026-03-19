@@ -124,7 +124,7 @@ export default function DashboardTopBar({
     laborPct == null ? "No report uploaded"   :
     laborPct <= 30   ? "Well within range"    :
     laborPct <= 35   ? "Healthy"              :
-    laborPct <= 45   ? "Elevated — monitor"   :
+    laborPct <= 45   ? "Elevated — act now"   :
     "High — take action";
   const labourSubColor =
     laborPct == null ? "text-stone-400 dark:text-stone-600"       :

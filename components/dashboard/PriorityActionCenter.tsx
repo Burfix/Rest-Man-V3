@@ -38,8 +38,8 @@ const SEVERITY_CONFIG: Record<
     dot:    "bg-blue-500",
     border: "border-blue-200",
   },
-  monitor: {
-    label:  "MONITOR",
+  watch: {
+    label:  "WATCH",
     bg:     "bg-stone-50",
     text:   "text-stone-500",
     dot:    "bg-stone-400",

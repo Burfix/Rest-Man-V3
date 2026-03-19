@@ -20,8 +20,11 @@ import { getDataFreshnessSummary } from "@/services/ops/dataFreshness";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 import { getMicrosStatus } from "@/services/micros/status";
+import { getOperatingScore } from "@/services/ops/operatingScore";
 
-import FreshnessBar          from "@/components/dashboard/ops/FreshnessBar";
+import FreshnessBar               from "@/components/dashboard/ops/FreshnessBar";
+import OperatingScoreWidget       from "@/components/dashboard/ops/OperatingScoreWidget";
+import DailyAccountabilityPanel   from "@/components/dashboard/ops/DailyAccountabilityPanel";
 import CommandHeadlineBanner from "@/components/dashboard/ops/CommandHeadlineBanner";
 import DashboardTopBar       from "@/components/dashboard/ops/DashboardTopBar";
 import CriticalActionsPanel  from "@/components/dashboard/ops/CriticalActionsPanel";
@@ -138,6 +141,7 @@ export default async function OperationsDashboard() {
     forecastResult,
     complianceResult,
     microsResult,
+    operatingScoreResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getSevenDayReviewSummary(),
@@ -149,6 +153,7 @@ export default async function OperationsDashboard() {
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),
+    getOperatingScore("00000000-0000-0000-0000-000000000001"),
   ]);
 
   const { value: today, error: todayErr }           = settled(todayResult, EMPTY_TODAY);
@@ -161,6 +166,7 @@ export default async function OperationsDashboard() {
   const { value: forecast }                         = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }                = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }                     = settled(microsResult, null);
+  const { value: operatingScore }                   = settled(operatingScoreResult, null);
 
   const errors = [todayErr, reviewsErr, salesErr, maintenanceErr, eventsErr, dailyOpsErr]
     .filter(Boolean) as string[];
@@ -217,6 +223,12 @@ export default async function OperationsDashboard() {
 
   return (
     <div className="space-y-5">
+
+      {/* ── 0. Operating Score + Accountability row ── */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <OperatingScoreWidget score={operatingScore} />
+        <DailyAccountabilityPanel />
+      </div>
 
       {/* ── 1. Operations Command Bar ── */}
       <DashboardTopBar
