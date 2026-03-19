@@ -7,6 +7,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import ActionsBoard, { type Action } from "@/components/dashboard/actions/ActionsBoard";
+import DailyOpsSummaryPanel from "@/components/dashboard/actions/DailyOpsSummaryPanel";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
@@ -83,6 +84,9 @@ export default async function ActionsPage() {
           Operational execution board — track every action from creation to completion.
         </p>
       </div>
+
+      {/* Daily Ops Summary — morning brief / evening debrief */}
+      <DailyOpsSummaryPanel />
 
       {/* Error banner */}
       {loadError && (

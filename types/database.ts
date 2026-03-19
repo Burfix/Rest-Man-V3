@@ -1585,6 +1585,8 @@ export interface Database {
           high_completed:         number;
           medium_completed:       number;
           low_completed:          number;
+          ops_score:              number | null;
+          missed_actions:         number;
           created_at:             string;
         };
         Insert: {
@@ -1600,6 +1602,8 @@ export interface Database {
           high_completed?:         number;
           medium_completed?:       number;
           low_completed?:          number;
+          ops_score?:              number | null;
+          missed_actions?:         number;
           created_at?:             string;
         };
         Update: {
@@ -1615,6 +1619,8 @@ export interface Database {
           high_completed?:         number;
           medium_completed?:       number;
           low_completed?:          number;
+          ops_score?:              number | null;
+          missed_actions?:         number;
           created_at?:             string;
         };
         Relationships: [];
