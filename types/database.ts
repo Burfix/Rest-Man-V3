@@ -1625,6 +1625,71 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      store_snapshots: {
+        Row: {
+          id:                string;
+          site_id:           string;
+          snapshot_date:     string;
+          operating_score:   number | null;
+          score_grade:       string | null;
+          sales_net_vat:     number | null;
+          revenue_target:    number | null;
+          revenue_gap_pct:   number | null;
+          labour_pct:        number | null;
+          compliance_score:  number | null;
+          maintenance_score: number | null;
+          risk_level:        "green" | "yellow" | "red";
+          actions_total:     number;
+          actions_completed: number;
+          actions_overdue:   number;
+          created_at:        string;
+        };
+        Insert: {
+          id?:                string;
+          site_id:            string;
+          snapshot_date:      string;
+          operating_score?:   number | null;
+          score_grade?:       string | null;
+          sales_net_vat?:     number | null;
+          revenue_target?:    number | null;
+          revenue_gap_pct?:   number | null;
+          labour_pct?:        number | null;
+          compliance_score?:  number | null;
+          maintenance_score?: number | null;
+          risk_level?:        "green" | "yellow" | "red";
+          actions_total?:     number;
+          actions_completed?: number;
+          actions_overdue?:   number;
+          created_at?:        string;
+        };
+        Update: {
+          id?:                string;
+          site_id?:           string;
+          snapshot_date?:     string;
+          operating_score?:   number | null;
+          score_grade?:       string | null;
+          sales_net_vat?:     number | null;
+          revenue_target?:    number | null;
+          revenue_gap_pct?:   number | null;
+          labour_pct?:        number | null;
+          compliance_score?:  number | null;
+          maintenance_score?: number | null;
+          risk_level?:        "green" | "yellow" | "red";
+          actions_total?:     number;
+          actions_completed?: number;
+          actions_overdue?:   number;
+          created_at?:        string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "store_snapshots_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
