@@ -9,24 +9,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
 
 const VALID_STATUSES      = ["pending", "in_progress", "completed"] as const;
 const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
 const DEFAULT_SITE_ID     = "00000000-0000-0000-0000-000000000001";
-
-/** Fetch the most recent daily ops revenue figure (sales_net_vat). */
-export async function getLatestRevenueFigure(
-  supabase: SupabaseClient
-): Promise<{ sales: number | null; date: string | null }> {
-  const { data } = await supabase
-    .from("daily_operations_reports")
-    .select("report_date, sales_net_vat")
-    .order("report_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  return { sales: data?.sales_net_vat ?? null, date: data?.report_date ?? null };
-}
 
 export async function GET(req: NextRequest) {
   try {

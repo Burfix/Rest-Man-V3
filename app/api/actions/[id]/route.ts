@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { getLatestRevenueFigure } from "@/app/api/actions/route";
+import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
 
 const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
 
