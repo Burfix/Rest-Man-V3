@@ -19,6 +19,9 @@ export interface Action {
   created_at:    string;
   started_at:    string | null;
   completed_at:  string | null;
+  revenue_before: number | null;
+  revenue_after:  number | null;
+  revenue_delta:  number | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -252,6 +255,30 @@ function ActionCard({
               <span className="text-green-600">✓ {resTime}</span>
             )}
           </div>
+
+          {/* Revenue impact badge — shown only on completed actions with data */}
+          {action.status === "completed" && action.revenue_delta !== null && (
+            <div className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  action.revenue_delta >= 0
+                    ? "bg-green-50 text-green-700 ring-1 ring-inset ring-green-200"
+                    : "bg-red-50 text-red-700 ring-1 ring-inset ring-red-200"
+                }`}
+              >
+                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  {action.revenue_delta >= 0 ? (
+                    <path fillRule="evenodd" d="M12.577 4.878a.75.75 0 01.919-.53l4.78 1.281a.75.75 0 01.531.919l-1.281 4.78a.75.75 0 01-1.449-.387l.81-3.022a19.407 19.407 0 00-5.594 5.203.75.75 0 01-1.139.093L7 10.06l-4.72 4.72a.75.75 0 01-1.06-1.061l5.25-5.25a.75.75 0 011.06 0l3.074 3.073a20.923 20.923 0 015.545-4.931l-3.042-.815a.75.75 0 01-.53-.919z" clipRule="evenodd" />
+                  ) : (
+                    <path fillRule="evenodd" d="M1.22 5.222a.75.75 0 011.06 0L7 9.942l3.768-3.769a.75.75 0 011.113.058 20.908 20.908 0 013.813 7.254l1.574-2.727a.75.75 0 011.3.75l-2.475 4.286a.75.75 0 01-1.025.275l-4.287-2.475a.75.75 0 01.75-1.3l2.71 1.565a19.422 19.422 0 00-3.013-6.024L7.53 11.533a.75.75 0 01-1.06 0l-5.25-5.25a.75.75 0 010-1.06z" clipRule="evenodd" />
+                  )}
+                </svg>
+                Impact: {action.revenue_delta >= 0 ? "+" : "-"}R
+                {Math.abs(action.revenue_delta).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                {" "}{action.revenue_delta >= 0 ? "revenue recovered" : "revenue decline"}
+              </span>
+            </div>
+          )}
 
           {err && (
             <p className="text-xs text-red-600">{err}</p>

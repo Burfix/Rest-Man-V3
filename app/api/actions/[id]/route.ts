@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { getLatestRevenueFigure } from "@/app/api/actions/route";
 
 const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
 
@@ -34,7 +35,7 @@ export async function PATCH(
     // Verify action exists
     const { data: existing, error: fetchErr } = await supabase
       .from("actions")
-      .select("id, status")
+      .select("id, status, revenue_before")
       .eq("id", id)
       .single();
 
@@ -42,7 +43,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
-    let update: Record<string, string | null> = {};
+    let update: Record<string, string | number | null> = {};
 
     switch (op) {
       case "assign": {
@@ -65,9 +66,17 @@ export async function PATCH(
       }
 
       case "complete": {
+        const rev = await getLatestRevenueFigure(supabase);
+        const revBefore = typeof existing.revenue_before === "number" ? existing.revenue_before : null;
+        const revAfter  = rev.sales;
+        const revDelta  = revBefore !== null && revAfter !== null ? revAfter - revBefore : null;
+
         update = {
-          status:       "completed",
-          completed_at: new Date().toISOString(),
+          status:             "completed",
+          completed_at:       new Date().toISOString(),
+          revenue_after:      revAfter,
+          revenue_date_after: rev.date,
+          revenue_delta:      revDelta,
         };
         if (!existing.status || existing.status === "pending") {
           update.started_at = new Date().toISOString();

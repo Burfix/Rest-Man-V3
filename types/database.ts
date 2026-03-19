@@ -1515,6 +1515,11 @@ export interface Database {
           started_at:    string | null;
           completed_at:  string | null;
           archived_at:   string | null;
+          revenue_before:      number | null;
+          revenue_after:       number | null;
+          revenue_delta:       number | null;
+          revenue_date_before: string | null;
+          revenue_date_after:  string | null;
         };
         Insert: {
           id?:           string;
@@ -1532,6 +1537,11 @@ export interface Database {
           started_at?:   string | null;
           completed_at?: string | null;
           archived_at?:  string | null;
+          revenue_before?:      number | null;
+          revenue_after?:       number | null;
+          revenue_delta?:       number | null;
+          revenue_date_before?: string | null;
+          revenue_date_after?:  string | null;
         };
         Update: {
           id?:           string;
@@ -1549,6 +1559,11 @@ export interface Database {
           started_at?:   string | null;
           completed_at?: string | null;
           archived_at?:  string | null;
+          revenue_before?:      number | null;
+          revenue_after?:       number | null;
+          revenue_delta?:       number | null;
+          revenue_date_before?: string | null;
+          revenue_date_after?:  string | null;
         };
         Relationships: [];
       };
