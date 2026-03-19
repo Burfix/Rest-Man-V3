@@ -1520,6 +1520,7 @@ export interface Database {
           revenue_delta:       number | null;
           revenue_date_before: string | null;
           revenue_date_after:  string | null;
+          execution_type:      string | null;
         };
         Insert: {
           id?:           string;
@@ -1542,6 +1543,7 @@ export interface Database {
           revenue_delta?:       number | null;
           revenue_date_before?: string | null;
           revenue_date_after?:  string | null;
+          execution_type?:      string | null;
         };
         Update: {
           id?:           string;
@@ -1564,6 +1566,7 @@ export interface Database {
           revenue_delta?:       number | null;
           revenue_date_before?: string | null;
           revenue_date_after?:  string | null;
+          execution_type?:      string | null;
         };
         Relationships: [];
       };

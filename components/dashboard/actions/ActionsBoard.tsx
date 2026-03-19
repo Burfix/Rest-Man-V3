@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type ActionStatus  = "pending" | "in_progress" | "completed";
-export type ImpactWeight  = "critical" | "high" | "medium" | "low";
+export type ActionStatus    = "pending" | "in_progress" | "completed";
+export type ImpactWeight    = "critical" | "high" | "medium" | "low";
+export type ExecutionType   = "call" | "message" | "staffing" | "compliance";
 
 export interface Action {
   id:            string;
@@ -19,9 +20,10 @@ export interface Action {
   created_at:    string;
   started_at:    string | null;
   completed_at:  string | null;
-  revenue_before: number | null;
-  revenue_after:  number | null;
-  revenue_delta:  number | null;
+  revenue_before:  number | null;
+  revenue_after:   number | null;
+  revenue_delta:   number | null;
+  execution_type:  ExecutionType | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -31,6 +33,38 @@ const impactConfig: Record<ImpactWeight, { label: string; badge: string }> = {
   high:     { label: "High",     badge: "bg-orange-100 text-orange-700 ring-orange-200" },
   medium:   { label: "Medium",   badge: "bg-amber-100 text-amber-700 ring-amber-200" },
   low:      { label: "Low",      badge: "bg-stone-100 text-stone-500 ring-stone-200" },
+};
+
+const executionConfig: Record<ExecutionType, {
+  label:    string;
+  icon:     string;
+  btnClass: string;
+  hint:     string;
+}> = {
+  call: {
+    label:    "Call",
+    icon:     "📞",
+    btnClass: "border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100",
+    hint:     "Open call / waiting list",
+  },
+  message: {
+    label:    "Message",
+    icon:     "💬",
+    btnClass: "border-violet-200 bg-violet-50 text-violet-700 hover:bg-violet-100",
+    hint:     "Send message to team",
+  },
+  staffing: {
+    label:    "Staffing",
+    icon:     "👥",
+    btnClass: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
+    hint:     "Adjust floor staffing",
+  },
+  compliance: {
+    label:    "Compliance",
+    icon:     "📋",
+    btnClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
+    hint:     "Log compliance check",
+  },
 };
 
 const statusConfig: Record<ActionStatus, { label: string; bar: string }> = {
@@ -57,6 +91,141 @@ function resolutionTime(action: Action): string | null {
   const hours = Math.floor(mins / 60);
   if (hours > 0) return `${hours}h ${mins % 60}m`;
   return `${mins}m`;
+}
+
+// ── Quick-Action Modals ──────────────────────────────────────────────────────
+
+function QuickActionModal({
+  action,
+  onClose,
+}: {
+  action: Action;
+  onClose: () => void;
+}) {
+  const et = action.execution_type;
+  if (!et) return null;
+  const cfg = executionConfig[et];
+
+  // Shared dismiss on overlay click
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-sm rounded-xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="border-b border-stone-100 px-5 py-4 flex items-center gap-3">
+          <span className="text-2xl">{cfg.icon}</span>
+          <div>
+            <h3 className="font-semibold text-stone-900">{cfg.label} Action</h3>
+            <p className="mt-0.5 text-sm text-stone-500 truncate">{action.title}</p>
+          </div>
+        </div>
+
+        <div className="px-5 py-5 space-y-4">
+          {et === "call" && (
+            <>
+              <p className="text-sm text-stone-600">
+                Call the waiting list or contact a guest directly.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href="tel:"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-sky-500 px-4 py-3 text-sm font-semibold text-white hover:bg-sky-600"
+                >
+                  📞 Dial Guest
+                </a>
+                <button
+                  onClick={onClose}
+                  className="rounded-lg border border-stone-200 px-4 py-3 text-sm font-medium text-stone-600 hover:bg-stone-50"
+                >
+                  Open Waiting List →
+                </button>
+              </div>
+            </>
+          )}
+
+          {et === "message" && (
+            <>
+              <p className="text-sm text-stone-600">
+                Send a quick message to the team about this action.
+              </p>
+              <textarea
+                rows={3}
+                placeholder="Type your message…"
+                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-400 resize-none"
+                autoFocus
+              />
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={onClose}
+                  className="rounded-md border border-stone-200 px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onClose}
+                  className="rounded-md bg-violet-500 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-600"
+                >
+                  Send via WhatsApp
+                </button>
+              </div>
+            </>
+          )}
+
+          {et === "staffing" && (
+            <>
+              <p className="text-sm text-stone-600">
+                Adjust floor-of-house staffing levels for this shift.
+              </p>
+              <div className="space-y-2">
+                {(["FOH", "BOH", "Bar"] as const).map((zone) => (
+                  <div key={zone} className="flex items-center justify-between rounded-lg border border-stone-200 px-4 py-2.5">
+                    <span className="text-sm font-medium text-stone-700">{zone}</span>
+                    <div className="flex items-center gap-3">
+                      <button className="h-7 w-7 rounded-full border border-stone-300 text-stone-600 hover:bg-stone-100 text-base leading-none">&minus;</button>
+                      <span className="w-4 text-center text-sm font-semibold text-stone-900">—</span>
+                      <button className="h-7 w-7 rounded-full border border-stone-300 text-stone-600 hover:bg-stone-100 text-base leading-none">+</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full rounded-md bg-amber-500 py-2 text-sm font-medium text-white hover:bg-amber-600"
+              >
+                Confirm Staffing Change
+              </button>
+            </>
+          )}
+
+          {et === "compliance" && (
+            <>
+              <p className="text-sm text-stone-600">
+                Log a compliance check or acknowledge an outstanding item.
+              </p>
+              <div className="space-y-2">
+                {["Temperature logs checked", "Cleaning schedule signed off", "Equipment inspection done"].map((item) => (
+                  <label key={item} className="flex items-center gap-3 rounded-lg border border-stone-200 px-4 py-2.5 cursor-pointer hover:bg-stone-50">
+                    <input type="checkbox" className="h-4 w-4 rounded border-stone-300 accent-rose-500" />
+                    <span className="text-sm text-stone-700">{item}</span>
+                  </label>
+                ))}
+              </div>
+              <button
+                onClick={onClose}
+                className="w-full rounded-md bg-rose-500 py-2 text-sm font-medium text-white hover:bg-rose-600"
+              >
+                Submit Compliance Log
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ── Assign modal ──────────────────────────────────────────────────────────────
@@ -145,9 +314,10 @@ function ActionCard({
   action: Action;
   onMutate: (updated: Action) => void;
 }) {
-  const [showAssign, setShowAssign] = useState(false);
-  const [busy, setBusy]             = useState(false);
-  const [err, setErr]               = useState<string | null>(null);
+  const [showAssign,  setShowAssign]  = useState(false);
+  const [showQuick,   setShowQuick]   = useState(false);
+  const [busy, setBusy]               = useState(false);
+  const [err, setErr]                 = useState<string | null>(null);
 
   async function callOp(op: string) {
     setBusy(true);
@@ -172,6 +342,8 @@ function ActionCard({
   const sc      = statusConfig[action.status]        ?? statusConfig.pending;
   const resTime = resolutionTime(action);
 
+  const execCfg = action.execution_type ? executionConfig[action.execution_type] : null;
+
   return (
     <>
       {showAssign && (
@@ -183,6 +355,9 @@ function ActionCard({
             setShowAssign(false);
           }}
         />
+      )}
+      {showQuick && (
+        <QuickActionModal action={action} onClose={() => setShowQuick(false)} />
       )}
 
       <div
@@ -223,6 +398,15 @@ function ActionCard({
               {impact.label}
             </span>
           </div>
+
+          {/* Execution type chip */}
+          {execCfg && (
+            <div className="flex items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500 ring-1 ring-inset ring-stone-200">
+                {execCfg.icon} {execCfg.label}
+              </span>
+            </div>
+          )}
 
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
@@ -287,6 +471,19 @@ function ActionCard({
           {/* Action buttons */}
           {action.status !== "completed" && (
             <div className="flex flex-wrap gap-1.5 pt-1 border-t border-stone-100">
+              {/* Quick Action — shown when execution_type is set */}
+              {execCfg && (
+                <button
+                  onClick={() => setShowQuick(true)}
+                  disabled={busy}
+                  title={execCfg.hint}
+                  className={`flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-semibold disabled:opacity-40 transition-colors ${execCfg.btnClass}`}
+                >
+                  <span>{execCfg.icon}</span>
+                  {execCfg.label}
+                </button>
+              )}
+
               {/* Assign */}
               <button
                 onClick={() => setShowAssign(true)}
@@ -349,16 +546,17 @@ function ActionCard({
 // ── Add Action Form ───────────────────────────────────────────────────────────
 
 function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
-  const [open,   setOpen]   = useState(false);
-  const [title,  setTitle]  = useState("");
-  const [desc,   setDesc]   = useState("");
-  const [impact, setImpact] = useState<ImpactWeight>("medium");
-  const [who,    setWho]    = useState("");
-  const [busy,   startT]    = useTransition();
-  const [err,    setErr]    = useState<string | null>(null);
+  const [open,      setOpen]      = useState(false);
+  const [title,     setTitle]     = useState("");
+  const [desc,      setDesc]      = useState("");
+  const [impact,    setImpact]    = useState<ImpactWeight>("medium");
+  const [who,       setWho]       = useState("");
+  const [execType,  setExecType]  = useState<ExecutionType | "">("" );
+  const [busy,      startT]       = useTransition();
+  const [err,       setErr]       = useState<string | null>(null);
 
   function reset() {
-    setTitle(""); setDesc(""); setImpact("medium"); setWho(""); setErr(null);
+    setTitle(""); setDesc(""); setImpact("medium"); setWho(""); setExecType(""); setErr(null);
   }
 
   function submit(e: React.FormEvent) {
@@ -369,10 +567,11 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title:         title.trim(),
-          description:   desc.trim() || undefined,
-          impact_weight: impact,
-          assigned_to:   who.trim()   || undefined,
+          title:          title.trim(),
+          description:    desc.trim() || undefined,
+          impact_weight:  impact,
+          assigned_to:    who.trim()  || undefined,
+          execution_type: execType    || undefined,
         }),
       });
       const j = await res.json();
@@ -443,6 +642,29 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
               placeholder="Name or role…"
               className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm focus:border-amber-400 focus:outline-none"
             />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-stone-600 mb-1">Quick Action type <span className="text-stone-400 font-normal">(optional)</span></label>
+          <div className="flex gap-1.5 flex-wrap">
+            {(["call", "message", "staffing", "compliance"] as ExecutionType[]).map((t) => {
+              const c = executionConfig[t];
+              return (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setExecType(execType === t ? "" : t)}
+                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+                    execType === t
+                      ? c.btnClass + " ring-2 ring-offset-1"
+                      : "border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
+                  }`}
+                >
+                  {c.icon} {c.label}
+                </button>
+              );
+            })}
           </div>
         </div>
         {err && <p className="text-xs text-red-600">{err}</p>}

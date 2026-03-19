@@ -13,6 +13,7 @@ import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
 
 const VALID_STATUSES      = ["pending", "in_progress", "completed"] as const;
 const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
+const VALID_EXEC_TYPES    = ["call", "message", "staffing", "compliance"] as const;
 const DEFAULT_SITE_ID     = "00000000-0000-0000-0000-000000000001";
 
 export async function GET(req: NextRequest) {
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, description, impact_weight, assigned_to, source_type, source_id, zone_id } =
+    const { title, description, impact_weight, assigned_to, source_type, source_id, zone_id, execution_type } =
       body as Record<string, string | undefined>;
 
     if (!title?.trim()) {
@@ -61,6 +62,13 @@ export async function POST(req: NextRequest) {
     if (impact_weight && !VALID_IMPACT_LEVELS.includes(impact_weight as never)) {
       return NextResponse.json(
         { error: `impact_weight must be one of: ${VALID_IMPACT_LEVELS.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
+    if (execution_type && !VALID_EXEC_TYPES.includes(execution_type as never)) {
+      return NextResponse.json(
+        { error: `execution_type must be one of: ${VALID_EXEC_TYPES.join(", ")}` },
         { status: 400 }
       );
     }
@@ -82,6 +90,7 @@ export async function POST(req: NextRequest) {
         zone_id:             zone_id     || null,
         site_id:             DEFAULT_SITE_ID,
         status:              "pending",
+        execution_type:      execution_type || null,
         revenue_before:      rev.sales,
         revenue_date_before: rev.date,
       })
