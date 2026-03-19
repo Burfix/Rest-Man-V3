@@ -231,6 +231,22 @@ export interface Database {
           site_id: string | null;
           zone_id: string | null;
           ticket_type: string;
+          // Added by migration 014 — maintenance intelligence
+          impact_level: string;
+          date_acknowledged: string | null;
+          date_fixed: string | null;
+          reported_by: string | null;
+          fixed_by: string | null;
+          fixed_by_type: string | null;
+          contractor_name: string | null;
+          contractor_contact: string | null;
+          downtime_minutes: number | null;
+          estimated_cost: number | null;
+          actual_cost: number | null;
+          resolution_notes: string | null;
+          root_cause: string | null;
+          follow_up_required: boolean;
+          follow_up_notes: string | null;
         };
         Insert: {
           id?: string;
@@ -249,6 +265,21 @@ export interface Database {
           site_id?: string | null;
           zone_id?: string | null;
           ticket_type?: string;
+          impact_level?: string;
+          date_acknowledged?: string | null;
+          date_fixed?: string | null;
+          reported_by?: string | null;
+          fixed_by?: string | null;
+          fixed_by_type?: string | null;
+          contractor_name?: string | null;
+          contractor_contact?: string | null;
+          downtime_minutes?: number | null;
+          estimated_cost?: number | null;
+          actual_cost?: number | null;
+          resolution_notes?: string | null;
+          root_cause?: string | null;
+          follow_up_required?: boolean;
+          follow_up_notes?: string | null;
         };
         Update: {
           id?: string;
@@ -267,6 +298,21 @@ export interface Database {
           site_id?: string | null;
           zone_id?: string | null;
           ticket_type?: string;
+          impact_level?: string;
+          date_acknowledged?: string | null;
+          date_fixed?: string | null;
+          reported_by?: string | null;
+          fixed_by?: string | null;
+          fixed_by_type?: string | null;
+          contractor_name?: string | null;
+          contractor_contact?: string | null;
+          downtime_minutes?: number | null;
+          estimated_cost?: number | null;
+          actual_cost?: number | null;
+          resolution_notes?: string | null;
+          root_cause?: string | null;
+          follow_up_required?: boolean;
+          follow_up_notes?: string | null;
         };
         Relationships: [];
       };
