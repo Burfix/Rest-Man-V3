@@ -6,7 +6,10 @@
 import { getMicrosStatus }               from "@/services/micros/status";
 import { getMicrosConfigStatus }         from "@/lib/micros/config";
 import { deriveMicrosIntegrationStatus } from "@/lib/integrations/status";
+import { sanitizeMicrosError }           from "@/lib/integrations/status";
+import { createServerClient }            from "@/lib/supabase/server";
 import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
+import MicrosDebugPanel                  from "@/components/dashboard/settings/MicrosDebugPanel";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
@@ -16,6 +19,13 @@ export default async function IntegrationsPage() {
   const connection   = microsResult?.connection ?? null;
   const cfgStatus    = getMicrosConfigStatus();
   const microsHealth = deriveMicrosIntegrationStatus(microsResult, cfgStatus.configured, cfgStatus.enabled);
+
+  // ── Admin check (server-side) — debug panel shown to admin users only ──
+  const supabase = createServerClient();
+  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+  const role    = (user?.user_metadata?.role as string | undefined) ??
+                  (user?.app_metadata?.role  as string | undefined) ?? "";
+  const isAdmin = role === "admin";
 
   // ── [MICROS_STATUS_DEBUG] server-side only ───────────────────────────────
   console.log("[MICROS_STATUS_DEBUG] integrations page render", {
@@ -31,6 +41,7 @@ export default async function IntegrationsPage() {
     derivedLabel:          microsHealth.label,
     derivedUserMessage:    microsHealth.userMessage,
     isLiveDataAvailable:   microsHealth.isLiveDataAvailable,
+    isAdmin,
   });
   // ── end debug ────────────────────────────────────────────────────────────
 
@@ -44,6 +55,18 @@ export default async function IntegrationsPage() {
       </div>
 
       <MicrosSettingsCard connection={connection as never} microsHealth={microsHealth} />
+
+      {/* Admin-only: MICROS config diagnostics panel */}
+      {isAdmin && (
+        <MicrosDebugPanel
+          lastSyncError={
+            connection?.last_sync_error
+              ? sanitizeMicrosError(connection.last_sync_error)
+              : null
+          }
+          connectionStatus={connection?.status ?? null}
+        />
+      )}
 
       {/* Future integration slots — placeholder style matches empty maintenance card */}
       <section className="rounded-lg border border-dashed border-stone-200 bg-stone-50 p-6">

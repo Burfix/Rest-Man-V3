@@ -1,109 +1,86 @@
 /**
  * lib/micros/auth.ts
  *
- * Oracle MICROS BI API — Authorization Code + PKCE auth flow.
+ * Oracle MICROS BI API -- OAuth 2.0 Resource Owner Password Credentials grant.
  *
- * Three-step flow (no client_secret, no password grant):
+ * Single request:
+ *   POST {MICROS_AUTH_SERVER}/oauth/token
+ *   Content-Type: application/x-www-form-urlencoded
+ *   Body: grant_type=password&username=...&password=...&client_id=...
  *
- *   A. AUTHORIZE  — GET  /oidc-provider/v1/oauth2/authorize
- *                   Obtains a session cookie + PKCE challenge registered.
+ * No client_secret. No PKCE. No cookies. No redirects.
  *
- *   B. SIGN IN    — POST /oidc-provider/v1/oauth2/signin
- *                   Authenticates the BIAPI account (username + password + orgname).
- *                   Returns a redirectUrl containing ?code=...
- *
- *   C. TOKEN      — POST /oidc-provider/v1/oauth2/token
- *                   Exchanges the auth code + verifier for id_token / refresh_token.
- *
- * Tokens stored in process memory only.
- * Refresh flow uses the stored refresh_token; falls back to full PKCE re-auth.
- *
- * Env vars (all server-side — never expose to browser):
- *   MICROS_AUTH_SERVER      Oracle OIDC provider base URL (no trailing slash)
- *   MICROS_CLIENT_ID        Registered OAuth client ID
- *   MICROS_USERNAME         BIAPI account username  (e.g. SCS_THAMSANQA_BIAPI)
- *   MICROS_PASSWORD         BIAPI account password
- *   MICROS_ORG_SHORT_NAME   Oracle enterprise short name  (e.g. SCS)
- *   MICROS_REDIRECT_URI     Registered redirect URI  (e.g. apiaccount://callback)
- *
- * Security rules:
- *   - Password is read from env only, never logged, never returned to client.
- *   - Tokens live in process memory only.
- *   - All log lines use sanitize() — no secrets, no raw tokens.
+ * Env vars (server-side only):
+ *   MICROS_AUTH_SERVER   Oracle auth server base URL (no trailing slash)
+ *   MICROS_CLIENT_ID     Registered OAuth client ID
+ *   MICROS_USERNAME      Oracle BI API account username
+ *   MICROS_PASSWORD      Oracle BI API account password
  */
 
-import { generateCodeVerifier, generateCodeChallenge } from "./pkce";
-
-// ── Constants ─────────────────────────────────────────────────────────────
-
-const AUTHORIZE_PATH = "/oidc-provider/v1/oauth2/authorize";
-const SIGNIN_PATH    = "/oidc-provider/v1/oauth2/signin";
-const TOKEN_PATH     = "/oidc-provider/v1/oauth2/token";
-
+const TOKEN_PATH = "/oauth/token";
 const FETCH_TIMEOUT_MS = 20_000;
+const TOKEN_BUFFER_MS = 5 * 60 * 1000;
 
-/**
- * id_token treated as expired this many ms before actual expiry.
- * Oracle issues 14-day id_tokens; refresh at ~13 days to stay safe.
- */
-const TOKEN_BUFFER_MS = 60 * 60 * 1000; // 1 hour
-
-/** Refresh token validity. Oracle issues 28-day refresh tokens. */
-const REFRESH_EXPIRY_MS = 28 * 24 * 60 * 60 * 1000;
-
-// ── Types ─────────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 export interface OracleTokenSet {
-  idToken:      string;
-  refreshToken: string;
-  expiresAt:    number; // unix ms — when idToken expires
-  refreshExpiresAt: number; // unix ms — when refreshToken expires
+  accessToken: string;
+  expiresAt: number;
 }
 
-/** Structured failure — carries the stage that failed + a user-safe message. */
 export class MicrosAuthError extends Error {
   constructor(
-    public readonly stage: "authorize" | "signin" | "token" | "refresh" | "config",
+    public readonly stage: "token" | "config",
     public readonly userMessage: string,
     public readonly detail?: string,
-    /** Machine-readable reason code for programmatic branching (e.g. "INVALID_CLIENT_ID"). */
     public readonly reasonCode?: string,
   ) {
-    super(`[MicrosAuth:${stage}] ${userMessage}${detail ? ` — ${detail}` : ""}`);
+    super(
+      "[MicrosAuth:" +
+        stage +
+        "] " +
+        userMessage +
+        (detail ? " -- " + detail : ""),
+    );
     this.name = "MicrosAuthError";
   }
 }
 
-// ── In-memory token store ─────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// In-memory token cache
+// ---------------------------------------------------------------------------
 
 let _tokenSet: OracleTokenSet | null = null;
 let _inflight: Promise<OracleTokenSet> | null = null;
 
-// ── Public API ────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
 
 /**
- * Returns a valid id_token string.
- * Serves from cache when valid, refreshes with refresh_token when close to
- * expiry, re-runs full PKCE flow when refresh fails or is unavailable.
- * Concurrent callers share one inflight request — no thundering herd.
+ * Returns a valid access_token string.
+ * Serves from cache when valid; re-authenticates when expired.
+ * Concurrent callers share one inflight request (no thundering herd).
  */
-export async function getMicrosIdToken(): Promise<string> {
-  if (_tokenSet && isIdTokenValid(_tokenSet)) {
-    return _tokenSet.idToken;
-  }
-
-  if (_inflight) return (await _inflight).idToken;
-
-  _inflight = acquireTokenSet();
+export async function getMicrosAccessToken(): Promise<string> {
+  if (_tokenSet && isTokenValid(_tokenSet)) return _tokenSet.accessToken;
+  if (_inflight) return (await _inflight).accessToken;
+  _inflight = acquireToken();
   try {
     _tokenSet = await _inflight;
-    return _tokenSet.idToken;
+    return _tokenSet.accessToken;
   } finally {
     _inflight = null;
   }
 }
 
-/** Returns current token metadata — safe to surface in settings UI. */
+/** @deprecated Use getMicrosAccessToken() */
+export async function getMicrosIdToken(): Promise<string> {
+  return getMicrosAccessToken();
+}
+
 export function getMicrosTokenStatus(): {
   valid: boolean;
   expiresAt: number | null;
@@ -111,603 +88,220 @@ export function getMicrosTokenStatus(): {
   refreshExpiresAt: number | null;
 } {
   return {
-    valid:            !!_tokenSet && isIdTokenValid(_tokenSet),
-    expiresAt:        _tokenSet?.expiresAt        ?? null,
-    hasRefreshToken:  !!_tokenSet?.refreshToken,
-    refreshExpiresAt: _tokenSet?.refreshExpiresAt ?? null,
+    valid: !!_tokenSet && isTokenValid(_tokenSet),
+    expiresAt: _tokenSet?.expiresAt ?? null,
+    hasRefreshToken: false,
+    refreshExpiresAt: null,
   };
 }
 
-/** Clears the in-memory token cache. Call before a fresh test. */
 export function clearMicrosTokenCache(): void {
   _tokenSet = null;
 }
 
-// ── Token acquisition ─────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Internal: token acquisition
+// ---------------------------------------------------------------------------
 
-async function acquireTokenSet(): Promise<OracleTokenSet> {
-  // Try refresh_token path first — cheaper, no password re-transmission.
-  if (_tokenSet?.refreshToken && isRefreshTokenValid(_tokenSet)) {
-    try {
-      const refreshed = await executeRefreshGrant(_tokenSet.refreshToken);
-      console.info("[MicrosAuth] Token refreshed via refresh_token grant.");
-      return refreshed;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[MicrosAuth] Refresh failed — falling back to full PKCE flow. ${sanitize(msg)}`);
-    }
-  }
-
-  // Full PKCE auth flow.
-  console.info("[MicrosAuth] Starting full PKCE authorization flow.");
-  return executePkceFlow();
-}
-
-// ── PKCE flow ─────────────────────────────────────────────────────────────
-
-async function executePkceFlow(): Promise<OracleTokenSet> {
+async function acquireToken(): Promise<OracleTokenSet> {
   const cfg = loadConfig();
 
-  // Step A: Authorize — get session cookie + register code challenge.
-  const { sessionCookies, codeVerifier } = await stepAuthorize(cfg);
-
-  // Step B: Sign in — authenticate BIAPI account, get auth code.
-  const authCode = await stepSignIn(cfg, sessionCookies);
-
-  // Step C: Token exchange — code + verifier → tokens.
-  const tokens = await stepToken(cfg, authCode, codeVerifier, sessionCookies);
-
-  return tokens;
-}
-
-// ── Step A: Authorize ─────────────────────────────────────────────────────
-
-async function stepAuthorize(
-  cfg: MicrosAuthConfig,
-): Promise<{ sessionCookies: string; codeVerifier: string }> {
-  const codeVerifier  = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-
-  const params = new URLSearchParams({
-    response_type:          "code",
-    client_id:              cfg.clientId,
-    scope:                  "openid",
-    redirect_uri:           cfg.redirectUri,
-    code_challenge:         codeChallenge,
-    code_challenge_method:  "S256",
-  });
-
-  const url = `${cfg.authServer}${AUTHORIZE_PATH}?${params.toString()}`;
-
-  // ── Authorize params diagnostic log ───────────────────────────────────
-  const cidFirst6 = cfg.clientId.length >= 6 ? cfg.clientId.slice(0, 6) : cfg.clientId.slice(0, 3) + "***";
-  const cidLast6  = cfg.clientId.length >= 6 ? cfg.clientId.slice(-6)  : "***";
-  console.log("[MICROS_AUTH_DEBUG] authorize params", {
-    response_type:          "code",
-    client_id_length:       cfg.clientId.length,
-    client_id_preview:      `${cidFirst6}…${cidLast6}`,
-    scope:                  "openid",
-    redirect_uri:           cfg.redirectUri,
-    code_challenge_method:  "S256",
-    code_challenge_present: codeChallenge.length > 0,
-  });
-
-  console.log(
-    "[MicrosAuth:authorize] GET authorize\n" +
-    `  url:            ${cfg.authServer}${AUTHORIZE_PATH}\n` +
-    `  client_id:      ${mask(cfg.clientId)}\n` +
-    `  redirect_uri:   ${cfg.redirectUri}\n` +
-    `  challenge_method: S256`,
-  );
-
-  const res = await fetchWithTimeout(url, {
-    method:   "GET",
-    redirect: "manual", // Oracle redirects; we need cookies from the raw response
-    headers:  {
-      "Accept":     "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
-      "User-Agent": "OracleRestaurants/MicrosBI-PKCE",
-    },
-  }, "authorize");
-
-  // ── Extract all Set-Cookie headers robustly ────────────────────────────
-  const setCookies = extractSetCookies(res);
-  const cookieHeader = buildCookieHeader(setCookies);
-
-  // ── Structured debug logging ───────────────────────────────────────────
-  const location = res.headers.get("location") ?? null;
-  const ct       = res.headers.get("content-type") ?? "";
-  const firstTwoCookieNames = setCookies
-    .slice(0, 2)
-    .map((c) => c.split("=")[0] ?? "?");
-
-  console.log("[MICROS_AUTH_DEBUG] authorize response", {
-    status:          res.status,
-    redirected:      res.redirected,
-    location:        location ? sanitize(location) : null,
-    setCookieCount:  setCookies.length,
-    firstCookies:    firstTwoCookieNames,
-    contentType:     ct.split(";")[0],
-  });
-
-  // ── Handle specific failure cases ─────────────────────────────────────
-  if (res.status >= 400) {
-    const body = await readErrorBody(res);
-
-    // Parse Oracle JSON error to extract machine-readable codes.
-    let oracleMessage = "";
-    let oracleCode    = "";
-    try {
-      const parsed = JSON.parse(body) as Record<string, unknown>;
-      oracleMessage = String(parsed.message ?? parsed.error_description ?? "");
-      oracleCode    = String(parsed.code    ?? parsed.error             ?? "");
-    } catch { /* response was not JSON — fall through */ }
-
-    console.error("[MICROS_AUTH_DEBUG] authorize HTTP error", {
-      status:        res.status,
-      oracleMessage: sanitize(oracleMessage),
-      oracleCode:    sanitize(oracleCode),
-      rawBody:       sanitize(body),
-    });
-
-    // INVALID_CLIENT_ID — Oracle OIDC provider does not recognise this client.
-    // Typically caused by: wrong value, wrong Oracle environment, trailing whitespace.
-    if (
-      oracleMessage.includes("INVALID_CLIENT_ID") ||
-      oracleCode.includes("INVALID_CLIENT_ID")    ||
-      body.includes("INVALID_CLIENT_ID")
-    ) {
-      throw new MicrosAuthError(
-        "authorize",
-        "The Oracle client ID was rejected. Please verify the exact client ID and environment configuration.",
-        `oracle: ${sanitize(body)}`,
-        "INVALID_CLIENT_ID",
-      );
-    }
-
-    throw new MicrosAuthError(
-      "authorize",
-      `Oracle authorize endpoint returned HTTP ${res.status}`,
-      `oracle: ${sanitize(body)}`,
-      "AUTHORIZE_HTTP_ERROR",
-    );
-  }
-
-  if (setCookies.length === 0) {
-    // Log a snippet of the body to aid diagnostics (no secrets in authorize response)
-    let bodySnippet = "";
-    if (ct.includes("text/html") || ct.includes("text/plain") || ct.includes("application/json")) {
-      try {
-        const text = await res.text();
-        bodySnippet = text.slice(0, 400);
-      } catch { /* ignore */ }
-    }
-
-    console.error("[MICROS_AUTH_DEBUG] authorize: no session cookies", {
-      status:      res.status,
-      location:    location ? sanitize(location) : null,
-      bodySnippet: sanitize(bodySnippet || "(empty)"),
-      reasonCode:  isRedirectStatus(res.status) ? "AUTHORIZE_REDIRECT_ONLY" : "AUTHORIZE_NO_SESSION",
-    });
-
-    const reasonCode = isRedirectStatus(res.status)
-      ? "AUTHORIZE_REDIRECT_ONLY"
-      : "AUTHORIZE_NO_SESSION";
-
-    throw new MicrosAuthError(
-      "authorize",
-      "Oracle authorize step did not establish a session.",
-      `reasonCode: ${reasonCode} — status ${res.status}, location: ${sanitize(location ?? "none")}`,
-    );
-  }
-
-  console.log(
-    `[MicrosAuth:authorize] OK — ${setCookies.length} Set-Cookie header(s), ` +
-    `${cookieHeader.split(";").length} cookie(s) forwarded to signin`,
-  );
-  return { sessionCookies: cookieHeader, codeVerifier };
-}
-
-// ── Step B: Sign in ───────────────────────────────────────────────────────
-
-async function stepSignIn(cfg: MicrosAuthConfig, sessionCookies: string): Promise<string> {
   const body = new URLSearchParams({
+    grant_type: "password",
     username: cfg.username,
     password: cfg.password,
-    orgname:  cfg.orgShortName,
+    client_id: cfg.clientId,
   });
 
-  console.log(
-    "[MicrosAuth:signin] POST signin\n" +
-    `  url:      ${cfg.authServer}${SIGNIN_PATH}\n` +
-    `  username: ${mask(cfg.username)}\n` +
-    `  orgname:  ${cfg.orgShortName}`,
-    // password is NEVER logged
-  );
+  const url = cfg.authServer + TOKEN_PATH;
 
-  const res = await fetchWithTimeout(`${cfg.authServer}${SIGNIN_PATH}`, {
-    method:  "POST",
+  console.log("[MICROS_AUTH_DEBUG] token request", {
+    url,
+    grant_type: "password",
+    client_id_length: cfg.clientId.length,
+    client_id_preview:
+      cfg.clientId.slice(0, 6) + "..." + cfg.clientId.slice(-6),
+    username_present: !!cfg.username,
+  });
+
+  const res = await fetchWithTimeout(url, {
+    method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie":       sessionCookies,
-      "Accept":       "application/json",
+      Accept: "application/json",
     },
     body: body.toString(),
-  }, "signin");
+  });
 
-  if (!res.ok) {
-    const detail = await readErrorBody(res);
-    throw new MicrosAuthError(
-      "signin",
-      classifySignInError(res.status, detail),
-      sanitize(detail),
-    );
-  }
-
-  let json: unknown;
+  const responseText = await res.text();
+  let json: Record<string, unknown> = {};
   try {
-    json = await res.json();
+    json = JSON.parse(responseText);
   } catch {
-    throw new MicrosAuthError("signin", "PKCE sign-in session failed", "Response was not JSON");
+    /* non-JSON body */
   }
-
-  const redirectUrl = (json as Record<string, unknown>)?.redirectUrl as string | undefined;
-  if (!redirectUrl) {
-    throw new MicrosAuthError(
-      "signin",
-      "PKCE sign-in session failed",
-      `No redirectUrl in signin response. Body: ${JSON.stringify(json).slice(0, 200)}`,
-    );
-  }
-
-  const code = extractAuthCode(redirectUrl, cfg.redirectUri);
-  if (!code) {
-    throw new MicrosAuthError(
-      "signin",
-      "PKCE sign-in session failed",
-      `Could not extract ?code= from redirectUrl: ${sanitize(redirectUrl)}`,
-    );
-  }
-
-  console.log("[MicrosAuth:signin] OK — auth code obtained.");
-  return code;
-}
-
-// ── Step C: Token exchange ────────────────────────────────────────────────
-
-async function stepToken(
-  cfg:            MicrosAuthConfig,
-  code:           string,
-  codeVerifier:   string,
-  sessionCookies: string,
-): Promise<OracleTokenSet> {
-  const body = new URLSearchParams({
-    scope:         "openid",
-    grant_type:    "authorization_code",
-    client_id:     cfg.clientId,
-    code_verifier: codeVerifier,
-    code,
-    redirect_uri:  cfg.redirectUri,
-  });
-
-  console.log(
-    "[MicrosAuth:token] POST token\n" +
-    `  url:          ${cfg.authServer}${TOKEN_PATH}\n` +
-    `  grant_type:   authorization_code\n` +
-    `  redirect_uri: ${cfg.redirectUri}`,
-  );
-
-  const res = await fetchWithTimeout(`${cfg.authServer}${TOKEN_PATH}`, {
-    method:  "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Cookie":       sessionCookies,
-      "Accept":       "application/json",
-      "x-requested-by": "Oracle",
-    },
-    body: body.toString(),
-  }, "token");
 
   if (!res.ok) {
-    const detail = await readErrorBody(res);
+    const errorCode = String(json.error ?? json.code ?? "");
+    const errorMsg = String(
+      json.error_description ?? json.message ?? responseText.slice(0, 200),
+    );
+    console.error("[MICROS_AUTH_DEBUG] token error", {
+      status: res.status,
+      errorCode: sanitize(errorCode),
+      errorMsg: sanitize(errorMsg),
+    });
     throw new MicrosAuthError(
       "token",
-      classifyTokenError(res.status, detail),
-      sanitize(detail),
+      classifyError(errorCode, res.status),
+      sanitize(errorMsg),
+      mapReasonCode(errorCode),
     );
   }
 
-  const json = await res.json() as {
-    id_token?:     string;
-    refresh_token?: string;
-    expires_in?:   number;
-    access_token?: string;
-    token_type?:   string;
-  };
+  const accessToken = String(json.access_token ?? "");
+  const expiresIn = Number(json.expires_in ?? 3600);
 
-  // Oracle BIAPI returns id_token (not access_token) — use it as bearer.
-  const idToken = json.id_token ?? json.access_token;
-  if (!idToken) {
-    throw new MicrosAuthError("token", "Client ID rejected by Oracle", "No id_token in token response");
-  }
-  if (!json.refresh_token) {
-    throw new MicrosAuthError("token", "Client ID rejected by Oracle", "No refresh_token in token response");
+  if (!accessToken) {
+    throw new MicrosAuthError(
+      "token",
+      "No access_token in Oracle response",
+      sanitize(responseText.slice(0, 200)),
+    );
   }
 
-  const expiresIn = json.expires_in ?? 14 * 24 * 60 * 60; // default 14 days
   console.info(
-    `[MicrosAuth:token] Tokens obtained. id_token expires in ${Math.round(expiresIn / 3600)}h.`,
+    "[MicrosAuth] Token acquired via password grant. Expires in " +
+      Math.round(expiresIn / 60) +
+      "m.",
   );
-
-  return {
-    idToken,
-    refreshToken: json.refresh_token,
-    expiresAt:       Date.now() + expiresIn * 1000,
-    refreshExpiresAt: Date.now() + REFRESH_EXPIRY_MS,
-  };
+  return { accessToken, expiresAt: Date.now() + expiresIn * 1000 };
 }
 
-// ── Refresh grant ─────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Error classification
+// ---------------------------------------------------------------------------
 
-async function executeRefreshGrant(refreshToken: string): Promise<OracleTokenSet> {
-  const cfg  = loadConfig();
-  const body = new URLSearchParams({
-    scope:         "openid",
-    grant_type:    "refresh_token",
-    client_id:     cfg.clientId,
-    refresh_token: refreshToken,
-    redirect_uri:  cfg.redirectUri,
-  });
-
-  const res = await fetchWithTimeout(`${cfg.authServer}${TOKEN_PATH}`, {
-    method:  "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "Accept":       "application/json",
-      "x-requested-by": "Oracle",
-    },
-    body: body.toString(),
-  }, "refresh");
-
-  if (!res.ok) {
-    const detail = await readErrorBody(res);
-    throw new MicrosAuthError("refresh", "Refresh token rejected", sanitize(detail));
-  }
-
-  const json = await res.json() as {
-    id_token?:     string;
-    refresh_token?: string;
-    expires_in?:   number;
-    access_token?: string;
-  };
-
-  const idToken = json.id_token ?? json.access_token;
-  if (!idToken) throw new MicrosAuthError("refresh", "Refresh token rejected", "No id_token returned");
-
-  const expiresIn = json.expires_in ?? 14 * 24 * 60 * 60;
-  return {
-    idToken,
-    refreshToken:    json.refresh_token ?? refreshToken,
-    expiresAt:       Date.now() + expiresIn * 1000,
-    refreshExpiresAt: Date.now() + REFRESH_EXPIRY_MS,
-  };
+function classifyError(errorCode: string, status: number): string {
+  const code = errorCode.toLowerCase();
+  if (code.includes("invalid_grant")) return "Invalid MICROS credentials";
+  if (code.includes("invalid_client") || code.includes("invalid_client_id"))
+    return "Client ID rejected by Oracle";
+  if (code.includes("invalid_request")) return "Authentication request invalid";
+  if (status === 401) return "Invalid MICROS credentials";
+  if (status === 400) return "Authentication request rejected by Oracle";
+  return "Authentication failed (HTTP " + status + ")";
 }
 
-// ── Config loader ─────────────────────────────────────────────────────────
+function mapReasonCode(errorCode: string): string {
+  const code = errorCode.toLowerCase();
+  if (code.includes("invalid_grant")) return "INVALID_CREDENTIALS";
+  if (code.includes("invalid_client") || code.includes("invalid_client_id"))
+    return "INVALID_CLIENT_ID";
+  if (code.includes("invalid_request")) return "INVALID_REQUEST";
+  return "AUTH_FAILED";
+}
+
+// ---------------------------------------------------------------------------
+// Config loading
+// ---------------------------------------------------------------------------
 
 interface MicrosAuthConfig {
-  authServer:   string;
-  clientId:     string;
-  username:     string;
-  password:     string;
+  authServer: string;
+  clientId: string;
+  username: string;
+  password: string;
   orgShortName: string;
-  redirectUri:  string;
 }
 
-/**
- * Strips leading/trailing whitespace and any stray CR/LF characters from a
- * config string.  Env var values pasted into Vercel panels or .env files
- * sometimes carry invisible whitespace that breaks exact-match validation.
- */
 function normalizeConfigValue(value: string): string {
   return value.replace(/[\r\n]/g, "").trim();
 }
 
 function loadConfig(): MicrosAuthConfig {
   const required: Record<string, string | undefined> = {
-    MICROS_AUTH_SERVER:    process.env.MICROS_AUTH_SERVER,
-    MICROS_CLIENT_ID:      process.env.MICROS_CLIENT_ID,
-    MICROS_USERNAME:       process.env.MICROS_USERNAME,
-    MICROS_PASSWORD:       process.env.MICROS_PASSWORD,
-    MICROS_ORG_SHORT_NAME: process.env.MICROS_ORG_SHORT_NAME,
+    MICROS_AUTH_SERVER: process.env.MICROS_AUTH_SERVER,
+    MICROS_CLIENT_ID: process.env.MICROS_CLIENT_ID,
+    MICROS_USERNAME: process.env.MICROS_USERNAME,
+    MICROS_PASSWORD: process.env.MICROS_PASSWORD,
   };
-
   const missing = Object.entries(required)
     .filter(([, v]) => !v?.trim())
     .map(([k]) => k);
-
   if (missing.length > 0) {
     throw new MicrosAuthError(
       "config",
       "Integration not fully configured",
-      `Missing env vars: ${missing.join(", ")}`,
+      "Missing env vars: " + missing.join(", "),
     );
   }
 
-  // Normalize every value — trim whitespace + strip accidental CR/LF chars.
-  const rawClientId   = process.env.MICROS_CLIENT_ID!;
-  const clientId      = normalizeConfigValue(rawClientId);
-  const authServer    = normalizeConfigValue(process.env.MICROS_AUTH_SERVER!).replace(/\/$/, "");
-  const biServer      = normalizeConfigValue(
+  const rawClientId = process.env.MICROS_CLIENT_ID!;
+  const clientId = normalizeConfigValue(rawClientId);
+  const authServer = normalizeConfigValue(process.env.MICROS_AUTH_SERVER!).replace(/\/$/, "");
+  const biServer = normalizeConfigValue(
     process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER ?? "",
   ).replace(/\/$/, "");
 
-  // ── Config diagnostic log (no plaintext secrets) ─────────────────────
   const cidHasWhitespace = rawClientId !== rawClientId.trim();
-  const cidHasNewline    = /[\r\n]/.test(rawClientId);
-  const cidFirstSix = clientId.length >= 6 ? clientId.slice(0, 6) : clientId.padEnd(6, "?").slice(0, 6);
-  const cidLastSix  = clientId.length >= 6 ? clientId.slice(-6)  : "??????";
+  const cidHasNewline = /[\r\n]/.test(rawClientId);
+  const cidFirstSix =
+    clientId.length >= 6
+      ? clientId.slice(0, 6)
+      : clientId.padEnd(6, "?").slice(0, 6);
+  const cidLastSix = clientId.length >= 6 ? clientId.slice(-6) : "??????";
 
-  // Detect potential environment mismatch: authServer and BI server should
-  // share the same Oracle environment domain (e.g. same datacenter slug).
   let environmentMismatch = false;
   if (authServer && biServer) {
     try {
-      const authHost = new URL(authServer).hostname;
-      const biHost   = new URL(biServer).hostname;
-      // Heuristic: the last two segments of both hostnames should match
-      // (e.g. both in .micros.com, .oracle.com, or the same cloud region prefix).
-      const authSuffix = authHost.split(".").slice(-2).join(".");
-      const biSuffix   = biHost.split(".").slice(-2).join(".");
+      const authSuffix = new URL(authServer).hostname.split(".").slice(-2).join(".");
+      const biSuffix = new URL(biServer).hostname.split(".").slice(-2).join(".");
       environmentMismatch = authSuffix !== biSuffix;
-    } catch { /* malformed URL — skip mismatch check */ }
+    } catch {
+      /* malformed URL */
+    }
   }
 
   console.log("[MICROS_AUTH_DEBUG] config loaded", {
-    envVarUsed:           ["MICROS_AUTH_SERVER", "MICROS_CLIENT_ID", "MICROS_USERNAME",
-                           "MICROS_ORG_SHORT_NAME", "MICROS_REDIRECT_URI"],
+    envVarUsed: ["MICROS_AUTH_SERVER", "MICROS_CLIENT_ID", "MICROS_USERNAME"],
     authServer,
-    biServer:             biServer || "(not set)",
-    clientIdLength:       clientId.length,
-    clientIdFirst6:       cidFirstSix,
-    clientIdLast6:        cidLastSix,
+    biServer: biServer || "(not set)",
+    clientIdLength: clientId.length,
+    clientIdFirst6: cidFirstSix,
+    clientIdLast6: cidLastSix,
     clientIdHasWhitespace: cidHasWhitespace,
-    clientIdHasNewline:   cidHasNewline,
-    orgShortName:         normalizeConfigValue(process.env.MICROS_ORG_SHORT_NAME!),
+    clientIdHasNewline: cidHasNewline,
+    orgShortName: normalizeConfigValue(
+      process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER ?? "",
+    ),
     environmentMismatch,
   });
 
   if (environmentMismatch) {
-    console.warn("[MICROS_AUTH_DEBUG] ENVIRONMENT_MISMATCH detected — authServer and BI server " +
-      "appear to belong to different Oracle environments. " +
-      "Verify that all MICROS_* values were issued for the same Oracle tenant.");
+    console.warn(
+      "[MICROS_AUTH_DEBUG] ENVIRONMENT_MISMATCH detected -- authServer and BI server belong to different Oracle environments.",
+    );
   }
 
   return {
     authServer,
     clientId,
-    username:     normalizeConfigValue(process.env.MICROS_USERNAME!),
-    password:     process.env.MICROS_PASSWORD!.trim(), // trim only — never strip more
-    orgShortName: normalizeConfigValue(process.env.MICROS_ORG_SHORT_NAME!),
-    redirectUri:  normalizeConfigValue(process.env.MICROS_REDIRECT_URI ?? "apiaccount://callback"),
+    username: normalizeConfigValue(process.env.MICROS_USERNAME!),
+    password: process.env.MICROS_PASSWORD!.trim(),
+    orgShortName: normalizeConfigValue(
+      process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER ?? "",
+    ),
   };
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-function isRedirectStatus(status: number): boolean {
-  return [301, 302, 303, 307, 308].includes(status);
+function isTokenValid(t: OracleTokenSet): boolean {
+  return t.accessToken.length > 0 && t.expiresAt - Date.now() > TOKEN_BUFFER_MS;
 }
 
-/**
- * Extracts ALL Set-Cookie header values from a response.
- *
- * Uses getSetCookie() (Node 18+ / undici) which returns each Set-Cookie
- * header separately — critical because the Headers API merges them with
- * commas when you call .get(), which breaks cookie parsing.
- *
- * Falls back to iterating raw headers for older runtimes.
- */
-export function extractSetCookies(res: Response): string[] {
-  // Preferred: undici / Node 18+ getSetCookie() — returns each header separately
-  if (typeof (res.headers as { getSetCookie?: () => string[] }).getSetCookie === "function") {
-    return (res.headers as { getSetCookie: () => string[] }).getSetCookie();
-  }
-
-  // Fallback: iterate all headers looking for set-cookie entries
-  const cookies: string[] = [];
-  res.headers.forEach((value, name) => {
-    if (name.toLowerCase() === "set-cookie") {
-      // In some environments multiple Set-Cookie headers are merged with \n
-      for (const part of value.split("\n")) {
-        const trimmed = part.trim();
-        if (trimmed) cookies.push(trimmed);
-      }
-    }
-  });
-  return cookies;
-}
-
-/**
- * Takes Set-Cookie header values and builds the Cookie request header string.
- * Only preserves the name=value part — strips Path, HttpOnly, SameSite etc.
- */
-export function buildCookieHeader(setCookies: string[]): string {
-  return setCookies
-    .map((h) => h.split(";")[0]?.trim())
-    .filter(Boolean)
-    .join("; ");
-}
-
-function isIdTokenValid(t: OracleTokenSet): boolean {
-  return t.idToken.length > 0 && t.expiresAt - Date.now() > TOKEN_BUFFER_MS;
-}
-
-function isRefreshTokenValid(t: OracleTokenSet): boolean {
-  return t.refreshToken.length > 0 && t.refreshExpiresAt - Date.now() > TOKEN_BUFFER_MS;
-}
-
-/**
- * @deprecated — use extractSetCookies() + buildCookieHeader().
- * Kept only for internal backward compat within this file.
- */
-function extractCookies(res: Response): string {
-  return buildCookieHeader(extractSetCookies(res));
-}
-
-/**
- * Extracts the `code` query parameter from the Oracle redirect URI.
- * e.g. apiaccount://callback?code=abc123  →  "abc123"
- */
-function extractAuthCode(redirectUrl: string, redirectUri: string): string | null {
-  try {
-    // The redirectUrl may use a custom scheme (apiaccount://).
-    // Replace the custom scheme with https:// so URL() can parse it.
-    const base    = redirectUri.replace(/^[^:]+:\/\//, "https://");
-    const full    = redirectUrl.replace(/^[^:]+:\/\//, "https://");
-    const parsed  = new URL(full, base);
-    return parsed.searchParams.get("code");
-  } catch {
-    // Fallback: simple regex
-    const m = /[?&]code=([^&]+)/.exec(redirectUrl);
-    return m ? decodeURIComponent(m[1]) : null;
-  }
-}
-
-async function readErrorBody(res: Response): Promise<string> {
-  try {
-    const text = await res.text();
-    return text.slice(0, 500);
-  } catch {
-    return `HTTP ${res.status} ${res.statusText}`;
-  }
-}
-
-function classifySignInError(status: number, body: string): string {
-  const lower = body.toLowerCase();
-  if (status === 401 || lower.includes("authentication_invalid") || lower.includes("invalid credential")) {
-    return "Invalid API account credentials";
-  }
-  if (lower.includes("password expired") || lower.includes("passwordexpired")) {
-    return "API account password expired";
-  }
-  if (lower.includes("locked") || lower.includes("account_locked")) {
-    return "MICROS API account locked";
-  }
-  if (lower.includes("orgname") || lower.includes("org not found")) {
-    return "Missing or invalid org short name";
-  }
-  return `Sign-in rejected by Oracle (HTTP ${status})`;
-}
-
-function classifyTokenError(status: number, body: string): string {
-  const lower = body.toLowerCase();
-  if (lower.includes("invalid_client")) return "Client ID rejected by Oracle";
-  if (lower.includes("invalid_grant"))  return "Authorization code expired or already used";
-  if (lower.includes("invalid_request")) return "Invalid PKCE token request parameters";
-  return `Token exchange rejected by Oracle (HTTP ${status})`;
-}
-
-/** Strips secrets, tokens and long encoded strings from log output. */
 function sanitize(msg: string): string {
   return msg
     .replace(/https?:\/\/[^\s"]+/g, "<url>")
@@ -716,34 +310,26 @@ function sanitize(msg: string): string {
     .slice(0, 400);
 }
 
-/** Shows first 6 chars + last 4, rest masked. */
-function mask(value: string): string {
-  if (value.length <= 10) return "***";
-  return `${value.slice(0, 6)}…${value.slice(-4)} (${value.length} chars)`;
-}
-
 async function fetchWithTimeout(
-  url:     string,
-  init:    RequestInit,
-  stage:   string,
+  url: string,
+  init: RequestInit,
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    return res;
+    return await fetch(url, { ...init, signal: controller.signal });
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
       throw new MicrosAuthError(
-        stage as MicrosAuthError["stage"],
-        "PKCE sign-in session failed",
-        `Request timed out after ${FETCH_TIMEOUT_MS}ms`,
+        "token",
+        "Authentication request timed out",
+        "Timeout after " + FETCH_TIMEOUT_MS + "ms",
       );
     }
     throw new MicrosAuthError(
-      stage as MicrosAuthError["stage"],
-      "PKCE sign-in session failed",
-      `Network error: ${err instanceof Error ? err.message : String(err)}`,
+      "token",
+      "Authentication request failed",
+      "Network error: " + (err instanceof Error ? err.message : String(err)),
     );
   } finally {
     clearTimeout(timer);

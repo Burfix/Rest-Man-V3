@@ -3,10 +3,10 @@
  *
  * Oracle MICROS BI API — authenticated HTTP client.
  *
- * - Every request gets a valid id_token via getMicrosIdToken() (auto-refresh/PKCE).
- * - Authorization header: Bearer <id_token>
+ * - Every request gets a valid access_token via getMicrosAccessToken().
+ * - Authorization header: Bearer <access_token>
  * - Required Oracle headers: x-app-key (org short name), x-hotelid (locRef)
- * - 401 response → refresh token and retry once
+ * - 401 response → clear cache, re-authenticate, retry once
  * - 5xx response → retry once with 1 s back-off
  * - Hard timeout: 20 s per attempt
  *
@@ -16,7 +16,7 @@
  * SERVER-SIDE ONLY.  Never import in client components.
  */
 
-import { getMicrosIdToken, clearMicrosTokenCache, MicrosAuthError } from "./auth";
+import { getMicrosAccessToken, clearMicrosTokenCache, MicrosAuthError } from "./auth";
 
 // ── Config ────────────────────────────────────────────────────────────────
 
@@ -88,16 +88,16 @@ class MicrosApiClientImpl {
 
     const url = buildUrl(biServer, orgName, path, locRef, params);
 
-    // First attempt — get a fresh token.
-    const idToken = await getMicrosIdToken();
-    const res = await this.doFetch(method, url, idToken, body);
+    // First attempt — get a valid access token.
+    const accessToken = await getMicrosAccessToken();
+    const res = await this.doFetch(method, url, accessToken, body);
 
     if (res.status === 401) {
-      // Token rejected — clear cache, get a new token, retry once.
+      // Token rejected — clear cache, re-authenticate, retry once.
       console.warn("[MicrosClient] 401 on first attempt — clearing token cache and retrying.");
       clearMicrosTokenCache();
       await delay(RETRY_DELAY_MS);
-      const freshToken = await getMicrosIdToken();
+      const freshToken = await getMicrosAccessToken();
       const retryRes   = await this.doFetch(method, url, freshToken, body);
       return this.parseResponse<T>(retryRes, url);
     }
@@ -105,7 +105,7 @@ class MicrosApiClientImpl {
     if (res.status >= 500) {
       console.warn(`[MicrosClient] ${res.status} on first attempt — retrying once.`);
       await delay(RETRY_DELAY_MS);
-      const retryRes = await this.doFetch(method, url, idToken, body);
+      const retryRes = await this.doFetch(method, url, accessToken, body);
       return this.parseResponse<T>(retryRes, url);
     }
 
@@ -113,13 +113,13 @@ class MicrosApiClientImpl {
   }
 
   private async doFetch(
-    method:  string,
-    url:     URL,
-    idToken: string,
-    body?:   unknown,
+    method:       string,
+    url:          URL,
+    accessToken:  string,
+    body?:        unknown,
   ): Promise<Response> {
     const headers: Record<string, string> = {
-      "Authorization": `Bearer ${idToken}`,
+      "Authorization": `Bearer ${accessToken}`,
       "x-app-key":     getOrgShortName(),
       "x-hotelid":     getLocRef(),
       "Accept":        "application/json",

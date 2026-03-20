@@ -1,11 +1,11 @@
 /**
  * POST /api/micros/test-connection
  *
- * Runs the Oracle MICROS BI API PKCE auth flow end-to-end and returns
+ * Runs the Oracle MICROS BI API password-grant auth flow and returns
  * a structured result showing exactly which stage passed or failed.
  *
  * Response shape:
- *   { ok, stage, message, hasIdToken, hasRefreshToken, authMs, checkedAt }
+ *   { ok, stage, reasonCode, message, hasIdToken, hasRefreshToken, authMs, checkedAt }
  *
  * NEVER returns token values, passwords, or credential content.
  */
@@ -13,7 +13,7 @@
 import { NextResponse }           from "next/server";
 import {
   clearMicrosTokenCache,
-  getMicrosIdToken,
+  getMicrosAccessToken,
   getMicrosTokenStatus,
   MicrosAuthError,
 }                                  from "@/lib/micros/auth";
@@ -30,20 +30,18 @@ export async function POST() {
   // Always start with a cold cache so we're testing the real flow.
   clearMicrosTokenCache();
 
-  // ── Step 1: PKCE auth flow ────────────────────────────────────────────
-  let stage: "authorize" | "signin" | "token" | "api" | "config" = "authorize";
+  // ── Step 1: password grant auth flow ────────────────────────────────────
+  let stage: "token" | "api" | "config" = "token";
   const authT0 = Date.now();
 
   try {
-    await getMicrosIdToken();
+    await getMicrosAccessToken();
   } catch (err) {
-    const isAuthErr = err instanceof MicrosAuthError;
-    const authStage = isAuthErr ? err.stage : "authorize";
-    const userMsg   = isAuthErr
-      ? err.userMessage
-      : err instanceof Error ? err.message : "Authentication failed";
-    const reasonCode = isAuthErr ? (err.reasonCode ?? "AUTH_FAILED") : "AUTH_FAILED";
-    const safeMsg   = sanitizeMicrosError(userMsg);
+    const authErr    = err instanceof MicrosAuthError ? err : null;
+    const authStage  = authErr?.stage ?? "token";
+    const userMsg    = authErr?.userMessage ?? (err instanceof Error ? err.message : "Authentication failed");
+    const reasonCode = authErr?.reasonCode  ?? "AUTH_FAILED";
+    const safeMsg    = sanitizeMicrosError(userMsg);
 
     // Persist sanitized error to DB connection record
     await persistSyncError(safeMsg).catch(() => null);

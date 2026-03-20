@@ -1,26 +1,26 @@
 /**
  * services/micros/MicrosAuthService.ts
  *
- * Thin wrapper around lib/micros/auth.ts (PKCE flow).
+ * Thin wrapper around lib/micros/auth.ts (password grant flow).
  * Keeps the same public API so MicrosApiClient and sync routes work unchanged.
  */
 
 import {
-  getMicrosIdToken,
+  getMicrosAccessToken,
   clearMicrosTokenCache,
   getMicrosTokenStatus,
 } from "@/lib/micros/auth";
 
 class MicrosAuthServiceImpl {
-  /** Returns a valid Bearer id_token via the PKCE flow. */
+  /** Returns a valid Bearer access_token via the password grant flow. */
   async getAccessToken(): Promise<string> {
-    return getMicrosIdToken();
+    return getMicrosAccessToken();
   }
 
   /** Forces a fresh token acquisition (clears cache, then re-authenticates). */
   async refreshAccessToken(): Promise<string> {
     clearMicrosTokenCache();
-    return getMicrosIdToken();
+    return getMicrosAccessToken();
   }
 
   isTokenValid(): boolean {
