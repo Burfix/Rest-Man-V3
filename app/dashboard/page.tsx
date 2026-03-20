@@ -103,12 +103,14 @@ const EMPTY_DAILY_OPS: DailyOperationsDashboardSummary = {
 const EMPTY_COMPLIANCE: ComplianceSummary = {
   total: 0,
   compliant: 0,
+  scheduled: 0,
   due_soon: 0,
   expired: 0,
   unknown: 0,
   compliance_pct: 0,
   critical_items: [],
   due_soon_items: [],
+  scheduled_items: [],
 };
 
 const EMPTY_MAINTENANCE: MaintenanceSummary = {

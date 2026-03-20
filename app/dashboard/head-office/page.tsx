@@ -6,12 +6,11 @@
  * 7-day trend analysis and action oversight in a single screen.
  *
  * Layout (top-to-bottom):
- *   1. GroupScoreHeader  — group avg score + 5 KPI tiles
- *   2. StoreRiskGrid     — per-store risk map (responsive grid)
- *   3. Bottom row:
- *        StoreLeaderboard   (1/3)    — ranked store list
- *        GroupTrendsPanel   (2/3)    — 7-day sparklines (3 metrics)
- *   4. ActionOversightPanel (full) — per-store action tracking table
+ *   0. GlobalAlertBar      — live client strip (risk state, revenue gap, clock)
+ *   1. GroupScoreHeader    — group avg score + 5 KPI tiles + urgency banner
+ *   2. StoreRiskGrid       — per-store risk map (responsive grid, clickable)
+ *   3. Accountability + Action Oversight (2-col)
+ *   4. StoreLeaderboard + GroupTrendsPanel (1/3 + 2/3)
  */
 
 import {
@@ -20,10 +19,14 @@ import {
   buildLeaderboard,
   getGroupTrends,
   getGroupActionStats,
+  getCriticalActionsFromSummaries,
+  computeLabourTrendDirection,
 } from "@/services/ops/headOffice";
 
+import GlobalAlertBar        from "@/components/dashboard/head-office/GlobalAlertBar";
 import GroupScoreHeader      from "@/components/dashboard/head-office/GroupScoreHeader";
 import StoreRiskGrid         from "@/components/dashboard/head-office/StoreRiskGrid";
+import AccountabilityPanel   from "@/components/dashboard/head-office/AccountabilityPanel";
 import StoreLeaderboard      from "@/components/dashboard/head-office/StoreLeaderboard";
 import GroupTrendsPanel      from "@/components/dashboard/head-office/GroupTrendsPanel";
 import ActionOversightPanel  from "@/components/dashboard/head-office/ActionOversightPanel";
@@ -50,11 +53,17 @@ export default async function HeadOfficePage() {
   const trends      = settled(trendsResult,      { revenue: [], labour: [], risk_score: [] });
   const actionStats = settled(actionStatsResult, []);
 
-  const metrics     = computeGroupMetrics(summaries);
-  const leaderboard = buildLeaderboard(summaries);
+  const metrics         = computeGroupMetrics(summaries);
+  const leaderboard     = buildLeaderboard(summaries);
+  const criticalActions = getCriticalActionsFromSummaries(summaries);
+  const labourTrend     = computeLabourTrendDirection(trends);
+  const computedAt      = new Date().toISOString();
 
   return (
     <div className="space-y-6">
+
+      {/* ── 0. Global alert bar (client — live clock + risk state) ── */}
+      <GlobalAlertBar metrics={metrics} computedAt={computedAt} />
 
       {/* ── Page header ── */}
       <div className="flex items-start justify-between gap-4">
@@ -64,7 +73,7 @@ export default async function HeadOfficePage() {
           </h1>
           <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
             Group performance across {metrics.store_count} store{metrics.store_count !== 1 ? "s" : ""}
-            {" "}· Live
+            {" "}· Real-time
           </p>
         </div>
 
@@ -74,19 +83,26 @@ export default async function HeadOfficePage() {
       </div>
 
       {/* ── 1. Group score header ── */}
-      <GroupScoreHeader metrics={metrics} storeCount={metrics.store_count} />
+      <GroupScoreHeader
+        metrics={metrics}
+        storeCount={metrics.store_count}
+        labourTrend={labourTrend}
+      />
 
       {/* ── 2. Store risk map (full width) ── */}
       <StoreRiskGrid stores={summaries} />
 
-      {/* ── 3. Leaderboard + Trends ── */}
+      {/* ── 3. Accountability + Action Oversight ── */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <AccountabilityPanel stores={summaries} />
+        <ActionOversightPanel stats={actionStats} criticalActions={criticalActions} />
+      </div>
+
+      {/* ── 4. Leaderboard + Trends ── */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1fr_2fr]">
         <StoreLeaderboard entries={leaderboard} />
         <GroupTrendsPanel trends={trends} />
       </div>
-
-      {/* ── 4. Action oversight (full width) ── */}
-      <ActionOversightPanel stats={actionStats} />
 
     </div>
   );

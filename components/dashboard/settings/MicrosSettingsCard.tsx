@@ -266,7 +266,7 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
           </div>
 
           <p className="text-xs text-stone-400">
-            The client secret is configured via the <code className="font-mono bg-stone-100 px-1 rounded">MICROS_CLIENT_SECRET</code> server environment variable.
+            The BIAPI account password is configured via the <code className="font-mono bg-stone-100 px-1 rounded">MICROS_API_ACCOUNT_PASSWORD</code> server environment variable.
           </p>
 
           {/* Save feedback */}

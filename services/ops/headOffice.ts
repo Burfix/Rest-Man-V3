@@ -50,6 +50,7 @@ export interface GroupMetrics {
   store_count:             number;
   total_revenue:           number | null;
   total_revenue_target:    number | null;
+  group_revenue_gap_pct:   number | null;  // positive = below target
   avg_operating_score:     number | null;
   avg_labour_pct:          number | null;
   compliance_risk_count:   number;    // stores with compliance_score < 20
@@ -94,6 +95,14 @@ export interface StoreActionStats {
   open:           number;
   overdue:        number;
   completion_pct: number | null;
+}
+
+export interface GroupCriticalAction {
+  site_id:   string;
+  site_name: string;
+  category:  "compliance" | "revenue" | "maintenance" | "actions";
+  severity:  "critical" | "urgent";
+  message:   string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -211,7 +220,60 @@ export function computeGroupMetrics(summaries: StoreSummary[]): GroupMetrics {
     group_completion_pct:    totalCreated > 0
       ? Math.round((totalCompleted / totalCreated) * 100)
       : null,
+    group_revenue_gap_pct:   totalTarget != null && totalTarget > 0 && totalRevenue != null
+      ? Math.round(((totalTarget - totalRevenue) / totalTarget) * 100)
+      : null,
   };
+}
+
+// ── Pure analysis helpers ──────────────────────────────────────────────────────
+
+export function getCriticalActionsFromSummaries(
+  summaries: StoreSummary[]
+): GroupCriticalAction[] {
+  const out: GroupCriticalAction[] = [];
+
+  for (const s of summaries) {
+    if ((s.compliance_score ?? 20) === 0) {
+      out.push({ site_id: s.site_id, site_name: s.name, category: "compliance",   severity: "critical", message: "Compliance expired — immediate renewal required" });
+    }
+    if ((s.maintenance_score ?? 20) === 0) {
+      out.push({ site_id: s.site_id, site_name: s.name, category: "maintenance",  severity: "critical", message: "Critical maintenance issue — service disruption risk" });
+    }
+    if (s.revenue_gap_pct !== null && s.revenue_gap_pct > 25) {
+      out.push({ site_id: s.site_id, site_name: s.name, category: "revenue",      severity: "critical", message: `${s.revenue_gap_pct.toFixed(1)}% below revenue target` });
+    } else if (s.revenue_gap_pct !== null && s.revenue_gap_pct > 10) {
+      out.push({ site_id: s.site_id, site_name: s.name, category: "revenue",      severity: "urgent",   message: `${s.revenue_gap_pct.toFixed(1)}% below revenue target` });
+    }
+    if (s.actions_overdue > 3) {
+      out.push({ site_id: s.site_id, site_name: s.name, category: "actions",      severity: "critical", message: `${s.actions_overdue} overdue actions — escalation needed` });
+    } else if (s.actions_overdue > 0) {
+      out.push({ site_id: s.site_id, site_name: s.name, category: "actions",      severity: "urgent",   message: `${s.actions_overdue} overdue action${s.actions_overdue > 1 ? "s" : ""} not completed` });
+    }
+  }
+
+  // Critical first, then urgent
+  return out.sort((a, b) => (a.severity === "critical" ? 0 : 1) - (b.severity === "critical" ? 0 : 1));
+}
+
+export function computeLabourTrendDirection(trends: GroupTrends): "up" | "down" | "flat" {
+  const firstVals: number[] = [];
+  const lastVals:  number[] = [];
+
+  for (const line of trends.labour) {
+    const valid = line.points.filter((p): p is { date: string; value: number } => p.value !== null);
+    if (valid.length >= 2) {
+      firstVals.push(valid[0].value);
+      lastVals.push(valid[valid.length - 1].value);
+    }
+  }
+
+  if (firstVals.length === 0) return "flat";
+  const avgFirst = firstVals.reduce((s, v) => s + v, 0) / firstVals.length;
+  const avgLast  = lastVals.reduce((s, v)  => s + v, 0) / lastVals.length;
+  const delta    = avgLast - avgFirst;
+  if (Math.abs(delta) < 0.5) return "flat";
+  return delta > 0 ? "up" : "down";
 }
 
 export function buildLeaderboard(summaries: StoreSummary[]): StoreLeaderboardEntry[] {

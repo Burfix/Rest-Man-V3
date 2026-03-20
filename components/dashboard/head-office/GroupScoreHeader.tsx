@@ -77,29 +77,53 @@ function KpiTile({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 interface Props {
-  metrics:    GroupMetrics;
-  storeCount: number;
+  metrics:     GroupMetrics;
+  storeCount:  number;
+  labourTrend: "up" | "down" | "flat";
 }
 
-export default function GroupScoreHeader({ metrics, storeCount }: Props) {
+export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: Props) {
   const score     = metrics.avg_operating_score;
   const grade     = scoreToGrade(score);
   const palette   = GRADE_PALETTE[grade];
 
-  const revGap = metrics.total_revenue !== null && metrics.total_revenue_target !== null && metrics.total_revenue_target > 0
-    ? ((metrics.total_revenue_target - metrics.total_revenue) / metrics.total_revenue_target * 100)
+  const revGap    = metrics.group_revenue_gap_pct;
+  const revAtRisk = metrics.total_revenue_target != null && revGap != null && revGap > 0
+    ? metrics.total_revenue_target * (revGap / 100)
     : null;
+
+  const labourTrendLabel =
+    labourTrend === "up"   ? "▲ rising"  :
+    labourTrend === "down" ? "▼ falling" :
+    null;
 
   return (
     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
 
       {/* Top banner ─── critical alert strip */}
       {metrics.red_stores > 0 && (
-        <div className="flex items-center gap-3 bg-red-600 px-5 py-2">
-          <span className="h-2 w-2 rounded-full bg-white animate-ping shrink-0" />
-          <p className="text-xs font-bold text-white uppercase tracking-wider">
-            {metrics.red_stores} store{metrics.red_stores > 1 ? "s" : ""} require immediate attention
-          </p>
+        <div className="flex flex-wrap items-center gap-4 bg-red-600 px-5 py-2.5">
+          <div className="flex items-center gap-2">
+            <span className="h-2.5 w-2.5 rounded-full bg-white animate-ping shrink-0" />
+            <p className="text-xs font-black text-white uppercase tracking-wider">
+              {metrics.red_stores} store{metrics.red_stores > 1 ? "s" : ""} require immediate attention
+            </p>
+          </div>
+          {revAtRisk != null && revAtRisk > 500 && (
+            <span className="text-xs font-semibold text-white/90">
+              · {fmtZAR(revAtRisk)} revenue at risk
+            </span>
+          )}
+          {metrics.compliance_risk_count > 0 && (
+            <span className="text-xs font-semibold text-white/90">
+              · {metrics.compliance_risk_count} compliance issue{metrics.compliance_risk_count > 1 ? "s" : ""}
+            </span>
+          )}
+          {metrics.total_actions_overdue > 0 && (
+            <span className="text-xs font-semibold text-white/90">
+              · {metrics.total_actions_overdue} overdue action{metrics.total_actions_overdue > 1 ? "s" : ""}
+            </span>
+          )}
         </div>
       )}
 
@@ -176,9 +200,9 @@ export default function GroupScoreHeader({ metrics, storeCount }: Props) {
             value={metrics.avg_labour_pct !== null ? `${metrics.avg_labour_pct}%` : "—"}
             sub={
               metrics.avg_labour_pct !== null
-                ? metrics.avg_labour_pct <= 30 ? "Healthy"
-                  : metrics.avg_labour_pct <= 35 ? "Elevated"
-                  : "Over budget"
+                ? `${metrics.avg_labour_pct <= 30 ? "Healthy" : metrics.avg_labour_pct <= 35 ? "Elevated" : "Over budget"}${
+                    labourTrendLabel ? ` ${labourTrendLabel}` : ""
+                  }`
                 : undefined
             }
             alert={(metrics.avg_labour_pct ?? 0) > 35}

@@ -6,7 +6,16 @@
  */
 
 import { cn } from "@/lib/utils";
-import type { StoreActionStats } from "@/services/ops/headOffice";
+import type { StoreActionStats, GroupCriticalAction } from "@/services/ops/headOffice";
+
+// ── Category icons ────────────────────────────────────────────────────────────
+
+const CAT_ICON: Record<GroupCriticalAction["category"], string> = {
+  compliance:  "📋",
+  revenue:     "💰",
+  maintenance: "🔧",
+  actions:     "⏰",
+};
 
 // ── Completion progress bar ───────────────────────────────────────────────────
 
@@ -37,10 +46,11 @@ function ProgressBar({ pct }: { pct: number | null }) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 interface Props {
-  stats: StoreActionStats[];
+  stats:           StoreActionStats[];
+  criticalActions?: GroupCriticalAction[];
 }
 
-export default function ActionOversightPanel({ stats }: Props) {
+export default function ActionOversightPanel({ stats, criticalActions = [] }: Props) {
   const totals = {
     total:     stats.reduce((s, x) => s + x.total,     0),
     completed: stats.reduce((s, x) => s + x.completed, 0),
@@ -133,6 +143,51 @@ export default function ActionOversightPanel({ stats }: Props) {
         <span className="text-[11px] text-stone-400">Group completion rate</span>
         <ProgressBar pct={groupPct} />
       </div>
+
+      {/* Critical actions by store */}
+      {criticalActions.length > 0 && (
+        <div className="border-t border-red-200 dark:border-red-800/50">
+          <div className="px-5 py-3 bg-red-50 dark:bg-red-950/20">
+            <p className="text-[10px] font-black uppercase tracking-widest text-red-700 dark:text-red-400 mb-2">
+              🚨 Critical Actions Requiring Attention
+            </p>
+            <div className="space-y-1.5">
+              {criticalActions.slice(0, 6).map((action, i) => (
+                <div key={i} className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2",
+                  action.severity === "critical"
+                    ? "bg-red-100 dark:bg-red-900/30"
+                    : "bg-amber-50 dark:bg-amber-950/20"
+                )}>
+                  <span className="text-sm">{CAT_ICON[action.category]}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn(
+                      "text-[11px] font-bold truncate",
+                      action.severity === "critical" ? "text-red-800 dark:text-red-300" : "text-amber-800 dark:text-amber-300"
+                    )}>
+                      {action.site_name}
+                    </p>
+                    <p className="text-[10px] text-stone-500 dark:text-stone-400 truncate">{action.message}</p>
+                  </div>
+                  <span className={cn(
+                    "shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider",
+                    action.severity === "critical"
+                      ? "bg-red-200 dark:bg-red-900/60 text-red-700 dark:text-red-300"
+                      : "bg-amber-200 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                  )}>
+                    {action.severity}
+                  </span>
+                </div>
+              ))}
+              {criticalActions.length > 6 && (
+                <p className="text-[10px] text-red-500 dark:text-red-400 px-1">
+                  +{criticalActions.length - 6} more critical item{criticalActions.length - 6 > 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

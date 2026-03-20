@@ -9,14 +9,13 @@
  * Required env vars when MICROS_ENABLED=true:
  *   MICROS_AUTH_SERVER             Oracle OIDC provider base URL (no trailing slash)
  *   MICROS_APP_SERVER              MICROS BI application server base URL
- *   MICROS_CLIENT_ID               Registered OIDC client / app ID
+ *   MICROS_CLIENT_ID               Registered OIDC client ID
+ *   MICROS_API_ACCOUNT_PASSWORD    BI API account password (BIAPI password-grant auth)
  *   MICROS_ORG_IDENTIFIER          Oracle org / tenant identifier
- *   MICROS_API_ACCOUNT_NAME        BI API account username
- *   MICROS_API_ACCOUNT_PASSWORD    BI API account password  (never logged/exposed)
+ *   MICROS_API_ACCOUNT_NAME        BI API account username (used as x-app-key header + password grant)
  *   MICROS_LOC_REF                 Location reference for the pilot store
  *
  * Optional:
- *   MICROS_CLIENT_SECRET      OIDC client secret — enables Basic Auth if set
  *   MICROS_ENABLED            "true" | "false"  (default: "false")
  *   MICROS_AUTH_TOKEN_PATH    Token endpoint path override
  *                             (default: /oidc-provider/v1/oauth2/token)
@@ -31,15 +30,19 @@ export interface MicrosEnvConfig {
   /** OAuth 2.0 client ID */
   clientId: string;
   /**
-   * OIDC client secret — optional. When set, used in Authorization: Basic
-   * header. When absent, client_id is sent in the POST body (public client).
-   * NEVER logged, NEVER sent to client.
+   * OIDC client secret — kept for legacy DB-path compatibility.
+   * Not required for the BIAPI password grant flow.
    */
   clientSecret: string;
   /** Oracle org / tenant identifier used in OAuth scope + x-app-key header */
   orgIdentifier: string;
-  /** API account name (Oracle MICROS API account, used as x-app-key) */
+  /** API account name (Oracle MICROS API account, used as x-app-key + password grant username) */
   apiAccountName: string;
+  /**
+   * BI API account password — used with apiAccountName for the BIAPI
+   * password grant (grant_type=password). NEVER logged, NEVER sent to client.
+   */
+  apiAccountPassword: string;
   /** Location reference for the pilot store (passed as locRef query param) */
   locRef: string;
   /** Feature flag — when false, sync routes are disabled */
@@ -48,15 +51,14 @@ export interface MicrosEnvConfig {
 
 /**
  * Variables that must be non-empty strings when MICROS is enabled.
- * MICROS_CLIENT_SECRET is intentionally absent — it is optional (public client
- * mode is used when it is not set).
- * MICROS_API_ACCOUNT_PASSWORD is checked separately because it is a secret
- * that must never appear in variable name lists shown to the frontend.
+ * MICROS_API_ACCOUNT_PASSWORD is required — the BIAPI uses a password grant
+ * (grant_type=password) with the BIAPI account username + password.
  */
 const REQUIRED_VARS = [
   "MICROS_AUTH_SERVER",
   "MICROS_APP_SERVER",
   "MICROS_CLIENT_ID",
+  "MICROS_API_ACCOUNT_PASSWORD",
   "MICROS_ORG_IDENTIFIER",
   "MICROS_API_ACCOUNT_NAME",
   "MICROS_LOC_REF",
@@ -71,11 +73,12 @@ export function getMicrosEnvConfig(): MicrosEnvConfig {
   return {
     authServer:     (process.env.MICROS_AUTH_SERVER     ?? "").replace(/\/$/, ""),
     appServer:      (process.env.MICROS_APP_SERVER      ?? "").replace(/\/$/, ""),
-    clientId:       process.env.MICROS_CLIENT_ID        ?? "",
-    clientSecret:   process.env.MICROS_CLIENT_SECRET    ?? "",
-    orgIdentifier:  process.env.MICROS_ORG_IDENTIFIER   ?? "",
-    apiAccountName: process.env.MICROS_API_ACCOUNT_NAME ?? "",
-    locRef:         process.env.MICROS_LOC_REF          ?? "",
+    clientId:          process.env.MICROS_CLIENT_ID            ?? "",
+    clientSecret:      process.env.MICROS_CLIENT_SECRET        ?? "",
+    orgIdentifier:     process.env.MICROS_ORG_IDENTIFIER       ?? "",
+    apiAccountName:    process.env.MICROS_API_ACCOUNT_NAME     ?? "",
+    apiAccountPassword: process.env.MICROS_API_ACCOUNT_PASSWORD ?? "",
+    locRef:            process.env.MICROS_LOC_REF              ?? "",
     enabled:        isMicrosEnabled(),
   };
 }
@@ -117,9 +120,6 @@ export function getMicrosConfig(): MicrosEnvConfig {
 /**
  * Validates required vars and throws if any are absent, regardless of
  * the MICROS_ENABLED flag.  Use this in auth + sync services.
- *
- * Also checks MICROS_API_ACCOUNT_PASSWORD (treated as a secret — never
- * included in error messages by name when it may be echoed to the frontend).
  */
 export function assertMicrosConfigured(): MicrosEnvConfig {
   const missing = REQUIRED_VARS.filter(
@@ -129,13 +129,6 @@ export function assertMicrosConfigured(): MicrosEnvConfig {
   if (missing.length > 0) {
     throw new Error(
       `[MICROS] Integration is not fully configured. Missing: ${missing.join(", ")}`,
-    );
-  }
-
-  if (!process.env.MICROS_API_ACCOUNT_PASSWORD?.trim()) {
-    throw new Error(
-      "MICROS credentials incomplete — API account password required. " +
-      "Set MICROS_API_ACCOUNT_PASSWORD in your environment variables.",
     );
   }
 
@@ -157,19 +150,11 @@ export function getMicrosConfigStatus(): {
     (key) => !(process.env[key] as string | undefined)?.trim(),
   );
 
-  // Check the API account password separately — it is a secret so we use a
-  // generic placeholder name rather than the actual var name in UI-facing lists.
-  const passwordMissing = !process.env.MICROS_API_ACCOUNT_PASSWORD?.trim();
-  if (passwordMissing) missing.push("MICROS_API_ACCOUNT_PASSWORD");
-
   const configured = missing.length === 0;
 
   let message: string;
   if (!enabled) {
     message = "MICROS integration is disabled (MICROS_ENABLED is not set to true).";
-  } else if (passwordMissing && missing.length === 1) {
-    // Specific admin-safe message when ONLY the password is missing
-    message = "MICROS credentials incomplete — API account password required.";
   } else if (!configured) {
     message = `MICROS is enabled but missing configuration: ${missing.join(", ")}.`;
   } else {

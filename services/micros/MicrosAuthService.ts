@@ -3,36 +3,43 @@
  *
  * Oracle MICROS BI API — OpenID Connect token service.
  *
- * Auth flow (Oracle MSAF OIDC — Client Credentials):
+ * Auth flow (Oracle BIAPI — Resource Owner Password Credentials):
  *   Token endpoint: POST /oidc-provider/v1/oauth2/token
- *   grant_type=client_credentials (the only machine-level grant the Oracle
- *   MSAF OIDC server advertises via /.well-known/openid-configuration).
- *   Auth method: client_secret_post — client_id and client_secret go in
- *   the POST body, NOT in an Authorization: Basic header.
+ *   grant_type=password with:
+ *     username      = MICROS_API_ACCOUNT_NAME  (BIAPI account — NOT a standard RNA user)
+ *     password      = MICROS_API_ACCOUNT_PASSWORD
+ *     client_id     = MICROS_CLIENT_ID
+ *     client_secret = MICROS_CLIENT_SECRET  (if set — required by most Oracle MSAF tenants)
+ *   Client auth method: client_secret_post — credentials go in the POST body.
  *
- *   On token expiry: re-issue via client_credentials (or use refresh_token
- *   grant if the server returned one).
+ *   On token expiry: re-issue via refresh_token grant if the server returned one,
+ *   otherwise re-authenticate with the password grant.
  *
  * Security rules:
- *  - MICROS_CLIENT_SECRET is read from env — NEVER logged or exposed.
+ *  - MICROS_API_ACCOUNT_PASSWORD and MICROS_CLIENT_SECRET are read from env only.
+ *    NEVER logged, NEVER included in error messages, NEVER sent to the client.
  *  - access_token and refresh_token are kept in process memory only.
- *    They are NEVER written to a database, log file, or API response.
- *  - All error messages are sanitized before being logged or re-thrown.
+ *  - All diagnostic logs use sanitize() to strip tokens, URLs, and long strings.
  *
- * Structured log events emitted:
- *   [MicrosAuth] token acquisition attempt N/2 failed: <sanitized message>
- *   [MicrosAuth] refresh failure — <sanitized message>. Re-acquiring.
- *   [MicrosAuth] Token obtained via client_credentials. Expires in N min.
+ * Structured log events emitted (all server-side only):
+ *   [MicrosAuth:config] Startup validation summary
+ *   [MicrosAuth] Pre-request diagnostics for every token attempt
+ *   [MicrosAuth] Token obtained via password grant. Expires in N min.
  *   [MicrosAuth] Token refreshed via refresh_token grant. Expires in N min.
- *   [MicrosAuth] Authentication failed after 2 attempts.
+ *   [MicrosAuth] token acquisition attempt N/2 failed: <sanitized message>
+ *   [MicrosAuth] Authentication failed after 2 attempts. Last error: ...
  *
  * Env vars consumed (all server-side only):
- *   MICROS_AUTH_SERVER        Oracle OIDC provider base URL (no trailing slash)
- *   MICROS_CLIENT_ID          Registered OIDC client ID
- *   MICROS_CLIENT_SECRET      OIDC client secret (required for client_credentials)
- *   MICROS_AUTH_SCOPE         OAuth scope (optional; default: "openid")
- *   MICROS_AUTH_TOKEN_PATH    Token endpoint path override
- *                             (default: /oidc-provider/v1/oauth2/token)
+ *   MICROS_AUTH_SERVER           Oracle OIDC provider base URL (no trailing slash)
+ *   MICROS_CLIENT_ID             Registered OIDC client ID
+ *   MICROS_CLIENT_SECRET         Client secret (used in POST body for ROPC grant)
+ *   MICROS_API_ACCOUNT_NAME      BIAPI account username
+ *   MICROS_API_ACCOUNT_PASSWORD  BIAPI account password
+ *   MICROS_ORG_IDENTIFIER        Oracle org/tenant identifier
+ *   MICROS_LOC_REF               Location reference for the pilot store
+ *   MICROS_AUTH_SCOPE            OAuth scope (optional; default: "openid")
+ *   MICROS_AUTH_TOKEN_PATH       Token endpoint path override
+ *                                (default: /oidc-provider/v1/oauth2/token)
  */
 
 import { assertMicrosConfigured, getMicrosEnvConfig } from "@/lib/micros/config";
@@ -119,6 +126,22 @@ class MicrosAuthServiceImpl {
     this.state = null;
   }
 
+  /**
+   * Returns the current token status — safe to surface in settings UI.
+   * Never includes the token value itself.
+   */
+  getTokenStatus(): {
+    valid:          boolean;
+    expiresAt:      number | null;
+    hasRefreshToken: boolean;
+  } {
+    return {
+      valid:           this.isTokenValid(),
+      expiresAt:       this.state?.expiresAt ?? null,
+      hasRefreshToken: !!this.state?.refreshToken,
+    };
+  }
+
   // ── Token acquisition ────────────────────────────────────────────────────
 
   private async acquireToken(): Promise<string> {
@@ -138,24 +161,24 @@ class MicrosAuthServiceImpl {
         return this.state.accessToken;
       } catch (err) {
         const safe = sanitize(err instanceof Error ? err.message : String(err));
-        console.warn(`[MicrosAuth] refresh failure — ${safe}. Re-acquiring with client_credentials.`);
+        console.warn(`[MicrosAuth] refresh failure — ${safe}. Re-acquiring with password grant.`);
         this.state = null;
       }
     }
 
-    // ── Path B: client_credentials grant ─────────────────────────────────────
+    // ── Path B: password grant (BIAPI account credentials) ────────────────────
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const data = await this.executeClientCredentialsGrant();
+        const data = await this.executePasswordGrant();
         this.state = {
           accessToken:  data.access_token,
           refreshToken: data.refresh_token ?? null,
           expiresAt:    Date.now() + data.expires_in * 1000,
         };
         console.info(
-          `[MicrosAuth] Token obtained via client_credentials. ` +
+          `[MicrosAuth] Token obtained via password grant. ` +
           `Expires in ${Math.round(data.expires_in / 60)} min.` +
           (this.state.refreshToken ? " Refresh token stored." : ""),
         );
@@ -171,26 +194,66 @@ class MicrosAuthServiceImpl {
     }
 
     throw new Error(
-      `[MicrosAuth] Authentication failed after 2 attempts. ` +
-      `Verify MICROS_AUTH_SERVER, MICROS_CLIENT_ID, and MICROS_CLIENT_SECRET ` +
-      `are correct and that the client app is registered in Oracle MSAF IDM.`,
+      `[MicrosAuth] Authentication failed after 2 attempts. ` +      (lastError ? `Last error: ${sanitize(lastError.message)}. ` : "") +      `Verify MICROS_AUTH_SERVER, MICROS_CLIENT_ID, MICROS_API_ACCOUNT_NAME, ` +
+      `and MICROS_API_ACCOUNT_PASSWORD are correct and that the BIAPI account ` +
+      `is registered in Oracle IDM with the required API access grant.`,
     );
   }
 
   // ── Grant implementations ────────────────────────────────────────────────
 
   /**
+   * OAuth 2.0 Resource Owner Password Credentials grant (BIAPI path).
+   *
+   * Oracle BIAPI requires a dedicated API account — do NOT use a standard
+   * RNA / OIDC user. The grant uses the BIAPI account username + password,
+   * plus client_id and (if set) client_secret in the POST body.
+   *
+   * Most Oracle MSAF tenants require client_secret even for ROPC — always
+   * include it when MICROS_CLIENT_SECRET is configured.
+   *
+   * @throws if MICROS_API_ACCOUNT_PASSWORD is not set
+   * @internal
+   */
+  private async executePasswordGrant(): Promise<_OracleTokenResponse> {
+    const cfg = assertMicrosConfigured();
+
+    if (!cfg.apiAccountPassword) {
+      throw new Error(
+        "MICROS BIAPI password missing — set MICROS_API_ACCOUNT_PASSWORD " +
+        "in your environment variables (Vercel project settings → Environment Variables).",
+      );
+    }
+    if (!cfg.apiAccountName) {
+      throw new Error(
+        "MICROS BIAPI username missing — set MICROS_API_ACCOUNT_NAME " +
+        "in your environment variables.",
+      );
+    }
+    if (!cfg.clientId) {
+      throw new Error(
+        "MICROS client ID missing — set MICROS_CLIENT_ID in your environment variables.",
+      );
+    }
+
+    const body: Record<string, string> = {
+      grant_type: "password",
+      username:   cfg.apiAccountName,
+      password:   cfg.apiAccountPassword,
+      scope:      process.env.MICROS_AUTH_SCOPE?.trim() || "openid",
+    };
+
+    // Include client_secret when configured — Oracle MSAF tenants typically
+    // require it in the POST body (client_secret_post method) even for ROPC.
+    return this.postTokenEndpoint(body, cfg.clientId, cfg.clientSecret, cfg.authServer, "password-grant");
+  }
+
+  /**
    * OAuth 2.0 Client Credentials grant.
    *
-   * Authenticates the registered OIDC application against the Oracle MSAF
-   * OIDC provider using client_secret_post method (credentials in body).
-   * Requires MICROS_CLIENT_SECRET to be set.
+   * Kept for compatibility; not used by default now that the BIAPI password
+   * grant is the primary auth path. Only called if explicitly invoked.
    *
-   * Oracle MSAF OIDC discovery confirms:
-   *   grant_types_supported: ["client_credentials", "refresh_token", ...]
-   *   token_endpoint_auth_methods_supported: ["client_secret_post"]
-   *
-   * @throws if MICROS_CLIENT_SECRET is not set
    * @internal
    */
   private async executeClientCredentialsGrant(): Promise<_OracleTokenResponse> {
@@ -234,14 +297,13 @@ class MicrosAuthServiceImpl {
   // ── Core HTTP helper ─────────────────────────────────────────────────────
 
   /**
-   * HTTP POST to the OIDC token endpoint.
+   * HTTP POST to the Oracle OIDC token endpoint.
    *
-   * Authentication strategy for the client:
-   *  - If a clientSecret is configured: Authorization: Basic base64(id:secret)
-   *  - Otherwise: client_id sent in the POST body (public-client mode).
+   * Client auth method: client_secret_post — client_id + client_secret go in
+   * the POST body (Oracle MSAF OIDC standard). No Authorization: Basic header.
    *
-   * `x-requested-by: Oracle` is required by Oracle IDM to bypass the
-   * built-in CSRF protection for API (non-browser) clients.
+   * `x-requested-by: Oracle` is required by Oracle IDM to bypass CSRF
+   * protection for API (non-browser) clients.
    *
    * @internal
    */
@@ -255,18 +317,51 @@ class MicrosAuthServiceImpl {
     const tokenPath = process.env.MICROS_AUTH_TOKEN_PATH?.trim() || DEFAULT_TOKEN_PATH;
     const tokenUrl  = `${authServer}${tokenPath}`;
 
-    const headers: Record<string, string> = {
-      "Content-Type":   "application/x-www-form-urlencoded",
-      "x-requested-by": "Oracle",
-    };
+    // ── Startup validation: catch misconfigured token path ───────────────
+    if (
+      tokenPath !== DEFAULT_TOKEN_PATH &&
+      tokenPath.includes("/oauth2/v1/token") &&
+      !tokenPath.includes("/oidc-provider/")
+    ) {
+      console.error(
+        `[MicrosAuth] MISCONFIGURATION: MICROS_AUTH_TOKEN_PATH is set to the legacy Oracle path.\n` +
+        `  Current : ${tokenPath}\n` +
+        `  Required: ${DEFAULT_TOKEN_PATH}\n` +
+        `  Fix: remove MICROS_AUTH_TOKEN_PATH from env vars.`,
+      );
+      throw new Error(
+        `[MicrosAuth] Wrong token endpoint configured. MICROS_AUTH_TOKEN_PATH='${tokenPath}' ` +
+        `is the legacy Oracle path. Remove this env var or set it to '${DEFAULT_TOKEN_PATH}'.`,
+      );
+    }
 
-    // Oracle MSAF OIDC uses client_secret_post (not client_secret_basic).
-    // client_id and client_secret always go in the POST body.
-    const params = { ...bodyParams };
+    // ── Build POST body ───────────────────────────────────────────────────
+    const params: Record<string, string> = { ...bodyParams };
     params.client_id = clientId;
     if (clientSecret) {
       params.client_secret = clientSecret;
     }
+
+    // ── Pre-request diagnostics (no credential values) ───────────────────
+    console.log(
+      `[MicrosAuth] Pre-request diagnostics:\n` +
+      `  grant:          ${grantLabel}\n` +
+      `  tokenUrl:       ${tokenUrl}\n` +
+      `  authServer:     ${authServer || "(empty — MICROS_AUTH_SERVER not set)"}\n` +
+      `  tokenPath:      ${tokenPath}\n` +
+      `  client_id:      ${clientId ? `${clientId.slice(0, 8)}… (${clientId.length} chars)` : "(empty — MICROS_CLIENT_ID not set)"}\n` +
+      `  client_secret:  ${clientSecret ? `set (${clientSecret.length} chars)` : "not set"}\n` +
+      `  client auth:    client_secret_post (credentials in POST body)\n` +
+      `  username:       ${params.username ? `${params.username.slice(0, 6)}… (${params.username.length} chars)` : "n/a"}\n` +
+      `  password:       ${params.password ? `set (${params.password.length} chars)` : "n/a"}\n` +
+      `  scope:          ${params.scope ?? "not set"}\n` +
+      `  grant_type:     ${params.grant_type}`,
+    );
+
+    const headers: Record<string, string> = {
+      "Content-Type":   "application/x-www-form-urlencoded",
+      "x-requested-by": "Oracle",
+    };
 
     const controller = new AbortController();
     const timer      = setTimeout(() => controller.abort(), AUTH_TIMEOUT_MS);
@@ -280,12 +375,10 @@ class MicrosAuthServiceImpl {
         signal:  controller.signal,
       });
     } catch (err) {
-      throw new Error(
-        `[MicrosAuth] Network error during ${grantLabel}: ` +
-        (err instanceof Error && err.name === "AbortError"
-          ? "request timed out"
-          : "connection failed"),
-      );
+      const reason = err instanceof Error && err.name === "AbortError"
+        ? `request timed out after ${AUTH_TIMEOUT_MS}ms`
+        : `connection failed — is MICROS_AUTH_SERVER reachable from this server?`;
+      throw new Error(`[MicrosAuth] Network error during ${grantLabel}: ${reason}`);
     } finally {
       clearTimeout(timer);
     }
@@ -298,10 +391,10 @@ class MicrosAuthServiceImpl {
     const json = (await res.json()) as _OracleTokenResponse;
 
     if (!json.access_token) {
-      throw new Error(`[MicrosAuth] ${grantLabel} response is missing access_token.`);
+      throw new Error(`[MicrosAuth] ${grantLabel} response missing access_token.`);
     }
     if (typeof json.expires_in !== "number" || json.expires_in <= 0) {
-      throw new Error(`[MicrosAuth] ${grantLabel} response has invalid expires_in value.`);
+      throw new Error(`[MicrosAuth] ${grantLabel} response has invalid expires_in (got: ${json.expires_in}).`);
     }
 
     return json;
@@ -315,66 +408,91 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Builds a structured, admin-safe error message from an HTTP error response.
+ * Builds an admin-safe, actionable error from an HTTP failure response.
  *
- * Oracle OAuth error bodies (400/401) contain `error` and `error_description`
- * fields that are safe to include — they describe the error, not credentials.
+ * Captures raw response body for all status codes so no information is lost —
+ * Oracle returns both JSON {error, error_description} and plain-text / HTML.
  */
 async function buildHttpError(
   res:        Response,
   url:        string,
   grantLabel: string,
 ): Promise<string> {
-  let code = "";
-  let desc = "";
-
-  if (res.status === 400 || res.status === 401) {
-    try {
-      const body = (await res.json()) as { error?: string; error_description?: string };
-      if (body?.error)             code = ` [${body.error}]`;
-      if (body?.error_description) desc = `: ${body.error_description}`;
-    } catch {
-      // JSON parse failed — proceed with status-only message
-    }
+  // Always capture the raw body — Oracle returns JSON for 400/401 but
+  // text/html for 404/405 and some 500s.
+  let rawBody = "";
+  try {
+    rawBody = await res.text();
+  } catch {
+    rawBody = "(could not read response body)";
   }
 
+  // Extract Oracle's structured error fields from JSON when possible.
+  let oracleCode = "";
+  let oracleDesc = "";
+  try {
+    const parsed = JSON.parse(rawBody) as { error?: string; error_description?: string };
+    if (parsed.error)             oracleCode = ` [${parsed.error}]`;
+    if (parsed.error_description) oracleDesc = `: ${parsed.error_description}`;
+  } catch {
+    // Not JSON — include a sanitized excerpt of the raw body instead.
+  }
+
+  // Safe excerpt: strip tags, long tokens, clip to 300 chars.
+  const bodyExcerpt = rawBody
+    .replace(/<[^>]+>/g, " ")              // strip HTML tags
+    .replace(/[A-Za-z0-9+/=]{40,}/g, "<token>") // redact long encoded strings
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+
+  console.error(
+    `[MicrosAuth] ${grantLabel} failed.\n` +
+    `  URL:    ${url}\n` +
+    `  Status: ${res.status} ${res.statusText}\n` +
+    `  Body:   ${bodyExcerpt || "(empty)"}`,
+  );
+
   switch (res.status) {
-    case 401:
-      return (
-        `[MicrosAuth] auth failure (HTTP 401${code})${desc}. ` +
-        `Client credentials rejected by Oracle IDM. ` +
-        `Verify MICROS_CLIENT_ID and MICROS_CLIENT_SECRET.`
-      );
     case 400:
       return (
-        `[MicrosAuth] token request failure (HTTP 400${code})${desc}. ` +
-        `Invalid request parameters. Check MICROS_CLIENT_ID, MICROS_CLIENT_SECRET, ` +
-        `and verify the client app is registered in Oracle MSAF IDM.`
+        `[MicrosAuth] Token request rejected (HTTP 400${oracleCode})${oracleDesc}. ` +
+        `Invalid request parameters — check MICROS_CLIENT_ID, MICROS_API_ACCOUNT_NAME, ` +
+        `and MICROS_ORG_IDENTIFIER. Body excerpt: ${bodyExcerpt.slice(0, 150)}`
+      );
+    case 401:
+      return (
+        `[MicrosAuth] Auth rejected by Oracle (HTTP 401${oracleCode})${oracleDesc}. ` +
+        `BIAPI credentials rejected — verify MICROS_CLIENT_ID, MICROS_CLIENT_SECRET, ` +
+        `MICROS_API_ACCOUNT_NAME, and MICROS_API_ACCOUNT_PASSWORD are correct.`
       );
     case 403:
       return (
-        `[MicrosAuth] authorize failure (HTTP 403): Access denied. ` +
-        `The BI API account may lack the required API access grant in Oracle IDM.`
+        `[MicrosAuth] Access denied (HTTP 403). ` +
+        `The BIAPI account may lack the required API access grant in Oracle IDM.`
       );
     case 404:
       return (
-        `[MicrosAuth] authorize failure (HTTP 404): Token endpoint not found at ${url}. ` +
-        `Check MICROS_AUTH_SERVER and MICROS_AUTH_TOKEN_PATH ` +
+        `[MicrosAuth] Token endpoint not found (HTTP 404) at ${url}. ` +
+        `Check MICROS_AUTH_SERVER (no trailing slash) and MICROS_AUTH_TOKEN_PATH ` +
         `(default: ${DEFAULT_TOKEN_PATH}).`
       );
     case 405:
       return (
-        `[MicrosAuth] authorize failure (HTTP 405): POST rejected at ${url}. ` +
-        `Oracle MSAF may be blocking requests from this server's IP address. ` +
-        `Contact Oracle support to whitelist your outbound IP, or verify ` +
-        `MICROS_AUTH_TOKEN_PATH is set to ${DEFAULT_TOKEN_PATH}.`
+        `[MicrosAuth] POST rejected by Oracle (HTTP 405) at ${url}. ` +
+        `This usually means MICROS_AUTH_SERVER contains the full token path — ` +
+        `it should be the base URL only (e.g. https://host.example.com). ` +
+        `Current MICROS_AUTH_TOKEN_PATH: ${process.env.MICROS_AUTH_TOKEN_PATH ?? "(default)"}.`
       );
     default:
-      return `[MicrosAuth] ${grantLabel} failed with HTTP ${res.status}.`;
+      return (
+        `[MicrosAuth] ${grantLabel} failed (HTTP ${res.status} ${res.statusText}). ` +
+        `Body: ${bodyExcerpt.slice(0, 200)}`
+      );
   }
 }
 
-/** Strips long base64/hex strings and URLs that might encode secrets. */
+/** Strips long base64/hex strings and full URLs that might encode secrets. */
 function sanitize(msg: string): string {
   return msg
     .replace(/https?:\/\/[^\s]+/g, "<url>")
@@ -382,8 +500,66 @@ function sanitize(msg: string): string {
     .slice(0, 300);
 }
 
+// ── Startup config validation ─────────────────────────────────────────────
+
+/**
+ * Logs a one-time startup summary of the MICROS auth configuration.
+ * Safe to call on any server boot — never logs credential values.
+ */
+function logStartupConfig(): void {
+  const vars: Record<string, string | undefined> = {
+    MICROS_ENABLED:              process.env.MICROS_ENABLED,
+    MICROS_AUTH_SERVER:          process.env.MICROS_AUTH_SERVER,
+    MICROS_APP_SERVER:           process.env.MICROS_APP_SERVER,
+    MICROS_CLIENT_ID:            process.env.MICROS_CLIENT_ID,
+    MICROS_CLIENT_SECRET:        process.env.MICROS_CLIENT_SECRET,
+    MICROS_API_ACCOUNT_NAME:     process.env.MICROS_API_ACCOUNT_NAME,
+    MICROS_API_ACCOUNT_PASSWORD: process.env.MICROS_API_ACCOUNT_PASSWORD,
+    MICROS_ORG_IDENTIFIER:       process.env.MICROS_ORG_IDENTIFIER,
+    MICROS_LOC_REF:              process.env.MICROS_LOC_REF,
+    MICROS_AUTH_TOKEN_PATH:      process.env.MICROS_AUTH_TOKEN_PATH,
+    MICROS_AUTH_SCOPE:           process.env.MICROS_AUTH_SCOPE,
+  };
+
+  const lines = Object.entries(vars).map(([k, v]) => {
+    if (v === undefined || v === "") return `  ${k}: NOT SET`;
+    // Show a short non-sensitive preview for URL vars, hide credential values.
+    if (k.endsWith("_PASSWORD") || k.endsWith("_SECRET")) return `  ${k}: set (${v.length} chars)`;
+    if (k.endsWith("_SERVER") || k.endsWith("_APP_SERVER")) return `  ${k}: ${v}`;
+    return `  ${k}: ${v}`;
+  });
+
+  const tokenPath = process.env.MICROS_AUTH_TOKEN_PATH?.trim() || DEFAULT_TOKEN_PATH;
+  const authServer = (process.env.MICROS_AUTH_SERVER ?? "").replace(/\/$/, "");
+  const resolvedTokenUrl = authServer ? `${authServer}${tokenPath}` : "(cannot resolve — MICROS_AUTH_SERVER not set)";
+
+  console.log(
+    `[MicrosAuth:config] Startup validation:\n` +
+    lines.join("\n") + "\n" +
+    `  → resolved token URL: ${resolvedTokenUrl}`,
+  );
+
+  // Warn on known misconfigurations.
+  if (authServer.includes("/oidc-provider") || authServer.includes("/oauth2")) {
+    console.warn(
+      `[MicrosAuth:config] WARNING: MICROS_AUTH_SERVER appears to contain a path. ` +
+      `It should be the base URL only (e.g. https://host.example.com). ` +
+      `Current value: ${authServer}`,
+    );
+  }
+  if (tokenPath !== DEFAULT_TOKEN_PATH) {
+    console.warn(
+      `[MicrosAuth:config] WARNING: MICROS_AUTH_TOKEN_PATH is overridden to '${tokenPath}'. ` +
+      `The correct Oracle MSAF default is '${DEFAULT_TOKEN_PATH}'.`,
+    );
+  }
+}
+
 // ── Module singleton ──────────────────────────────────────────────────────
 // One instance per Node.js process — ensures the token cache is shared across
 // all server-side callers, including concurrent requests.
 
 export const MicrosAuthService = new MicrosAuthServiceImpl();
+
+// Log startup config once when this module is first imported.
+logStartupConfig();

@@ -19,10 +19,13 @@ interface Props {
 }
 
 const STATUS_ORDER: Record<ComplianceStatus, number> = {
-  expired:   0,
-  due_soon:  1,
-  compliant: 2,
-  unknown:   3,
+  expired:     0,
+  due_soon:    1,
+  in_progress: 2,
+  scheduled:   3,
+  compliant:   4,
+  blocked:     5,
+  unknown:     6,
 };
 
 const STATUS_CONFIG: Record<ComplianceStatus, {
@@ -30,10 +33,13 @@ const STATUS_CONFIG: Record<ComplianceStatus, {
   variant: StatusVariant;
   daysCls: string;
 }> = {
-  expired:   { chip: "Expired",   variant: "critical", daysCls: "text-red-600 font-bold" },
-  due_soon:  { chip: "Due Soon",  variant: "warning",  daysCls: "text-amber-600 font-semibold" },
-  compliant: { chip: "Current",   variant: "ok",       daysCls: "text-emerald-600" },
-  unknown:   { chip: "Unknown",   variant: "neutral",  daysCls: "text-stone-400" },
+  expired:     { chip: "Expired",     variant: "critical", daysCls: "text-red-600 font-bold" },
+  due_soon:    { chip: "Due Soon",    variant: "warning",  daysCls: "text-amber-600 font-semibold" },
+  in_progress: { chip: "In Progress", variant: "warning",  daysCls: "text-amber-600" },
+  scheduled:   { chip: "Scheduled",   variant: "ok",       daysCls: "text-emerald-600" },
+  compliant:   { chip: "Current",     variant: "ok",       daysCls: "text-emerald-600" },
+  blocked:     { chip: "Blocked",     variant: "critical", daysCls: "text-red-600" },
+  unknown:     { chip: "Unknown",     variant: "neutral",  daysCls: "text-stone-400" },
 };
 
 function daysLabel(item: ComplianceItem): string {

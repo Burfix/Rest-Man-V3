@@ -35,10 +35,10 @@ const RISK_STYLE: Record<RiskLevel, {
     label:  "Attention",
   },
   red: {
-    border: "border-red-200 dark:border-red-800",
-    header: "bg-red-50 dark:bg-red-950/20",
+    border: "border-red-300 dark:border-red-700 ring-1 ring-red-300 dark:ring-red-700",
+    header: "bg-red-100 dark:bg-red-950/40",
     badge:  "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300",
-    dot:    "bg-red-500 animate-pulse",
+    dot:    "bg-red-500 animate-ping",
     label:  "At Risk",
   },
 };
@@ -93,17 +93,23 @@ function CompletionBar({ pct }: { pct: number | null }) {
 function StoreCard({ store }: { store: StoreSummary }) {
   const risk  = RISK_STYLE[store.risk_level];
   const grade = store.score_grade as ScoreGrade | null;
+  const pendingActions = store.actions_total - store.actions_completed;
 
   return (
     <div className={cn(
-      "rounded-xl border overflow-hidden flex flex-col",
+      "rounded-xl border overflow-hidden flex flex-col group transition-all hover:shadow-md hover:scale-[1.01]",
       risk.border
     )}>
 
       {/* Header */}
       <div className={cn("flex items-center justify-between gap-2 px-4 py-3", risk.header)}>
         <div className="flex items-center gap-2 min-w-0">
-          <span className={cn("h-2 w-2 rounded-full shrink-0", risk.dot)} />
+          <span className="relative shrink-0">
+            <span className={cn("h-2 w-2 rounded-full block", risk.dot)} />
+            {store.risk_level === "red" && (
+              <span className="absolute inset-0 h-2 w-2 rounded-full bg-red-500 opacity-75" />
+            )}
+          </span>
           <div className="min-w-0">
             <p className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate leading-tight">
               {store.name}
@@ -198,6 +204,14 @@ function StoreCard({ store }: { store: StoreSummary }) {
             </span>
           </div>
           <CompletionBar pct={store.actions_completion_pct} />
+          {pendingActions > 0 && (
+            <p className={cn(
+              "text-[10px] mt-1 font-semibold",
+              store.actions_overdue > 0 ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+            )}>
+              {pendingActions} pending{store.actions_overdue > 0 ? ` · ${store.actions_overdue} late` : ""}
+            </p>
+          )}
         </div>
 
         {/* Snapshot date */}
@@ -212,9 +226,14 @@ function StoreCard({ store }: { store: StoreSummary }) {
       <div className="border-t border-stone-100 dark:border-stone-800 px-4 py-2 bg-white dark:bg-stone-900">
         <Link
           href={`/dashboard?site=${store.site_id}`}
-          className="text-[11px] font-semibold text-stone-500 hover:text-stone-900 dark:hover:text-stone-100 transition-colors"
+          className={cn(
+            "block text-center text-[11px] font-bold uppercase tracking-wider py-0.5 transition-colors rounded",
+            store.risk_level === "red"
+              ? "text-red-600 dark:text-red-400 hover:text-red-900"
+              : "text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+          )}
         >
-          View command center →
+          {store.risk_level === "red" ? "🚨 Needs attention →" : "Open dashboard →"}
         </Link>
       </div>
     </div>

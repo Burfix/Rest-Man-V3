@@ -20,6 +20,23 @@ const STORE_COLORS = [
   "#ec4899", // pink-500
 ];
 
+// ── Biggest mover helper ─────────────────────────────────────────────────────
+
+function biggestMover(
+  lines: StoreTrendLine[]
+): { name: string; delta: number } | null {
+  let best: { name: string; delta: number } | null = null;
+  for (const line of lines) {
+    const valid = line.points.filter((p): p is { date: string; value: number } => p.value !== null);
+    if (valid.length < 2) continue;
+    const delta = valid[valid.length - 1].value - valid[0].value;
+    if (!best || Math.abs(delta) > Math.abs(best.delta)) {
+      best = { name: line.name, delta };
+    }
+  }
+  return best;
+}
+
 // ── SVG Sparkline ─────────────────────────────────────────────────────────────
 
 const SVG_W = 200;
@@ -124,6 +141,7 @@ function TrendChart({
   yMaxOverride,
   threshold,
   thresholdColor,
+  moverLabel,
 }: {
   title:          string;
   icon:           string;
@@ -133,6 +151,7 @@ function TrendChart({
   yMaxOverride?:  number;
   threshold?:     number;
   thresholdColor?: string;
+  moverLabel?:    string;
 }) {
   // Compute y-axis range across all store lines
   const allValues = trendLines
@@ -190,6 +209,13 @@ function TrendChart({
           </div>
         ))}
       </div>
+
+      {/* Biggest mover annotation */}
+      {moverLabel && (
+        <p className="mt-2 text-[10px] font-semibold text-blue-600 dark:text-blue-400 border-t border-stone-100 dark:border-stone-800 pt-2">
+          📊 {moverLabel}
+        </p>
+      )}
     </div>
   );
 }
@@ -201,6 +227,25 @@ interface Props {
 }
 
 export default function GroupTrendsPanel({ trends }: Props) {
+  const revMover   = biggestMover(trends.revenue);
+  const labMover   = biggestMover(trends.labour);
+  const scoreMover = biggestMover(trends.risk_score);
+
+  function revMoverLabel(m: typeof revMover) {
+    if (!m) return undefined;
+    const sign = m.delta >= 0 ? "+" : "";
+    return `${m.name} moved most — ${sign}R${Math.round(Math.abs(m.delta) / 1000)}k over 7d`;
+  }
+  function labMoverLabel(m: typeof labMover) {
+    if (!m) return undefined;
+    const sign = m.delta >= 0 ? "+" : "−";
+    return `${m.name} drove labour ${m.delta >= 0 ? "up" : "down"} ${sign}${Math.abs(m.delta).toFixed(1)}pp`;
+  }
+  function scoreMoverLabel(m: typeof scoreMover) {
+    if (!m) return undefined;
+    const sign = m.delta >= 0 ? "+" : "";
+    return `${m.name} ${m.delta >= 0 ? "improved" : "declined"} most — ${sign}${Math.round(m.delta)} pts`;
+  }
   return (
     <section>
       <div className="mb-3">
@@ -215,6 +260,7 @@ export default function GroupTrendsPanel({ trends }: Props) {
           icon="💰"
           trendLines={trends.revenue}
           formatValue={(v) => `R${Math.round(v / 1000)}k`}
+          moverLabel={revMoverLabel(revMover)}
         />
 
         <TrendChart
@@ -226,6 +272,7 @@ export default function GroupTrendsPanel({ trends }: Props) {
           thresholdColor="#ef4444"
           yMinOverride={20}
           yMaxOverride={50}
+          moverLabel={labMoverLabel(labMover)}
         />
 
         <TrendChart
@@ -237,6 +284,7 @@ export default function GroupTrendsPanel({ trends }: Props) {
           yMaxOverride={100}
           threshold={70}
           thresholdColor="#f59e0b"
+          moverLabel={scoreMoverLabel(scoreMover)}
         />
       </div>
     </section>

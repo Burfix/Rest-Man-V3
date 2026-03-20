@@ -77,13 +77,26 @@ export async function getMicrosToken(connectionId: string): Promise<string> {
  * Performs the OAuth client_credentials token request against Oracle Identity Cloud.
  * @internal
  */
+/** Correct Oracle MSAF OIDC token endpoint path. */
+const ORACLE_TOKEN_PATH = "/oidc-provider/v1/oauth2/token";
+
 async function fetchNewToken(
   authServerUrl: string,
   clientId: string,
   clientSecret: string,
   orgIdentifier: string,
 ): Promise<_OracleTokenResponse> {
-  const tokenUrl = `${authServerUrl.replace(/\/$/, "")}/oauth2/v1/token`;
+  const tokenUrl = `${authServerUrl.replace(/\/$/, "")}${ORACLE_TOKEN_PATH}`;
+
+  // Guard: catch any accidental regression to the wrong legacy path.
+  if (tokenUrl.includes("/oauth2/v1/token") && !tokenUrl.includes("/oidc-provider/")) {
+    console.warn(
+      "[MicrosAuth legacy] WARNING: tokenUrl looks like the wrong Oracle path.\n" +
+      `  Resolved: ${tokenUrl}\n` +
+      `  Expected path: ${ORACLE_TOKEN_PATH}\n` +
+      "  Check MICROS_AUTH_SERVER — it should NOT already contain the token path.",
+    );
+  }
 
   const body = new URLSearchParams({
     grant_type:    "client_credentials",
