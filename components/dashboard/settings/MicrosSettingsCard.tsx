@@ -75,8 +75,8 @@ type SaveState =
 type TestState =
   | { status: "idle" }
   | { status: "testing" }
-  | { status: "success" }
-  | { status: "error"; message: string };
+  | { status: "success"; message: string }
+  | { status: "error"; stage?: string; message: string };
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -137,14 +137,18 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
         body:    JSON.stringify({}),
       });
       const json = await res.json();
-      if (json.success) {
-        setTestState({ status: "success" });
+      if (json.ok) {
+        setTestState({ status: "success", message: json.message ?? "Authentication successful and BI API is reachable." });
         setConnection((prev) =>
           prev ? { ...prev, status: "connected" } : prev,
         );
         router.refresh();
       } else {
-        setTestState({ status: "error", message: json.error ?? "Connection test failed." });
+        setTestState({
+          status:  "error",
+          stage:   json.stage,
+          message: json.message ?? json.error ?? "Connection test failed.",
+        });
       }
     } catch (err) {
       setTestState({ status: "error", message: err instanceof Error ? err.message : "Unexpected error." });
@@ -163,7 +167,7 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
       });
       const json = await res.json();
       if (json.success) {
-        setTestState({ status: "success" });
+        setTestState({ status: "success", message: "Sync completed successfully." });
         router.refresh();
       } else {
         setTestState({ status: "error", message: json.error ?? "Sync failed." });
@@ -266,7 +270,9 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
           </div>
 
           <p className="text-xs text-stone-400">
-            The BIAPI account password is configured via the <code className="font-mono bg-stone-100 px-1 rounded">MICROS_API_ACCOUNT_PASSWORD</code> server environment variable.
+            The API account username and password are configured via the{" "}
+            <code className="font-mono bg-stone-100 px-1 rounded">MICROS_USERNAME</code> and{" "}
+            <code className="font-mono bg-stone-100 px-1 rounded">MICROS_PASSWORD</code> server environment variables.
           </p>
 
           {/* Save feedback */}
@@ -384,7 +390,7 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
           )}
           {testState.status === "success" && (
             <div className="mt-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
-              {testState.status === "success" ? "Operation completed successfully." : ""}
+              {testState.message}
             </div>
           )}
 

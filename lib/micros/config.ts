@@ -7,43 +7,37 @@
  * NEVER import this in client components.
  *
  * Required env vars when MICROS_ENABLED=true:
- *   MICROS_AUTH_SERVER             Oracle OIDC provider base URL (no trailing slash)
- *   MICROS_APP_SERVER              MICROS BI application server base URL
- *   MICROS_CLIENT_ID               Registered OIDC client ID
- *   MICROS_API_ACCOUNT_PASSWORD    BI API account password (BIAPI password-grant auth)
- *   MICROS_ORG_IDENTIFIER          Oracle org / tenant identifier
- *   MICROS_API_ACCOUNT_NAME        BI API account username (used as x-app-key header + password grant)
- *   MICROS_LOC_REF                 Location reference for the pilot store
+ *   MICROS_AUTH_SERVER       Oracle OIDC provider base URL (no trailing slash)
+ *   MICROS_BI_SERVER         MICROS BI application server base URL
+ *   MICROS_CLIENT_ID         Registered OIDC client ID (public client — no secret)
+ *   MICROS_USERNAME          BI API account username
+ *   MICROS_PASSWORD          BI API account password (server-side only, never logged)
+ *   MICROS_ORG_SHORT_NAME    Oracle org / tenant short name (e.g. "SCS")
+ *   MICROS_LOCATION_REF      Location reference for the pilot store (e.g. "2000002")
  *
  * Optional:
- *   MICROS_ENABLED            "true" | "false"  (default: "false")
- *   MICROS_AUTH_TOKEN_PATH    Token endpoint path override
- *                             (default: /oidc-provider/v1/oauth2/token)
- *   MICROS_AUTH_SCOPE         OAuth scope (default: "openid")
+ *   MICROS_ENABLED           "true" | "false"  (default: "false")
+ *   MICROS_REDIRECT_URI      PKCE redirect URI (default: "apiaccount://callback")
+ *
+ * Backward-compat aliases still accepted (deprecated):
+ *   MICROS_APP_SERVER        → MICROS_BI_SERVER
+ *   MICROS_ORG_IDENTIFIER    → MICROS_ORG_SHORT_NAME
+ *   MICROS_API_ACCOUNT_NAME  → MICROS_USERNAME
+ *   MICROS_LOC_REF           → MICROS_LOCATION_REF
  */
 
 export interface MicrosEnvConfig {
   /** Base URL of the Oracle Identity Cloud Service (no trailing slash) */
   authServer: string;
-  /** Base URL of the MICROS BI app server (no trailing slash) */
+  /** Base URL of the MICROS BI app server (no trailing slash). Read from MICROS_BI_SERVER. */
   appServer: string;
-  /** OAuth 2.0 client ID */
+  /** OAuth 2.0 client ID (public client — no secret for PKCE flow) */
   clientId: string;
-  /**
-   * OIDC client secret — kept for legacy DB-path compatibility.
-   * Not required for the BIAPI password grant flow.
-   */
-  clientSecret: string;
-  /** Oracle org / tenant identifier used in OAuth scope + x-app-key header */
+  /** Oracle org / tenant short name used in x-app-key header. Read from MICROS_ORG_SHORT_NAME. */
   orgIdentifier: string;
-  /** API account name (Oracle MICROS API account, used as x-app-key + password grant username) */
+  /** API account username. Read from MICROS_USERNAME. */
   apiAccountName: string;
-  /**
-   * BI API account password — used with apiAccountName for the BIAPI
-   * password grant (grant_type=password). NEVER logged, NEVER sent to client.
-   */
-  apiAccountPassword: string;
-  /** Location reference for the pilot store (passed as locRef query param) */
+  /** Location reference for the pilot store (passed as locRef query param). Read from MICROS_LOCATION_REF. */
   locRef: string;
   /** Feature flag — when false, sync routes are disabled */
   enabled: boolean;
@@ -51,18 +45,21 @@ export interface MicrosEnvConfig {
 
 /**
  * Variables that must be non-empty strings when MICROS is enabled.
- * MICROS_API_ACCOUNT_PASSWORD is required — the BIAPI uses a password grant
- * (grant_type=password) with the BIAPI account username + password.
+ * Checks both new names and their backward-compat aliases.
  */
 const REQUIRED_VARS = [
   "MICROS_AUTH_SERVER",
-  "MICROS_APP_SERVER",
   "MICROS_CLIENT_ID",
-  "MICROS_API_ACCOUNT_PASSWORD",
-  "MICROS_ORG_IDENTIFIER",
-  "MICROS_API_ACCOUNT_NAME",
-  "MICROS_LOC_REF",
 ] as const;
+
+/** Additional vars checked with backward-compat alias fallback. */
+const REQUIRED_VARS_WITH_ALIAS: Array<[primary: string, alias: string]> = [
+  ["MICROS_BI_SERVER",       "MICROS_APP_SERVER"],
+  ["MICROS_USERNAME",        "MICROS_API_ACCOUNT_NAME"],
+  ["MICROS_PASSWORD",        "MICROS_API_ACCOUNT_PASSWORD"],
+  ["MICROS_ORG_SHORT_NAME",  "MICROS_ORG_IDENTIFIER"],
+  ["MICROS_LOCATION_REF",    "MICROS_LOC_REF"],
+];
 
 /**
  * Returns the current MICROS env config.
@@ -71,14 +68,12 @@ const REQUIRED_VARS = [
  */
 export function getMicrosEnvConfig(): MicrosEnvConfig {
   return {
-    authServer:     (process.env.MICROS_AUTH_SERVER     ?? "").replace(/\/$/, ""),
-    appServer:      (process.env.MICROS_APP_SERVER      ?? "").replace(/\/$/, ""),
-    clientId:          process.env.MICROS_CLIENT_ID            ?? "",
-    clientSecret:      process.env.MICROS_CLIENT_SECRET        ?? "",
-    orgIdentifier:     process.env.MICROS_ORG_IDENTIFIER       ?? "",
-    apiAccountName:    process.env.MICROS_API_ACCOUNT_NAME     ?? "",
-    apiAccountPassword: process.env.MICROS_API_ACCOUNT_PASSWORD ?? "",
-    locRef:            process.env.MICROS_LOC_REF              ?? "",
+    authServer:    (process.env.MICROS_AUTH_SERVER ?? "").replace(/\/$/, ""),
+    appServer:     (process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER ?? "").replace(/\/$/, ""),
+    clientId:       process.env.MICROS_CLIENT_ID ?? "",
+    orgIdentifier:  process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER ?? "",
+    apiAccountName: process.env.MICROS_USERNAME ?? process.env.MICROS_API_ACCOUNT_NAME ?? "",
+    locRef:         process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "",
     enabled:        isMicrosEnabled(),
   };
 }
@@ -96,6 +91,24 @@ export function isMicrosEnabled(): boolean {
  * Throws a descriptive error if MICROS is enabled but any required var is missing.
  * If MICROS is disabled, returns the partial config (no throw).
  */
+/** Returns missing var names (primary name shown, accepts alias as fallback). */
+function getMissingVars(): string[] {
+  const missing: string[] = [];
+
+  for (const key of REQUIRED_VARS) {
+    if (!(process.env[key] as string | undefined)?.trim()) missing.push(key);
+  }
+
+  for (const [primary, alias] of REQUIRED_VARS_WITH_ALIAS) {
+    const hasValue =
+      (process.env[primary] as string | undefined)?.trim() ||
+      (process.env[alias]   as string | undefined)?.trim();
+    if (!hasValue) missing.push(primary);
+  }
+
+  return missing;
+}
+
 export function getMicrosConfig(): MicrosEnvConfig {
   const cfg = getMicrosEnvConfig();
 
@@ -103,9 +116,7 @@ export function getMicrosConfig(): MicrosEnvConfig {
     return cfg;
   }
 
-  const missing = REQUIRED_VARS.filter(
-    (key) => !(process.env[key] as string | undefined)?.trim(),
-  );
+  const missing = getMissingVars();
 
   if (missing.length > 0) {
     throw new Error(
@@ -122,9 +133,7 @@ export function getMicrosConfig(): MicrosEnvConfig {
  * the MICROS_ENABLED flag.  Use this in auth + sync services.
  */
 export function assertMicrosConfigured(): MicrosEnvConfig {
-  const missing = REQUIRED_VARS.filter(
-    (key) => !(process.env[key] as string | undefined)?.trim(),
-  );
+  const missing = getMissingVars();
 
   if (missing.length > 0) {
     throw new Error(
@@ -146,10 +155,7 @@ export function getMicrosConfigStatus(): {
   message: string;
 } {
   const enabled = isMicrosEnabled();
-  const missing: string[] = REQUIRED_VARS.filter(
-    (key) => !(process.env[key] as string | undefined)?.trim(),
-  );
-
+  const missing  = getMissingVars();
   const configured = missing.length === 0;
 
   let message: string;
