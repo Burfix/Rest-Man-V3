@@ -17,6 +17,7 @@ import { createServerClient }     from "@/lib/supabase/server";
 import { getMicrosConfig, isMicrosEnabled } from "@/lib/micros/config";
 import { MicrosSalesService }     from "./MicrosSalesService";
 import { MicrosLabourService }    from "./MicrosLabourService";
+import { sanitizeMicrosError }    from "@/lib/integrations/status";
 import type { MicrosSyncStatus, MicrosSyncType } from "@/types/micros";
 
 // ── Result types ──────────────────────────────────────────────────────────
@@ -237,8 +238,9 @@ export class MicrosSyncService {
       };
 
     } catch (err) {
-      const message = safeMessage(err);
-      const now     = new Date().toISOString();
+      const rawMessage  = safeMessage(err);
+      const message     = sanitizeMicrosError(rawMessage);
+      const now         = new Date().toISOString();
 
       await Promise.all([
         this.closeSyncRun(syncRunId, "error", totalFetched, totalInserted, message),

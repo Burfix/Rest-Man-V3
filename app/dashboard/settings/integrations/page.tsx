@@ -17,6 +17,23 @@ export default async function IntegrationsPage() {
   const cfgStatus    = getMicrosConfigStatus();
   const microsHealth = deriveMicrosIntegrationStatus(microsResult, cfgStatus.configured, cfgStatus.enabled);
 
+  // ── [MICROS_STATUS_DEBUG] server-side only ───────────────────────────────
+  console.log("[MICROS_STATUS_DEBUG] integrations page render", {
+    envEnabled:            cfgStatus.enabled,
+    envConfigured:         cfgStatus.configured,
+    envMissing:            cfgStatus.missing,
+    dbConnectionStatus:    connection?.status ?? "no_row",
+    dbLastSyncError:       connection?.last_sync_error
+                             ? `[present — ${connection.last_sync_error.length} chars]`
+                             : "null",
+    containsClientSecret:  connection?.last_sync_error?.includes("MICROS_CLIENT_SECRET") ?? false,
+    derivedHealth:         microsHealth.health,
+    derivedLabel:          microsHealth.label,
+    derivedUserMessage:    microsHealth.userMessage,
+    isLiveDataAvailable:   microsHealth.isLiveDataAvailable,
+  });
+  // ── end debug ────────────────────────────────────────────────────────────
+
   return (
     <div className="space-y-8">
       <div>

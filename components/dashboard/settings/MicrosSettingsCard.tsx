@@ -15,6 +15,7 @@ import { useRouter }         from "next/navigation";
 import { cn }                from "@/lib/utils";
 import type { MicrosConnection } from "@/types/micros";
 import type { MicrosIntegrationStatus, IntegrationHealth } from "@/lib/integrations/status";
+import { sanitizeMicrosError }                            from "@/lib/integrations/status";
 
 // ── Status chip ───────────────────────────────────────────────────────────
 
@@ -325,7 +326,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
                         Technical details
                       </summary>
                       <p className="mt-1 rounded-md border border-stone-100 bg-white px-2 py-1.5 font-mono text-xs text-stone-600 break-all">
-                        {connection.last_sync_error}
+                        {sanitizeMicrosError(connection.last_sync_error)}
                       </p>
                     </details>
                   )}

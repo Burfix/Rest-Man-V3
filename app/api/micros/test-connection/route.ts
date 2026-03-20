@@ -19,6 +19,7 @@ import {
 }                                  from "@/lib/micros/auth";
 import { MicrosApiClient }         from "@/lib/micros/client";
 import { createServerClient }      from "@/lib/supabase/server";
+import { sanitizeMicrosError }     from "@/lib/integrations/status";
 
 export const dynamic = "force-dynamic";
 
@@ -40,15 +41,16 @@ export async function POST() {
     const userMsg   = isAuthErr
       ? err.userMessage
       : err instanceof Error ? err.message : "Authentication failed";
+    const safeMsg   = sanitizeMicrosError(userMsg);
 
-    // Persist error to DB connection record
-    await persistSyncError(userMsg).catch(() => null);
+    // Persist sanitized error to DB connection record
+    await persistSyncError(safeMsg).catch(() => null);
 
     return NextResponse.json(
       {
         ok:              false,
         stage:           authStage,
-        message:         userMsg,
+        message:         safeMsg,
         hasIdToken:      false,
         hasRefreshToken: false,
         checkedAt:       new Date().toISOString(),

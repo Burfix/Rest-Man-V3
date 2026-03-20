@@ -47,6 +47,52 @@ export interface MicrosIntegrationStatus {
 /** Sync older than this is "degraded" — live data is no longer trusted. */
 const STALE_THRESHOLD_MS = 4 * 60 * 60 * 1_000; // 4 hours
 
+// ── Sanitizer ─────────────────────────────────────────────────────────────
+
+/**
+ * Strips legacy / credential-revealing text from any MICROS error string
+ * before it is shown in the UI or persisted to the DB.
+ *
+ * Safe to call on any raw string coming from the DB, env validator, or
+ * error catch blocks.  Idempotent — calling it twice on clean text is safe.
+ */
+export function sanitizeMicrosError(raw: string | null | undefined): string {
+  if (!raw) return "Authentication failed. Please run a connection test.";
+
+  const REDACTIONS: Array<[RegExp, string]> = [
+    // Env-var name fragments — must never be shown to users
+    [/MICROS_CLIENT_SECRET\s*(environment variable)?\s*(is not set\.?)?/gi, ""],
+    [/MICROS_API_ACCOUNT_PASSWORD\s*/gi,                                    ""],
+    // Legacy "X attempts" phrasing
+    [/Authentication failed after \d+ attempts\.?/gi,
+      "Authentication failed. Please run a connection test."],
+    // Old "Check X, Y, Z" guidance
+    [/Check\s+MICROS_AUTH_SERVER[^.]*\./gi,                                ""],
+    [/Check\s+MICROS_[A-Z_]+[^.]*\./gi,                                    ""],
+    // Missing config error message from old validator
+    [/MICROS is enabled but missing configuration:\s*[^.]+\./gi,
+      "Setup is incomplete. Please review your server configuration."],
+    // Redundant verb fragments left after redaction
+    [/\s*is not set\.\s*/gi,   " "],
+    [/\s*environment variable\s*/gi, " "],
+  ];
+
+  let clean = raw;
+  for (const [pattern, replacement] of REDACTIONS) {
+    clean = clean.replace(pattern, replacement);
+  }
+
+  // Collapse multiple spaces / leading-trailing whitespace
+  clean = clean.replace(/\s{2,}/g, " ").trim();
+
+  // If nothing meaningful remains, return canonical fallback
+  if (!clean || clean === "." || clean.length < 8) {
+    return "Authentication failed. Please run a connection test.";
+  }
+
+  return clean;
+}
+
 // ── Derivation ────────────────────────────────────────────────────────────
 
 /**
@@ -106,10 +152,7 @@ export function deriveMicrosIntegrationStatus(
 
   // ④ Last sync errored — sanitise message (strip deprecated env var references)
   if (conn.status === "error" || conn.last_sync_error) {
-    const raw     = conn.last_sync_error ?? "Authentication failed.";
-    const safeMsg = raw.includes("MICROS_CLIENT_SECRET")
-      ? "Authentication failed. Please run a connection test to re-authenticate."
-      : raw;
+    const safeMsg = sanitizeMicrosError(conn.last_sync_error);
     return {
       health:               "auth_failed",
       label:                "Auth failed",

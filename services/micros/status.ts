@@ -6,6 +6,7 @@
  */
 
 import { createServerClient }   from "@/lib/supabase/server";
+import { sanitizeMicrosError }  from "@/lib/integrations/status";
 import type { MicrosStatusSummary, MicrosConnection, MicrosSyncRun, MicrosSalesDaily } from "@/types/micros";
 
 const SAFE_CONNECTION_COLUMNS =
@@ -36,6 +37,15 @@ export async function getMicrosStatus(): Promise<MicrosStatusSummary> {
 
   const connection = (connRes.data as MicrosConnection | null) ?? null;
   const lastRun    = (runRes.data as MicrosSyncRun | null) ?? null;
+
+  // Sanitize any stale legacy error text before it propagates to UI
+  if (connection?.last_sync_error) {
+    const sanitized = sanitizeMicrosError(connection.last_sync_error);
+    // Only overwrite if sanitization changed the value (avoid unnecessary mutation)
+    if (sanitized !== connection.last_sync_error) {
+      (connection as MicrosConnection & { last_sync_error: string }).last_sync_error = sanitized;
+    }
+  }
 
   // Fetch latest daily sales row if connected
   let latestDailySales: MicrosSalesDaily | null = null;
