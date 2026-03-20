@@ -13,6 +13,7 @@
 import { NextResponse }           from "next/server";
 import {
   clearMicrosTokenCache,
+  getAuthMode,
   getMicrosAccessToken,
   getMicrosTokenStatus,
   MicrosAuthError,
@@ -26,6 +27,29 @@ export const runtime = "nodejs";
 
 export async function POST() {
   const t0 = Date.now();
+
+  // Fail closed if auth mode is not yet confirmed.
+  if (getAuthMode() === "unknown") {
+    await persistSyncError(
+      "MICROS authentication mode has not been confirmed by Oracle.",
+    ).catch(() => null);
+    return NextResponse.json(
+      {
+        ok:          false,
+        health:      "setup_incomplete",
+        reasonCode:  "AUTH_MODE_UNCONFIRMED",
+        userMessage: "Authentication mode not confirmed.",
+        technicalDetails: {
+          stage: "config",
+          hint:  "Set MICROS_AUTH_MODE=pkce or MICROS_AUTH_MODE=password after Oracle confirms the correct flow.",
+        },
+        hasIdToken:      false,
+        hasRefreshToken: false,
+        checkedAt:       new Date().toISOString(),
+      },
+      { status: 400 },
+    );
+  }
 
   // Always start with a cold cache so we're testing the real flow.
   clearMicrosTokenCache();

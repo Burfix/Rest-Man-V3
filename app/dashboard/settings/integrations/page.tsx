@@ -17,8 +17,11 @@ export const revalidate = 0;
 export default async function IntegrationsPage() {
   const microsResult = await getMicrosStatus().catch(() => null);
   const connection   = microsResult?.connection ?? null;
-  const cfgStatus    = getMicrosConfigStatus();
-  const microsHealth = deriveMicrosIntegrationStatus(microsResult, cfgStatus.configured, cfgStatus.enabled);
+  const cfgStatus         = getMicrosConfigStatus();
+  const authModeUnconfirmed = cfgStatus.enabled && cfgStatus.authMode === "unknown";
+  const microsHealth      = deriveMicrosIntegrationStatus(
+    microsResult, cfgStatus.configured, cfgStatus.enabled, authModeUnconfirmed,
+  );
 
   // ── Admin check (server-side) — debug panel shown to admin users only ──
   const supabase = createServerClient();
@@ -32,6 +35,7 @@ export default async function IntegrationsPage() {
     envEnabled:            cfgStatus.enabled,
     envConfigured:         cfgStatus.configured,
     envMissing:            cfgStatus.missing,
+    authMode:              cfgStatus.authMode,
     dbConnectionStatus:    connection?.status ?? "no_row",
     dbLastSyncError:       connection?.last_sync_error
                              ? `[present — ${connection.last_sync_error.length} chars]`

@@ -46,6 +46,8 @@ export async function GET() {
   const locationRef  = norm(process.env.MICROS_LOCATION_REF   ?? process.env.MICROS_LOC_REF        ?? "");
   const redirectUri  = norm(process.env.MICROS_REDIRECT_URI ?? "apiaccount://callback");
   const password     = process.env.MICROS_PASSWORD ?? process.env.MICROS_API_ACCOUNT_PASSWORD ?? "";
+  const rawAuthMode  = norm(process.env.MICROS_AUTH_MODE ?? "").toLowerCase();
+  const authMode     = rawAuthMode === "pkce" || rawAuthMode === "password" ? rawAuthMode : "unknown";
 
   // Detect environment mismatch heuristic.
   let environmentMismatch = false;
@@ -78,6 +80,10 @@ export async function GET() {
     locationRefPresent:   !!locationRef,
     passwordPresent:      !!password.trim(),
     redirectUri,
+
+    // Auth mode
+    authMode,
+    authModeConfirmed:    authMode !== "unknown",
 
     // Integration flag
     microsEnabled:        (process.env.MICROS_ENABLED ?? "false").toLowerCase() === "true",

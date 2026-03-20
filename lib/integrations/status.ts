@@ -106,9 +106,10 @@ export function sanitizeMicrosError(raw: string | null | undefined): string {
  * @param envEnabled    Result of getMicrosConfigStatus().enabled
  */
 export function deriveMicrosIntegrationStatus(
-  ms:            MicrosStatusSummary | null,
-  envConfigured: boolean,
-  envEnabled:    boolean,
+  ms:                    MicrosStatusSummary | null,
+  envConfigured:         boolean,
+  envEnabled:            boolean,
+  authModeUnconfirmed = false,
 ): MicrosIntegrationStatus {
 
   // ① Feature flag off
@@ -123,7 +124,19 @@ export function deriveMicrosIntegrationStatus(
     };
   }
 
-  // ② Required env vars missing
+  // ② Auth mode not confirmed -- fail closed before other checks
+  if (authModeUnconfirmed) {
+    return {
+      health:               "awaiting_setup",
+      label:                "Authentication mode not confirmed",
+      isLiveDataAvailable:  false,
+      lastSuccessfulSyncAt: null,
+      reasonCode:           "AUTH_MODE_UNCONFIRMED",
+      userMessage:          "Awaiting Oracle confirmation. Set MICROS_AUTH_MODE=pkce or MICROS_AUTH_MODE=password to proceed.",
+    };
+  }
+
+  // ③ Required env vars missing
   if (!envConfigured) {
     return {
       health:               "not_configured",

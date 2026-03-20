@@ -163,10 +163,14 @@ export function getMicrosConfigStatus(): {
   enabled: boolean;
   missing: string[];
   message: string;
+  authMode: string;
 } {
-  const enabled = isMicrosEnabled();
-  const missing  = getMissingVars();
+  const enabled    = isMicrosEnabled();
+  const missing    = getMissingVars();
   const configured = missing.length === 0;
+
+  const rawMode   = (process.env.MICROS_AUTH_MODE ?? "").replace(/[\r\n]/g, "").trim().toLowerCase();
+  const authMode  = rawMode === "pkce" || rawMode === "password" ? rawMode : "unknown";
 
   let message: string;
   if (!enabled) {
@@ -177,5 +181,5 @@ export function getMicrosConfigStatus(): {
     message = "MICROS integration is fully configured.";
   }
 
-  return { configured, enabled, missing, message };
+  return { configured, enabled, missing, message, authMode };
 }

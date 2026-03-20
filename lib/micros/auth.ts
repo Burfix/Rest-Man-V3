@@ -1,24 +1,28 @@
 /**
  * lib/micros/auth.ts
  *
- * Oracle MICROS BI API -- OIDC Authorization Code flow with PKCE (RFC 7636).
+ * Oracle MICROS BI API -- configurable authentication.
  *
- * Three-step server-side flow:
- *   1. GET  {MICROS_AUTH_SERVER}/oidc-provider/v1/oauth2/authorize
- *      Sets session cookies; returns 302.
- *   2. POST {MICROS_AUTH_SERVER}/oidc-provider/v1/oauth2/signin
- *      Submits credentials + cookies; returns 302 with ?code= in Location.
- *   3. POST {MICROS_AUTH_SERVER}/oidc-provider/v1/oauth2/token
- *      Exchanges auth code + code_verifier for {access_token, id_token,
- *      refresh_token, expires_in}.
+ * Auth mode is controlled by MICROS_AUTH_MODE (default: "unknown").
  *
- * Refresh (same token endpoint):
- *   POST {MICROS_AUTH_SERVER}/oidc-provider/v1/oauth2/token
- *   grant_type=refresh_token — silent re-auth before expiry.
+ * Modes:
+ *   "unknown"  — fail closed; no auth request is sent until Oracle
+ *                confirms the correct flow. Throws AUTH_MODE_UNCONFIRMED.
+ *   "pkce"     — OIDC Authorization Code + PKCE (3-step):
+ *                GET  /oidc-provider/v1/oauth2/authorize
+ *                POST /oidc-provider/v1/oauth2/signin
+ *                POST /oidc-provider/v1/oauth2/token
+ *   "password" — OAuth 2.0 Resource Owner Password Credentials:
+ *                POST /oidc-provider/v1/oauth2/token
+ *                grant_type=password
+ *
+ * Refresh (both modes): POST /oidc-provider/v1/oauth2/token
+ *                        grant_type=refresh_token
  *
  * Redirect URI: apiaccount://callback
  *
  * Env vars (server-side only):
+ *   MICROS_AUTH_MODE     "pkce" | "password" (default: "unknown")
  *   MICROS_AUTH_SERVER   Oracle OIDC provider base URL (no trailing slash)
  *   MICROS_CLIENT_ID     Registered OAuth client ID (public client, no secret)
  *   MICROS_USERNAME      Oracle BI API account username
@@ -28,6 +32,7 @@
 import crypto from "crypto";
 import { generateCodeVerifier, generateCodeChallenge } from "./pkce";
 
+// Path constants — only used when the corresponding mode is active.
 const AUTHORIZE_PATH = "/oidc-provider/v1/oauth2/authorize";
 const SIGNIN_PATH    = "/oidc-provider/v1/oauth2/signin";
 const TOKEN_PATH     = "/oidc-provider/v1/oauth2/token";
@@ -39,6 +44,8 @@ const TOKEN_BUFFER_MS  = 5 * 60 * 1000; // 5-min early-expiry buffer
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+export type MicrosAuthMode = "unknown" | "pkce" | "password";
 
 export interface OracleTokenSet {
   accessToken: string;
@@ -67,6 +74,23 @@ export class MicrosAuthError extends Error {
 }
 
 // ---------------------------------------------------------------------------
+// Auth mode resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Reads MICROS_AUTH_MODE from the environment.
+ * Returns "unknown" if the value is absent or not one of "pkce" | "password".
+ */
+export function getAuthMode(): MicrosAuthMode {
+  const raw = (process.env.MICROS_AUTH_MODE ?? "")
+    .replace(/[\r\n]/g, "")
+    .trim()
+    .toLowerCase();
+  if (raw === "pkce" || raw === "password") return raw;
+  return "unknown";
+}
+
+// ---------------------------------------------------------------------------
 // In-memory token cache
 // ---------------------------------------------------------------------------
 
@@ -78,11 +102,29 @@ let _inflight: Promise<OracleTokenSet> | null = null;
 // ---------------------------------------------------------------------------
 
 /**
- * Returns a valid token string (id_token preferred, falls back to access_token).
- * Silently refreshes using refresh_token when near expiry.
+ * Returns a valid token string.
+ *
+ * Behaviour depends on MICROS_AUTH_MODE:
+ *   "unknown"  — throws AUTH_MODE_UNCONFIRMED immediately (no network request)
+ *   "pkce"     — OIDC PKCE 3-step flow (authorize → signin → token)
+ *   "password" — password grant POST to /oidc-provider/v1/oauth2/token
+ *
  * Concurrent callers share one inflight request — no thundering herd.
+ * Silently refreshes via refresh_token when near expiry.
  */
 export async function getMicrosAccessToken(): Promise<string> {
+  const mode = getAuthMode();
+
+  // Fail closed — do not send any auth request until mode is confirmed.
+  if (mode === "unknown") {
+    throw new MicrosAuthError(
+      "config",
+      "MICROS authentication mode has not been confirmed by Oracle.",
+      "Set MICROS_AUTH_MODE=pkce or MICROS_AUTH_MODE=password after Oracle confirms the correct flow.",
+      "AUTH_MODE_UNCONFIRMED",
+    );
+  }
+
   if (_tokenSet && isTokenValid(_tokenSet)) return _tokenSet.accessToken;
 
   // Silent refresh when we have a refresh token that is not yet expired.
@@ -94,10 +136,10 @@ export async function getMicrosAccessToken(): Promise<string> {
       _tokenSet = await _inflight;
       return _tokenSet.accessToken;
     } catch (err) {
-      // Refresh failed — clear cache and fall through to full PKCE flow.
+      // Refresh failed — clear cache and fall through to fresh acquisition.
       _tokenSet = null;
       console.warn(
-        "[MicrosAuth] Refresh failed; starting full PKCE flow.",
+        "[MicrosAuth] Refresh failed; starting fresh " + mode + " flow.",
         err instanceof Error ? err.message : String(err),
       );
     } finally {
@@ -106,7 +148,7 @@ export async function getMicrosAccessToken(): Promise<string> {
   }
 
   if (_inflight) return (await _inflight).accessToken;
-  _inflight = acquireToken();
+  _inflight = acquireToken(mode);
   try {
     _tokenSet = await _inflight;
     return _tokenSet.accessToken;
@@ -139,10 +181,21 @@ export function clearMicrosTokenCache(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Full PKCE acquisition
+// Mode dispatch
 // ---------------------------------------------------------------------------
 
-async function acquireToken(): Promise<OracleTokenSet> {
+async function acquireToken(mode: "pkce" | "password"): Promise<OracleTokenSet> {
+  return mode === "pkce" ? acquireTokenPkce() : acquireTokenPassword();
+}
+
+// ---------------------------------------------------------------------------
+// PKCE flow (mode = "pkce")
+//   GET  /oidc-provider/v1/oauth2/authorize
+//   POST /oidc-provider/v1/oauth2/signin
+//   POST /oidc-provider/v1/oauth2/token
+// ---------------------------------------------------------------------------
+
+async function acquireTokenPkce(): Promise<OracleTokenSet> {
   const cfg           = loadConfig();
   const codeVerifier  = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
@@ -153,10 +206,7 @@ async function acquireToken(): Promise<OracleTokenSet> {
   return stepToken(cfg, code, codeVerifier);
 }
 
-// ---------------------------------------------------------------------------
-// Step 1: Authorize  GET /oidc-provider/v1/oauth2/authorize
-// ---------------------------------------------------------------------------
-
+// Step 1: GET /oidc-provider/v1/oauth2/authorize
 async function stepAuthorize(
   cfg: MicrosAuthConfig,
   codeChallenge: string,
@@ -179,11 +229,11 @@ async function stepAuthorize(
     client_id_preview: cfg.clientId.slice(0, 6) + "..." + cfg.clientId.slice(-6),
   });
 
-  const res = await fetchWithTimeout(requestUrl, {
-    method:   "GET",
-    redirect: "manual",
-    headers:  { Accept: "text/html,application/json" },
-  }, "authorize");
+  const res = await fetchWithTimeout(
+    requestUrl,
+    { method: "GET", redirect: "manual", headers: { Accept: "text/html,application/json" } },
+    "authorize",
+  );
 
   console.log("[MICROS_AUTH_DEBUG] authorize response", {
     status:             res.status,
@@ -205,16 +255,10 @@ async function stepAuthorize(
   return extractSetCookies(res.headers);
 }
 
-// ---------------------------------------------------------------------------
-// Step 2: Sign in  POST /oidc-provider/v1/oauth2/signin
-// ---------------------------------------------------------------------------
-
+// Step 2: POST /oidc-provider/v1/oauth2/signin
 async function stepSignin(cfg: MicrosAuthConfig, cookies: string): Promise<string> {
   const url  = cfg.authServer + SIGNIN_PATH;
-  const body = new URLSearchParams({
-    username: cfg.username,
-    password: cfg.password,
-  });
+  const body = new URLSearchParams({ username: cfg.username, password: cfg.password });
 
   console.log("[MICROS_AUTH_DEBUG] signin request", {
     url,
@@ -263,10 +307,7 @@ async function stepSignin(cfg: MicrosAuthConfig, cookies: string): Promise<strin
   return code;
 }
 
-// ---------------------------------------------------------------------------
-// Step 3: Token exchange  POST /oidc-provider/v1/oauth2/token
-// ---------------------------------------------------------------------------
-
+// Step 3: POST /oidc-provider/v1/oauth2/token  grant_type=authorization_code
 async function stepToken(
   cfg: MicrosAuthConfig,
   code: string,
@@ -294,10 +335,41 @@ async function stepToken(
 
   const res = await fetchWithTimeout(url, {
     method:  "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept:         "application/json",
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+    body: body.toString(),
+  }, "token");
+
+  return parseTokenResponse(res, "token");
+}
+
+// ---------------------------------------------------------------------------
+// Password grant flow (mode = "password")
+//   POST /oidc-provider/v1/oauth2/token  grant_type=password
+// ---------------------------------------------------------------------------
+
+async function acquireTokenPassword(): Promise<OracleTokenSet> {
+  const cfg  = loadConfig();
+  const url  = cfg.authServer + TOKEN_PATH;
+  const body = new URLSearchParams({
+    scope:      "openid",
+    grant_type: "password",
+    client_id:  cfg.clientId,
+    username:   cfg.username,
+    password:   cfg.password,
+  });
+
+  console.log("[MICROS_AUTH_DEBUG] password grant request", {
+    url,
+    method:            "POST",
+    grant_type:        "password",
+    client_id_length:  cfg.clientId.length,
+    client_id_preview: cfg.clientId.slice(0, 6) + "..." + cfg.clientId.slice(-6),
+    username_present:  !!cfg.username,
+  });
+
+  const res = await fetchWithTimeout(url, {
+    method:  "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: body.toString(),
   }, "token");
 
@@ -329,10 +401,7 @@ async function doRefresh(refreshToken: string): Promise<OracleTokenSet> {
 
   const res = await fetchWithTimeout(url, {
     method:  "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept:         "application/json",
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
     body: body.toString(),
   }, "refresh");
 
@@ -384,7 +453,7 @@ async function parseTokenResponse(
 
   const accessToken  = String(json.access_token ?? "");
   const idToken      = String(json.id_token ?? "");
-  // Prefer id_token (contains Oracle BI claims) over access_token.
+  // Prefer id_token (contains Oracle BI claims) when available.
   const token        = idToken || accessToken;
   const newRefresh   = String(json.refresh_token ?? existingRefreshToken ?? "");
   const expiresIn    = Number(json.expires_in ?? 3600);
@@ -398,10 +467,13 @@ async function parseTokenResponse(
     );
   }
 
+  const modeLabel = getAuthMode() === "password" ? "password grant" : "PKCE OIDC";
   console.info(
     "[MicrosAuth] Token " +
       (stage === "refresh" ? "refreshed" : "acquired") +
-      " via PKCE OIDC. Expires in " +
+      " via " +
+      modeLabel +
+      ". Expires in " +
       Math.round(expiresIn / 60) +
       "m." +
       (newRefresh ? " Refresh token present." : ""),
@@ -502,6 +574,7 @@ function loadConfig(): MicrosAuthConfig {
 
   console.log("[MICROS_AUTH_DEBUG] config loaded", {
     envVarUsed:            ["MICROS_AUTH_SERVER", "MICROS_CLIENT_ID", "MICROS_USERNAME"],
+    authMode:              getAuthMode(),
     authServer,
     biServer:              biServer || "(not set)",
     clientIdLength:        clientId.length,
@@ -551,7 +624,6 @@ function generateState(): string {
 }
 
 function extractSetCookies(headers: Headers): string {
-  // getSetCookie() available in Node >=18 / undici; fall back to get()
   const all: string[] =
     (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
   if (all.length > 0) {
@@ -579,7 +651,6 @@ function extractCode(location: string): string {
       : location;
     return new URL(normalized).searchParams.get("code") ?? "";
   } catch {
-    // Regex fallback
     const m = location.match(/[?&]code=([^&]+)/);
     return m ? decodeURIComponent(m[1]) : "";
   }
