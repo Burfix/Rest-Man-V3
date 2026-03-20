@@ -20,6 +20,13 @@ const STATUS_CONFIG: Record<ComplianceStatus, {
     cardBorder: "border-emerald-100",
     icon: "✓",
   },
+  scheduled: {
+    label: "Scheduled",
+    badge: "bg-blue-50 text-blue-700 ring-blue-200",
+    ring: "ring-blue-400",
+    cardBorder: "border-blue-100",
+    icon: "📅",
+  },
   due_soon: {
     label: "Due Soon",
     badge: "bg-amber-50 text-amber-700 ring-amber-200",
@@ -27,12 +34,26 @@ const STATUS_CONFIG: Record<ComplianceStatus, {
     cardBorder: "border-amber-200",
     icon: "⚠",
   },
+  in_progress: {
+    label: "In Progress",
+    badge: "bg-sky-50 text-sky-700 ring-sky-200",
+    ring: "ring-sky-400",
+    cardBorder: "border-sky-100",
+    icon: "↻",
+  },
   expired: {
     label: "Expired",
     badge: "bg-red-50 text-red-700 ring-red-300",
     ring: "ring-red-500",
     cardBorder: "border-red-300",
     icon: "✗",
+  },
+  blocked: {
+    label: "Blocked",
+    badge: "bg-orange-50 text-orange-700 ring-orange-200",
+    ring: "ring-orange-400",
+    cardBorder: "border-orange-100",
+    icon: "⊘",
   },
   unknown: {
     label: "Not Set Up",
@@ -126,7 +147,7 @@ function SummaryHeader({ summary }: { summary: ComplianceSummary }) {
               {pct}%
             </span>
             <span className="text-sm text-stone-400">
-              {summary.compliant}/{summary.total - summary.unknown} categories
+              {summary.compliant + (summary.scheduled ?? 0)}/{summary.total - summary.unknown} managed
             </span>
           </div>
           {/* Progress bar */}
@@ -140,10 +161,13 @@ function SummaryHeader({ summary }: { summary: ComplianceSummary }) {
 
         {/* Stat pills */}
         <div className="flex flex-wrap gap-2">
-          <StatPill label="Compliant"  value={summary.compliant} color="emerald" />
-          <StatPill label="Due Soon"   value={summary.due_soon}  color="amber"   />
-          <StatPill label="Expired"    value={summary.expired}   color="red"     />
-          <StatPill label="Not Set Up" value={summary.unknown}   color="stone"   />
+          <StatPill label="Compliant"  value={summary.compliant}        color="emerald" />
+          {(summary.scheduled ?? 0) > 0 && (
+            <StatPill label="Scheduled" value={summary.scheduled ?? 0}  color="blue"    />
+          )}
+          <StatPill label="Due Soon"   value={summary.due_soon}         color="amber"   />
+          <StatPill label="Expired"    value={summary.expired}          color="red"     />
+          <StatPill label="Not Set Up" value={summary.unknown}          color="stone"   />
         </div>
       </div>
 
@@ -170,10 +194,11 @@ function StatPill({
 }: {
   label: string;
   value: number;
-  color: "emerald" | "amber" | "red" | "stone";
+  color: "emerald" | "blue" | "amber" | "red" | "stone";
 }) {
   const styles = {
     emerald: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    blue:    "bg-blue-50 text-blue-700 ring-blue-200",
     amber:   "bg-amber-50 text-amber-700 ring-amber-200",
     red:     "bg-red-50 text-red-700 ring-red-200",
     stone:   "bg-stone-100 text-stone-500 ring-stone-200",
@@ -462,6 +487,15 @@ function ComplianceCard({
           </p>
         )}
 
+        {/* Scheduled service helper text */}
+        {item.status === "scheduled" && item.scheduled_service_date && (
+          <p className="mt-2 rounded-md bg-blue-50 border border-blue-200 px-2.5 py-1.5 text-xs text-blue-700">
+            📅 Service booked for {formatShortDate(item.scheduled_service_date)}
+            {item.scheduled_with ? ` — ${item.scheduled_with}` : ""}. Certificate remains valid until{" "}
+            {item.next_due_date ? formatShortDate(item.next_due_date) : "expiry"}.
+          </p>
+        )}
+
         {/* Notes */}
         {item.notes && (
           <p className="mt-1.5 text-xs text-stone-500 italic line-clamp-2">{item.notes}</p>
@@ -688,7 +722,15 @@ export default function ComplianceHub({ items: initialItems, summary: initialSum
 
   // Sort: expired first, then due_soon, then compliant, then unknown — within each group by next_due_date
   const sorted = [...filtered].sort((a, b) => {
-    const order: Record<ComplianceStatus, number> = { expired: 0, due_soon: 1, compliant: 2, unknown: 3 };
+    const order: Record<ComplianceStatus, number> = {
+    expired:     0,
+    due_soon:    1,
+    blocked:     2,
+    scheduled:   3,
+    in_progress: 4,
+    compliant:   5,
+    unknown:     6,
+  };
     const diff = order[a.status] - order[b.status];
     if (diff !== 0) return diff;
     if (!a.next_due_date) return 1;
@@ -715,20 +757,28 @@ export default function ComplianceHub({ items: initialItems, summary: initialSum
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Filter tabs */}
         <div className="flex flex-wrap gap-1">
-          {(["all", "expired", "due_soon", "compliant", "unknown"] as FilterStatus[]).map((f) => {
+          {([
+            "all", "expired", "due_soon", "scheduled", "compliant", "unknown",
+          ] as FilterStatus[]).map((f) => {
             const labels: Record<FilterStatus, string> = {
-              all: "All",
-              expired: "Expired",
-              due_soon: "Due Soon",
-              compliant: "Compliant",
-              unknown: "Not Set Up",
+              all:         "All",
+              expired:     "Expired",
+              due_soon:    "Due Soon",
+              scheduled:   "Scheduled",
+              in_progress: "In Progress",
+              blocked:     "Blocked",
+              compliant:   "Compliant",
+              unknown:     "Not Set Up",
             };
             const counts: Record<FilterStatus, number> = {
-              all: items.length,
-              expired: summary.expired,
-              due_soon: summary.due_soon,
-              compliant: summary.compliant,
-              unknown: summary.unknown,
+              all:         items.length,
+              expired:     summary.expired,
+              due_soon:    summary.due_soon,
+              scheduled:   summary.scheduled ?? 0,
+              in_progress: items.filter((i) => i.status === "in_progress").length,
+              blocked:     items.filter((i) => i.status === "blocked").length,
+              compliant:   summary.compliant,
+              unknown:     summary.unknown,
             };
             return (
               <button
@@ -792,21 +842,33 @@ export default function ComplianceHub({ items: initialItems, summary: initialSum
 
 function computeLocalSummary(items: ComplianceItem[]): ComplianceSummary {
   const s: ComplianceSummary = {
-    total: items.length,
-    compliant: 0,
-    due_soon: 0,
-    expired: 0,
-    unknown: 0,
-    compliance_pct: 0,
-    critical_items: [],
-    due_soon_items: [],
+    total:           items.length,
+    compliant:       0,
+    scheduled:       0,
+    due_soon:        0,
+    expired:         0,
+    unknown:         0,
+    compliance_pct:  0,
+    critical_items:  [],
+    due_soon_items:  [],
+    scheduled_items: [],
   };
   for (const item of items) {
-    s[item.status]++;
-    if (item.status === "expired") s.critical_items.push(item);
-    if (item.status === "due_soon") s.due_soon_items.push(item);
+    if (
+      item.status === "compliant" || item.status === "scheduled" ||
+      item.status === "due_soon"  || item.status === "expired"   ||
+      item.status === "unknown"
+    ) {
+      s[item.status]++;
+    }
+    if (item.status === "expired")   s.critical_items.push(item);
+    if (item.status === "due_soon")  s.due_soon_items.push(item);
+    if (item.status === "scheduled") s.scheduled_items.push(item);
   }
   const rated = s.total - s.unknown;
-  s.compliance_pct = rated > 0 ? Math.round((s.compliant / rated) * 100) : 0;
+  // Scheduled = proactively managed — treat as compliant for the percentage
+  s.compliance_pct = rated > 0
+    ? Math.round(((s.compliant + s.scheduled) / rated) * 100)
+    : 0;
   return s;
 }

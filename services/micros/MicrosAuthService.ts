@@ -3,35 +3,36 @@
  *
  * Oracle MICROS BI API — OpenID Connect token service.
  *
- * Auth flow (Oracle MSAF OIDC — Resource Owner Password Credentials):
- *   1. POST /oidc-provider/v1/oauth2/token with grant_type=password +
- *      BI API account username/password → access_token + refresh_token.
- *   2. On token expiry: POST same endpoint with grant_type=refresh_token.
- *   3. On refresh failure: fall back to step 1 (re-authenticate with password).
+ * Auth flow (Oracle MSAF OIDC — Client Credentials):
+ *   Token endpoint: POST /oidc-provider/v1/oauth2/token
+ *   grant_type=client_credentials (the only machine-level grant the Oracle
+ *   MSAF OIDC server advertises via /.well-known/openid-configuration).
+ *   Auth method: client_secret_post — client_id and client_secret go in
+ *   the POST body, NOT in an Authorization: Basic header.
+ *
+ *   On token expiry: re-issue via client_credentials (or use refresh_token
+ *   grant if the server returned one).
  *
  * Security rules:
- *  - MICROS_API_ACCOUNT_PASSWORD is read from env — NEVER logged or exposed.
  *  - MICROS_CLIENT_SECRET is read from env — NEVER logged or exposed.
  *  - access_token and refresh_token are kept in process memory only.
  *    They are NEVER written to a database, log file, or API response.
  *  - All error messages are sanitized before being logged or re-thrown.
  *
  * Structured log events emitted:
- *   [MicrosAuth] sign-in attempt N/2 failed: <sanitized message>
- *   [MicrosAuth] refresh failure — <sanitized message>. Re-authenticating.
- *   [MicrosAuth] Token obtained via ROPC.  Expires in N min.
+ *   [MicrosAuth] token acquisition attempt N/2 failed: <sanitized message>
+ *   [MicrosAuth] refresh failure — <sanitized message>. Re-acquiring.
+ *   [MicrosAuth] Token obtained via client_credentials. Expires in N min.
  *   [MicrosAuth] Token refreshed via refresh_token grant. Expires in N min.
  *   [MicrosAuth] Authentication failed after 2 attempts.
  *
  * Env vars consumed (all server-side only):
- *   MICROS_AUTH_SERVER            Oracle OIDC provider base URL (no trailing slash)
- *   MICROS_CLIENT_ID              Registered OIDC client / app ID
- *   MICROS_CLIENT_SECRET          OIDC client secret (optional; enables Basic Auth)
- *   MICROS_API_ACCOUNT_NAME       BI API account username
- *   MICROS_API_ACCOUNT_PASSWORD   BI API account password  ← required
- *   MICROS_AUTH_SCOPE             OAuth scope (optional; default: "openid")
- *   MICROS_AUTH_TOKEN_PATH        Token endpoint path override
- *                                 (default: /oidc-provider/v1/oauth2/token)
+ *   MICROS_AUTH_SERVER        Oracle OIDC provider base URL (no trailing slash)
+ *   MICROS_CLIENT_ID          Registered OIDC client ID
+ *   MICROS_CLIENT_SECRET      OIDC client secret (required for client_credentials)
+ *   MICROS_AUTH_SCOPE         OAuth scope (optional; default: "openid")
+ *   MICROS_AUTH_TOKEN_PATH    Token endpoint path override
+ *                             (default: /oidc-provider/v1/oauth2/token)
  */
 
 import { assertMicrosConfigured, getMicrosEnvConfig } from "@/lib/micros/config";
@@ -66,7 +67,7 @@ class MicrosAuthServiceImpl {
    * Returns a valid Bearer access token.
    *
    * Uses cached token if still valid; uses refresh_token grant if the access
-   * token has expired; falls back to a full ROPC sign-in when both are
+   * token has expired; falls back to client_credentials grant when both are
    * exhausted or unavailable.
    *
    * Concurrent callers share a single inflight request — no thundering herd.
@@ -92,11 +93,11 @@ class MicrosAuthServiceImpl {
    * Forces re-acquisition of the access token.
    *
    * Preserves the stored refresh_token so acquireToken() will attempt the
-   * cheaper refresh grant before falling back to a full ROPC re-auth.
+   * cheaper refresh grant before falling back to client_credentials.
    * Called by MicrosApiClient on HTTP 401 responses.
    */
   async refreshAccessToken(): Promise<string> {
-    // Preserve refresh_token so acquireToken() uses it before ROPC.
+    // Preserve refresh_token so acquireToken() can try it before client_credentials.
     const savedRefreshToken = this.state?.refreshToken ?? null;
     this.state = savedRefreshToken
       ? { accessToken: "", refreshToken: savedRefreshToken, expiresAt: 0 }
@@ -137,33 +138,32 @@ class MicrosAuthServiceImpl {
         return this.state.accessToken;
       } catch (err) {
         const safe = sanitize(err instanceof Error ? err.message : String(err));
-        console.warn(`[MicrosAuth] refresh failure — ${safe}. Re-authenticating with credentials.`);
+        console.warn(`[MicrosAuth] refresh failure — ${safe}. Re-acquiring with client_credentials.`);
         this.state = null;
       }
     }
 
-    // ── Path B: ROPC grant (initial sign-in / after refresh failure) ─────────
+    // ── Path B: client_credentials grant ─────────────────────────────────────
     let lastError: Error | null = null;
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const data = await this.executePasswordGrant();
+        const data = await this.executeClientCredentialsGrant();
         this.state = {
           accessToken:  data.access_token,
           refreshToken: data.refresh_token ?? null,
           expiresAt:    Date.now() + data.expires_in * 1000,
         };
         console.info(
-          `[MicrosAuth] Token obtained via ROPC. ` +
-          `Expires in ${Math.round(data.expires_in / 60)} min. ` +
-          `Attempt ${attempt + 1}/2.` +
-          (this.state.refreshToken ? " Refresh token stored." : " No refresh token received."),
+          `[MicrosAuth] Token obtained via client_credentials. ` +
+          `Expires in ${Math.round(data.expires_in / 60)} min.` +
+          (this.state.refreshToken ? " Refresh token stored." : ""),
         );
         return this.state.accessToken;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         const safe = sanitize(lastError.message);
-        console.error(`[MicrosAuth] sign-in attempt ${attempt + 1}/2 failed: ${safe}`);
+        console.error(`[MicrosAuth] token acquisition attempt ${attempt + 1}/2 failed: ${safe}`);
         if (attempt === 0) {
           await delay(1_000);
         }
@@ -172,50 +172,51 @@ class MicrosAuthServiceImpl {
 
     throw new Error(
       `[MicrosAuth] Authentication failed after 2 attempts. ` +
-      `Verify MICROS_AUTH_SERVER, MICROS_CLIENT_ID, MICROS_API_ACCOUNT_NAME, ` +
-      `and MICROS_API_ACCOUNT_PASSWORD are correct and reachable from this server.`,
+      `Verify MICROS_AUTH_SERVER, MICROS_CLIENT_ID, and MICROS_CLIENT_SECRET ` +
+      `are correct and that the client app is registered in Oracle MSAF IDM.`,
     );
   }
 
   // ── Grant implementations ────────────────────────────────────────────────
 
   /**
-   * Resource Owner Password Credentials (ROPC) grant.
+   * OAuth 2.0 Client Credentials grant.
    *
-   * Authenticates the BI API service account against the Oracle OIDC provider.
-   * Requires MICROS_API_ACCOUNT_PASSWORD to be set; throws a descriptive admin-
-   * safe error if it is absent.
+   * Authenticates the registered OIDC application against the Oracle MSAF
+   * OIDC provider using client_secret_post method (credentials in body).
+   * Requires MICROS_CLIENT_SECRET to be set.
    *
-   * @throws if MICROS_API_ACCOUNT_PASSWORD is not set
+   * Oracle MSAF OIDC discovery confirms:
+   *   grant_types_supported: ["client_credentials", "refresh_token", ...]
+   *   token_endpoint_auth_methods_supported: ["client_secret_post"]
+   *
+   * @throws if MICROS_CLIENT_SECRET is not set
    * @internal
    */
-  private async executePasswordGrant(): Promise<_OracleTokenResponse> {
+  private async executeClientCredentialsGrant(): Promise<_OracleTokenResponse> {
     const cfg = assertMicrosConfigured();
 
-    const password = process.env.MICROS_API_ACCOUNT_PASSWORD?.trim();
-    if (!password) {
+    if (!cfg.clientSecret) {
       throw new Error(
-        "MICROS credentials incomplete — API account password required. " +
-        "Set MICROS_API_ACCOUNT_PASSWORD in your environment variables " +
+        "MICROS credentials incomplete — client secret required. " +
+        "Set MICROS_CLIENT_SECRET in your environment variables " +
         "(Vercel project settings → Environment Variables).",
       );
     }
 
     const body: Record<string, string> = {
-      grant_type: "password",
-      username:   cfg.apiAccountName,
-      password,                                                // account password
+      grant_type: "client_credentials",
       scope:      process.env.MICROS_AUTH_SCOPE?.trim() || "openid",
     };
 
-    return this.postTokenEndpoint(body, cfg.clientId, cfg.clientSecret, cfg.authServer, "sign-in");
+    return this.postTokenEndpoint(body, cfg.clientId, cfg.clientSecret, cfg.authServer, "client-credentials");
   }
 
   /**
    * Refresh token grant.
    *
    * Exchanges a stored refresh_token for a fresh access_token without
-   * re-transmitting the BI API account password.
+   * performing a full client_credentials re-authentication.
    *
    * @internal
    */
@@ -259,14 +260,12 @@ class MicrosAuthServiceImpl {
       "x-requested-by": "Oracle",
     };
 
-    // Prefer Basic Auth (RFC 6749 §2.3.1); fall back to body client_id for
-    // public clients that have no registered secret.
+    // Oracle MSAF OIDC uses client_secret_post (not client_secret_basic).
+    // client_id and client_secret always go in the POST body.
     const params = { ...bodyParams };
+    params.client_id = clientId;
     if (clientSecret) {
-      const cred = Buffer.from(`${clientId}:${clientSecret}`, "utf-8").toString("base64");
-      headers["Authorization"] = `Basic ${cred}`;
-    } else {
-      params.client_id = clientId;
+      params.client_secret = clientSecret;
     }
 
     const controller = new AbortController();
@@ -342,15 +341,15 @@ async function buildHttpError(
   switch (res.status) {
     case 401:
       return (
-        `[MicrosAuth] sign-in failure (HTTP 401${code})${desc}. ` +
-        `BI API account credentials rejected by Oracle IDM. ` +
-        `Verify MICROS_API_ACCOUNT_NAME and MICROS_API_ACCOUNT_PASSWORD.`
+        `[MicrosAuth] auth failure (HTTP 401${code})${desc}. ` +
+        `Client credentials rejected by Oracle IDM. ` +
+        `Verify MICROS_CLIENT_ID and MICROS_CLIENT_SECRET.`
       );
     case 400:
       return (
-        `[MicrosAuth] token exchange failure (HTTP 400${code})${desc}. ` +
-        `Invalid request parameters. Check MICROS_CLIENT_ID, ` +
-        `MICROS_ORG_IDENTIFIER, and MICROS_AUTH_SCOPE.`
+        `[MicrosAuth] token request failure (HTTP 400${code})${desc}. ` +
+        `Invalid request parameters. Check MICROS_CLIENT_ID, MICROS_CLIENT_SECRET, ` +
+        `and verify the client app is registered in Oracle MSAF IDM.`
       );
     case 403:
       return (

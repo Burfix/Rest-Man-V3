@@ -15,6 +15,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/utils";
+import { computeComplianceStatus } from "@/lib/compliance/scoring";
 import type { ComplianceItem, ComplianceSummary, ComplianceDocument, ComplianceStatus } from "@/types";
 
 /** Days ahead that counts as "due soon" */
@@ -22,16 +23,11 @@ const DUE_SOON_DAYS = 30;
 
 // ── Status computation ────────────────────────────────────────────────────────
 
-export function computeStatus(nextDueDate: string | null): ComplianceStatus {
-  if (!nextDueDate) return "unknown";
-  const today = todayISO();
-  const due = nextDueDate;
-  if (due < today) return "expired";
-  const threshold = new Date(today);
-  threshold.setDate(threshold.getDate() + DUE_SOON_DAYS);
-  const thresholdISO = threshold.toISOString().slice(0, 10);
-  if (due <= thresholdISO) return "due_soon";
-  return "compliant";
+export function computeStatus(
+  nextDueDate:           string | null,
+  scheduledServiceDate?: string | null,
+): ComplianceStatus {
+  return computeComplianceStatus(nextDueDate, scheduledServiceDate);
 }
 
 /** Days until the due date (negative = overdue) */
@@ -76,7 +72,7 @@ export async function getAllComplianceItems(): Promise<ComplianceItem[]> {
   // Recompute live status and attach documents
   return items.map((item) => ({
     ...item,
-    status: computeStatus(item.next_due_date),
+    status: computeStatus(item.next_due_date, item.scheduled_service_date),
     documents: docsByItem[item.id] ?? [],
   }));
 }
@@ -86,20 +82,29 @@ export async function getComplianceSummary(): Promise<ComplianceSummary> {
   const items = await getAllComplianceItems();
 
   const summary: ComplianceSummary = {
-    total: items.length,
-    compliant: 0,
-    due_soon: 0,
-    expired: 0,
-    unknown: 0,
-    compliance_pct: 0,
-    critical_items: [],
-    due_soon_items: [],
+    total:           items.length,
+    compliant:       0,
+    scheduled:       0,
+    due_soon:        0,
+    expired:         0,
+    unknown:         0,
+    compliance_pct:  0,
+    critical_items:  [],
+    due_soon_items:  [],
+    scheduled_items: [],
   };
 
   for (const item of items) {
-    summary[item.status]++;
-    if (item.status === "expired") summary.critical_items.push(item);
-    if (item.status === "due_soon") summary.due_soon_items.push(item);
+    if (
+      item.status === "compliant" || item.status === "scheduled" ||
+      item.status === "due_soon"  || item.status === "expired"   ||
+      item.status === "unknown"
+    ) {
+      summary[item.status]++;
+    }
+    if (item.status === "expired")   summary.critical_items.push(item);
+    if (item.status === "due_soon")  summary.due_soon_items.push(item);
+    if (item.status === "scheduled") summary.scheduled_items.push(item);
   }
 
   // Sort due_soon by nearest deadline first
@@ -109,9 +114,10 @@ export async function getComplianceSummary(): Promise<ComplianceSummary> {
     return a.next_due_date.localeCompare(b.next_due_date);
   });
 
+  // Scheduled items are proactively managed — count as compliant for percentage
   const rated = summary.total - summary.unknown;
   summary.compliance_pct = rated > 0
-    ? Math.round((summary.compliant / rated) * 100)
+    ? Math.round(((summary.compliant + summary.scheduled) / rated) * 100)
     : 0;
 
   return summary;
@@ -140,7 +146,7 @@ export async function getComplianceItem(id: string): Promise<ComplianceItem | nu
   const item = itemResult.data as ComplianceItem;
   return {
     ...item,
-    status: computeStatus(item.next_due_date),
+    status: computeStatus(item.next_due_date, item.scheduled_service_date),
     documents: (docsResult.data ?? []) as ComplianceDocument[],
   };
 }

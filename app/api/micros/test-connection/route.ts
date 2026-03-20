@@ -6,7 +6,7 @@
  *
  * Priority:
  *  1. If MICROS_ENABLED=true and env vars are configured, test using
- *     MicrosAuthService (OIDC ROPC flow with BI API account credentials).
+ *     MicrosAuthService (OIDC client_credentials grant with client_id + secret).
  *     Also makes one lightweight BI API call to verify end-to-end connectivity.
  *  2. Otherwise, fall back to saved DB credentials (legacy path).
  *

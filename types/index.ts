@@ -653,7 +653,14 @@ export interface AlertsApiResponse {
 // Compliance Hub
 // ============================================================
 
-export type ComplianceStatus = "compliant" | "due_soon" | "expired" | "unknown";
+export type ComplianceStatus =
+  | "compliant"     // certificate valid, well within renewal window
+  | "scheduled"     // valid cert + service/renewal booked before expiry (proactively managed)
+  | "due_soon"      // approaching expiry — no pre-expiry service booking confirmed
+  | "in_progress"   // renewal or inspection actively underway
+  | "expired"       // past due date — active compliance breach
+  | "blocked"       // external blocker preventing renewal
+  | "unknown";      // no due date configured
 
 export type ComplianceCategory =
   | "fire_certificate"
@@ -673,13 +680,26 @@ export interface ComplianceItem {
   description: string | null;
   status: ComplianceStatus;
   last_inspection_date: string | null;  // YYYY-MM-DD
-  next_due_date: string | null;         // YYYY-MM-DD
+  next_due_date: string | null;         // YYYY-MM-DD — certificate expiry date
   responsible_party: string | null;
   notes: string | null;
   is_default: boolean;
   created_at: string;
   updated_at: string;
   documents?: ComplianceDocument[];
+  // ── Proactive scheduling fields (optional; populated after DB migration) ──
+  /** ISO date of the booked renewal / service visit (YYYY-MM-DD) */
+  scheduled_service_date?: string | null;
+  /** Contractor, authority, or supplier handling the renewal */
+  scheduled_with?: string | null;
+  /** Booking state, e.g. "booked", "confirmed", "in_progress" */
+  service_status?: string | null;
+  /** Explicit certificate expiry override — falls back to next_due_date */
+  certificate_expiry_date?: string | null;
+  /** Computed risk contribution 0–1 (derived by scoring helper) */
+  risk_weight?: number | null;
+  /** Mitigation lifecycle state */
+  mitigation_state?: "unmanaged" | "scheduled" | "in_progress" | "resolved" | null;
 }
 
 export interface ComplianceDocument {
@@ -696,11 +716,19 @@ export interface ComplianceDocument {
 export interface ComplianceSummary {
   total: number;
   compliant: number;
+  /** Items whose certificate is still valid AND have a service booked before expiry */
+  scheduled: number;
+  /** Items nearing expiry with NO confirmed pre-expiry booking */
   due_soon: number;
   expired: number;
   unknown: number;
-  compliance_pct: number;        // (compliant / (total - unknown)) * 100, or 0
-  critical_items: ComplianceItem[];  // expired items
-  due_soon_items: ComplianceItem[];
+  /**
+   * (compliant + scheduled) / (total - unknown) × 100
+   * Scheduled items are treated as effectively compliant for percentage purposes.
+   */
+  compliance_pct: number;
+  critical_items: ComplianceItem[];   // expired items
+  due_soon_items: ComplianceItem[];   // unscheduled due-soon items
+  scheduled_items: ComplianceItem[];  // proactively managed items
 }
 

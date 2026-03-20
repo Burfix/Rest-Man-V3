@@ -9,10 +9,12 @@ interface Props {
 export default function ComplianceSummarySection({ summary }: Props) {
   const pct = summary.compliance_pct;
   const allGood = summary.expired === 0 && summary.due_soon === 0 && summary.unknown === 0;
+  const hasScheduled = (summary.scheduled ?? 0) > 0;
 
   const barColor =
     summary.expired > 0 ? "bg-red-500" :
     summary.due_soon > 0 ? "bg-amber-500" :
+    hasScheduled ? "bg-blue-400" :
     "bg-emerald-500";
 
   // Urgency banner config
@@ -34,8 +36,18 @@ export default function ComplianceSummarySection({ summary }: Props) {
           icon: "⚠",
           message:
             summary.due_soon === 1
-              ? "1 compliance item due soon — renew before it lapses."
-              : `${summary.due_soon} compliance items due soon — renew before they lapse.`,
+              ? "1 compliance item due soon — no renewal booked yet."
+              : `${summary.due_soon} compliance items due soon — no renewal booked yet.`,
+        }
+      : hasScheduled && summary.total > 0
+      ? {
+          bg: "bg-blue-500",
+          text: "text-white",
+          icon: "📅",
+          message:
+            (summary.scheduled ?? 0) === 1
+              ? "1 compliance renewal scheduled before expiry — certificate remains valid."
+              : `${summary.scheduled} compliance renewals scheduled before expiry — no active breach.`,
         }
       : summary.total > 0
       ? {
@@ -72,6 +84,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
         "rounded-xl border bg-white p-4 shadow-sm",
         summary.expired > 0 ? "border-red-200" :
         summary.due_soon > 0 ? "border-amber-200" :
+        hasScheduled ? "border-blue-200" :
         "border-stone-200"
       )}>
         {/* Score + bar */}
@@ -85,7 +98,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
             )}>
               {pct}%
             </p>
-            <p className="text-xs text-stone-400">compliant</p>
+            <p className="text-xs text-stone-400">managed</p>
           </div>
           <div className="flex-1 space-y-1">
             <div className="h-2 w-full rounded-full bg-stone-100">
@@ -95,7 +108,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
               />
             </div>
             <p className="text-xs text-stone-500">
-              {summary.compliant} of {summary.total - summary.unknown} categories up-to-date
+              {summary.compliant + (summary.scheduled ?? 0)} of {summary.total - summary.unknown} categories managed
             </p>
           </div>
         </div>
@@ -106,6 +119,12 @@ export default function ComplianceSummarySection({ summary }: Props) {
             <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
             {summary.compliant} compliant
           </span>
+          {(summary.scheduled ?? 0) > 0 && (
+            <span className="flex items-center gap-1 text-blue-600">
+              <span className="h-2 w-2 rounded-full bg-blue-400 inline-block" />
+              {summary.scheduled} scheduled
+            </span>
+          )}
           {summary.due_soon > 0 && (
             <span className="flex items-center gap-1 text-amber-600">
               <span className="h-2 w-2 rounded-full bg-amber-400 inline-block" />
@@ -152,7 +171,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
         {/* Due-soon warnings (when no expired) */}
         {summary.expired === 0 && summary.due_soon > 0 && (
           <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
-            <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Due Soon</p>
+            <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Due Soon — No Renewal Booked</p>
             <ul className="space-y-0.5">
               {summary.due_soon_items.slice(0, 3).map((item) => (
                 <li key={item.id} className="text-xs text-amber-700 flex items-center gap-1.5">
@@ -167,10 +186,38 @@ export default function ComplianceSummarySection({ summary }: Props) {
           </div>
         )}
 
+        {/* Renewals scheduled */}
+        {summary.expired === 0 && (summary.scheduled ?? 0) > 0 && (summary.scheduled_items?.length ?? 0) > 0 && (
+          <div className="mt-3 rounded-lg bg-blue-50 border border-blue-200 px-3 py-2">
+            <p className="text-xs font-semibold text-blue-700 mb-1">📅 Renewals Scheduled</p>
+            <ul className="space-y-0.5">
+              {(summary.scheduled_items ?? []).slice(0, 3).map((item) => (
+                <li key={item.id} className="text-xs text-blue-700 flex items-center gap-1.5">
+                  <span className="shrink-0">✓</span>
+                  <span>{item.display_name}</span>
+                  {item.scheduled_service_date && (
+                    <span className="text-blue-500">(booked {formatShortDate(item.scheduled_service_date)})</span>
+                  )}
+                </li>
+              ))}
+              {(summary.scheduled_items?.length ?? 0) > 3 && (
+                <li className="text-xs text-blue-400">
+                  +{(summary.scheduled_items?.length ?? 0) - 3} more
+                </li>
+              )}
+            </ul>
+          </div>
+        )}
+
         {/* All good */}
-        {allGood && summary.total > 0 && (
+        {allGood && !hasScheduled && summary.total > 0 && (
           <p className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700">
             ✓ All compliance requirements are up-to-date.
+          </p>
+        )}
+        {allGood && hasScheduled && summary.total > 0 && (
+          <p className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+            ✓ Compliance maintained — {summary.scheduled} renewal{(summary.scheduled ?? 0) !== 1 ? "s" : ""} already booked. No active breach.
           </p>
         )}
 
@@ -185,7 +232,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
         )}
 
         {/* CTA */}
-        {(summary.expired > 0 || summary.due_soon > 0 || summary.unknown > 2) && (
+        {(summary.expired > 0 || summary.due_soon > 0 || hasScheduled || summary.unknown > 2) && (
           <Link
             href="/dashboard/compliance"
             className="mt-3 block w-full rounded-lg bg-stone-900 px-4 py-2 text-center text-xs font-semibold text-white hover:bg-stone-700 transition-colors"

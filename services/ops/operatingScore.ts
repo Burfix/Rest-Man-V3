@@ -15,11 +15,12 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { computeComplianceStatus } from "@/lib/compliance/scoring";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type MaintenanceSeverity = "none" | "minor" | "critical";
-export type ComplianceWorstStatus = "compliant" | "due_soon" | "expired" | "unknown";
+export type ComplianceWorstStatus = "compliant" | "scheduled" | "due_soon" | "expired" | "unknown";
 export type ScoreGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface RevenueComponent {
@@ -40,12 +41,13 @@ export interface LabourComponent {
 }
 
 export interface ComplianceComponent {
-  score:        number;         // 0 | 10 | 20
+  score:        number;         // 0 | 10 | 19 | 20
   max:          20;
   worst_status: ComplianceWorstStatus;
   total_items:  number;
   expired:      number;
   due_soon:     number;
+  scheduled:    number;
   detail:       string;
 }
 
@@ -142,30 +144,35 @@ function labourDetail(score: number, pct: number | null): string {
 
 /**
  * Compliance bands:
- *   all 'compliant' or 'unknown' → 20
- *   any 'due_soon'               → 10
- *   any 'expired'                → 0
+ *   any expired                    →  0  (active breach)
+ *   any unscheduled due_soon       → 10  (unmanaged risk, no booking)
+ *   any scheduled (none at risk)   → 19  (proactively managed, near-full score)
+ *   all compliant / unknown        → 20
  */
 function scoreCompliance(
-  expired: number,
-  dueSoon: number
+  expired:   number,
+  dueSoon:   number,
+  scheduled: number,
 ): { score: number; worst: ComplianceWorstStatus } {
-  if (expired > 0)  return { score: 0,  worst: "expired"   };
-  if (dueSoon > 0)  return { score: 10, worst: "due_soon"  };
-  return              { score: 20, worst: "compliant" };
+  if (expired > 0)   return { score: 0,  worst: "expired"   };
+  if (dueSoon > 0)   return { score: 10, worst: "due_soon"  };
+  if (scheduled > 0) return { score: 19, worst: "scheduled" };
+  return               { score: 20, worst: "compliant" };
 }
 
 function complianceDetail(
-  score: number,
-  worst: ComplianceWorstStatus,
-  expired: number,
-  dueSoon: number,
-  total: number
+  score:     number,
+  worst:     ComplianceWorstStatus,
+  expired:   number,
+  dueSoon:   number,
+  scheduled: number,
+  total:     number,
 ): string {
-  if (total === 0)    return "No compliance items found";
-  if (score === 20)   return `All ${total} items compliant`;
-  if (worst === "expired")  return `${expired} item${expired === 1 ? "" : "s"} expired`;
-  return `${dueSoon} item${dueSoon === 1 ? "" : "s"} due soon`;
+  if (total === 0)           return "No compliance items found";
+  if (score === 20)          return `All ${total} items compliant`;
+  if (worst === "expired")   return `${expired} item${expired === 1 ? "" : "s"} expired`;
+  if (worst === "scheduled") return `${scheduled} renewal${scheduled === 1 ? "" : "s"} scheduled before expiry`;
+  return `${dueSoon} item${dueSoon === 1 ? "" : "s"} due soon — no renewal booked`;
 }
 
 // ── Maintenance scoring ───────────────────────────────────────────────────────
@@ -232,10 +239,10 @@ export async function getOperatingScore(locationId: string): Promise<OperatingSc
       .limit(1)
       .maybeSingle(),
 
-    // All compliance items (to find worst status)
+    // Compliance items — live status recomputed from date fields
     supabase
       .from("compliance_items")
-      .select("status"),
+      .select("next_due_date, scheduled_service_date"),
 
     // Open maintenance issues for this site
     supabase
@@ -283,19 +290,27 @@ export async function getOperatingScore(locationId: string): Promise<OperatingSc
     detail:     labourDetail(labourScore, labourPct),
   };
 
-  // ── Score compliance ──────────────────────────────────────────────────────
-  const complianceItems = (complianceResult.data ?? []) as { status: string }[];
-  const expiredCount    = complianceItems.filter((c) => c.status === "expired").length;
-  const dueSoonCount    = complianceItems.filter((c) => c.status === "due_soon").length;
-  const { score: complianceScore, worst: worstStatus } = scoreCompliance(expiredCount, dueSoonCount);
+  // ── Score compliance (live status recomputed from date fields) ────────────────────
+  const complianceRows = (complianceResult.data as unknown as {
+    next_due_date: string | null;
+    scheduled_service_date?: string | null;
+  }[] | null) ?? [];
+  const complianceItems = complianceRows.map((c) => ({
+    status: computeComplianceStatus(c.next_due_date, c.scheduled_service_date),
+  }));
+  const expiredCount   = complianceItems.filter((c) => c.status === "expired").length;
+  const dueSoonCount   = complianceItems.filter((c) => c.status === "due_soon").length;
+  const scheduledCount = complianceItems.filter((c) => c.status === "scheduled").length;
+  const { score: complianceScore, worst: worstStatus } = scoreCompliance(expiredCount, dueSoonCount, scheduledCount);
   const complianceComponent: ComplianceComponent = {
     score:        complianceScore,
     max:          20,
     worst_status: worstStatus,
     total_items:  complianceItems.length,
     expired:      expiredCount,
+    scheduled:    scheduledCount,
     due_soon:     dueSoonCount,
-    detail:       complianceDetail(complianceScore, worstStatus, expiredCount, dueSoonCount, complianceItems.length),
+    detail:       complianceDetail(complianceScore, worstStatus, expiredCount, dueSoonCount, scheduledCount, complianceItems.length),
   };
 
   // ── Score maintenance ─────────────────────────────────────────────────────

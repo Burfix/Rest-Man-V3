@@ -448,7 +448,7 @@ export function generateCommandHeadline(params: {
       return {
         severity: "warning",
         text:     "Operational items require attention before service",
-        subtext:  "Review maintenance and compliance before the service period begins.",
+        subtext:  "Review maintenance and any unscheduled compliance items before the service period begins.",
       };
     }
     return {
@@ -610,21 +610,40 @@ export function buildPriorityActions(params: {
     });
   }
 
+  // Unscheduled due-soon items — genuine risk, no booking in place
   if (compliance.expired === 0 && compliance.due_soon > 0) {
     const nearest = compliance.due_soon_items[0];
     actions.push({
       severity:       "urgent",
       category:       "compliance",
-      title:          `${compliance.due_soon} compliance item${compliance.due_soon > 1 ? "s" : ""} due soon`,
+      title:          `${compliance.due_soon} compliance item${compliance.due_soon > 1 ? "s" : ""} due soon — not yet booked`,
       message:        nearest
-        ? `${nearest.display_name} is due${nearest.next_due_date ? ` on ${nearest.next_due_date}` : " shortly"}.`
-        : "Certificates are expiring within 30 days.",
-      recommendation: "Begin renewal process — some authorities require 2–4 weeks of lead time.",
+        ? `${nearest.display_name} expires${nearest.next_due_date ? ` on ${nearest.next_due_date}` : " shortly"} — no renewal scheduled.`
+        : "Certificates are expiring within 30 days with no booking confirmed.",
+      recommendation: "Book the renewal now — some authorities require 2–4 weeks of lead time.",
       href:           "/dashboard/compliance",
-      primaryAction:   { label: "Start renewal", href: "/dashboard/compliance" },
+      primaryAction:   { label: "Book renewal", href: "/dashboard/compliance" },
       secondaryActions: [{ label: "Assign owner", href: "/dashboard/compliance" }],
       impactWeight:   "quick_win",
       impactLabel:    IMPACT_LABELS["quick_win"],
+    });
+  }
+
+  // Proactively managed — service booked before expiry, no urgent action needed
+  if (compliance.expired === 0 && compliance.due_soon === 0 && (compliance.scheduled ?? 0) > 0) {
+    const nearest = compliance.scheduled_items?.[0];
+    actions.push({
+      severity:       "watch",
+      category:       "compliance",
+      title:          `${compliance.scheduled} compliance renewal${(compliance.scheduled ?? 0) > 1 ? "s" : ""} scheduled`,
+      message:        nearest
+        ? `${nearest.display_name} — service booked${nearest.scheduled_service_date ? ` for ${nearest.scheduled_service_date}` : ""}. Certificate remains valid.`
+        : "Upcoming compliance renewals are booked before expiry. No action required.",
+      recommendation: "No immediate action needed — confirm booked services are completed on schedule.",
+      href:           "/dashboard/compliance",
+      primaryAction:   { label: "View schedule", href: "/dashboard/compliance" },
+      impactWeight:   "monitor",
+      impactLabel:    IMPACT_LABELS["monitor"],
     });
   }
 
