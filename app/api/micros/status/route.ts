@@ -17,6 +17,21 @@ import { NextResponse }         from "next/server";
 import { getMicrosStatus }      from "@/services/micros/status";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 
+// Vars to audit at runtime — name only, NO values ever returned.
+const AUDIT_VARS = [
+  "MICROS_ENABLED",
+  "MICROS_AUTH_SERVER",
+  "MICROS_APP_SERVER",
+  "MICROS_CLIENT_ID",
+  "MICROS_ORG_IDENTIFIER",
+  "MICROS_API_ACCOUNT_NAME",
+  "MICROS_LOC_REF",
+  "MICROS_API_ACCOUNT_PASSWORD",
+  "MICROS_CLIENT_SECRET",
+  "MICROS_AUTH_TOKEN_PATH",
+  "MICROS_AUTH_SCOPE",
+] as const;
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
@@ -35,6 +50,17 @@ export async function GET() {
         // Surface missing var names (no values) for debugging
         missing:    cfgStatus.missing,
         message:    cfgStatus.message,
+        // Which vars are set + length of sensitive ones — NO values ever returned
+        vars: Object.fromEntries(
+          AUDIT_VARS.map((k) => {
+            const v = process.env[k];
+            if (!v) return [k, "NOT SET"];
+            // For secrets: show only length
+            if (k.endsWith("_PASSWORD") || k.endsWith("_SECRET")) return [k, `set (${v.length} chars)`];
+            // For non-secrets: show value (safe, non-credential config)
+            return [k, v];
+          })
+        ),
       },
     });
   } catch (err) {
