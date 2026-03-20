@@ -31,6 +31,7 @@ const AUDIT_VARS = [
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const runtime = "nodejs";
 
 const BUILD_ID = "f724ad2-2026-03-20"; // bump on each deploy to confirm code version
 

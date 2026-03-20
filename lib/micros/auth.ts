@@ -187,22 +187,80 @@ async function stepAuthorize(
 
   const res = await fetchWithTimeout(url, {
     method:   "GET",
-    redirect: "manual", // Oracle redirects; we want the cookies, not the redirect
-    headers:  { "Accept": "text/html,application/json" },
+    redirect: "manual", // Oracle redirects; we need cookies from the raw response
+    headers:  {
+      "Accept":     "text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8",
+      "User-Agent": "OracleRestaurants/MicrosBI-PKCE",
+    },
   }, "authorize");
 
-  // Collect Set-Cookie headers — required for subsequent requests.
-  const cookies = extractCookies(res);
-  if (!cookies) {
+  // ── Extract all Set-Cookie headers robustly ────────────────────────────
+  const setCookies = extractSetCookies(res);
+  const cookieHeader = buildCookieHeader(setCookies);
+
+  // ── Structured debug logging ───────────────────────────────────────────
+  const location = res.headers.get("location") ?? null;
+  const ct       = res.headers.get("content-type") ?? "";
+  const firstTwoCookieNames = setCookies
+    .slice(0, 2)
+    .map((c) => c.split("=")[0] ?? "?");
+
+  console.log("[MICROS_AUTH_DEBUG] authorize response", {
+    status:          res.status,
+    redirected:      res.redirected,
+    location:        location ? sanitize(location) : null,
+    setCookieCount:  setCookies.length,
+    firstCookies:    firstTwoCookieNames,
+    contentType:     ct.split(";")[0],
+  });
+
+  // ── Handle specific failure cases ─────────────────────────────────────
+  if (res.status >= 400) {
+    const body = await readErrorBody(res);
+    console.error("[MICROS_AUTH_DEBUG] authorize HTTP error", {
+      status: res.status,
+      body:   sanitize(body),
+    });
     throw new MicrosAuthError(
       "authorize",
-      "PKCE sign-in session failed",
-      "No session cookies returned from authorize endpoint",
+      `Oracle authorize endpoint returned HTTP ${res.status}`,
+      `reasonCode: AUTHORIZE_HTTP_ERROR — ${sanitize(body)}`,
     );
   }
 
-  console.log(`[MicrosAuth:authorize] OK — ${cookies.split(";").length} cookie segments`);
-  return { sessionCookies: cookies, codeVerifier };
+  if (setCookies.length === 0) {
+    // Log a snippet of the body to aid diagnostics (no secrets in authorize response)
+    let bodySnippet = "";
+    if (ct.includes("text/html") || ct.includes("text/plain") || ct.includes("application/json")) {
+      try {
+        const text = await res.text();
+        bodySnippet = text.slice(0, 400);
+      } catch { /* ignore */ }
+    }
+
+    console.error("[MICROS_AUTH_DEBUG] authorize: no session cookies", {
+      status:      res.status,
+      location:    location ? sanitize(location) : null,
+      bodySnippet: sanitize(bodySnippet || "(empty)"),
+      reasonCode:  isRedirectStatus(res.status) ? "AUTHORIZE_REDIRECT_ONLY" : "AUTHORIZE_NO_SESSION",
+    });
+
+    const reasonCode = isRedirectStatus(res.status)
+      ? "AUTHORIZE_REDIRECT_ONLY"
+      : "AUTHORIZE_NO_SESSION";
+
+    throw new MicrosAuthError(
+      "authorize",
+      "Oracle authorize step did not establish a session.",
+      `reasonCode: ${reasonCode} — status ${res.status}, location: ${sanitize(location ?? "none")}`,
+    );
+  }
+
+  console.log(
+    `[MicrosAuth:authorize] OK — ${setCookies.length} Set-Cookie header(s), ` +
+    `${cookieHeader.split(";").length} cookie(s) forwarded to signin`,
+  );
+  return { sessionCookies: cookieHeader, codeVerifier };
 }
 
 // ── Step B: Sign in ───────────────────────────────────────────────────────
@@ -434,6 +492,50 @@ function loadConfig(): MicrosAuthConfig {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
+function isRedirectStatus(status: number): boolean {
+  return [301, 302, 303, 307, 308].includes(status);
+}
+
+/**
+ * Extracts ALL Set-Cookie header values from a response.
+ *
+ * Uses getSetCookie() (Node 18+ / undici) which returns each Set-Cookie
+ * header separately — critical because the Headers API merges them with
+ * commas when you call .get(), which breaks cookie parsing.
+ *
+ * Falls back to iterating raw headers for older runtimes.
+ */
+export function extractSetCookies(res: Response): string[] {
+  // Preferred: undici / Node 18+ getSetCookie() — returns each header separately
+  if (typeof (res.headers as { getSetCookie?: () => string[] }).getSetCookie === "function") {
+    return (res.headers as { getSetCookie: () => string[] }).getSetCookie();
+  }
+
+  // Fallback: iterate all headers looking for set-cookie entries
+  const cookies: string[] = [];
+  res.headers.forEach((value, name) => {
+    if (name.toLowerCase() === "set-cookie") {
+      // In some environments multiple Set-Cookie headers are merged with \n
+      for (const part of value.split("\n")) {
+        const trimmed = part.trim();
+        if (trimmed) cookies.push(trimmed);
+      }
+    }
+  });
+  return cookies;
+}
+
+/**
+ * Takes Set-Cookie header values and builds the Cookie request header string.
+ * Only preserves the name=value part — strips Path, HttpOnly, SameSite etc.
+ */
+export function buildCookieHeader(setCookies: string[]): string {
+  return setCookies
+    .map((h) => h.split(";")[0]?.trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
 function isIdTokenValid(t: OracleTokenSet): boolean {
   return t.idToken.length > 0 && t.expiresAt - Date.now() > TOKEN_BUFFER_MS;
 }
@@ -443,27 +545,11 @@ function isRefreshTokenValid(t: OracleTokenSet): boolean {
 }
 
 /**
- * Collects all Set-Cookie headers from a response into a single Cookie string
- * for use in subsequent requests.
+ * @deprecated — use extractSetCookies() + buildCookieHeader().
+ * Kept only for internal backward compat within this file.
  */
 function extractCookies(res: Response): string {
-  // Node.js fetch (undici) exposes Set-Cookie via getSetCookie when available,
-  // otherwise falls back to iterating the raw headers.
-  const raw: string[] = [];
-
-  if (typeof (res.headers as { getSetCookie?: () => string[] }).getSetCookie === "function") {
-    raw.push(...((res.headers as { getSetCookie: () => string[] }).getSetCookie()));
-  } else {
-    res.headers.forEach((value, name) => {
-      if (name.toLowerCase() === "set-cookie") raw.push(value);
-    });
-  }
-
-  // Each entry is "name=value; Path=...; HttpOnly" — keep only "name=value" parts.
-  return raw
-    .map((h) => h.split(";")[0]?.trim())
-    .filter(Boolean)
-    .join("; ");
+  return buildCookieHeader(extractSetCookies(res));
 }
 
 /**

@@ -22,6 +22,7 @@ import { createServerClient }      from "@/lib/supabase/server";
 import { sanitizeMicrosError }     from "@/lib/integrations/status";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function POST() {
   const t0 = Date.now();

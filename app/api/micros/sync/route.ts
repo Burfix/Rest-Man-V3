@@ -18,6 +18,7 @@ import { isMicrosEnabled, getMicrosConfigStatus } from "@/lib/micros/config";
 import { MicrosSyncService }         from "@/services/micros/MicrosSyncService";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 function todayJHB(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
