@@ -1,8 +1,8 @@
 /**
  * POST /api/micros/test-connection
  *
- * Runs the Oracle MICROS BI API password-grant auth flow and returns
- * a structured result showing exactly which stage passed or failed.
+ * Runs the Oracle MICROS BI API PKCE OIDC auth flow (authorize → signin → token)
+ * and returns a structured result showing exactly which stage passed or failed.
  *
  * Response shape:
  *   { ok, stage, reasonCode, message, hasIdToken, hasRefreshToken, authMs, checkedAt }
@@ -30,8 +30,8 @@ export async function POST() {
   // Always start with a cold cache so we're testing the real flow.
   clearMicrosTokenCache();
 
-  // ── Step 1: password grant auth flow ────────────────────────────────────
-  let stage: "token" | "api" | "config" = "token";
+  // ── Step 1: PKCE OIDC auth flow (authorize → signin → token) ──────────────
+  let stage: "authorize" | "signin" | "token" | "refresh" | "api" | "config" = "authorize";
   const authT0 = Date.now();
 
   try {
@@ -58,6 +58,27 @@ export async function POST() {
             stage:         authStage,
             oracleCode:    "VALIDATION_ERRORS",
             oracleMessage: "INVALID_CLIENT_ID",
+          },
+          hasIdToken:      false,
+          hasRefreshToken: false,
+          checkedAt:       new Date().toISOString(),
+        },
+        { status: 400 },
+      );
+    }
+
+    // WRONG_AUTH_ENDPOINT — 405 means wrong URL or HTTP method.
+    if (reasonCode === "WRONG_AUTH_ENDPOINT") {
+      return NextResponse.json(
+        {
+          ok:              false,
+          health:          "setup_incomplete",
+          reasonCode:      "WRONG_AUTH_ENDPOINT",
+          userMessage:     safeMsg,
+          technicalDetails: {
+            stage:         authStage,
+            httpStatus:    405,
+            hint:          "Verify MICROS_AUTH_SERVER and confirm /oidc-provider/v1/oauth2/* paths.",
           },
           hasIdToken:      false,
           hasRefreshToken: false,
