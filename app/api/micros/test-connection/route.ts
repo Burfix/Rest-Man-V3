@@ -42,15 +42,38 @@ export async function POST() {
     const userMsg   = isAuthErr
       ? err.userMessage
       : err instanceof Error ? err.message : "Authentication failed";
+    const reasonCode = isAuthErr ? (err.reasonCode ?? "AUTH_FAILED") : "AUTH_FAILED";
     const safeMsg   = sanitizeMicrosError(userMsg);
 
     // Persist sanitized error to DB connection record
     await persistSyncError(safeMsg).catch(() => null);
 
+    // INVALID_CLIENT_ID — surface specific Oracle error with structured detail.
+    if (reasonCode === "INVALID_CLIENT_ID") {
+      return NextResponse.json(
+        {
+          ok:              false,
+          health:          "setup_incomplete",
+          reasonCode:      "INVALID_CLIENT_ID",
+          userMessage:     safeMsg,
+          technicalDetails: {
+            stage:         authStage,
+            oracleCode:    "VALIDATION_ERRORS",
+            oracleMessage: "INVALID_CLIENT_ID",
+          },
+          hasIdToken:      false,
+          hasRefreshToken: false,
+          checkedAt:       new Date().toISOString(),
+        },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json(
       {
         ok:              false,
         stage:           authStage,
+        reasonCode,
         message:         safeMsg,
         hasIdToken:      false,
         hasRefreshToken: false,

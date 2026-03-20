@@ -62,19 +62,29 @@ const REQUIRED_VARS_WITH_ALIAS: Array<[primary: string, alias: string]> = [
 ];
 
 /**
+ * Strips leading/trailing whitespace and stray CR/LF characters from a config
+ * string.  Env values pasted into Vercel panels often carry invisible chars.
+ */
+function normalizeEnvValue(v: string): string {
+  return v.replace(/[\r\n]/g, "").trim();
+}
+
+/**
  * Returns the current MICROS env config.
+ * All string values are normalised (trimmed + CR/LF removed) so that a
+ * client_id with invisible whitespace isn't silently mis-sent to Oracle.
  * Missing vars result in empty strings — check `enabled` first, or use
  * `assertMicrosConfigured()` when you need all vars to be present.
  */
 export function getMicrosEnvConfig(): MicrosEnvConfig {
   return {
-    authServer:    (process.env.MICROS_AUTH_SERVER ?? "").replace(/\/$/, ""),
-    appServer:     (process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER ?? "").replace(/\/$/, ""),
-    clientId:       process.env.MICROS_CLIENT_ID ?? "",
-    orgIdentifier:  process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER ?? "",
-    apiAccountName: process.env.MICROS_USERNAME ?? process.env.MICROS_API_ACCOUNT_NAME ?? "",
-    locRef:         process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "",
-    enabled:        isMicrosEnabled(),
+    authServer:    normalizeEnvValue(process.env.MICROS_AUTH_SERVER ?? "").replace(/\/$/, ""),
+    appServer:     normalizeEnvValue(process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER ?? "").replace(/\/$/, ""),
+    clientId:      normalizeEnvValue(process.env.MICROS_CLIENT_ID ?? ""),
+    orgIdentifier: normalizeEnvValue(process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER ?? ""),
+    apiAccountName: normalizeEnvValue(process.env.MICROS_USERNAME ?? process.env.MICROS_API_ACCOUNT_NAME ?? ""),
+    locRef:        normalizeEnvValue(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? ""),
+    enabled:       isMicrosEnabled(),
   };
 }
 

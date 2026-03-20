@@ -66,6 +66,8 @@ export class MicrosAuthError extends Error {
     public readonly stage: "authorize" | "signin" | "token" | "refresh" | "config",
     public readonly userMessage: string,
     public readonly detail?: string,
+    /** Machine-readable reason code for programmatic branching (e.g. "INVALID_CLIENT_ID"). */
+    public readonly reasonCode?: string,
   ) {
     super(`[MicrosAuth:${stage}] ${userMessage}${detail ? ` — ${detail}` : ""}`);
     this.name = "MicrosAuthError";
@@ -177,6 +179,19 @@ async function stepAuthorize(
 
   const url = `${cfg.authServer}${AUTHORIZE_PATH}?${params.toString()}`;
 
+  // ── Authorize params diagnostic log ───────────────────────────────────
+  const cidFirst6 = cfg.clientId.length >= 6 ? cfg.clientId.slice(0, 6) : cfg.clientId.slice(0, 3) + "***";
+  const cidLast6  = cfg.clientId.length >= 6 ? cfg.clientId.slice(-6)  : "***";
+  console.log("[MICROS_AUTH_DEBUG] authorize params", {
+    response_type:          "code",
+    client_id_length:       cfg.clientId.length,
+    client_id_preview:      `${cidFirst6}…${cidLast6}`,
+    scope:                  "openid",
+    redirect_uri:           cfg.redirectUri,
+    code_challenge_method:  "S256",
+    code_challenge_present: codeChallenge.length > 0,
+  });
+
   console.log(
     "[MicrosAuth:authorize] GET authorize\n" +
     `  url:            ${cfg.authServer}${AUTHORIZE_PATH}\n` +
@@ -217,14 +232,43 @@ async function stepAuthorize(
   // ── Handle specific failure cases ─────────────────────────────────────
   if (res.status >= 400) {
     const body = await readErrorBody(res);
+
+    // Parse Oracle JSON error to extract machine-readable codes.
+    let oracleMessage = "";
+    let oracleCode    = "";
+    try {
+      const parsed = JSON.parse(body) as Record<string, unknown>;
+      oracleMessage = String(parsed.message ?? parsed.error_description ?? "");
+      oracleCode    = String(parsed.code    ?? parsed.error             ?? "");
+    } catch { /* response was not JSON — fall through */ }
+
     console.error("[MICROS_AUTH_DEBUG] authorize HTTP error", {
-      status: res.status,
-      body:   sanitize(body),
+      status:        res.status,
+      oracleMessage: sanitize(oracleMessage),
+      oracleCode:    sanitize(oracleCode),
+      rawBody:       sanitize(body),
     });
+
+    // INVALID_CLIENT_ID — Oracle OIDC provider does not recognise this client.
+    // Typically caused by: wrong value, wrong Oracle environment, trailing whitespace.
+    if (
+      oracleMessage.includes("INVALID_CLIENT_ID") ||
+      oracleCode.includes("INVALID_CLIENT_ID")    ||
+      body.includes("INVALID_CLIENT_ID")
+    ) {
+      throw new MicrosAuthError(
+        "authorize",
+        "The Oracle client ID was rejected. Please verify the exact client ID and environment configuration.",
+        `oracle: ${sanitize(body)}`,
+        "INVALID_CLIENT_ID",
+      );
+    }
+
     throw new MicrosAuthError(
       "authorize",
       `Oracle authorize endpoint returned HTTP ${res.status}`,
-      `reasonCode: AUTHORIZE_HTTP_ERROR — ${sanitize(body)}`,
+      `oracle: ${sanitize(body)}`,
+      "AUTHORIZE_HTTP_ERROR",
     );
   }
 
@@ -459,6 +503,15 @@ interface MicrosAuthConfig {
   redirectUri:  string;
 }
 
+/**
+ * Strips leading/trailing whitespace and any stray CR/LF characters from a
+ * config string.  Env var values pasted into Vercel panels or .env files
+ * sometimes carry invisible whitespace that breaks exact-match validation.
+ */
+function normalizeConfigValue(value: string): string {
+  return value.replace(/[\r\n]/g, "").trim();
+}
+
 function loadConfig(): MicrosAuthConfig {
   const required: Record<string, string | undefined> = {
     MICROS_AUTH_SERVER:    process.env.MICROS_AUTH_SERVER,
@@ -480,13 +533,62 @@ function loadConfig(): MicrosAuthConfig {
     );
   }
 
+  // Normalize every value — trim whitespace + strip accidental CR/LF chars.
+  const rawClientId   = process.env.MICROS_CLIENT_ID!;
+  const clientId      = normalizeConfigValue(rawClientId);
+  const authServer    = normalizeConfigValue(process.env.MICROS_AUTH_SERVER!).replace(/\/$/, "");
+  const biServer      = normalizeConfigValue(
+    process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER ?? "",
+  ).replace(/\/$/, "");
+
+  // ── Config diagnostic log (no plaintext secrets) ─────────────────────
+  const cidHasWhitespace = rawClientId !== rawClientId.trim();
+  const cidHasNewline    = /[\r\n]/.test(rawClientId);
+  const cidFirstSix = clientId.length >= 6 ? clientId.slice(0, 6) : clientId.padEnd(6, "?").slice(0, 6);
+  const cidLastSix  = clientId.length >= 6 ? clientId.slice(-6)  : "??????";
+
+  // Detect potential environment mismatch: authServer and BI server should
+  // share the same Oracle environment domain (e.g. same datacenter slug).
+  let environmentMismatch = false;
+  if (authServer && biServer) {
+    try {
+      const authHost = new URL(authServer).hostname;
+      const biHost   = new URL(biServer).hostname;
+      // Heuristic: the last two segments of both hostnames should match
+      // (e.g. both in .micros.com, .oracle.com, or the same cloud region prefix).
+      const authSuffix = authHost.split(".").slice(-2).join(".");
+      const biSuffix   = biHost.split(".").slice(-2).join(".");
+      environmentMismatch = authSuffix !== biSuffix;
+    } catch { /* malformed URL — skip mismatch check */ }
+  }
+
+  console.log("[MICROS_AUTH_DEBUG] config loaded", {
+    envVarUsed:           ["MICROS_AUTH_SERVER", "MICROS_CLIENT_ID", "MICROS_USERNAME",
+                           "MICROS_ORG_SHORT_NAME", "MICROS_REDIRECT_URI"],
+    authServer,
+    biServer:             biServer || "(not set)",
+    clientIdLength:       clientId.length,
+    clientIdFirst6:       cidFirstSix,
+    clientIdLast6:        cidLastSix,
+    clientIdHasWhitespace: cidHasWhitespace,
+    clientIdHasNewline:   cidHasNewline,
+    orgShortName:         normalizeConfigValue(process.env.MICROS_ORG_SHORT_NAME!),
+    environmentMismatch,
+  });
+
+  if (environmentMismatch) {
+    console.warn("[MICROS_AUTH_DEBUG] ENVIRONMENT_MISMATCH detected — authServer and BI server " +
+      "appear to belong to different Oracle environments. " +
+      "Verify that all MICROS_* values were issued for the same Oracle tenant.");
+  }
+
   return {
-    authServer:   (process.env.MICROS_AUTH_SERVER!).replace(/\/$/, ""),
-    clientId:      process.env.MICROS_CLIENT_ID!,
-    username:      process.env.MICROS_USERNAME!,
-    password:      process.env.MICROS_PASSWORD!,
-    orgShortName:  process.env.MICROS_ORG_SHORT_NAME!,
-    redirectUri:   process.env.MICROS_REDIRECT_URI ?? "apiaccount://callback",
+    authServer,
+    clientId,
+    username:     normalizeConfigValue(process.env.MICROS_USERNAME!),
+    password:     process.env.MICROS_PASSWORD!.trim(), // trim only — never strip more
+    orgShortName: normalizeConfigValue(process.env.MICROS_ORG_SHORT_NAME!),
+    redirectUri:  normalizeConfigValue(process.env.MICROS_REDIRECT_URI ?? "apiaccount://callback"),
   };
 }
 
