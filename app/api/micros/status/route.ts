@@ -35,6 +35,8 @@ const AUDIT_VARS = [
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
+const BUILD_ID = "f724ad2-2026-03-20"; // bump on each deploy to confirm code version
+
 export async function GET() {
   try {
     const [dbStatus, cfgStatus] = await Promise.all([
@@ -43,6 +45,7 @@ export async function GET() {
     ]);
 
     return NextResponse.json({
+      buildId:   BUILD_ID,
       ...dbStatus,
       envConfig: {
         enabled:    cfgStatus.enabled,
