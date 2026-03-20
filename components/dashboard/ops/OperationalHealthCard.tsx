@@ -29,9 +29,10 @@ interface Props {
   reviews:      SevenDayReviewSummary;
   dailyOps:     DailyOperationsDashboardSummary;
   microsStatus?: {
-    minutesSinceSync: number | null;
-    isConfigured:     boolean;
-    lastSyncError?:   string | null;
+    minutesSinceSync:    number | null;
+    isConfigured:        boolean;
+    isLiveDataAvailable?: boolean;
+    lastSyncError?:      string | null;
   } | null;
   freshness?: {
     sales:   { lastUpdated: string | null; stale: boolean } | null;
@@ -85,18 +86,18 @@ export default function OperationalHealthCard({
 
   // ── Freshness / confidence note ────────────────────────────────────────
   const freshnessNotes: string[] = [];
-  if (microsStatus?.isConfigured && microsStatus.minutesSinceSync != null) {
+  if (microsStatus?.isLiveDataAvailable === true && microsStatus.minutesSinceSync != null) {
     const m = microsStatus.minutesSinceSync;
-    freshnessNotes.push(`MICROS synced ${m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`}`);
+    freshnessNotes.push(`Live POS synced ${m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`}`);
   } else if (microsStatus?.isConfigured && microsStatus.lastSyncError) {
-    freshnessNotes.push("MICROS sync error — showing last known values");
+    freshnessNotes.push("POS feed unavailable — using latest saved values");
   }
   if (freshness?.sales?.lastUpdated) {
     const d = Math.round((Date.now() - new Date(freshness.sales.lastUpdated).getTime()) / 86_400_000);
     if (d > 0) freshnessNotes.push(`Sales data ${d}d old`);
   }
-  if (freshnessNotes.length === 0 && !microsStatus?.isConfigured) {
-    freshnessNotes.push("Connect MICROS for live confidence scoring");
+  if (freshnessNotes.length === 0 && !microsStatus?.isLiveDataAvailable) {
+    freshnessNotes.push("Using latest available data — connect POS for live scoring");
   }
 
   const statusCfg = {

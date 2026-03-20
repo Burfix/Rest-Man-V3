@@ -21,15 +21,12 @@ import { getMicrosConfigStatus } from "@/lib/micros/config";
 const AUDIT_VARS = [
   "MICROS_ENABLED",
   "MICROS_AUTH_SERVER",
-  "MICROS_APP_SERVER",
+  "MICROS_BI_SERVER",
   "MICROS_CLIENT_ID",
-  "MICROS_ORG_IDENTIFIER",
-  "MICROS_API_ACCOUNT_NAME",
-  "MICROS_LOC_REF",
-  "MICROS_API_ACCOUNT_PASSWORD",
-  "MICROS_CLIENT_SECRET",
-  "MICROS_AUTH_TOKEN_PATH",
-  "MICROS_AUTH_SCOPE",
+  "MICROS_ORG_SHORT_NAME",
+  "MICROS_USERNAME",
+  "MICROS_LOCATION_REF",
+  "MICROS_REDIRECT_URI",
 ] as const;
 
 export const dynamic = "force-dynamic";

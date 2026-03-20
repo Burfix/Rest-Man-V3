@@ -6,6 +6,8 @@
 
 import { getDailyOperationsDashboardSummary, getDailyOperationsHistory } from "@/services/ops/dailyOperationsSummary";
 import { getMicrosStatus } from "@/services/micros/status";
+import { getMicrosConfigStatus } from "@/lib/micros/config";
+import { deriveMicrosIntegrationStatus, canUseMicrosLiveData } from "@/lib/integrations/status";
 import DailyOpsUploadForm from "@/components/dashboard/DailyOpsUploadForm";
 import { formatShortDate, formatCurrency, todayISO } from "@/lib/utils";
 import Link from "next/link";
@@ -26,10 +28,14 @@ export default async function OperationsPage() {
   ]);
 
   const ms = microsStatus as MicrosStatusSummary | null;
+  const cfgStatus    = getMicrosConfigStatus();
+  const microsHealth = deriveMicrosIntegrationStatus(ms, cfgStatus.configured, cfgStatus.enabled);
+  const microsIsLive = canUseMicrosLiveData(microsHealth);
+
   const microsConnectedToday =
-    ms?.isConfigured && ms.latestDailySales?.business_date === todayISO();
+    microsIsLive && ms?.latestDailySales?.business_date === todayISO();
   const microsStale =
-    ms?.isConfigured && !microsConnectedToday && ms.minutesSinceSync != null;
+    microsIsLive && !microsConnectedToday && ms?.minutesSinceSync != null;
   const microsAgeLabel = ms?.minutesSinceSync != null
     ? ms.minutesSinceSync < 1 ? "just now"
       : ms.minutesSinceSync < 60 ? `${ms.minutesSinceSync} min ago`
@@ -76,12 +82,12 @@ export default async function OperationsPage() {
           </div>
         </div>
       )}
-      {ms && !ms.isConfigured && (
+      {ms && !microsIsLive && (
         <div className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3">
           <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-stone-400" />
           <div>
             <p className="text-sm font-semibold text-stone-700">
-              Manual mode — MICROS not connected
+              Manual mode — POS feed not connected
             </p>
             <p className="mt-0.5 text-xs text-stone-500">
               Upload a Toast Daily Ops CSV each day.{" "}

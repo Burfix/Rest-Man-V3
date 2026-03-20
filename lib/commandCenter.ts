@@ -170,9 +170,10 @@ export interface ConfidenceSummary {
 
 export function generateConfidenceSummary(params: {
   microsStatus?: {
-    isConfigured:     boolean;
-    minutesSinceSync: number | null;
-    lastSyncError?:   string | null;
+    isConfigured:        boolean;
+    isLiveDataAvailable?: boolean;
+    minutesSinceSync:    number | null;
+    lastSyncError?:      string | null;
   } | null;
   dailyOps: DailyOperationsDashboardSummary;
   today:    string; // YYYY-MM-DD
@@ -180,10 +181,9 @@ export function generateConfidenceSummary(params: {
   const { microsStatus, dailyOps, today } = params;
   const ms = microsStatus;
 
-  // MICROS live + fresh (< 15 min)
+  // Live POS + fresh (< 15 min) — only when isLiveDataAvailable is verified
   if (
-    ms?.isConfigured &&
-    !ms.lastSyncError &&
+    ms?.isLiveDataAvailable === true &&
     ms.minutesSinceSync != null &&
     ms.minutesSinceSync < 15
   ) {
@@ -192,15 +192,15 @@ export function generateConfidenceSummary(params: {
     return { level: "high", detail: `Sales ${age} · ${labourDetail}` };
   }
 
-  // MICROS connected but stale or errored
-  if (ms?.isConfigured && ms.lastSyncError) {
-    return { level: "low", detail: "Live sync failed — last known values" };
+  // MICROS configured but not live (error / stale)
+  if (ms?.isConfigured && !ms.isLiveDataAvailable && ms.lastSyncError) {
+    return { level: "low", detail: "POS feed unavailable — using saved values" };
   }
-  if (ms?.isConfigured && (ms.minutesSinceSync == null || ms.minutesSinceSync >= 60)) {
+  if (ms?.isConfigured && !ms.isLiveDataAvailable && (ms.minutesSinceSync == null || ms.minutesSinceSync >= 60)) {
     const h = ms.minutesSinceSync != null ? Math.floor(ms.minutesSinceSync / 60) : null;
-    return { level: "low", detail: h ? `Live sync stale — ${h}h ago` : "Live sync stale" };
+    return { level: "low", detail: h ? `POS sync stale — ${h}h ago` : "POS sync stale" };
   }
-  if (ms?.isConfigured && ms.minutesSinceSync != null && ms.minutesSinceSync < 60) {
+  if (ms?.isLiveDataAvailable === true && ms.minutesSinceSync != null && ms.minutesSinceSync < 60) {
     const age = `${ms.minutesSinceSync}m`;
     return { level: "medium", detail: `Sales ${age} · Labour from CSV` };
   }

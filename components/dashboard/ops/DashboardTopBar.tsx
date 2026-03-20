@@ -32,9 +32,10 @@ interface Props {
   today:          TodayBookingsSummary;
   totalAlerts:    number;
   microsStatus?:  {
-    isConfigured:     boolean;
-    minutesSinceSync: number | null;
-    lastSyncError?:   string | null;
+    isConfigured:        boolean;
+    isLiveDataAvailable?: boolean;
+    minutesSinceSync:    number | null;
+    lastSyncError?:      string | null;
   } | null;
   revenueTrend?:  TrendSignal | null;
   labourTrend?:   TrendSignal | null;
@@ -142,9 +143,10 @@ export default function DashboardTopBar({
       ? "text-stone-500 dark:text-stone-500"
       : "text-amber-600 dark:text-amber-400";
 
-  // ── MICROS source badge for Revenue/Labour tiles ─────────────────────────
-  const microsLive    = microsStatus?.isConfigured && microsStatus.minutesSinceSync != null;
-  const microsStale   = microsStatus?.isConfigured && microsStatus.lastSyncError != null;
+  // ── MICROS source badge — only when isLiveDataAvailable is explicitly true ─────
+  const microsLive  = microsStatus?.isLiveDataAvailable === true;
+  // Only show "stale" badge when config is present but live check explicitly failed / errored
+  const microsStale = !microsLive && (microsStatus?.isConfigured ?? false) && microsStatus?.lastSyncError != null;
   let microsAgeLabel: string | undefined;
   if (microsStatus?.minutesSinceSync != null) {
     const m = microsStatus.minutesSinceSync;

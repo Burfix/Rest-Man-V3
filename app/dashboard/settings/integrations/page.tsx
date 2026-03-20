@@ -3,14 +3,19 @@
  * Matches the existing settings aesthetic: same card style, same typography.
  */
 
-import { getMicrosStatus } from "@/services/micros/status";
-import MicrosSettingsCard  from "@/components/dashboard/settings/MicrosSettingsCard";
+import { getMicrosStatus }               from "@/services/micros/status";
+import { getMicrosConfigStatus }         from "@/lib/micros/config";
+import { deriveMicrosIntegrationStatus } from "@/lib/integrations/status";
+import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
 
 export default async function IntegrationsPage() {
-  const { connection } = await getMicrosStatus().catch(() => ({ connection: null }));
+  const microsResult = await getMicrosStatus().catch(() => null);
+  const connection   = microsResult?.connection ?? null;
+  const cfgStatus    = getMicrosConfigStatus();
+  const microsHealth = deriveMicrosIntegrationStatus(microsResult, cfgStatus.configured, cfgStatus.enabled);
 
   return (
     <div className="space-y-8">
@@ -21,7 +26,7 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
-      <MicrosSettingsCard connection={connection as never} />
+      <MicrosSettingsCard connection={connection as never} microsHealth={microsHealth} />
 
       {/* Future integration slots — placeholder style matches empty maintenance card */}
       <section className="rounded-lg border border-dashed border-stone-200 bg-stone-50 p-6">

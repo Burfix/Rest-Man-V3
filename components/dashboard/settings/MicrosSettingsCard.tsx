@@ -13,44 +13,41 @@
 import { useState, useRef } from "react";
 import { useRouter }         from "next/navigation";
 import { cn }                from "@/lib/utils";
-import type { MicrosConnection, MicrosConnectionStatus } from "@/types/micros";
+import type { MicrosConnection } from "@/types/micros";
+import type { MicrosIntegrationStatus, IntegrationHealth } from "@/lib/integrations/status";
 
 // ── Status chip ───────────────────────────────────────────────────────────
 
-const STATUS_STYLES: Record<MicrosConnectionStatus, string> = {
-  awaiting_setup: "bg-stone-100 text-stone-500 ring-stone-200",
+const HEALTH_STYLES: Record<IntegrationHealth, string> = {
   connected:      "bg-green-50  text-green-700  ring-green-200",
+  degraded:       "bg-amber-50  text-amber-700  ring-amber-200",
+  not_configured: "bg-stone-100 text-stone-500  ring-stone-200",
+  auth_failed:    "bg-red-50    text-red-700    ring-red-200",
+  awaiting_setup: "bg-stone-100 text-stone-500  ring-stone-200",
+  disabled:       "bg-stone-100 text-stone-500  ring-stone-200",
   syncing:        "bg-sky-50    text-sky-700    ring-sky-200",
-  stale:          "bg-amber-50  text-amber-700  ring-amber-200",
-  error:          "bg-red-50    text-red-700    ring-red-200",
 };
 
-const STATUS_LABELS: Record<MicrosConnectionStatus, string> = {
-  awaiting_setup: "Awaiting setup",
-  connected:      "Connected",
-  syncing:        "Syncing",
-  stale:          "Stale",
-  error:          "Error",
+const HEALTH_DOT: Record<IntegrationHealth, string> = {
+  connected:      "bg-green-500",
+  degraded:       "bg-amber-500",
+  not_configured: "bg-stone-400",
+  auth_failed:    "bg-red-500",
+  awaiting_setup: "bg-stone-400",
+  disabled:       "bg-stone-400",
+  syncing:        "bg-sky-500 animate-pulse",
 };
 
-function ConnectionChip({ status }: { status: MicrosConnectionStatus }) {
+function ConnectionChip({ health, label }: { health: IntegrationHealth; label: string }) {
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset",
-        STATUS_STYLES[status],
+        HEALTH_STYLES[health],
       )}
     >
-      <span
-        className={cn("h-1.5 w-1.5 rounded-full shrink-0", {
-          "bg-stone-400":  status === "awaiting_setup",
-          "bg-green-500":  status === "connected",
-          "bg-sky-500":    status === "syncing",
-          "bg-amber-500":  status === "stale",
-          "bg-red-500":    status === "error",
-        })}
-      />
-      {STATUS_LABELS[status]}
+      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", HEALTH_DOT[health])} />
+      {label}
     </span>
   );
 }
@@ -63,7 +60,8 @@ const fieldCls =
 // ── Props ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  connection: MicrosConnection | null;
+  connection:   MicrosConnection | null;
+  microsHealth: MicrosIntegrationStatus;
 }
 
 type SaveState =
@@ -80,7 +78,7 @@ type TestState =
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export default function MicrosSettingsCard({ connection: initial }: Props) {
+export default function MicrosSettingsCard({ connection: initial, microsHealth }: Props) {
   const router  = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -207,9 +205,7 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {connection?.status && (
-            <ConnectionChip status={connection.status} />
-          )}
+          <ConnectionChip health={microsHealth.health} label={microsHealth.label} />
           {!editing && (
             <button
               type="button"
@@ -316,47 +312,35 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
               Sync Status
             </h3>
 
-            {/* Sync health indicator */}
-            {(() => {
-              const hasError  = !!connection.last_sync_error;
-              const lastSync  = connection.last_successful_sync_at;
-              const minsAgo   = lastSync
-                ? Math.floor((Date.now() - new Date(lastSync).getTime()) / 60_000)
-                : null;
-              let healthLabel = "Unknown";
-              let healthColor = "bg-stone-400";
-              let healthText  = "No sync data available.";
-              if (hasError) {
-                healthLabel = "Sync error";
-                healthColor = "bg-red-500";
-                healthText  = connection.last_sync_error!;
-              } else if (minsAgo == null) {
-                healthLabel = "Not synced";
-                healthColor = "bg-stone-400";
-                healthText  = "No successful sync recorded.";
-              } else if (minsAgo < 10) {
-                healthLabel = "Healthy";
-                healthColor = "bg-emerald-500";
-                healthText  = `Last synced ${minsAgo < 1 ? "just now" : `${minsAgo}m ago`}. Data is fresh.`;
-              } else if (minsAgo < 60) {
-                healthLabel = "Recent";
-                healthColor = "bg-sky-500";
-                healthText  = `Last synced ${minsAgo}m ago.`;
-              } else {
-                healthLabel = "Stale";
-                healthColor = "bg-amber-500";
-                healthText  = `Last synced ${Math.floor(minsAgo / 60)}h ago. Consider triggering a manual sync.`;
-              }
-              return (
-                <div className="mb-4 flex items-start gap-3 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3">
-                  <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${healthColor}`} />
-                  <div>
-                    <p className="text-xs font-semibold text-stone-700">{healthLabel}</p>
-                    <p className="mt-0.5 text-xs text-stone-500">{healthText}</p>
-                  </div>
+            {/* Connection health summary */}
+            {microsHealth.health !== "connected" && (
+              <div className="mb-4 flex items-start gap-3 rounded-lg border border-stone-100 bg-stone-50 px-4 py-3">
+                <span className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${HEALTH_DOT[microsHealth.health]}`} />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-stone-700">{microsHealth.label}</p>
+                  <p className="mt-0.5 text-xs text-stone-500">{microsHealth.userMessage}</p>
+                  {connection?.last_sync_error && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-stone-400 hover:text-stone-600">
+                        Technical details
+                      </summary>
+                      <p className="mt-1 rounded-md border border-stone-100 bg-white px-2 py-1.5 font-mono text-xs text-stone-600 break-all">
+                        {connection.last_sync_error}
+                      </p>
+                    </details>
+                  )}
                 </div>
-              );
-            })()}
+              </div>
+            )}
+            {microsHealth.health === "connected" && (
+              <div className="mb-4 flex items-start gap-3 rounded-lg border border-green-100 bg-green-50 px-4 py-3">
+                <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-green-500" />
+                <div>
+                  <p className="text-xs font-semibold text-stone-700">Live POS feed active</p>
+                  <p className="mt-0.5 text-xs text-stone-500">{microsHealth.userMessage}</p>
+                </div>
+              </div>
+            )}
 
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
               <div>
@@ -371,14 +355,7 @@ export default function MicrosSettingsCard({ connection: initial }: Props) {
                   {formatDate(connection.last_sync_at)}
                 </dd>
               </div>
-              {connection.last_sync_error && (
-                <div className="sm:col-span-2">
-                  <dt className="text-xs text-stone-500">Last error</dt>
-                  <dd className="mt-0.5 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                    {connection.last_sync_error}
-                  </dd>
-                </div>
-              )}
+
             </dl>
           </div>
 

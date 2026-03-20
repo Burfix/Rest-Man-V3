@@ -20,6 +20,8 @@ import { getDataFreshnessSummary } from "@/services/ops/dataFreshness";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 import { getMicrosStatus } from "@/services/micros/status";
+import { getMicrosConfigStatus } from "@/lib/micros/config";
+import { deriveMicrosIntegrationStatus, canUseMicrosLiveData } from "@/lib/integrations/status";
 import { getOperatingScore } from "@/services/ops/operatingScore";
 
 import FreshnessBar               from "@/components/dashboard/ops/FreshnessBar";
@@ -199,11 +201,22 @@ export default async function OperationsDashboard() {
 
   const ms = microsStatus as MicrosStatusSummary | null;
 
+  // ─── Central integration health — SINGLE SOURCE OF TRUTH ─────────────────
+  //  Fail closed: any ambiguous state → isLiveDataAvailable = false
+  const cfgStatus    = getMicrosConfigStatus();
+  const microsHealth = deriveMicrosIntegrationStatus(
+    ms,
+    cfgStatus.configured,
+    cfgStatus.enabled,
+  );
+  const microsLiveData = canUseMicrosLiveData(microsHealth);
+
   const confidenceSummary = generateConfidenceSummary({
     microsStatus: ms ? {
-      isConfigured:     ms.isConfigured,
-      minutesSinceSync: ms.minutesSinceSync ?? null,
-      lastSyncError:    ms.connection?.last_sync_error ?? null,
+      isConfigured:        ms.isConfigured,
+      isLiveDataAvailable: microsLiveData,
+      minutesSinceSync:    ms.minutesSinceSync ?? null,
+      lastSyncError:       ms.connection?.last_sync_error ?? null,
     } : null,
     dailyOps,
     today: today_iso,
@@ -244,16 +257,22 @@ export default async function OperationsDashboard() {
         today={today}
         totalAlerts={totalAlerts}
         microsStatus={ms ? {
-          isConfigured:     ms.isConfigured,
-          minutesSinceSync: ms.minutesSinceSync ?? null,
-          lastSyncError:    ms.connection?.last_sync_error ?? null,
+          isConfigured:        ms.isConfigured,
+          isLiveDataAvailable: microsLiveData,
+          minutesSinceSync:    ms.minutesSinceSync ?? null,
+          lastSyncError:       ms.connection?.last_sync_error ?? null,
         } : null}
         revenueTrend={revenueTrend}
         labourTrend={labourTrend}
       />
 
       {/* ── 2. Data Freshness Row ── */}
-      {freshness && <FreshnessBar freshness={freshness} />}
+      {freshness && (
+        <FreshnessBar
+          freshness={freshness}
+          microsIsLive={microsLiveData}
+        />
+      )}
 
       {/* ── Command Headline ── */}
       <CommandHeadlineBanner headline={commandHeadline} confidence={confidenceSummary} />
@@ -261,9 +280,9 @@ export default async function OperationsDashboard() {
       {/* ── Two-Hour Outlook ── */}
       <TwoHourOutlookPanel outlook={twoHourOutlook} />
 
-      {/* ── MICROS live revenue strip — shown only when synced today ── */}
+      {/* ── MICROS live revenue strip — only when verified connected + synced today ── */}
       {(() => {
-        const ms = microsStatus as MicrosStatusSummary | null;
+        if (!microsLiveData) return null;
         const ld = ms?.latestDailySales;
         const todayDate = today_iso;
         if (!ld || ld.business_date !== todayDate) return null;
@@ -272,8 +291,8 @@ export default async function OperationsDashboard() {
         return (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs">
             <span className="flex items-center gap-1 font-semibold text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
-              MICROS Live{ageLabel}
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+              Live POS data{ageLabel}
             </span>
             <span className="text-stone-400">·</span>
             <span className="text-stone-600">Sales: <span className="font-semibold text-stone-900">R {ld.net_sales.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
@@ -326,7 +345,7 @@ export default async function OperationsDashboard() {
           maintenance={maintenance}
           date={today_iso}
           forecast={forecast}
-          microsSource={ms?.isConfigured ? "micros_live" : null}
+          microsSource={microsLiveData ? "micros_live" : null}
           microsSyncedAt={ms?.connection?.last_sync_at ?? null}
         />
         <OperationalHealthCard
@@ -336,9 +355,10 @@ export default async function OperationsDashboard() {
           reviews={reviews}
           dailyOps={dailyOps}
           microsStatus={ms ? {
-            isConfigured:     ms.isConfigured,
-            minutesSinceSync: ms.minutesSinceSync ?? null,
-            lastSyncError:    ms.connection?.last_sync_error ?? null,
+            isConfigured:        ms.isConfigured,
+            isLiveDataAvailable: microsLiveData,
+            minutesSinceSync:    ms.minutesSinceSync ?? null,
+            lastSyncError:       ms.connection?.last_sync_error ?? null,
           } : undefined}
           freshness={freshness ? {
             sales:  freshness.sales  ? { lastUpdated: freshness.sales.lastUpdatedAt,  stale: freshness.sales.stale }  : null,

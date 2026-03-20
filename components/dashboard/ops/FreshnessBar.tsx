@@ -40,10 +40,12 @@ function FreshnessChip({ item, minuteMode }: { item: FreshnessItem; minuteMode?:
 }
 
 interface Props {
-  freshness: DataFreshnessSummary;
+  freshness:    DataFreshnessSummary;
+  /** True only when deriveMicrosIntegrationStatus returns isLiveDataAvailable=true */
+  microsIsLive?: boolean;
 }
 
-export default function FreshnessBar({ freshness }: Props) {
+export default function FreshnessBar({ freshness, microsIsLive = false }: Props) {
   const items: FreshnessItem[] = [
     freshness.dailyOps,
     freshness.sales,
@@ -51,8 +53,9 @@ export default function FreshnessBar({ freshness }: Props) {
     freshness.maintenance,
   ];
 
-  // Only show MICROS chip if it is configured or stale (i.e. relevant to the operator)
-  const showMicros = freshness.micros.configured || freshness.micros.stale;
+  // MICROS chip: only show when live OR configured-but-not-live (so operator can see it's not flowing)
+  const showMicrosLive    = microsIsLive;
+  const showMicrosOffline = !microsIsLive && freshness.micros.configured;
 
   return (
     <div
@@ -66,10 +69,27 @@ export default function FreshnessBar({ freshness }: Props) {
       {items.map((item) => (
         <FreshnessChip key={item.label} item={item} />
       ))}
-      {showMicros && (
+
+      {/* Live POS chip — only when verified connected */}
+      {showMicrosLive && (
         <>
           <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
           <FreshnessChip item={freshness.micros} minuteMode />
+        </>
+      )}
+
+      {/* Offline POS chip — shown when MICROS is set up but not currently live */}
+      {showMicrosOffline && (
+        <>
+          <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+          <a
+            href="/dashboard/settings/integrations"
+            title="POS feed not connected — check integration settings"
+            className="inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-600 transition-colors hover:bg-amber-100"
+          >
+            <span className="h-1 w-1 rounded-full bg-amber-400 shrink-0" />
+            No live POS
+          </a>
         </>
       )}
     </div>
