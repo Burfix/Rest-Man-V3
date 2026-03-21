@@ -18,9 +18,8 @@ export default async function IntegrationsPage() {
   const microsResult = await getMicrosStatus().catch(() => null);
   const connection   = microsResult?.connection ?? null;
   const cfgStatus         = getMicrosConfigStatus();
-  const authModeUnconfirmed = cfgStatus.enabled && cfgStatus.configured;
   const microsHealth      = deriveMicrosIntegrationStatus(
-    microsResult, cfgStatus.configured, cfgStatus.enabled, authModeUnconfirmed,
+    microsResult, cfgStatus.configured, cfgStatus.enabled,
   );
 
   // ── Admin check (server-side) — debug panel shown to admin users only ──

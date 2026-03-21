@@ -119,7 +119,6 @@ export function deriveMicrosIntegrationStatus(
   ms:                    MicrosStatusSummary | null,
   envConfigured:         boolean,
   envEnabled:            boolean,
-  authModeUnconfirmed = false,
 ): MicrosIntegrationStatus {
 
   // ① Feature flag off
@@ -134,19 +133,7 @@ export function deriveMicrosIntegrationStatus(
     };
   }
 
-  // ② Credentials present but connection method not yet confirmed
-  if (authModeUnconfirmed || envConfigured) {
-    return {
-      health:               "credentials_present",
-      label:                "Awaiting verification",
-      isLiveDataAvailable:  false,
-      lastSuccessfulSyncAt: null,
-      reasonCode:           "AUTH_METHOD_UNCONFIRMED",
-      userMessage:          "MICROS credentials have been captured from the Oracle provisioning details. Authentication and live data access are paused until the exact supported connection method is confirmed.",
-    };
-  }
-
-  // ③ Required env vars missing
+  // ② Required env vars missing
   if (!envConfigured) {
     return {
       health:               "not_configured",
