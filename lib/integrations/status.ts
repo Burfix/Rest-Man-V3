@@ -132,7 +132,7 @@ export function deriveMicrosIntegrationStatus(
       isLiveDataAvailable:  false,
       lastSuccessfulSyncAt: null,
       reasonCode:           "AUTH_MODE_UNCONFIRMED",
-      userMessage:          "Awaiting Oracle confirmation. Set MICROS_AUTH_MODE=pkce or MICROS_AUTH_MODE=password to proceed.",
+      userMessage:          "Awaiting Oracle confirmation. Set MICROS_AUTH_MODE=password once Oracle confirms the correct flow.",
     };
   }
 

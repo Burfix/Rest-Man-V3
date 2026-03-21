@@ -170,7 +170,7 @@ export function getMicrosConfigStatus(): {
   const configured = missing.length === 0;
 
   const rawMode   = (process.env.MICROS_AUTH_MODE ?? "").replace(/[\r\n]/g, "").trim().toLowerCase();
-  const authMode  = rawMode === "pkce" || rawMode === "password" ? rawMode : "unknown";
+  const authMode  = rawMode === "password" ? rawMode : "unknown";
 
   let message: string;
   if (!enabled) {

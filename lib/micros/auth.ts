@@ -1,42 +1,30 @@
 /**
  * lib/micros/auth.ts
  *
- * Oracle MICROS BI API -- configurable authentication.
+ * Oracle MICROS BI API -- authentication.
  *
  * Auth mode is controlled by MICROS_AUTH_MODE (default: "unknown").
  *
  * Modes:
  *   "unknown"  — fail closed; no auth request is sent until Oracle
  *                confirms the correct flow. Throws AUTH_MODE_UNCONFIRMED.
- *   "pkce"     — OIDC Authorization Code + PKCE (3-step):
- *                GET  /oidc-provider/v1/oauth2/authorize
- *                POST /oidc-provider/v1/oauth2/signin
- *                POST /oidc-provider/v1/oauth2/token
  *   "password" — OAuth 2.0 Resource Owner Password Credentials:
  *                POST /oidc-provider/v1/oauth2/token
  *                grant_type=password
  *
- * Refresh (both modes): POST /oidc-provider/v1/oauth2/token
- *                        grant_type=refresh_token
- *
- * Redirect URI: apiaccount://callback
+ * Refresh: POST /oidc-provider/v1/oauth2/token
+ *          grant_type=refresh_token
  *
  * Env vars (server-side only):
- *   MICROS_AUTH_MODE     "pkce" | "password" (default: "unknown")
+ *   MICROS_AUTH_MODE     "password" (default: "unknown")
  *   MICROS_AUTH_SERVER   Oracle OIDC provider base URL (no trailing slash)
  *   MICROS_CLIENT_ID     Registered OAuth client ID (public client, no secret)
  *   MICROS_USERNAME      Oracle BI API account username
  *   MICROS_PASSWORD      Oracle BI API account password
  */
 
-import crypto from "crypto";
-import { generateCodeVerifier, generateCodeChallenge } from "./pkce";
-
-// Path constants — only used when the corresponding mode is active.
-const AUTHORIZE_PATH = "/oidc-provider/v1/oauth2/authorize";
-const SIGNIN_PATH    = "/oidc-provider/v1/oauth2/signin";
-const TOKEN_PATH     = "/oidc-provider/v1/oauth2/token";
-const REDIRECT_URI   = "apiaccount://callback";
+const TOKEN_PATH   = "/oidc-provider/v1/oauth2/token";
+const REDIRECT_URI = "apiaccount://callback";
 
 const FETCH_TIMEOUT_MS = 20_000;
 const TOKEN_BUFFER_MS  = 5 * 60 * 1000; // 5-min early-expiry buffer
@@ -45,7 +33,7 @@ const TOKEN_BUFFER_MS  = 5 * 60 * 1000; // 5-min early-expiry buffer
 // Types
 // ---------------------------------------------------------------------------
 
-export type MicrosAuthMode = "unknown" | "pkce" | "password";
+export type MicrosAuthMode = "unknown" | "password";
 
 export interface OracleTokenSet {
   accessToken: string;
@@ -57,7 +45,7 @@ export interface OracleTokenSet {
 
 export class MicrosAuthError extends Error {
   constructor(
-    public readonly stage: "authorize" | "signin" | "token" | "refresh" | "config",
+    public readonly stage: "token" | "refresh" | "config",
     public readonly userMessage: string,
     public readonly detail?: string,
     public readonly reasonCode?: string,
@@ -79,14 +67,14 @@ export class MicrosAuthError extends Error {
 
 /**
  * Reads MICROS_AUTH_MODE from the environment.
- * Returns "unknown" if the value is absent or not one of "pkce" | "password".
+ * Returns "unknown" if the value is absent or not "password".
  */
 export function getAuthMode(): MicrosAuthMode {
   const raw = (process.env.MICROS_AUTH_MODE ?? "")
     .replace(/[\r\n]/g, "")
     .trim()
     .toLowerCase();
-  if (raw === "pkce" || raw === "password") return raw;
+  if (raw === "password") return raw;
   return "unknown";
 }
 
@@ -106,7 +94,6 @@ let _inflight: Promise<OracleTokenSet> | null = null;
  *
  * Behaviour depends on MICROS_AUTH_MODE:
  *   "unknown"  — throws AUTH_MODE_UNCONFIRMED immediately (no network request)
- *   "pkce"     — OIDC PKCE 3-step flow (authorize → signin → token)
  *   "password" — password grant POST to /oidc-provider/v1/oauth2/token
  *
  * Concurrent callers share one inflight request — no thundering herd.
@@ -120,7 +107,7 @@ export async function getMicrosAccessToken(): Promise<string> {
     throw new MicrosAuthError(
       "config",
       "MICROS authentication mode has not been confirmed by Oracle.",
-      "Set MICROS_AUTH_MODE=pkce or MICROS_AUTH_MODE=password after Oracle confirms the correct flow.",
+      "Set MICROS_AUTH_MODE=password once Oracle confirms password authentication is enabled for this client.",
       "AUTH_MODE_UNCONFIRMED",
     );
   }
@@ -148,7 +135,7 @@ export async function getMicrosAccessToken(): Promise<string> {
   }
 
   if (_inflight) return (await _inflight).accessToken;
-  _inflight = acquireToken(mode);
+  _inflight = acquireTokenPassword();
   try {
     _tokenSet = await _inflight;
     return _tokenSet.accessToken;
@@ -181,171 +168,10 @@ export function clearMicrosTokenCache(): void {
 }
 
 // ---------------------------------------------------------------------------
-// Mode dispatch
-// ---------------------------------------------------------------------------
-
-async function acquireToken(mode: "pkce" | "password"): Promise<OracleTokenSet> {
-  return mode === "pkce" ? acquireTokenPkce() : acquireTokenPassword();
-}
-
-// ---------------------------------------------------------------------------
-// PKCE flow (mode = "pkce")
-//   GET  /oidc-provider/v1/oauth2/authorize
-//   POST /oidc-provider/v1/oauth2/signin
-//   POST /oidc-provider/v1/oauth2/token
-// ---------------------------------------------------------------------------
-
-async function acquireTokenPkce(): Promise<OracleTokenSet> {
-  const cfg           = loadConfig();
-  const codeVerifier  = generateCodeVerifier();
-  const codeChallenge = await generateCodeChallenge(codeVerifier);
-  const state         = generateState();
-
-  const cookies = await stepAuthorize(cfg, codeChallenge, state);
-  const code    = await stepSignin(cfg, cookies);
-  return stepToken(cfg, code, codeVerifier);
-}
-
-// Step 1: GET /oidc-provider/v1/oauth2/authorize
-async function stepAuthorize(
-  cfg: MicrosAuthConfig,
-  codeChallenge: string,
-  state: string,
-): Promise<string> {
-  const url = new URL(cfg.authServer + AUTHORIZE_PATH);
-  url.searchParams.set("response_type",         "code");
-  url.searchParams.set("client_id",             cfg.clientId);
-  url.searchParams.set("redirect_uri",          REDIRECT_URI);
-  url.searchParams.set("scope",                 "openid");
-  url.searchParams.set("code_challenge",        codeChallenge);
-  url.searchParams.set("code_challenge_method", "S256");
-  url.searchParams.set("state",                 state);
-
-  const requestUrl = url.toString();
-  console.log("[MICROS_AUTH_DEBUG] authorize request", {
-    url:               sanitize(requestUrl),
-    method:            "GET",
-    client_id_length:  cfg.clientId.length,
-    client_id_preview: cfg.clientId.slice(0, 6) + "..." + cfg.clientId.slice(-6),
-  });
-
-  const res = await fetchWithTimeout(
-    requestUrl,
-    { method: "GET", redirect: "manual", headers: { Accept: "text/html,application/json" } },
-    "authorize",
-  );
-
-  console.log("[MICROS_AUTH_DEBUG] authorize response", {
-    status:             res.status,
-    contentType:        res.headers.get("content-type"),
-    location_present:   !!res.headers.get("location"),
-    set_cookie_present: hasCookies(res.headers),
-  });
-
-  if (res.status !== 200 && res.status !== 302 && res.status !== 303) {
-    const body = await safeReadBody(res);
-    throw new MicrosAuthError(
-      "authorize",
-      classifyError("", res.status),
-      "GET " + sanitize(requestUrl) + " => " + res.status + (body ? " -- " + body : ""),
-      mapReasonCode("", res.status),
-    );
-  }
-
-  return extractSetCookies(res.headers);
-}
-
-// Step 2: POST /oidc-provider/v1/oauth2/signin
-async function stepSignin(cfg: MicrosAuthConfig, cookies: string): Promise<string> {
-  const url  = cfg.authServer + SIGNIN_PATH;
-  const body = new URLSearchParams({ username: cfg.username, password: cfg.password });
-
-  console.log("[MICROS_AUTH_DEBUG] signin request", {
-    url,
-    method:           "POST",
-    username_present: !!cfg.username,
-    cookies_present:  cookies.length > 0,
-  });
-
-  const res = await fetchWithTimeout(url, {
-    method:   "POST",
-    redirect: "manual",
-    headers:  {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Accept:         "text/html,application/json",
-      ...(cookies ? { Cookie: cookies } : {}),
-    },
-    body: body.toString(),
-  }, "signin");
-
-  const location = res.headers.get("location") ?? "";
-  console.log("[MICROS_AUTH_DEBUG] signin response", {
-    status:           res.status,
-    contentType:      res.headers.get("content-type"),
-    location_present: !!location,
-    code_present:     location.includes("code="),
-  });
-
-  if (res.status !== 302 && res.status !== 303) {
-    const responseBody = await safeReadBody(res);
-    throw new MicrosAuthError(
-      "signin",
-      classifyError("", res.status),
-      "POST " + url + " => " + res.status + (responseBody ? " -- " + responseBody : ""),
-      mapReasonCode("", res.status),
-    );
-  }
-
-  const code = extractCode(location);
-  if (!code) {
-    throw new MicrosAuthError(
-      "signin",
-      "No authorization code in Oracle signin redirect",
-      "Location: " + sanitize(location.slice(0, 150)),
-    );
-  }
-  return code;
-}
-
-// Step 3: POST /oidc-provider/v1/oauth2/token  grant_type=authorization_code
-async function stepToken(
-  cfg: MicrosAuthConfig,
-  code: string,
-  codeVerifier: string,
-): Promise<OracleTokenSet> {
-  const url  = cfg.authServer + TOKEN_PATH;
-  const body = new URLSearchParams({
-    scope:         "openid",
-    grant_type:    "authorization_code",
-    client_id:     cfg.clientId,
-    code_verifier: codeVerifier,
-    code,
-    redirect_uri:  REDIRECT_URI,
-  });
-
-  console.log("[MICROS_AUTH_DEBUG] token request", {
-    url,
-    method:            "POST",
-    grant_type:        "authorization_code",
-    client_id_length:  cfg.clientId.length,
-    client_id_preview: cfg.clientId.slice(0, 6) + "..." + cfg.clientId.slice(-6),
-    code_present:      !!code,
-    verifier_present:  !!codeVerifier,
-  });
-
-  const res = await fetchWithTimeout(url, {
-    method:  "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
-    body: body.toString(),
-  }, "token");
-
-  return parseTokenResponse(res, "token");
-}
-
-// ---------------------------------------------------------------------------
 // Password grant flow (mode = "password")
 //   POST /oidc-provider/v1/oauth2/token  grant_type=password
 // ---------------------------------------------------------------------------
+
 
 async function acquireTokenPassword(): Promise<OracleTokenSet> {
   const cfg  = loadConfig();
@@ -467,7 +293,7 @@ async function parseTokenResponse(
     );
   }
 
-  const modeLabel = getAuthMode() === "password" ? "password grant" : "PKCE OIDC";
+  const modeLabel = stage === "refresh" ? "refresh" : "password grant";
   console.info(
     "[MicrosAuth] Token " +
       (stage === "refresh" ? "refreshed" : "acquired") +
@@ -617,43 +443,6 @@ function isRefreshTokenValid(t: OracleTokenSet): boolean {
   if (!t.refreshToken) return false;
   if (!t.refreshExpiresAt) return true; // no expiry info — assume valid
   return t.refreshExpiresAt - Date.now() > TOKEN_BUFFER_MS;
-}
-
-function generateState(): string {
-  return crypto.randomBytes(16).toString("base64url");
-}
-
-function extractSetCookies(headers: Headers): string {
-  const all: string[] =
-    (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
-  if (all.length > 0) {
-    return all.map((c) => c.split(";")[0]).join("; ");
-  }
-  const single = headers.get("set-cookie") ?? "";
-  if (!single) return "";
-  return single
-    .split(",")
-    .map((c) => c.split(";")[0].trim())
-    .join("; ");
-}
-
-function hasCookies(headers: Headers): boolean {
-  const all =
-    (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
-  return all.length > 0 || !!headers.get("set-cookie");
-}
-
-function extractCode(location: string): string {
-  if (!location) return "";
-  try {
-    const normalized = location.startsWith("apiaccount://")
-      ? location.replace("apiaccount://callback", "https://placeholder/callback")
-      : location;
-    return new URL(normalized).searchParams.get("code") ?? "";
-  } catch {
-    const m = location.match(/[?&]code=([^&]+)/);
-    return m ? decodeURIComponent(m[1]) : "";
-  }
 }
 
 function sanitize(msg: string): string {

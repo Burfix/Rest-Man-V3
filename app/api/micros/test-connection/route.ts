@@ -1,7 +1,7 @@
 /**
  * POST /api/micros/test-connection
  *
- * Runs the Oracle MICROS BI API PKCE OIDC auth flow (authorize → signin → token)
+ * Runs the Oracle MICROS BI API password grant auth flow
  * and returns a structured result showing exactly which stage passed or failed.
  *
  * Response shape:
@@ -41,7 +41,7 @@ export async function POST() {
         userMessage: "Authentication mode not confirmed.",
         technicalDetails: {
           stage: "config",
-          hint:  "Set MICROS_AUTH_MODE=pkce or MICROS_AUTH_MODE=password after Oracle confirms the correct flow.",
+          hint:  "Set MICROS_AUTH_MODE=password once Oracle confirms password authentication is enabled for this client.",
         },
         hasIdToken:      false,
         hasRefreshToken: false,
@@ -54,8 +54,8 @@ export async function POST() {
   // Always start with a cold cache so we're testing the real flow.
   clearMicrosTokenCache();
 
-  // ── Step 1: PKCE OIDC auth flow (authorize → signin → token) ──────────────
-  let stage: "authorize" | "signin" | "token" | "refresh" | "api" | "config" = "authorize";
+  // ── Step 1: Password grant auth flow (token) ─────────────────────────────
+  let stage: "token" | "refresh" | "api" | "config" = "token";
   const authT0 = Date.now();
 
   try {

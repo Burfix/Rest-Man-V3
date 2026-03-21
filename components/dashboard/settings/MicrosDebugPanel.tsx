@@ -128,9 +128,8 @@ export default function MicrosDebugPanel({
             {!state.data.authModeConfirmed && (
               <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-100 px-2 py-1.5 text-xs text-amber-800">
                 Set{" "}
-                <code className="font-mono">MICROS_AUTH_MODE=pkce</code>{" "}or{" "}
                 <code className="font-mono">MICROS_AUTH_MODE=password</code>{" "}
-                after Oracle confirms the correct flow.
+                once Oracle confirms password authentication is enabled for this client.
               </p>
             )}
           </div>
