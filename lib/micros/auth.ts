@@ -57,7 +57,8 @@ export class MicrosAuthError extends Error {
 // -- Constants --------------------------------------------------------------
 
 const REDIRECT_URI = "apiaccount://callback";
-const REQUEST_TIMEOUT_MS = 20_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+const USER_AGENT = "SiCantinaConcierge/1.0";
 
 const AUTHORIZE_PATH = "/oidc-provider/v1/oauth2/authorize";
 const SIGNIN_PATH = "/oidc-provider/v1/oauth2/signin";
@@ -140,14 +141,21 @@ async function authorize(
   const res = await fetchWithTimeout(url.toString(), {
     method: "GET",
     redirect: "manual",
+    headers: {
+      "User-Agent": USER_AGENT,
+      Accept: "text/html, application/xhtml+xml, */*",
+    },
+    cache: "no-store",
   });
 
   if (res.status >= 400) {
     const text = await res.text().catch(() => "");
+    const hdrs: Record<string, string> = {};
+    res.headers.forEach((v, k) => { hdrs[k] = v.slice(0, 120); });
     throw new MicrosAuthError(
       "authorize",
       "OpenID authorization failed.",
-      `HTTP ${res.status}: ${text.slice(0, 300)}`,
+      `HTTP ${res.status} from ${url.origin}${url.pathname} | body: ${text.slice(0, 200)} | headers: ${JSON.stringify(hdrs).slice(0, 300)}`,
       "AUTHORIZE_FAILED"
     );
   }
@@ -185,10 +193,12 @@ async function signin(
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": USER_AGENT,
       Cookie: cookieHeader(cookies),
     },
     body: body.toString(),
     redirect: "manual",
+    cache: "no-store",
   });
 
   // Collect any new cookies from signin response
@@ -296,10 +306,12 @@ async function getToken(
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": USER_AGENT,
       Cookie: cookieHeader(cookies),
     },
     body: body.toString(),
     redirect: "manual",
+    cache: "no-store",
   });
 
   const text = await res.text();
@@ -372,8 +384,12 @@ async function refreshTokens(
 
   const res = await fetchWithTimeout(url, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": USER_AGENT,
+    },
     body: body.toString(),
+    cache: "no-store",
   });
 
   const text = await res.text();

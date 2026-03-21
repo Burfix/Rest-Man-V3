@@ -81,7 +81,7 @@ type TestState =
   | { status: "idle" }
   | { status: "testing" }
   | { status: "success"; message: string }
-  | { status: "error"; stage?: string; message: string };
+  | { status: "error"; stage?: string; message: string; detail?: string | null };
 
 // ── Component ─────────────────────────────────────────────────────────────
 
@@ -153,6 +153,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
           status:  "error",
           stage:   json.stage,
           message: json.message ?? json.error ?? "Connection test failed.",
+          detail:  json.detail ?? null,
         });
       }
     } catch (err) {
@@ -346,8 +347,14 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
 
           {/* Test-connection / sync feedback */}
           {testState.status === "error" && (
-            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              {testState.message}
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 space-y-1">
+              <div>{testState.message}</div>
+              {testState.detail && (
+                <details className="text-[10px] text-red-500">
+                  <summary className="cursor-pointer">Diagnostic detail</summary>
+                  <pre className="mt-1 whitespace-pre-wrap break-all">{testState.detail}</pre>
+                </details>
+              )}
             </div>
           )}
           {testState.status === "success" && (
