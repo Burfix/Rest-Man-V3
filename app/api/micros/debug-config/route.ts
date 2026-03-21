@@ -44,10 +44,7 @@ export async function GET() {
   const username     = norm(process.env.MICROS_USERNAME    ?? process.env.MICROS_API_ACCOUNT_NAME ?? "");
   const orgShortName = norm(process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER ?? "");
   const locationRef  = norm(process.env.MICROS_LOCATION_REF   ?? process.env.MICROS_LOC_REF        ?? "");
-  const redirectUri  = norm(process.env.MICROS_REDIRECT_URI ?? "apiaccount://callback");
   const password     = process.env.MICROS_PASSWORD ?? process.env.MICROS_API_ACCOUNT_PASSWORD ?? "";
-  const rawAuthMode  = norm(process.env.MICROS_AUTH_MODE ?? "").toLowerCase();
-  const authMode     = rawAuthMode === "pkce" || rawAuthMode === "password" ? rawAuthMode : "unknown";
 
   // Detect environment mismatch heuristic.
   let environmentMismatch = false;
@@ -62,11 +59,11 @@ export async function GET() {
   return NextResponse.json({
     // Server presence checks (no raw values)
     authServerPresent:    !!authServer,
-    authServer,                          // URL is safe to show — not a secret
+    authServer,                          // URL is safe to show -- not a secret
     biServerPresent:      !!biServer,
     biServer:             biServer || null,
 
-    // Client ID diagnostics — length + masked preview only
+    // Client ID diagnostics -- length + masked preview only
     clientIdPresent:      !!clientId,
     clientIdLength:       clientId.length,
     clientIdFirst6:       clientId.length >= 6 ? clientId.slice(0, 6) : clientId || "(empty)",
@@ -79,11 +76,6 @@ export async function GET() {
     orgShortNamePresent:  !!orgShortName,
     locationRefPresent:   !!locationRef,
     passwordPresent:      !!password.trim(),
-    redirectUri,
-
-    // Auth mode
-    authMode,
-    authModeConfirmed:    authMode !== "unknown",
 
     // Integration flag
     microsEnabled:        (process.env.MICROS_ENABLED ?? "false").toLowerCase() === "true",

@@ -112,16 +112,6 @@ export interface MicrosStatusSummary {
 // ── Internal Oracle API response shapes ───────────────────────────────────
 // These are NEVER bound to UI. Normalization happens in services/micros/normalize.ts
 
-/** @internal Raw OAuth token response from Oracle OIDC provider */
-export interface _OracleTokenResponse {
-  access_token:  string;
-  token_type:    string;
-  expires_in:    number;
-  refresh_token?: string;
-  id_token?:     string;
-  scope?:        string;
-}
-
 /** @internal Oracle MICROS BI daily business summary */
 export interface _OracleDailyTotals {
   locRef?:         string;

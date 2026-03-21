@@ -26,7 +26,6 @@ const AUDIT_VARS = [
   "MICROS_ORG_SHORT_NAME",
   "MICROS_USERNAME",
   "MICROS_LOCATION_REF",
-  "MICROS_REDIRECT_URI",
 ] as const;
 
 export const dynamic = "force-dynamic";

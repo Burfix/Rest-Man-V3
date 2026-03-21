@@ -17,8 +17,6 @@ import { useEffect, useState } from "react";
 // ---------------------------------------------------------------------------
 
 interface DebugConfig {
-  authMode: string;
-  authModeConfirmed: boolean;
   authServerPresent: boolean;
   authServer: string | null;
   biServerPresent: boolean;
@@ -33,7 +31,6 @@ interface DebugConfig {
   passwordPresent: boolean;
   orgShortNamePresent: boolean;
   locationRefPresent: boolean;
-  redirectUri: string;
   microsEnabled: boolean;
   environmentMismatch: boolean;
   environmentMismatchWarning: string | null;
@@ -106,34 +103,6 @@ export default function MicrosDebugPanel({
 
       {state.status === "ok" && (
         <div className="space-y-4">
-          {/* Auth mode */}
-          <div>
-            <p className="mb-1.5 text-xs font-semibold text-amber-700">
-              Authentication mode
-            </p>
-            <table className="w-full text-xs">
-              <tbody className="divide-y divide-amber-100">
-                <DiagRow
-                  label="MICROS_AUTH_MODE"
-                  value={state.data.authMode}
-                  highlight={!state.data.authModeConfirmed ? "error" : undefined}
-                />
-                <DiagRow
-                  label="Confirmed"
-                  value={state.data.authModeConfirmed ? "Yes" : "Not yet — awaiting Oracle confirmation"}
-                  highlight={!state.data.authModeConfirmed ? "error" : undefined}
-                />
-              </tbody>
-            </table>
-            {!state.data.authModeConfirmed && (
-              <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-100 px-2 py-1.5 text-xs text-amber-800">
-                Oracle provided BI API credentials, but the exact OAuth grant type was not
-                explicitly stated in the provisioning details. Once confirmed, set{" "}
-                <code className="font-mono">MICROS_AUTH_MODE=password</code>.
-              </p>
-            )}
-          </div>
-
           {/* Client ID */}
           <div>
             <p className="mb-1.5 text-xs font-semibold text-amber-700">

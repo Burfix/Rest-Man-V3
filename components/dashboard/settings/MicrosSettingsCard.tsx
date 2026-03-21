@@ -20,23 +20,29 @@ import { sanitizeMicrosError }                            from "@/lib/integratio
 // ── Status chip ───────────────────────────────────────────────────────────
 
 const HEALTH_STYLES: Record<IntegrationHealth, string> = {
-  connected:      "bg-green-50  text-green-700  ring-green-200",
-  degraded:       "bg-amber-50  text-amber-700  ring-amber-200",
-  not_configured: "bg-stone-100 text-stone-500  ring-stone-200",
-  auth_failed:    "bg-red-50    text-red-700    ring-red-200",
-  awaiting_setup: "bg-stone-100 text-stone-500  ring-stone-200",
-  disabled:       "bg-stone-100 text-stone-500  ring-stone-200",
-  syncing:        "bg-sky-50    text-sky-700    ring-sky-200",
+  connected:             "bg-green-50  text-green-700  ring-green-200",
+  degraded:              "bg-amber-50  text-amber-700  ring-amber-200",
+  not_configured:        "bg-stone-100 text-stone-500  ring-stone-200",
+  auth_failed:           "bg-red-50    text-red-700    ring-red-200",
+  awaiting_setup:        "bg-stone-100 text-stone-500  ring-stone-200",
+  disabled:              "bg-stone-100 text-stone-500  ring-stone-200",
+  syncing:               "bg-sky-50    text-sky-700    ring-sky-200",
+  credentials_present:   "bg-amber-50  text-amber-700  ring-amber-200",
+  awaiting_verification: "bg-amber-50  text-amber-700  ring-amber-200",
+  failed:                "bg-red-50    text-red-700    ring-red-200",
 };
 
 const HEALTH_DOT: Record<IntegrationHealth, string> = {
-  connected:      "bg-green-500",
-  degraded:       "bg-amber-500",
-  not_configured: "bg-stone-400",
-  auth_failed:    "bg-red-500",
-  awaiting_setup: "bg-stone-400",
-  disabled:       "bg-stone-400",
-  syncing:        "bg-sky-500 animate-pulse",
+  connected:             "bg-green-500",
+  degraded:              "bg-amber-500",
+  not_configured:        "bg-stone-400",
+  auth_failed:           "bg-red-500",
+  awaiting_setup:        "bg-stone-400",
+  disabled:              "bg-stone-400",
+  syncing:               "bg-sky-500 animate-pulse",
+  credentials_present:   "bg-amber-400",
+  awaiting_verification: "bg-amber-400",
+  failed:                "bg-red-500",
 };
 
 function ConnectionChip({ health, label }: { health: IntegrationHealth; label: string }) {
@@ -154,28 +160,6 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
     }
   }
 
-  // ── Manual sync handler ─────────────────────────────────────────────────
-
-  async function handleSync() {
-    setTestState({ status: "testing" });
-    try {
-      const res  = await fetch("/api/micros/sync", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({}),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setTestState({ status: "success", message: "Sync completed successfully." });
-        router.refresh();
-      } else {
-        setTestState({ status: "error", message: json.error ?? "Sync failed." });
-      }
-    } catch (err) {
-      setTestState({ status: "error", message: err instanceof Error ? err.message : "Unexpected error." });
-    }
-  }
-
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   function formatDate(iso: string | null): string {
@@ -202,7 +186,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
             Oracle MICROS BI
           </h2>
           <p className="mt-0.5 text-xs text-stone-500">
-            Live POS data — sales, labour, guest checks.
+            Oracle MICROS BI API integration.
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -381,14 +365,6 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
             >
               <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", testState.status === "testing" ? "bg-sky-400 animate-pulse" : "bg-stone-400")} />
               {testState.status === "testing" ? "Testing…" : "Test connection"}
-            </button>
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={testState.status === "testing"}
-              className="flex items-center gap-1.5 rounded-md border border-stone-300 bg-white px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50 transition-colors"
-            >
-              Sync now
             </button>
           </div>
         </>

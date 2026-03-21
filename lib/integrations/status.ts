@@ -21,13 +21,23 @@ import type { MicrosStatusSummary } from "@/types/micros";
 // ── Types ─────────────────────────────────────────────────────────────────
 
 export type IntegrationHealth =
-  | "connected"       // Verified — live data available and fresh
-  | "degraded"        // Auth succeeded but last sync is stale (> 4 h)
-  | "not_configured"  // Required server env vars are missing
-  | "auth_failed"     // Config present but connection.status = "error"
-  | "awaiting_setup"  // First-time: no connection row or status awaiting_setup
-  | "disabled"        // MICROS_ENABLED = false
-  | "syncing";        // Status = syncing (in progress)
+  | "connected"            // Verified — live data available and fresh
+  | "degraded"             // Auth succeeded but last sync is stale (> 4 h)
+  | "not_configured"       // Required server env vars are missing
+  | "auth_failed"          // Config present but connection.status = "error"
+  | "awaiting_setup"       // First-time: no connection row or status awaiting_setup
+  | "disabled"             // MICROS_ENABLED = false
+  | "syncing"              // Status = syncing (in progress)
+  | "credentials_present"  // Env vars set but connection method unconfirmed
+  | "awaiting_verification" // DB row present but auth unconfirmed
+  | "failed";              // Unrecoverable failure
+
+export type MicrosSetupStatus =
+  | "not_configured"
+  | "credentials_present"
+  | "awaiting_verification"
+  | "connected"
+  | "failed";
 
 export interface MicrosIntegrationStatus {
   health:               IntegrationHealth;
@@ -124,15 +134,15 @@ export function deriveMicrosIntegrationStatus(
     };
   }
 
-  // ② Auth mode not confirmed -- fail closed before other checks
-  if (authModeUnconfirmed) {
+  // ② Credentials present but connection method not yet confirmed
+  if (authModeUnconfirmed || envConfigured) {
     return {
-      health:               "awaiting_setup",
-      label:                "Awaiting auth flow verification",
+      health:               "credentials_present",
+      label:                "Awaiting verification",
       isLiveDataAvailable:  false,
       lastSuccessfulSyncAt: null,
-      reasonCode:           "AUTH_MODE_UNCONFIRMED",
-      userMessage:          "MICROS BI API credentials are present. Authentication is paused while the exact Oracle-supported auth flow for this client is being verified.",
+      reasonCode:           "AUTH_METHOD_UNCONFIRMED",
+      userMessage:          "MICROS credentials have been captured from the Oracle provisioning details. Authentication and live data access are paused until the exact supported connection method is confirmed.",
     };
   }
 
