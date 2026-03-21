@@ -7,7 +7,8 @@
  * Request: POST {MICROS_AUTH_SERVER}/oauth/token
  * Body:    grant_type=password, username, password, client_id
  *
- * Response: { ok, status, httpStatus, responsePreview, message }
+ * Response: { ok, status, httpStatus, contentType, requestUrl, requestMethod,
+ *             responsePreview, oracleError, message }
  *
  * No fallbacks. No alternate flows. No retries.
  * NEVER returns token values, passwords, or credential content.
@@ -22,9 +23,13 @@ export const runtime = "nodejs";
 
 const FETCH_TIMEOUT_MS = 20_000;
 
-const FAILURE_MESSAGE =
-  "Authentication failed using the Oracle-provided credentials. " +
-  "The authentication flow for this client may require additional configuration from Oracle.";
+function statusMessage(httpStatus: number): string {
+  if (httpStatus === 400) return "Oracle rejected the authentication request.";
+  if (httpStatus === 401) return "Oracle rejected the username or password.";
+  if (httpStatus === 403) return "Oracle accepted the request but does not allow this client/account.";
+  if (httpStatus === 405) return "Oracle rejected the endpoint or HTTP method.";
+  return "Oracle rejected the authentication request.";
+}
 
 export async function POST() {
   const authServer = (process.env.MICROS_AUTH_SERVER ?? "").replace(/[\r\n]/g, "").trim().replace(/\/$/, "");
@@ -46,7 +51,11 @@ export async function POST() {
         ok:              false,
         status:          "not_configured",
         httpStatus:      null,
+        contentType:     null,
+        requestUrl:      authServer ? authServer + "/oauth/token" : null,
+        requestMethod:   "POST",
         responsePreview: null,
+        oracleError:     null,
         message:         `Required credentials are missing: ${missing}. Check your environment variables.`,
         checkedAt:       new Date().toISOString(),
       },
@@ -75,26 +84,47 @@ export async function POST() {
     });
     clearTimeout(timer);
   } catch (err) {
-    const networkMsg = err instanceof Error ? err.message : String(err);
-    await persistSyncError(FAILURE_MESSAGE).catch(() => null);
+    const isTimeout  = err instanceof Error && err.name === "AbortError";
+    const networkMsg = isTimeout ? "Request timed out after 20s" : (err instanceof Error ? err.message : String(err));
+    const failMsg    = "Oracle auth server did not respond. " + networkMsg.slice(0, 150);
+    await persistSyncError(failMsg).catch(() => null);
     return NextResponse.json(
       {
         ok:              false,
-        status:          "auth_failed",
+        status:          "network_error",
         httpStatus:      null,
+        contentType:     null,
+        requestUrl:      url,
+        requestMethod:   "POST",
         responsePreview: null,
-        message:         FAILURE_MESSAGE,
-        networkError:    networkMsg.slice(0, 200),
+        oracleError:     null,
+        message:         failMsg,
         checkedAt:       new Date().toISOString(),
       },
       { status: 502 },
     );
   }
 
-  const raw     = await res.text().catch(() => "");
-  const preview = sanitizePreview(raw);
+  const raw         = await res.text().catch(() => "");
+  const contentType = res.headers.get("content-type") ?? "";
+  const preview     = sanitizePreview(raw);
+
+  // Extract Oracle error fields from JSON responses.
+  let oracleError: Record<string, string | number | null> | null = null;
   let json: Record<string, unknown> = {};
-  try { json = JSON.parse(raw); } catch { /* non-JSON body */ }
+  try {
+    json = JSON.parse(raw);
+    const pick = (key: string) => (json[key] != null ? String(json[key]) : null);
+    oracleError = {
+      error:             pick("error"),
+      error_description: pick("error_description"),
+      message:           pick("message"),
+      code:              pick("code"),
+      status:            json.status != null ? Number(json.status) : null,
+    };
+    // Nullify if all fields are empty (non-error success body).
+    if (Object.values(oracleError).every((v) => v === null)) oracleError = null;
+  } catch { /* non-JSON — leave oracleError null, preview covers it */ }
 
   if (res.ok && json.access_token) {
     clearMicrosTokenCache();
@@ -103,20 +133,29 @@ export async function POST() {
       ok:              true,
       status:          "connected",
       httpStatus:      res.status,
+      contentType,
+      requestUrl:      url,
+      requestMethod:   "POST",
       responsePreview: preview,
+      oracleError:     null,
       message:         "Authentication successful.",
       checkedAt:       new Date().toISOString(),
     });
   }
 
-  await persistSyncError(FAILURE_MESSAGE).catch(() => null);
+  const failureMessage = statusMessage(res.status);
+  await persistSyncError(failureMessage).catch(() => null);
   return NextResponse.json(
     {
       ok:              false,
       status:          "auth_failed",
       httpStatus:      res.status,
+      contentType,
+      requestUrl:      url,
+      requestMethod:   "POST",
       responsePreview: preview,
-      message:         FAILURE_MESSAGE,
+      oracleError,
+      message:         failureMessage,
       checkedAt:       new Date().toISOString(),
     },
     { status: 400 },
