@@ -30,7 +30,7 @@ export interface MicrosEnvConfig {
   authServer: string;
   /** Base URL of the MICROS BI app server (no trailing slash). Read from MICROS_BI_SERVER. */
   appServer: string;
-  /** OAuth 2.0 client ID (public client — no secret for PKCE flow) */
+  /** OAuth 2.0 client ID */
   clientId: string;
   /** Oracle org / tenant short name used in x-app-key header. Read from MICROS_ORG_SHORT_NAME. */
   orgIdentifier: string;

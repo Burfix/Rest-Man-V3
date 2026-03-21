@@ -39,7 +39,6 @@ export default async function IntegrationsPage() {
     dbLastSyncError:       connection?.last_sync_error
                              ? `[present — ${connection.last_sync_error.length} chars]`
                              : "null",
-    containsClientSecret:  connection?.last_sync_error?.includes("MICROS_CLIENT_SECRET") ?? false,
     derivedHealth:         microsHealth.health,
     derivedLabel:          microsHealth.label,
     derivedUserMessage:    microsHealth.userMessage,

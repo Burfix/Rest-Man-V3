@@ -219,7 +219,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
       {!editing && !connection && (
         <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-8 text-center">
           <p className="text-sm font-medium text-stone-500">Not configured</p>
-          <p className="mt-1 text-xs text-stone-400">Enter your Oracle MICROS credentials to enable live POS sync.</p>
+          <p className="mt-1 text-xs text-stone-400">Enter your Oracle MICROS credentials to begin setup.</p>
           <button
             type="button"
             onClick={() => setEditing(true)}

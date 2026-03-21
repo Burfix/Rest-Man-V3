@@ -3,8 +3,6 @@
  * POST /api/micros/settings — upsert connection config (create or update)
  *
  * Credentials are stored server-side in Supabase behind service_role RLS.
- * The client_secret is never stored in the DB — it lives in the
- * MICROS_CLIENT_SECRET env var only.
  */
 
 import { NextRequest, NextResponse } from "next/server";

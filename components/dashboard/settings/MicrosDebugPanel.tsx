@@ -230,7 +230,7 @@ export default function MicrosDebugPanel({
             </p>
             <table className="w-full text-xs">
               <tbody className="divide-y divide-amber-100">
-                <DiagRow label="Stage" value="token (password grant)" />
+                <DiagRow label="Stage" value="awaiting verification" />
                 <DiagRow
                   label="Connection status"
                   value={connectionStatus ?? "unknown"}
