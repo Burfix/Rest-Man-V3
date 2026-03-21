@@ -78,6 +78,17 @@ function generateCodeChallenge(verifier: string): string {
 
 function parseCookies(headers: Headers): string[] {
   const cookies: string[] = [];
+
+  // Prefer getSetCookie() (Node 18+) which properly handles multiple Set-Cookie headers
+  if (typeof headers.getSetCookie === "function") {
+    for (const raw of headers.getSetCookie()) {
+      const cookiePart = raw.split(";")[0];
+      if (cookiePart) cookies.push(cookiePart);
+    }
+    return cookies;
+  }
+
+  // Fallback: iterate headers (works in Node 20 undici but may collapse in some runtimes)
   headers.forEach((value, key) => {
     if (key.toLowerCase() === "set-cookie") {
       const cookiePart = value.split(";")[0];
@@ -194,13 +205,9 @@ async function signin(
     }
     throw new MicrosAuthError(
       "signin",
-      parsed.message === "Invalid credentials."
-        ? "Invalid API account credentials. Check username, password, and org name."
-        : `Sign-in rejected (HTTP 401): ${parsed.message ?? text.slice(0, 200)}`,
+      "Invalid credentials. Please verify your API account username, password, and org name (Enterprise Short Name). Note: Oracle API passwords expire after 60 days.",
       parsed.code,
-      parsed.code === "AUTHENTICATION_INVALID"
-        ? "INVALID_CREDENTIALS"
-        : "SIGNIN_FAILED"
+      "INVALID_CREDENTIALS"
     );
   }
 
