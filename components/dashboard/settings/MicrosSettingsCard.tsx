@@ -304,7 +304,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
                 <div className="min-w-0">
                   <p className="text-xs font-semibold text-stone-700">{microsHealth.label}</p>
                   <p className="mt-0.5 text-xs text-stone-500">{microsHealth.userMessage}</p>
-                  {connection?.last_sync_error && microsHealth.health !== "credentials_present" && microsHealth.health !== "awaiting_verification" && (
+                  {connection?.last_sync_error && microsHealth.health !== "credentials_present" && microsHealth.health !== "awaiting_verification" && microsHealth.health !== "awaiting_setup" && (
                     <details className="mt-2">
                       <summary className="cursor-pointer text-xs text-stone-400 hover:text-stone-600">
                         Technical details

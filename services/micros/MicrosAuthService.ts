@@ -4,13 +4,19 @@
 
 class MicrosAuthServiceImpl {
   async getAccessToken(): Promise<string> {
-    throw new Error("MICROS authentication is not configured.");
+    const { getMicrosIdToken } = await import("@/lib/micros/auth");
+    return getMicrosIdToken();
   }
   async testConnection(): Promise<{ ok: boolean; message: string }> {
-    return {
-      ok: false,
-      message: "No connection test has been run because the exact Oracle-supported authentication method has not yet been confirmed.",
-    };
+    try {
+      await this.getAccessToken();
+      return { ok: true, message: "PKCE authentication successful." };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof Error ? err.message : "Authentication failed.",
+      };
+    }
   }
 }
 

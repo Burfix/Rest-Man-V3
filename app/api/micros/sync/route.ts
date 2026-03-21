@@ -1,8 +1,8 @@
 /**
  * POST /api/micros/sync
  *
- * Returns 503 -- data sync is not available.
- * The Oracle MICROS connection method has not yet been confirmed.
+ * Returns 503 -- sync logic is not yet implemented.
+ * Authentication is available via the PKCE flow in lib/micros/auth.
  */
 
 import { NextResponse } from "next/server";
@@ -15,7 +15,7 @@ export async function POST() {
     {
       ok:      false,
       status:  "not_available",
-      message: "Data sync is not available. The Oracle MICROS connection method has not yet been confirmed.",
+      message: "Data sync is not yet implemented. Authentication is available — sync logic is pending.",
     },
     { status: 503 },
   );

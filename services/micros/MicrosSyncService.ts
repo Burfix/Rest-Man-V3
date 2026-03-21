@@ -1,6 +1,6 @@
 /**
  * services/micros/MicrosSyncService.ts -- stub.
- * Data sync is not available until the Oracle connection method is confirmed.
+ * Full sync implementation pending; auth flow is available via lib/micros/auth.
  */
 
 export interface SyncResult {
@@ -15,7 +15,7 @@ export class MicrosSyncService {
   async runFullSync(_date?: string): Promise<SyncResult> {
     return {
       success: false,
-      message: "Data sync is not available. The Oracle MICROS connection method has not yet been confirmed.",
+      message: "Data sync is not yet implemented. Authentication is available — sync logic is pending.",
     };
   }
 }

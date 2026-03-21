@@ -1,5 +1,5 @@
 /**
- * services/micros/sync.ts -- stub: data sync is not available.
+ * services/micros/sync.ts -- stub: sync logic pending implementation.
  */
 
 export interface SyncResult {
@@ -13,6 +13,6 @@ export interface SyncResult {
 export async function runFullSync(_date?: string): Promise<SyncResult> {
   return {
     success: false,
-    message: "Data sync is not available. The Oracle MICROS connection method has not yet been confirmed.",
+    message: "Data sync is not yet implemented. Authentication is available — sync logic is pending.",
   };
 }

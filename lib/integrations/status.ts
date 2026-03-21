@@ -82,6 +82,13 @@ export function sanitizeMicrosError(raw: string | null | undefined): string {
     // Missing config error message from old validator
     [/MICROS is enabled but missing configuration:\s*[^.]+\./gi,
       "Setup is incomplete. Please review your server configuration."],
+    // Stale stub messages from before auth was implemented
+    [/No connection test has been run because.*not yet been confirmed\.?/gi,
+      "Run a connection test to verify authentication."],
+    [/Oracle.*connection method has not.*been confirmed\.?/gi,
+      "Run a connection test to verify authentication."],
+    [/Authentication and live data access are paused until.*confirmed\.?/gi,
+      "Run a connection test to verify authentication."],
     // Redundant verb fragments left after redaction
     [/\s*is not set\.\s*/gi,   " "],
     [/\s*environment variable\s*/gi, " "],
@@ -149,11 +156,11 @@ export function deriveMicrosIntegrationStatus(
   if (!ms?.connection) {
     return {
       health:               "awaiting_setup",
-      label:                "Awaiting setup",
+      label:                "Ready to connect",
       isLiveDataAvailable:  false,
       lastSuccessfulSyncAt: null,
       reasonCode:           "no_connection_row",
-      userMessage:          "Integration has not been activated yet. Run a connection test to begin.",
+      userMessage:          "MICROS credentials are configured. Click \"Test connection\" to authenticate via PKCE.",
     };
   }
 
@@ -161,7 +168,8 @@ export function deriveMicrosIntegrationStatus(
   const lastSuccess = conn.last_successful_sync_at ?? null;
 
   // ④ Last sync errored — sanitise message (strip deprecated env var references)
-  if (conn.status === "error" || conn.last_sync_error) {
+  //    But ignore stale last_sync_error if DB status is awaiting_setup (not a real error)
+  if (conn.status === "error" || (conn.last_sync_error && conn.status !== "awaiting_setup")) {
     const safeMsg = sanitizeMicrosError(conn.last_sync_error);
     return {
       health:               "auth_failed",
@@ -222,11 +230,11 @@ export function deriveMicrosIntegrationStatus(
   // ⑦ Default: awaiting_setup DB status
   return {
     health:               "awaiting_setup",
-    label:                "Awaiting setup",
+    label:                "Ready to connect",
     isLiveDataAvailable:  false,
     lastSuccessfulSyncAt: lastSuccess,
     reasonCode:           "awaiting_setup",
-    userMessage:          "Integration saved. Run a connection test to verify authentication.",
+    userMessage:          "MICROS credentials are configured. Click \"Test connection\" to authenticate via PKCE.",
   };
 }
 

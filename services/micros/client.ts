@@ -1,5 +1,5 @@
 /**
- * services/micros/client.ts -- stub: no auth flow active.
+ * services/micros/client.ts -- delegates to lib/micros/client.
  */
 
 export async function microsGet<T = unknown>(
@@ -12,5 +12,6 @@ export async function microsGet<T = unknown>(
     params?: Record<string, string>;
   }
 ): Promise<T> {
-  throw new Error("MICROS API client is not available. The Oracle connection method has not been confirmed.");
+  const { MicrosApiClient } = await import("@/lib/micros/client");
+  return MicrosApiClient.get<T>(_opts.path);
 }
