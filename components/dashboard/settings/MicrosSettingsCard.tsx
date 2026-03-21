@@ -92,6 +92,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
   const [connection, setConnection] = useState<MicrosConnection | null>(initial);
   const [saveState,  setSaveState]  = useState<SaveState>({ status: "idle" });
   const [testState,  setTestState]  = useState<TestState>({ status: "idle" });
+  const [syncState,  setSyncState]  = useState<TestState>({ status: "idle" });
   const [editing,    setEditing]    = useState(!initial);
 
   // ── Save handler ────────────────────────────────────────────────────────
@@ -158,6 +159,32 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
       }
     } catch (err) {
       setTestState({ status: "error", message: err instanceof Error ? err.message : "Unexpected error." });
+    }
+  }
+
+  // ── Sync data handler ──────────────────────────────────────────────────
+
+  async function handleSyncNow() {
+    setSyncState({ status: "testing" });
+    try {
+      const res  = await fetch("/api/micros/sync", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (json.ok) {
+        setSyncState({ status: "success", message: json.message ?? "Sync complete." });
+        router.refresh();
+      } else {
+        setSyncState({
+          status:  "error",
+          message: json.message ?? "Sync failed.",
+          detail:  json.errors?.join("; ") ?? null,
+        });
+      }
+    } catch (err) {
+      setSyncState({ status: "error", message: err instanceof Error ? err.message : "Unexpected error." });
     }
   }
 
@@ -363,6 +390,24 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
             </div>
           )}
 
+          {/* Sync feedback */}
+          {syncState.status === "error" && (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 space-y-1">
+              <div>{syncState.message}</div>
+              {syncState.detail && (
+                <details className="text-[10px] text-red-500">
+                  <summary className="cursor-pointer">Detail</summary>
+                  <pre className="mt-1 whitespace-pre-wrap break-all">{syncState.detail}</pre>
+                </details>
+              )}
+            </div>
+          )}
+          {syncState.status === "success" && (
+            <div className="mt-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+              {syncState.message}
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -372,6 +417,15 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
             >
               <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", testState.status === "testing" ? "bg-sky-400 animate-pulse" : "bg-stone-400")} />
               {testState.status === "testing" ? "Testing…" : "Test connection"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSyncNow}
+              disabled={syncState.status === "testing"}
+              className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
+            >
+              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", syncState.status === "testing" ? "bg-emerald-400 animate-pulse" : "bg-emerald-500")} />
+              {syncState.status === "testing" ? "Syncing…" : "Sync now"}
             </button>
           </div>
         </>

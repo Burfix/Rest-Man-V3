@@ -1,18 +1,12 @@
 /**
- * services/micros/sync.ts -- stub: sync logic pending implementation.
+ * services/micros/sync.ts — convenience wrapper around MicrosSyncService.
  */
 
-export interface SyncResult {
-  success:       boolean;
-  message:       string;
-  businessDate?: string;
-  recordsSynced?: number;
-  errors?:       string[];
-}
+import { MicrosSyncService } from "./MicrosSyncService";
 
-export async function runFullSync(_date?: string): Promise<SyncResult> {
-  return {
-    success: false,
-    message: "Data sync is not yet implemented. Authentication is available — sync logic is pending.",
-  };
+export type { SyncResult } from "./MicrosSyncService";
+
+export async function runFullSync(date?: string) {
+  const svc = new MicrosSyncService();
+  return svc.runFullSync(date);
 }

@@ -3,5 +3,11 @@
   "buildCommand": "npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "regions": ["cpt1"]
+  "regions": ["cpt1"],
+  "crons": [
+    {
+      "path": "/api/micros/sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }
