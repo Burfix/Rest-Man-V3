@@ -1,183 +1,135 @@
 /**
  * POST /api/micros/test-connection
  *
- * Runs the Oracle MICROS BI API password grant auth flow
- * and returns a structured result showing exactly which stage passed or failed.
+ * Makes a single token request to the Oracle MICROS auth server using the
+ * credentials provided via environment variables.
  *
- * Response shape:
- *   { ok, stage, reasonCode, message, hasIdToken, hasRefreshToken, authMs, checkedAt }
+ * Request: POST {MICROS_AUTH_SERVER}/oauth/token
+ * Body:    grant_type=password, username, password, client_id
  *
+ * Response: { ok, status, httpStatus, responsePreview, message }
+ *
+ * No fallbacks. No alternate flows. No retries.
  * NEVER returns token values, passwords, or credential content.
  */
 
-import { NextResponse }           from "next/server";
-import {
-  clearMicrosTokenCache,
-  getAuthMode,
-  getMicrosAccessToken,
-  getMicrosTokenStatus,
-  MicrosAuthError,
-}                                  from "@/lib/micros/auth";
-import { MicrosApiClient }         from "@/lib/micros/client";
-import { createServerClient }      from "@/lib/supabase/server";
-import { sanitizeMicrosError }     from "@/lib/integrations/status";
+import { NextResponse }          from "next/server";
+import { clearMicrosTokenCache } from "@/lib/micros/auth";
+import { createServerClient }    from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const FETCH_TIMEOUT_MS = 20_000;
+
+const FAILURE_MESSAGE =
+  "Authentication failed using the Oracle-provided credentials. " +
+  "The authentication flow for this client may require additional configuration from Oracle.";
+
 export async function POST() {
-  const t0 = Date.now();
+  const authServer = (process.env.MICROS_AUTH_SERVER ?? "").replace(/[\r\n]/g, "").trim().replace(/\/$/, "");
+  const clientId   = (process.env.MICROS_CLIENT_ID   ?? "").replace(/[\r\n]/g, "").trim();
+  const username   = (process.env.MICROS_USERNAME     ?? "").replace(/[\r\n]/g, "").trim();
+  const password   = (process.env.MICROS_PASSWORD     ?? "").trim();
 
-  // Fail closed if auth mode is not yet confirmed.
-  if (getAuthMode() === "unknown") {
-    await persistSyncError(
-      "Credentials present. Auth flow unconfirmed — awaiting Oracle verification of the supported OAuth grant type.",
-    ).catch(() => null);
-    return NextResponse.json(
-      {
-        ok:          false,
-        health:      "setup_incomplete",
-        reasonCode:  "AUTH_MODE_UNCONFIRMED",
-        userMessage: "MICROS BI API credentials are present. Authentication is paused while the exact Oracle-supported auth flow for this client is being verified.",
-        technicalDetails: {
-          stage:              "config",
-          credentialsPresent: true,
-          authServerPresent:  !!(process.env.MICROS_AUTH_SERVER?.trim()),
-          clientIdPresent:    !!(process.env.MICROS_CLIENT_ID?.trim()),
-          usernamePresent:    !!(process.env.MICROS_USERNAME?.trim()),
-          flowMode:           "unconfirmed",
-          hint:               "Oracle provided BI API credentials, but the exact OAuth grant type was not explicitly stated in the provisioning details. Set MICROS_AUTH_MODE=password once confirmed.",
-        },
-        hasIdToken:      false,
-        hasRefreshToken: false,
-        checkedAt:       new Date().toISOString(),
-      },
-      { status: 400 },
-    );
-  }
-
-  // Always start with a cold cache so we're testing the real flow.
-  clearMicrosTokenCache();
-
-  // ── Step 1: Password grant auth flow (token) ─────────────────────────────
-  let stage: "token" | "refresh" | "api" | "config" = "token";
-  const authT0 = Date.now();
-
-  try {
-    await getMicrosAccessToken();
-  } catch (err) {
-    const authErr    = err instanceof MicrosAuthError ? err : null;
-    const authStage  = authErr?.stage ?? "token";
-    const userMsg    = authErr?.userMessage ?? (err instanceof Error ? err.message : "Authentication failed");
-    const reasonCode = authErr?.reasonCode  ?? "AUTH_FAILED";
-    const safeMsg    = sanitizeMicrosError(userMsg);
-
-    // Persist sanitized error to DB connection record
-    await persistSyncError(safeMsg).catch(() => null);
-
-    // INVALID_CLIENT_ID — surface specific Oracle error with structured detail.
-    if (reasonCode === "INVALID_CLIENT_ID") {
-      return NextResponse.json(
-        {
-          ok:              false,
-          health:          "setup_incomplete",
-          reasonCode:      "INVALID_CLIENT_ID",
-          userMessage:     safeMsg,
-          technicalDetails: {
-            stage:         authStage,
-            oracleCode:    "VALIDATION_ERRORS",
-            oracleMessage: "INVALID_CLIENT_ID",
-          },
-          hasIdToken:      false,
-          hasRefreshToken: false,
-          checkedAt:       new Date().toISOString(),
-        },
-        { status: 400 },
-      );
-    }
-
-    // WRONG_AUTH_ENDPOINT — 405 means wrong URL or HTTP method.
-    if (reasonCode === "WRONG_AUTH_ENDPOINT") {
-      return NextResponse.json(
-        {
-          ok:              false,
-          health:          "setup_incomplete",
-          reasonCode:      "WRONG_AUTH_ENDPOINT",
-          userMessage:     safeMsg,
-          technicalDetails: {
-            stage:         authStage,
-            httpStatus:    405,
-            hint:          "Verify MICROS_AUTH_SERVER and confirm /oidc-provider/v1/oauth2/* paths.",
-          },
-          hasIdToken:      false,
-          hasRefreshToken: false,
-          checkedAt:       new Date().toISOString(),
-        },
-        { status: 400 },
-      );
-    }
-
+  if (!authServer || !clientId || !username || !password) {
+    const missing = (
+      [
+        !authServer && "MICROS_AUTH_SERVER",
+        !clientId   && "MICROS_CLIENT_ID",
+        !username   && "MICROS_USERNAME",
+        !password   && "MICROS_PASSWORD",
+      ] as Array<string | false>
+    ).filter(Boolean).join(", ");
     return NextResponse.json(
       {
         ok:              false,
-        stage:           authStage,
-        reasonCode,
-        message:         safeMsg,
-        hasIdToken:      false,
-        hasRefreshToken: false,
+        status:          "not_configured",
+        httpStatus:      null,
+        responsePreview: null,
+        message:         `Required credentials are missing: ${missing}. Check your environment variables.`,
         checkedAt:       new Date().toISOString(),
       },
       { status: 400 },
     );
   }
 
-  const authMs  = Date.now() - authT0;
-  const status  = getMicrosTokenStatus();
-  stage = "api";
+  // Single, direct token request — no retries, no fallbacks.
+  const url  = authServer + "/oauth/token";
+  const body = new URLSearchParams({
+    grant_type: "password",
+    username,
+    password,
+    client_id:  clientId,
+  });
 
-  // ── Step 2: Lightweight BI API health check ───────────────────────────
-  const today   = todayJHB();
-  const apiT0   = Date.now();
-  let   apiMs   = 0;
-  let   apiNote: string | undefined;
-
+  let res: Response;
   try {
-    await MicrosApiClient.get(
-      process.env.MICROS_PATH_DAILY_TOTALS ?? "/reports/dailyBusinessSummary",
-      { businessDate: today },
+    const controller = new AbortController();
+    const timer      = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    res = await fetch(url, {
+      method:  "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body:    body.toString(),
+      signal:  controller.signal,
+    });
+    clearTimeout(timer);
+  } catch (err) {
+    const networkMsg = err instanceof Error ? err.message : String(err);
+    await persistSyncError(FAILURE_MESSAGE).catch(() => null);
+    return NextResponse.json(
+      {
+        ok:              false,
+        status:          "auth_failed",
+        httpStatus:      null,
+        responsePreview: null,
+        message:         FAILURE_MESSAGE,
+        networkError:    networkMsg.slice(0, 200),
+        checkedAt:       new Date().toISOString(),
+      },
+      { status: 502 },
     );
-    apiMs = Date.now() - apiT0;
-  } catch (apiErr) {
-    apiMs = Date.now() - apiT0;
-    const msg = apiErr instanceof Error ? apiErr.message : String(apiErr);
-    // 404 = no data for today, but routing works — treat as soft pass.
-    if (!msg.includes("404")) {
-      apiNote = msg.slice(0, 250);
-      console.warn("[POST /api/micros/test-connection] BI API warning:", msg);
-    }
   }
 
-  // ── Persist connected status ──────────────────────────────────────────
-  await persistConnected().catch(() => null);
+  const raw     = await res.text().catch(() => "");
+  const preview = sanitizePreview(raw);
+  let json: Record<string, unknown> = {};
+  try { json = JSON.parse(raw); } catch { /* non-JSON body */ }
 
-  return NextResponse.json({
-    ok:              true,
-    stage:           "api" as const,
-    message:         "Authentication successful and BI API is reachable." +
-                     (apiNote ? ` Note: ${apiNote}` : ""),
-    hasIdToken:      true,
-    hasRefreshToken: status.hasRefreshToken,
-    authMs,
-    apiMs,
-    latencyMs:       Date.now() - t0,
-    checkedAt:       new Date().toISOString(),
-  });
+  if (res.ok && json.access_token) {
+    clearMicrosTokenCache();
+    await persistConnected().catch(() => null);
+    return NextResponse.json({
+      ok:              true,
+      status:          "connected",
+      httpStatus:      res.status,
+      responsePreview: preview,
+      message:         "Authentication successful.",
+      checkedAt:       new Date().toISOString(),
+    });
+  }
+
+  await persistSyncError(FAILURE_MESSAGE).catch(() => null);
+  return NextResponse.json(
+    {
+      ok:              false,
+      status:          "auth_failed",
+      httpStatus:      res.status,
+      responsePreview: preview,
+      message:         FAILURE_MESSAGE,
+      checkedAt:       new Date().toISOString(),
+    },
+    { status: 400 },
+  );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function todayJHB(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
+function sanitizePreview(raw: string): string {
+  return raw
+    .replace(/[A-Za-z0-9+/=]{40,}/g, "<redacted>")
+    .replace(/password["']?\s*[:=]\s*["']?[^\s"',}]+/gi, "password=<redacted>")
+    .slice(0, 300);
 }
 
 async function persistConnected(): Promise<void> {

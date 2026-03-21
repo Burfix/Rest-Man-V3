@@ -9,10 +9,10 @@
  *   "unknown"  — fail closed; no auth request is sent until Oracle
  *                confirms the correct flow. Throws AUTH_MODE_UNCONFIRMED.
  *   "password" — OAuth 2.0 Resource Owner Password Credentials:
- *                POST /oidc-provider/v1/oauth2/token
+ *                POST /oauth/token
  *                grant_type=password
  *
- * Refresh: POST /oidc-provider/v1/oauth2/token
+ * Refresh: POST /oauth/token
  *          grant_type=refresh_token
  *
  * Env vars (server-side only):
@@ -23,7 +23,7 @@
  *   MICROS_PASSWORD      Oracle BI API account password
  */
 
-const TOKEN_PATH   = "/oidc-provider/v1/oauth2/token";
+const TOKEN_PATH   = "/oauth/token";
 const REDIRECT_URI = "apiaccount://callback";
 
 const FETCH_TIMEOUT_MS = 20_000;
@@ -169,7 +169,7 @@ export function clearMicrosTokenCache(): void {
 
 // ---------------------------------------------------------------------------
 // Password grant flow (mode = "password")
-//   POST /oidc-provider/v1/oauth2/token  grant_type=password
+//   POST /oauth/token  grant_type=password
 // ---------------------------------------------------------------------------
 
 
@@ -177,11 +177,10 @@ async function acquireTokenPassword(): Promise<OracleTokenSet> {
   const cfg  = loadConfig();
   const url  = cfg.authServer + TOKEN_PATH;
   const body = new URLSearchParams({
-    scope:      "openid",
     grant_type: "password",
-    client_id:  cfg.clientId,
     username:   cfg.username,
     password:   cfg.password,
+    client_id:  cfg.clientId,
   });
 
   console.log("[MICROS_AUTH_DEBUG] password grant request", {
@@ -203,14 +202,13 @@ async function acquireTokenPassword(): Promise<OracleTokenSet> {
 }
 
 // ---------------------------------------------------------------------------
-// Refresh flow  POST /oidc-provider/v1/oauth2/token  grant_type=refresh_token
+// Refresh flow  POST /oauth/token  grant_type=refresh_token
 // ---------------------------------------------------------------------------
 
 async function doRefresh(refreshToken: string): Promise<OracleTokenSet> {
   const cfg  = loadConfig();
   const url  = cfg.authServer + TOKEN_PATH;
   const body = new URLSearchParams({
-    scope:         "openid",
     grant_type:    "refresh_token",
     client_id:     cfg.clientId,
     refresh_token: refreshToken,
