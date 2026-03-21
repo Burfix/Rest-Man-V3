@@ -102,12 +102,12 @@ let _inflight: Promise<OracleTokenSet> | null = null;
 export async function getMicrosAccessToken(): Promise<string> {
   const mode = getAuthMode();
 
-  // Fail closed — do not send any auth request until mode is confirmed.
+  // Fail closed — do not send any auth request until the Oracle-confirmed flow is set.
   if (mode === "unknown") {
     throw new MicrosAuthError(
       "config",
-      "MICROS authentication mode has not been confirmed by Oracle.",
-      "Set MICROS_AUTH_MODE=password once Oracle confirms password authentication is enabled for this client.",
+      "MICROS BI API credentials are present. Authentication is paused while the exact Oracle-supported auth flow for this client is being verified.",
+      "Credentials present (auth server, client ID, username, password). Set MICROS_AUTH_MODE=password once the OAuth grant type is confirmed with Oracle.",
       "AUTH_MODE_UNCONFIRMED",
     );
   }

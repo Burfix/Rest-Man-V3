@@ -127,9 +127,9 @@ export default function MicrosDebugPanel({
             </table>
             {!state.data.authModeConfirmed && (
               <p className="mt-1.5 rounded-md border border-amber-300 bg-amber-100 px-2 py-1.5 text-xs text-amber-800">
-                Set{" "}
-                <code className="font-mono">MICROS_AUTH_MODE=password</code>{" "}
-                once Oracle confirms password authentication is enabled for this client.
+                Oracle provided BI API credentials, but the exact OAuth grant type was not
+                explicitly stated in the provisioning details. Once confirmed, set{" "}
+                <code className="font-mono">MICROS_AUTH_MODE=password</code>.
               </p>
             )}
           </div>

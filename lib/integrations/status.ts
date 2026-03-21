@@ -128,11 +128,11 @@ export function deriveMicrosIntegrationStatus(
   if (authModeUnconfirmed) {
     return {
       health:               "awaiting_setup",
-      label:                "Authentication mode not confirmed",
+      label:                "Awaiting auth flow verification",
       isLiveDataAvailable:  false,
       lastSuccessfulSyncAt: null,
       reasonCode:           "AUTH_MODE_UNCONFIRMED",
-      userMessage:          "Awaiting Oracle confirmation. Set MICROS_AUTH_MODE=password once Oracle confirms the correct flow.",
+      userMessage:          "MICROS BI API credentials are present. Authentication is paused while the exact Oracle-supported auth flow for this client is being verified.",
     };
   }
 

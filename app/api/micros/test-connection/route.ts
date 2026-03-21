@@ -31,17 +31,22 @@ export async function POST() {
   // Fail closed if auth mode is not yet confirmed.
   if (getAuthMode() === "unknown") {
     await persistSyncError(
-      "MICROS authentication mode has not been confirmed by Oracle.",
+      "Credentials present. Auth flow unconfirmed — awaiting Oracle verification of the supported OAuth grant type.",
     ).catch(() => null);
     return NextResponse.json(
       {
         ok:          false,
         health:      "setup_incomplete",
         reasonCode:  "AUTH_MODE_UNCONFIRMED",
-        userMessage: "Authentication mode not confirmed.",
+        userMessage: "MICROS BI API credentials are present. Authentication is paused while the exact Oracle-supported auth flow for this client is being verified.",
         technicalDetails: {
-          stage: "config",
-          hint:  "Set MICROS_AUTH_MODE=password once Oracle confirms password authentication is enabled for this client.",
+          stage:              "config",
+          credentialsPresent: true,
+          authServerPresent:  !!(process.env.MICROS_AUTH_SERVER?.trim()),
+          clientIdPresent:    !!(process.env.MICROS_CLIENT_ID?.trim()),
+          usernamePresent:    !!(process.env.MICROS_USERNAME?.trim()),
+          flowMode:           "unconfirmed",
+          hint:               "Oracle provided BI API credentials, but the exact OAuth grant type was not explicitly stated in the provisioning details. Set MICROS_AUTH_MODE=password once confirmed.",
         },
         hasIdToken:      false,
         hasRefreshToken: false,
