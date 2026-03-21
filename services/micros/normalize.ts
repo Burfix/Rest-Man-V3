@@ -13,7 +13,9 @@ interface OracleGuestCheck {
   chkNum: number;
   chkName?: string;
   opnBusDt: string;
+  opnLcl?: string;
   clsdBusDt?: string;
+  clsdLcl?: string;
   clsdFlag: boolean;
   gstCnt: number;
   subTtl: number | null;
@@ -161,8 +163,7 @@ export function aggregateGuestChecksToIntervals(
 
   for (const chk of checks) {
     // Use local close time or open time to assign to hour bucket
-    const timeStr = (chk as Record<string, unknown>).clsdLcl as string
-      ?? (chk as Record<string, unknown>).opnLcl as string;
+    const timeStr = chk.clsdLcl ?? chk.opnLcl;
     if (!timeStr) continue;
     const hour = new Date(timeStr).getHours();
     const entry = hourMap.get(hour) ?? { sales: 0, checks: 0, guests: 0 };
