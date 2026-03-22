@@ -320,6 +320,138 @@ function EditPanel({
 
 // ── Upload Panel ──────────────────────────────────────────────────────────────
 
+function SchedulePanel({
+  item,
+  onClose,
+  onSaved,
+}: {
+  item: ComplianceItem;
+  onClose: () => void;
+  onSaved: (updated: ComplianceItem) => void;
+}) {
+  const [form, setForm] = useState({
+    scheduled_service_date: item.scheduled_service_date ?? "",
+    scheduled_with:         item.scheduled_with ?? "",
+    schedule_note:          "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isClearing = !form.scheduled_service_date && !!item.scheduled_service_date;
+
+  async function handleSave() {
+    if (!isClearing && !form.scheduled_service_date) {
+      setError("Please select a renewal date");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/compliance/items/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scheduled_service_date: form.scheduled_service_date || null,
+          scheduled_with:         form.scheduled_with || null,
+          schedule_note:          form.schedule_note || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed");
+      onSaved({ ...data.item, documents: item.documents });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleClear() {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/compliance/items/${item.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduled_service_date: null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Clear failed");
+      onSaved({ ...data.item, documents: item.documents });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Clear failed");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+      <p className="text-xs font-semibold text-stone-700">📅 Schedule Renewal / Service</p>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="block text-xs font-medium text-stone-600 mb-1">Renewal Date *</label>
+          <input
+            type="date"
+            value={form.scheduled_service_date}
+            onChange={(e) => setForm((f) => ({ ...f, scheduled_service_date: e.target.value }))}
+            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-stone-600 mb-1">Provider / Vendor</label>
+          <input
+            type="text"
+            placeholder="e.g. FireTech Solutions"
+            value={form.scheduled_with}
+            onChange={(e) => setForm((f) => ({ ...f, scheduled_with: e.target.value }))}
+            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-stone-600 mb-1">Note (optional)</label>
+        <input
+          type="text"
+          placeholder="e.g. Deposit paid, confirmed via email"
+          value={form.schedule_note}
+          onChange={(e) => setForm((f) => ({ ...f, schedule_note: e.target.value }))}
+          className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+        />
+      </div>
+      {error && <p className="text-xs text-red-600">{error}</p>}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="rounded-md bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {saving ? "Saving…" : item.scheduled_service_date ? "Update Schedule" : "Schedule Renewal"}
+        </button>
+        {item.scheduled_service_date && (
+          <button
+            onClick={handleClear}
+            disabled={saving}
+            className="rounded-md border border-red-200 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            Clear Schedule
+          </button>
+        )}
+        <button
+          onClick={onClose}
+          className="rounded-md border border-stone-300 px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Upload Panel (certificate) ────────────────────────────────────────────────
+
 function UploadPanel({
   item,
   onClose,
@@ -410,13 +542,13 @@ function ComplianceCard({
   onDelete: (id: string) => void;
 }) {
   const [item, setItem] = useState<ComplianceItem>(initialItem);
-  const [panel, setPanel] = useState<"edit" | "upload" | null>(null);
+  const [panel, setPanel] = useState<"edit" | "upload" | "schedule" | null>(null);
   const [deletingDoc, setDeletingDoc] = useState<string | null>(null);
 
   const cfg = STATUS_CONFIG[item.status];
   const days = daysUntil(item.next_due_date);
 
-  function togglePanel(p: "edit" | "upload") {
+  function togglePanel(p: "edit" | "upload" | "schedule") {
     setPanel((prev) => (prev === p ? null : p));
   }
 
@@ -557,6 +689,20 @@ function ComplianceCard({
             📎 Upload Certificate
           </button>
 
+          {(item.status === "due_soon" || item.status === "expired" || item.status === "scheduled") && (
+            <button
+              onClick={() => togglePanel("schedule")}
+              className={cn(
+                "flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
+                panel === "schedule"
+                  ? "border-blue-400 bg-blue-50 text-blue-700"
+                  : "border-blue-100 text-blue-600 hover:bg-blue-50"
+              )}
+            >
+              📅 {item.scheduled_service_date ? "Edit Schedule" : "Schedule Renewal"}
+            </button>
+          )}
+
           {!item.is_default && (
             <button
               onClick={() => onDelete(item.id)}
@@ -590,6 +736,16 @@ function ComplianceCard({
                 ...prev,
                 documents: [doc, ...(prev.documents ?? [])],
               }));
+              setPanel(null);
+            }}
+          />
+        )}
+        {panel === "schedule" && (
+          <SchedulePanel
+            item={item}
+            onClose={() => setPanel(null)}
+            onSaved={(updated) => {
+              setItem(updated);
               setPanel(null);
             }}
           />
