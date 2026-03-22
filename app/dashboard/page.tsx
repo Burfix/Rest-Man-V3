@@ -23,6 +23,7 @@ import { getMicrosStatus } from "@/services/micros/status";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { deriveMicrosIntegrationStatus, canUseMicrosLiveData } from "@/lib/integrations/status";
 import { getOperatingScore } from "@/services/ops/operatingScore";
+import { getCurrentSalesSnapshot } from "@/lib/sales/service";
 
 import FreshnessBar               from "@/components/dashboard/ops/FreshnessBar";
 import OperatingScoreWidget       from "@/components/dashboard/ops/OperatingScoreWidget";
@@ -36,6 +37,7 @@ import ServiceBriefCard      from "@/components/dashboard/ops/ServiceBriefCard";
 import TodayAtVenueCard      from "@/components/dashboard/ops/TodayAtVenueCard";
 import OperationalHealthCard from "@/components/dashboard/ops/OperationalHealthCard";
 import SecondaryInsights     from "@/components/dashboard/SecondaryInsights";
+import ManualSalesUploadForm from "@/components/dashboard/ops/ManualSalesUploadForm";
 
 import {
   getServicePeriod,
@@ -58,7 +60,7 @@ import type {
   ComplianceSummary,
 } from "@/types";
 import type { MicrosStatusSummary } from "@/types/micros";
-import { todayISO } from "@/lib/utils";
+import { todayISO, cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -145,7 +147,6 @@ export default async function OperationsDashboard() {
     forecastResult,
     complianceResult,
     microsResult,
-    operatingScoreResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getSevenDayReviewSummary(),
@@ -157,7 +158,6 @@ export default async function OperationsDashboard() {
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),
-    getOperatingScore("00000000-0000-0000-0000-000000000001"),
   ]);
 
   const { value: today, error: todayErr }           = settled(todayResult, EMPTY_TODAY);
@@ -170,13 +170,33 @@ export default async function OperationsDashboard() {
   const { value: forecast }                         = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }                = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }                     = settled(microsResult, null);
-  const { value: operatingScore }                   = settled(operatingScoreResult, null);
+
+  // ─── Unified sales snapshot (single source of truth for revenue UI) ──────
+  const today_iso     = todayISO();
+  const ms = microsStatus as MicrosStatusSummary | null;
+
+  const salesSnapshot = await getCurrentSalesSnapshot(
+    today_iso,
+    ms,
+    forecast,
+    today.total,
+    today.totalCovers,
+  );
+
+  // ─── Operating score (needs salesOverride from snapshot) ──────────────────
+  const salesOverride = salesSnapshot.source !== "forecast"
+    ? { netSales: salesSnapshot.netSales, targetSales: salesSnapshot.targetSales, dataDate: salesSnapshot.businessDate }
+    : null;
+
+  const operatingScore = await getOperatingScore(
+    "00000000-0000-0000-0000-000000000001",
+    salesOverride,
+  ).catch(() => null);
 
   const errors = [todayErr, reviewsErr, salesErr, maintenanceErr, eventsErr, dailyOpsErr]
     .filter(Boolean) as string[];
 
   // ─── Command Center computations ─────────────────────────────────────────
-  const today_iso     = todayISO();
   const servicePeriod = getServicePeriod("Africa/Johannesburg");
 
   // Ranked priority actions from all operational signals
@@ -198,8 +218,6 @@ export default async function OperationsDashboard() {
     today:         { total: today.total, totalCovers: today.totalCovers },
     servicePeriod,
   });
-
-  const ms = microsStatus as MicrosStatusSummary | null;
 
   // ─── Central integration health — SINGLE SOURCE OF TRUTH ─────────────────
   //  Fail closed: any ambiguous state → isLiveDataAvailable = false
@@ -241,7 +259,14 @@ export default async function OperationsDashboard() {
 
       {/* ── 0. Operating Score + Accountability row ── */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <OperatingScoreWidget score={operatingScore} />
+        <OperatingScoreWidget
+          score={operatingScore}
+          salesSource={salesSnapshot ? {
+            label: salesSnapshot.sourceLabel,
+            freshnessState: salesSnapshot.freshnessState,
+            freshnessMinutes: salesSnapshot.freshnessMinutes,
+          } : undefined}
+        />
         <DailyAccountabilityPanel />
       </div>
 
@@ -256,11 +281,13 @@ export default async function OperationsDashboard() {
         events={events}
         today={today}
         totalAlerts={totalAlerts}
+        salesSnapshot={salesSnapshot}
         microsStatus={ms ? {
           isConfigured:        ms.isConfigured,
           isLiveDataAvailable: microsLiveData,
           minutesSinceSync:    ms.minutesSinceSync ?? null,
           lastSyncError:       ms.connection?.last_sync_error ?? null,
+          liveSales:           ms.latestDailySales?.business_date === today_iso ? ms.latestDailySales.net_sales : null,
         } : null}
         revenueTrend={revenueTrend}
         labourTrend={labourTrend}
@@ -280,30 +307,45 @@ export default async function OperationsDashboard() {
       {/* ── Two-Hour Outlook ── */}
       <TwoHourOutlookPanel outlook={twoHourOutlook} />
 
-      {/* ── MICROS live revenue strip — only when verified connected + synced today ── */}
-      {(() => {
-        if (!microsLiveData) return null;
-        const ld = ms?.latestDailySales;
-        const todayDate = today_iso;
-        if (!ld || ld.business_date !== todayDate) return null;
-        const mins = ms?.minutesSinceSync;
-        const ageLabel = mins == null ? "" : mins < 1 ? " · now" : mins < 60 ? ` · ${mins}m ago` : ` · ${Math.floor(mins / 60)}h ago`;
-        return (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs">
-            <span className="flex items-center gap-1 font-semibold text-emerald-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-              Live POS data{ageLabel}
-            </span>
-            <span className="text-stone-400">·</span>
-            <span className="text-stone-600">Sales: <span className="font-semibold text-stone-900">R {ld.net_sales.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
-            <span className="text-stone-600">Covers: <span className="font-semibold text-stone-900">{ld.guest_count}</span></span>
-            <span className="text-stone-600">Checks: <span className="font-semibold text-stone-900">{ld.check_count}</span></span>
-            {ld.labor_pct > 0 && (
-              <span className="text-stone-600">Labour: <span className={`font-semibold ${ld.labor_pct > 50 ? "text-amber-700" : "text-stone-900"}`}>{ld.labor_pct.toFixed(1)}%</span></span>
+      {/* ── Live sales data strip — shows when MICROS or manual data is available ── */}
+      {salesSnapshot.source !== "forecast" && (
+        <div className={cn(
+          "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-4 py-2.5 text-xs",
+          salesSnapshot.isLive
+            ? "border-emerald-200 bg-emerald-50"
+            : salesSnapshot.isStale
+            ? "border-amber-200 bg-amber-50"
+            : "border-stone-200 bg-stone-50",
+        )}>
+          <span className={cn(
+            "flex items-center gap-1 font-semibold",
+            salesSnapshot.isLive ? "text-emerald-700" : salesSnapshot.isStale ? "text-amber-700" : "text-stone-600",
+          )}>
+            <span className={cn(
+              "h-1.5 w-1.5 rounded-full shrink-0",
+              salesSnapshot.isLive ? "bg-emerald-500 animate-pulse" : salesSnapshot.isStale ? "bg-amber-400" : "bg-stone-400",
+            )} />
+            {salesSnapshot.sourceLabel}
+            {salesSnapshot.freshnessMinutes != null && (
+              salesSnapshot.freshnessMinutes < 1 ? " · now"
+              : salesSnapshot.freshnessMinutes < 60 ? ` · ${salesSnapshot.freshnessMinutes}m ago`
+              : ` · ${Math.floor(salesSnapshot.freshnessMinutes / 60)}h ago`
             )}
-          </div>
-        );
-      })()}
+          </span>
+          <span className="text-stone-400">·</span>
+          <span className="text-stone-600">Sales: <span className="font-semibold text-stone-900">R {salesSnapshot.netSales.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
+          <span className="text-stone-600">Covers: <span className="font-semibold text-stone-900">{salesSnapshot.covers}</span></span>
+          <span className="text-stone-600">Checks: <span className="font-semibold text-stone-900">{salesSnapshot.checks}</span></span>
+          {salesSnapshot.labourCostPercent != null && salesSnapshot.labourCostPercent > 0 && (
+            <span className="text-stone-600">Labour: <span className={`font-semibold ${salesSnapshot.labourCostPercent > 50 ? "text-amber-700" : "text-stone-900"}`}>{salesSnapshot.labourCostPercent.toFixed(1)}%</span></span>
+          )}
+        </div>
+      )}
+
+      {/* ── Manual sales upload prompt — when no live/manual data ── */}
+      {salesSnapshot.source === "forecast" && (
+        <ManualSalesUploadForm businessDate={today_iso} />
+      )}
 
       {/* ── Non-fatal DB errors ── */}
       {errors.length > 0 && (
@@ -333,6 +375,7 @@ export default async function OperationsDashboard() {
           dailyOps={dailyOps}
           date={today_iso}
           servicePeriod={servicePeriod}
+          salesSnapshot={salesSnapshot}
         />
       </div>
 
@@ -347,6 +390,7 @@ export default async function OperationsDashboard() {
           forecast={forecast}
           microsSource={microsLiveData ? "micros_live" : null}
           microsSyncedAt={ms?.connection?.last_sync_at ?? null}
+          salesSnapshot={salesSnapshot}
         />
         <OperationalHealthCard
           compliance={complianceSummary}
@@ -354,6 +398,7 @@ export default async function OperationsDashboard() {
           forecast={forecast}
           reviews={reviews}
           dailyOps={dailyOps}
+          salesSnapshot={salesSnapshot}
           microsStatus={ms ? {
             isConfigured:        ms.isConfigured,
             isLiveDataAvailable: microsLiveData,

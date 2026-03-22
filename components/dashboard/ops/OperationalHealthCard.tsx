@@ -21,6 +21,7 @@ import type {
   SevenDayReviewSummary,
   DailyOperationsDashboardSummary,
 } from "@/types";
+import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 
 interface Props {
   compliance:   ComplianceSummary;
@@ -28,6 +29,7 @@ interface Props {
   forecast:     RevenueForecast | null;
   reviews:      SevenDayReviewSummary;
   dailyOps:     DailyOperationsDashboardSummary;
+  salesSnapshot?: NormalizedSalesSnapshot | null;
   microsStatus?: {
     minutesSinceSync:    number | null;
     isConfigured:        boolean;
@@ -46,6 +48,7 @@ export default function OperationalHealthCard({
   forecast,
   reviews,
   dailyOps,
+  salesSnapshot,
   microsStatus,
   freshness,
 }: Props) {
@@ -71,8 +74,10 @@ export default function OperationalHealthCard({
     topRiskDriver = `${maintenance.outOfService} equipment unit${maintenance.outOfService > 1 ? "s" : ""} out of service`;
     fastestFix    = "Assign repair or source replacement unit";
   } else if (forecast?.sales_gap_pct && forecast.sales_gap_pct < -20) {
-    const gap = Math.abs(Math.round(forecast.sales_gap ?? 0));
-    topRiskDriver = `Revenue pace ${Math.abs(forecast.sales_gap_pct).toFixed(0)}% behind target`;
+    const ss = salesSnapshot;
+    const gapPct = ss?.targetVariancePercent != null ? Math.abs(ss.targetVariancePercent) : Math.abs(forecast.sales_gap_pct);
+    const gap = ss?.walkInRecoveryNeeded ?? Math.abs(Math.round(forecast.sales_gap ?? 0));
+    topRiskDriver = `Revenue pace ${gapPct.toFixed(0)}% behind target`;
     fastestFix    = gap > 0
       ? `Need R${gap.toLocaleString()} additional covers at current average spend`
       : "Push walk-ins and confirm open bookings";
@@ -86,13 +91,21 @@ export default function OperationalHealthCard({
 
   // ── Freshness / confidence note ────────────────────────────────────────
   const freshnessNotes: string[] = [];
-  if (microsStatus?.isLiveDataAvailable === true && microsStatus.minutesSinceSync != null) {
+  if (salesSnapshot && salesSnapshot.source !== "forecast") {
+    const m = salesSnapshot.freshnessMinutes;
+    const srcLabel = salesSnapshot.source === "micros" ? "Live POS" : "Manual upload";
+    freshnessNotes.push(
+      m != null
+        ? `${srcLabel} synced ${m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`}`
+        : `${srcLabel} data active`
+    );
+  } else if (microsStatus?.isLiveDataAvailable === true && microsStatus.minutesSinceSync != null) {
     const m = microsStatus.minutesSinceSync;
     freshnessNotes.push(`Live POS synced ${m < 1 ? "just now" : m < 60 ? `${m}m ago` : `${Math.floor(m / 60)}h ago`}`);
   } else if (microsStatus?.isConfigured && microsStatus.lastSyncError) {
     freshnessNotes.push("POS feed unavailable — using latest saved values");
   }
-  if (freshness?.sales?.lastUpdated) {
+  if (freshness?.sales?.lastUpdated && !(salesSnapshot && salesSnapshot.source !== "forecast")) {
     const d = Math.round((Date.now() - new Date(freshness.sales.lastUpdated).getTime()) / 86_400_000);
     if (d > 0) freshnessNotes.push(`Sales data ${d}d old`);
   }

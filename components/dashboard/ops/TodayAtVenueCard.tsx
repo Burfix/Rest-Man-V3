@@ -17,6 +17,7 @@ import type {
   MaintenanceSummary,
   RevenueForecast,
 } from "@/types";
+import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 
 interface Props {
   today:          TodayBookingsSummary;
@@ -27,6 +28,7 @@ interface Props {
   forecast?:      RevenueForecast | null;
   microsSource?:  SourceType | null;
   microsSyncedAt?: string | null;
+  salesSnapshot?: NormalizedSalesSnapshot | null;
 }
 
 function fmtTime(t: string): string {
@@ -84,6 +86,7 @@ export default function TodayAtVenueCard({
   forecast,
   microsSource,
   microsSyncedAt,
+  salesSnapshot,
 }: Props) {
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
   const report     = dailyOps.latestReport;
@@ -119,14 +122,26 @@ export default function TodayAtVenueCard({
     : null;
 
   const walkIn =
-    forecast?.sales_gap != null && forecast.sales_gap < 0
-      ? Math.abs(forecast.sales_gap)
-      : null;
+    salesSnapshot?.walkInRecoveryNeeded != null ? salesSnapshot.walkInRecoveryNeeded
+    : forecast?.sales_gap != null && forecast.sales_gap < 0 ? Math.abs(forecast.sales_gap)
+    : null;
 
-  // Source badge for revenue data
+  // Source badge for revenue data — prefer snapshot
   let revenueSource: SourceType | null = null;
   let revenueAgeLabel: string | undefined;
-  if (microsSource === "micros_live" && microsSyncedAt) {
+  if (salesSnapshot) {
+    revenueSource =
+      salesSnapshot.source === "micros" && salesSnapshot.isLive ? "micros_live"
+      : salesSnapshot.source === "micros" && salesSnapshot.isStale ? "stale"
+      : salesSnapshot.source === "manual" ? "manual_upload"
+      : salesSnapshot.source === "forecast" ? "forecast"
+      : null;
+    if (salesSnapshot.freshnessMinutes != null) {
+      revenueAgeLabel = salesSnapshot.freshnessMinutes < 1 ? "now"
+        : salesSnapshot.freshnessMinutes < 60 ? `${salesSnapshot.freshnessMinutes}m`
+        : `${Math.floor(salesSnapshot.freshnessMinutes / 60)}h`;
+    }
+  } else if (microsSource === "micros_live" && microsSyncedAt) {
     revenueSource = "micros_live";
     const mins = Math.floor((Date.now() - new Date(microsSyncedAt).getTime()) / 60_000);
     revenueAgeLabel = mins < 1 ? "now" : mins < 60 ? `${mins}m` : `${Math.floor(mins / 60)}h`;

@@ -25,6 +25,7 @@ export type SourceType =
   | "historical"
   | "forecast"
   | "manual"
+  | "manual_upload"
   | "stale"
   | "error"
   | "awaiting";
@@ -66,6 +67,11 @@ const STYLES: Record<SourceType, { cls: string; dot: string; label: string; puls
     cls:   "bg-stone-100 text-stone-500 ring-stone-200",
     dot:   "bg-stone-400",
     label: "MANUAL",
+  },
+  manual_upload: {
+    cls:   "bg-sky-50 text-sky-700 ring-sky-200",
+    dot:   "bg-sky-400",
+    label: "MANUAL UPLOAD",
   },
   stale:        {
     cls:   "bg-amber-50 text-amber-700 ring-amber-200",

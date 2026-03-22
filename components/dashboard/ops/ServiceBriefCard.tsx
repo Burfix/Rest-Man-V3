@@ -15,14 +15,16 @@ import type {
   RevenueForecast,
   DailyOperationsDashboardSummary,
 } from "@/types";
+import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 
 interface Props {
-  today:         TodayBookingsSummary;
-  events:        VenueEvent[];
-  forecast:      RevenueForecast | null;
-  dailyOps:      DailyOperationsDashboardSummary;
-  date:          string;
-  servicePeriod: string;
+  today:          TodayBookingsSummary;
+  events:         VenueEvent[];
+  forecast:       RevenueForecast | null;
+  dailyOps:       DailyOperationsDashboardSummary;
+  date:           string;
+  servicePeriod:  string;
+  salesSnapshot?: NormalizedSalesSnapshot | null;
 }
 
 function fmtTime(t: string): string {
@@ -38,7 +40,9 @@ export default function ServiceBriefCard({
   dailyOps,
   date,
   servicePeriod,
+  salesSnapshot,
 }: Props) {
+  const ss = salesSnapshot ?? null;
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
 
   const lunchBkgs = today.bookings.filter((b) => {
@@ -52,17 +56,22 @@ export default function ServiceBriefCard({
   const lunchCovers  = lunchBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
   const dinnerCovers = dinnerBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
 
-  const hasTarget  = forecast?.target_sales != null;
-  const isAutoTarget = forecast?.target_source === "auto";
-  const gapPos     = forecast?.sales_gap != null && forecast.sales_gap >= 0;
-  const gapNeg     = forecast?.sales_gap != null && forecast.sales_gap < 0;
-  const walkInNeed = gapNeg && forecast?.sales_gap != null ? Math.abs(forecast.sales_gap) : null;
-
-  // Progress toward target (forecast as % of target)
-  const progressPct =
-    hasTarget && forecast?.target_sales && forecast.target_sales > 0
-      ? Math.min(100, Math.round((forecast.forecast_sales / forecast.target_sales) * 100))
-      : null;
+  // Revenue — prefer snapshot, fall back to forecast
+  const revSales      = ss ? ss.netSales : forecast?.forecast_sales ?? null;
+  const hasTarget     = ss ? ss.targetSales != null : forecast?.target_sales != null;
+  const isAutoTarget  = ss ? ss.targetSource === "auto" : forecast?.target_source === "auto";
+  const targetSales   = ss ? ss.targetSales : forecast?.target_sales ?? null;
+  const variance      = ss ? ss.targetVarianceAmount : forecast?.sales_gap ?? null;
+  const gapPos        = variance != null && variance >= 0;
+  const gapNeg        = variance != null && variance < 0;
+  const walkInNeed    = ss ? ss.walkInRecoveryNeeded : (gapNeg && forecast?.sales_gap != null ? Math.abs(forecast.sales_gap) : null);
+  const progressPct   = ss ? ss.forecastProgressPercent : (
+    hasTarget && targetSales && targetSales > 0 && revSales != null
+      ? Math.min(100, Math.round((revSales / targetSales) * 100))
+      : null
+  );
+  const lastYearSales = ss ? ss.sameDayLastYearSales : forecast?.last_year_sales ?? null;
+  const sourceLabel   = ss ? ss.sourceLabel : null;
 
   const topRec    = (forecast?.recommendations ?? [])[0] ?? null;
   const recCount  = (forecast?.recommendations ?? []).length;
@@ -89,28 +98,40 @@ export default function ServiceBriefCard({
 
         {/* ── Revenue ── */}
         <div className="px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-2">
-            Revenue
-          </p>
+          <div className="flex items-center gap-2 mb-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+              Revenue
+            </p>
+            {sourceLabel && (
+              <span className={cn(
+                "text-[9px] font-semibold uppercase tracking-wider px-1.5 py-px rounded ring-1 ring-inset leading-none",
+                ss?.isLive  ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                : ss?.source === "manual" ? "bg-sky-50 text-sky-700 ring-sky-200"
+                : "bg-violet-50 text-violet-700 ring-violet-200"
+              )}>
+                {sourceLabel}
+              </span>
+            )}
+          </div>
 
-          {/* Forecast headline */}
+          {/* Revenue headline */}
           <div className="flex items-start justify-between gap-3 mb-3">
             <div>
               <p className="text-sm font-bold text-stone-900 dark:text-stone-100">
-                {forecast ? formatCurrency(forecast.forecast_sales) : "No forecast available"}
+                {revSales != null ? formatCurrency(revSales) : "No data available"}
               </p>
-              {hasTarget && (
+              {hasTarget && variance != null && (
                 <p className={cn(
                   "mt-0.5 text-[11px] font-medium",
                   gapPos  ? "text-emerald-600 dark:text-emerald-400"
-                          : gapNeg && Math.abs(forecast?.sales_gap_pct ?? 0) >= 20
+                          : Math.abs(variance) / (targetSales || 1) >= 0.2
                             ? "text-red-600 dark:text-red-400"
                             : "text-amber-600 dark:text-amber-400"
                 )}>
                   {gapPos
-                    ? `Ahead of target · +${formatCurrency(forecast?.sales_gap ?? 0)}`
+                    ? `Ahead of target · +${formatCurrency(variance)}`
                     : gapNeg
-                    ? `Behind target · −${formatCurrency(Math.abs(forecast?.sales_gap ?? 0))}`
+                    ? `Behind target · −${formatCurrency(Math.abs(variance))}`
                     : "On target"}
                 </p>
               )}
@@ -127,24 +148,24 @@ export default function ServiceBriefCard({
 
           {/* Last year baseline + today's target */}
           <div className="space-y-1 mb-3">
-            {forecast?.last_year_sales != null ? (
+            {lastYearSales != null ? (
               <div className="flex justify-between text-[11px]">
                 <span className="text-stone-400 dark:text-stone-600">Last year (same day)</span>
                 <span className="font-medium text-stone-600 dark:text-stone-400">
-                  {formatCurrency(forecast.last_year_sales)}
+                  {formatCurrency(lastYearSales)}
                 </span>
               </div>
             ) : null}
-            {hasTarget && (
+            {hasTarget && targetSales != null && (
               <div className="flex justify-between text-[11px]">
                 <span className="text-stone-400 dark:text-stone-600">
-                  Today's target
+                  Today&apos;s target
                   {isAutoTarget && (
                     <span className="ml-1 text-stone-300 dark:text-stone-700">(same day +10%)</span>
                   )}
                 </span>
                 <span className="font-medium text-stone-600 dark:text-stone-400">
-                  {formatCurrency(forecast!.target_sales!)}
+                  {formatCurrency(targetSales)}
                 </span>
               </div>
             )}
@@ -154,7 +175,9 @@ export default function ServiceBriefCard({
           {progressPct != null && (
             <div>
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-stone-400 dark:text-stone-600">Forecast progress</span>
+                <span className="text-stone-400 dark:text-stone-600">
+                  {ss?.source === "forecast" ? "Forecast progress" : "Progress to target"}
+                </span>
                 <span className={cn(
                   "font-semibold",
                   progressPct >= 100 ? "text-emerald-600 dark:text-emerald-400"

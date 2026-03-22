@@ -10,6 +10,7 @@
 
 import { cn } from "@/lib/utils";
 import type { OperatingScore, ScoreGrade } from "@/services/ops/operatingScore";
+import type { SalesFreshnessState } from "@/lib/sales/types";
 
 // ── Score palette ─────────────────────────────────────────────────────────────
 
@@ -70,11 +71,16 @@ const COMPONENT_BARS = [
 
 interface Props {
   score: OperatingScore | null;
+  salesSource?: {
+    label: string;
+    freshnessState: SalesFreshnessState;
+    freshnessMinutes: number | null;
+  } | null;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function OperatingScoreWidget({ score }: Props) {
+export default function OperatingScoreWidget({ score, salesSource }: Props) {
   if (!score) {
     return (
       <div className="flex items-center gap-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-5 py-4">
@@ -136,6 +142,8 @@ export default function OperatingScoreWidget({ score }: Props) {
           {COMPONENT_BARS.map(({ key, label, max, bar }) => {
             const comp = score.components[key];
             const pct  = Math.round((comp.score / max) * 100);
+            const isRevenue = key === "revenue";
+            const srcBadge = isRevenue && salesSource;
             return (
               <div key={key}>
                 <div className="flex items-center justify-between mb-0.5">
@@ -152,9 +160,26 @@ export default function OperatingScoreWidget({ score }: Props) {
                     style={{ width: `${pct}%` }}
                   />
                 </div>
-                <p className="mt-0.5 text-[10px] text-stone-400 dark:text-stone-600 truncate" title={comp.detail}>
-                  {comp.detail}
-                </p>
+                <div className="mt-0.5 flex items-center gap-1">
+                  <p className="text-[10px] text-stone-400 dark:text-stone-600 truncate" title={comp.detail}>
+                    {comp.detail}
+                  </p>
+                  {srcBadge && (
+                    <span className={cn(
+                      "shrink-0 inline-flex items-center gap-0.5 rounded px-1 py-px text-[8px] font-bold uppercase tracking-wider",
+                      salesSource.freshnessState === "live"
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                        : salesSource.freshnessState === "stale"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500"
+                    )}>
+                      {salesSource.freshnessState === "live" && (
+                        <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                      )}
+                      {salesSource.label}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

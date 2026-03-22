@@ -225,7 +225,20 @@ function maintenanceDetail(
 
 // ── Main function ─────────────────────────────────────────────────────────────
 
-export async function getOperatingScore(locationId: string): Promise<OperatingScore> {
+/**
+ * Optional override for revenue scoring — allows MICROS live data
+ * or manual uploads to be injected instead of querying daily_operations_reports.
+ */
+export interface SalesOverride {
+  netSales: number;
+  targetSales: number | null;
+  dataDate: string;
+}
+
+export async function getOperatingScore(
+  locationId: string,
+  salesOverride?: SalesOverride | null,
+): Promise<OperatingScore> {
   const supabase = createServerClient();
 
   // ── Fetch all four data sources in parallel ───────────────────────────────
@@ -253,20 +266,32 @@ export async function getOperatingScore(locationId: string): Promise<OperatingSc
 
   // ── Parse ops report ──────────────────────────────────────────────────────
   const opsReport  = opsResult.data as { report_date: string; sales_net_vat: number | null; labor_cost_percent: number | null } | null;
-  const actualSales = opsReport?.sales_net_vat  ?? null;
   const labourPct   = opsReport?.labor_cost_percent ?? null;
-  const dataDate    = opsReport?.report_date    ?? null;
 
-  // ── Fetch revenue target for the same date ────────────────────────────────
-  let targetSales: number | null = null;
-  if (dataDate) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: targetData } = await (supabase.from("sales_targets") as any)
-      .select("target_sales")
-      .eq("organization_id", DEFAULT_ORG_ID)
-      .eq("target_date", dataDate)
-      .maybeSingle();
-    targetSales = (targetData?.target_sales as number | null) ?? null;
+  // ── Resolve revenue: prefer salesOverride (MICROS/manual) over CSV ────────
+  let actualSales: number | null;
+  let targetSales: number | null;
+  let dataDate: string | null;
+
+  if (salesOverride) {
+    actualSales = salesOverride.netSales;
+    targetSales = salesOverride.targetSales;
+    dataDate    = salesOverride.dataDate;
+  } else {
+    actualSales = opsReport?.sales_net_vat  ?? null;
+    dataDate    = opsReport?.report_date    ?? null;
+
+    // ── Fetch revenue target for the same date ──────────────────────────────
+    targetSales = null;
+    if (dataDate) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data: targetData } = await (supabase.from("sales_targets") as any)
+        .select("target_sales")
+        .eq("organization_id", DEFAULT_ORG_ID)
+        .eq("target_date", dataDate)
+        .maybeSingle();
+      targetSales = (targetData?.target_sales as number | null) ?? null;
+    }
   }
 
   // ── Score revenue ─────────────────────────────────────────────────────────

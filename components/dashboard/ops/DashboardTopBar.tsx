@@ -20,6 +20,7 @@ import type {
   TodayBookingsSummary,
 } from "@/types";
 import type { TrendSignal } from "@/lib/commandCenter";
+import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 
 interface Props {
   date:           string;
@@ -31,11 +32,13 @@ interface Props {
   events:         VenueEvent[];
   today:          TodayBookingsSummary;
   totalAlerts:    number;
+  salesSnapshot?: NormalizedSalesSnapshot | null;
   microsStatus?:  {
     isConfigured:        boolean;
     isLiveDataAvailable?: boolean;
     minutesSinceSync:    number | null;
     lastSyncError?:      string | null;
+    liveSales?:          number | null;
   } | null;
   revenueTrend?:  TrendSignal | null;
   labourTrend?:   TrendSignal | null;
@@ -64,6 +67,7 @@ export default function DashboardTopBar({
   maintenance,
   forecast,
   dailyOps,
+  salesSnapshot,
   today,
   totalAlerts,
   microsStatus,
@@ -100,24 +104,50 @@ export default function DashboardTopBar({
     maintenance.totalEquipment > 0 ? "text-emerald-600 dark:text-emerald-500" :
     "text-stone-400 dark:text-stone-600";
 
-  // ── Revenue tile ─────────────────────────────────────────────────────────
-  const revMetric = forecast ? compactZAR(forecast.forecast_sales) : "—";
-  const isAutoTarget = forecast?.target_source === "auto";
+  // ── MICROS source badge — only when isLiveDataAvailable is explicitly true ─────
+  const microsLive  = microsStatus?.isLiveDataAvailable === true;
+  const microsStale = !microsLive && (microsStatus?.isConfigured ?? false) && microsStatus?.lastSyncError != null;
+  let microsAgeLabel: string | undefined;
+  if (microsStatus?.minutesSinceSync != null) {
+    const m = microsStatus.minutesSinceSync;
+    microsAgeLabel = m < 1 ? "now" : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`;
+  }
+
+  // ── Revenue tile — reads from unified sales snapshot ──────────────────────
+  const ss = salesSnapshot;
+  const revMetric = ss ? compactZAR(ss.netSales) : forecast ? compactZAR(forecast.forecast_sales) : "—";
+  const isAutoTarget = ss?.targetSource === "auto" || forecast?.target_source === "auto";
+  const variancePct = ss?.targetVariancePercent ?? forecast?.sales_gap_pct ?? null;
   const revSub =
-    !forecast                              ? "No forecast available"     :
-    !forecast.target_sales                 ? "Target unavailable"        :
-    (forecast.sales_gap_pct ?? 0) >= 5     ? "Ahead of target"          :
-    (forecast.sales_gap_pct ?? 0) >= 0     ? "On target"                :
-    Math.abs(forecast.sales_gap_pct ?? 0) >= 20
-      ? `${Math.abs(forecast.sales_gap_pct ?? 0).toFixed(0)}% behind target`
-      : `${Math.abs(forecast.sales_gap_pct ?? 0).toFixed(0)}% behind target`;
+    (ss && ss.targetSales == null) || (!ss && !forecast) ? "No target set" :
+    ss?.targetSales == null && forecast?.target_sales == null ? "Target unavailable" :
+    variancePct != null && variancePct >= 5              ? "Ahead of target"          :
+    variancePct != null && variancePct >= 0              ? "On target"                :
+    variancePct != null
+      ? `${Math.abs(variancePct).toFixed(0)}% behind target`
+      : "No forecast available";
   const revSubColor =
-    !forecast                              ? "text-stone-400 dark:text-stone-600" :
-    !forecast.target_sales                 ? "text-stone-400 dark:text-stone-600" :
-    (forecast.sales_gap_pct ?? 0) >= 0     ? "text-emerald-600 dark:text-emerald-500" :
-    Math.abs(forecast.sales_gap_pct ?? 0) >= 20 ? "text-red-600 dark:text-red-400" :
+    variancePct == null                  ? "text-stone-400 dark:text-stone-600" :
+    variancePct >= 0                     ? "text-emerald-600 dark:text-emerald-500" :
+    Math.abs(variancePct) >= 20          ? "text-red-600 dark:text-red-400" :
     "text-amber-600 dark:text-amber-400";
   const revSubNote = isAutoTarget ? "Target based on same day last year +10%" : undefined;
+
+  // Source badge for revenue tile — from snapshot
+  const revSourceType = ss
+    ? (ss.source === "micros" && ss.isLive ? "micros_live" as const
+      : ss.source === "micros" && ss.isStale ? "stale" as const
+      : ss.source === "manual" ? "manual_upload" as const
+      : "forecast" as const)
+    : microsLive ? "micros_live" as const
+    : microsStale ? "stale" as const
+    : forecast ? "forecast" as const
+    : undefined;
+  const revSourceAge = ss
+    ? (ss.freshnessMinutes != null
+        ? (ss.freshnessMinutes < 1 ? "now" : ss.freshnessMinutes < 60 ? `${ss.freshnessMinutes}m` : `${Math.floor(ss.freshnessMinutes / 60)}h`)
+        : undefined)
+    : microsLive ? microsAgeLabel : undefined;
 
   // ── Labour tile ───────────────────────────────────────────────────────────
   const labourMetric = laborPct != null ? `${laborPct.toFixed(1)}%` : "—";
@@ -143,15 +173,6 @@ export default function DashboardTopBar({
       ? "text-stone-500 dark:text-stone-500"
       : "text-amber-600 dark:text-amber-400";
 
-  // ── MICROS source badge — only when isLiveDataAvailable is explicitly true ─────
-  const microsLive  = microsStatus?.isLiveDataAvailable === true;
-  // Only show "stale" badge when config is present but live check explicitly failed / errored
-  const microsStale = !microsLive && (microsStatus?.isConfigured ?? false) && microsStatus?.lastSyncError != null;
-  let microsAgeLabel: string | undefined;
-  if (microsStatus?.minutesSinceSync != null) {
-    const m = microsStatus.minutesSinceSync;
-    microsAgeLabel = m < 1 ? "now" : m < 60 ? `${m}m` : `${Math.floor(m / 60)}h`;
-  }
 
   const kpis = [
     {
@@ -176,8 +197,8 @@ export default function DashboardTopBar({
       subColor:   revSubColor,
       note:       revSubNote,
       href:       "/dashboard/settings/targets",
-      sourceType: microsLive ? "micros_live" as const : microsStale ? "stale" as const : forecast ? "forecast" as const : undefined,
-      sourceAge:  microsLive ? microsAgeLabel : undefined,
+      sourceType: revSourceType,
+      sourceAge:  revSourceAge,
       trend:      revenueTrend ?? undefined,
     },
     {
