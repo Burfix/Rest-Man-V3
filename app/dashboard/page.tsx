@@ -38,6 +38,7 @@ import TodayAtVenueCard      from "@/components/dashboard/ops/TodayAtVenueCard";
 import OperationalHealthCard from "@/components/dashboard/ops/OperationalHealthCard";
 import SecondaryInsights     from "@/components/dashboard/SecondaryInsights";
 import ManualSalesUploadForm from "@/components/dashboard/ops/ManualSalesUploadForm";
+import SalesSyncButton       from "@/components/dashboard/ops/SalesSyncButton";
 
 import {
   getServicePeriod,
@@ -339,12 +340,16 @@ export default async function OperationsDashboard() {
           {salesSnapshot.labourCostPercent != null && salesSnapshot.labourCostPercent > 0 && (
             <span className="text-stone-600">Labour: <span className={`font-semibold ${salesSnapshot.labourCostPercent > 50 ? "text-amber-700" : "text-stone-900"}`}>{salesSnapshot.labourCostPercent.toFixed(1)}%</span></span>
           )}
+          <SalesSyncButton microsConfigured={cfgStatus.configured && cfgStatus.enabled} compact />
         </div>
       )}
 
       {/* ── Manual sales upload prompt — when no live/manual data ── */}
       {salesSnapshot.source === "forecast" && (
-        <ManualSalesUploadForm businessDate={today_iso} />
+        <div className="flex flex-col gap-2">
+          <ManualSalesUploadForm businessDate={today_iso} />
+          <SalesSyncButton microsConfigured={cfgStatus.configured && cfgStatus.enabled} />
+        </div>
       )}
 
       {/* ── Non-fatal DB errors ── */}
