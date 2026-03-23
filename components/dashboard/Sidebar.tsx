@@ -53,7 +53,7 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/settings/targets", label: "Revenue Targets", icon: "🎯" },
       { href: "/dashboard/sales",            label: "Sales",           icon: "💰" },
       { href: "/dashboard/sales/historical", label: "Historical",      icon: "📈" },
-      { href: "#",                           label: "Forecast",        icon: "🔮", soon: true },
+      { href: "/dashboard/forecast",         label: "GM Co-Pilot",     icon: "🧭" },
     ],
   },
   {
