@@ -61,6 +61,14 @@ export interface DashboardAction {
   recoveryMetric?:  string;
   /** Minutes remaining in current service window. Drives urgency countdown. */
   serviceWindowMinutes?: number;
+  /** Compliance items attached to this action (for inline scheduling) */
+  complianceItems?: Array<{
+    id: string;
+    display_name: string;
+    next_due_date: string | null;
+    scheduled_service_date?: string | null;
+    scheduled_with?: string | null;
+  }>;
 }
 
 // ── Command Headline ──────────────────────────────────────────────────────────
@@ -607,6 +615,10 @@ export function buildPriorityActions(params: {
       secondaryActions: [{ label: "View all", href: "/dashboard/compliance" }],
       impactWeight:   "required_today",
       impactLabel:    IMPACT_LABELS["required_today"],
+      complianceItems: compliance.critical_items.map((i) => ({
+        id: i.id, display_name: i.display_name, next_due_date: i.next_due_date,
+        scheduled_service_date: i.scheduled_service_date, scheduled_with: i.scheduled_with,
+      })),
     });
   }
 
@@ -622,10 +634,14 @@ export function buildPriorityActions(params: {
         : "Certificates are expiring within 30 days with no booking confirmed.",
       recommendation: "Book the renewal now — some authorities require 2–4 weeks of lead time.",
       href:           "/dashboard/compliance",
-      primaryAction:   { label: "Book renewal", href: "/dashboard/compliance" },
-      secondaryActions: [{ label: "Assign owner", href: "/dashboard/compliance" }],
+      primaryAction:   { label: "Schedule Renewal", href: "#schedule" },
+      secondaryActions: [{ label: "View in Compliance Hub", href: "/dashboard/compliance" }],
       impactWeight:   "quick_win",
       impactLabel:    IMPACT_LABELS["quick_win"],
+      complianceItems: compliance.due_soon_items.map((i) => ({
+        id: i.id, display_name: i.display_name, next_due_date: i.next_due_date,
+        scheduled_service_date: i.scheduled_service_date, scheduled_with: i.scheduled_with,
+      })),
     });
   }
 
@@ -644,6 +660,10 @@ export function buildPriorityActions(params: {
       primaryAction:   { label: "View schedule", href: "/dashboard/compliance" },
       impactWeight:   "monitor",
       impactLabel:    IMPACT_LABELS["monitor"],
+      complianceItems: (compliance.scheduled_items ?? []).map((i) => ({
+        id: i.id, display_name: i.display_name, next_due_date: i.next_due_date,
+        scheduled_service_date: i.scheduled_service_date, scheduled_with: i.scheduled_with,
+      })),
     });
   }
 
