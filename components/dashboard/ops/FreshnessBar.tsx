@@ -51,6 +51,8 @@ export default function FreshnessBar({ freshness, microsIsLive = false }: Props)
     freshness.sales,
     freshness.reviews,
     freshness.maintenance,
+    freshness.stock,
+    freshness.compliance,
   ];
 
   // MICROS chip: only show when live OR configured-but-not-live (so operator can see it's not flowing)

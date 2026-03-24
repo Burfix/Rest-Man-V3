@@ -31,11 +31,12 @@ const NAV: NavGroup[] = [
   {
     group: "Operations",
     items: [
-      { href: "/dashboard/compliance",  label: "Compliance",   icon: "📋" },
-      { href: "/dashboard/maintenance", label: "Maintenance",  icon: "🔧" },
-      { href: "/dashboard/operations",  label: "Daily Ops",    icon: "📊" },
-      { href: "/dashboard/heatmap",     label: "Zone Heatmap", icon: "🗺️" },
-      { href: "#",                      label: "Incidents",    icon: "🚨", soon: true },
+      { href: "/dashboard/compliance",  label: "Compliance",       icon: "📋" },
+      { href: "/dashboard/maintenance", label: "Maintenance",      icon: "🔧" },
+      { href: "/dashboard/inventory",   label: "Inventory & Stock", icon: "📦" },
+      { href: "/dashboard/operations",  label: "Daily Ops",        icon: "📊" },
+      { href: "/dashboard/heatmap",     label: "Zone Heatmap",     icon: "🗺️" },
+      { href: "#",                      label: "Incidents",        icon: "🚨", soon: true },
     ],
   },
   {
@@ -60,14 +61,6 @@ const NAV: NavGroup[] = [
     group: "Reputation",
     items: [
       { href: "/dashboard/reviews", label: "Reviews", icon: "⭐" },
-    ],
-  },
-  {
-    group: "Assets",
-    items: [
-      { href: "/dashboard/maintenance", label: "Equipment",    icon: "🏭" },
-      { href: "#",                      label: "Contractors",  icon: "👷", soon: true },
-      { href: "#",                      label: "Warranties",   icon: "🛡️", soon: true },
     ],
   },
   {

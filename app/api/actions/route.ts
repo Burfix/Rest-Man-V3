@@ -13,7 +13,8 @@ import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
 
 const VALID_STATUSES      = ["pending", "in_progress", "completed"] as const;
 const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
-const VALID_EXEC_TYPES    = ["call", "message", "staffing", "compliance"] as const;
+const VALID_EXEC_TYPES    = ["call", "message", "staffing", "compliance", "order", "inspect"] as const;
+const VALID_CATEGORIES    = ["revenue", "labour", "food_cost", "stock", "maintenance", "compliance", "daily_ops", "service", "general"] as const;
 const DEFAULT_SITE_ID     = "00000000-0000-0000-0000-000000000001";
 
 export async function GET(req: NextRequest) {
@@ -52,8 +53,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, description, impact_weight, assigned_to, source_type, source_id, zone_id, execution_type } =
-      body as Record<string, string | undefined>;
+    const {
+      title, description, impact_weight, assigned_to, source_type, source_id,
+      zone_id, execution_type, category, due_at, assignee_role,
+      expected_impact, why_it_matters, source_module,
+    } = body as Record<string, string | undefined>;
 
     if (!title?.trim()) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
@@ -84,8 +88,14 @@ export async function POST(req: NextRequest) {
         title:               title.trim(),
         description:         description?.trim() || null,
         impact_weight:       impact_weight || "medium",
+        category:            category && VALID_CATEGORIES.includes(category as never) ? category : null,
         assigned_to:         assigned_to?.trim() || null,
+        assignee_role:       assignee_role?.trim() || null,
+        due_at:              due_at || null,
+        expected_impact:     expected_impact?.trim() || null,
+        why_it_matters:      why_it_matters?.trim() || null,
         source_type:         source_type || null,
+        source_module:       source_module || null,
         source_id:           source_id   || null,
         zone_id:             zone_id     || null,
         site_id:             DEFAULT_SITE_ID,

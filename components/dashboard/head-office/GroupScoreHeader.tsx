@@ -186,7 +186,7 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
         </div>
 
         {/* ── Right: KPI grid ── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 lg:pl-2">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6 lg:pl-2">
           <KpiTile
             icon="💰"
             label="Group Revenue"
@@ -206,6 +206,15 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
                 : undefined
             }
             alert={(metrics.avg_labour_pct ?? 0) > 35}
+          />
+          <KpiTile
+            icon="🍽️"
+            label="Avg Food Cost"
+            value={metrics.avg_food_cost_pct !== null ? `${metrics.avg_food_cost_pct}%` : "—"}
+            sub={metrics.food_cost_risk_count > 0
+              ? `${metrics.food_cost_risk_count} store${metrics.food_cost_risk_count > 1 ? "s" : ""} above target`
+              : metrics.avg_food_cost_pct !== null ? "On target" : "No data"}
+            alert={metrics.food_cost_risk_count > 0}
           />
           <KpiTile
             icon="📋"

@@ -2,29 +2,17 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type {
+  Action,
+  ActionStatus,
+  ActionPriority as ImpactWeight,
+  ExecutionType,
+  ActionCategory,
+} from "@/types/actions";
+import { CATEGORY_CONFIG } from "@/types/actions";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export type ActionStatus    = "pending" | "in_progress" | "completed";
-export type ImpactWeight    = "critical" | "high" | "medium" | "low";
-export type ExecutionType   = "call" | "message" | "staffing" | "compliance";
-
-export interface Action {
-  id:            string;
-  title:         string;
-  description:   string | null;
-  impact_weight: ImpactWeight;
-  status:        ActionStatus;
-  assigned_to:   string | null;
-  source_type:   string | null;
-  created_at:    string;
-  started_at:    string | null;
-  completed_at:  string | null;
-  revenue_before:  number | null;
-  revenue_after:   number | null;
-  revenue_delta:   number | null;
-  execution_type:  ExecutionType | null;
-}
+// Re-export for backwards compat
+export type { Action, ActionStatus, ImpactWeight, ExecutionType };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -64,6 +52,18 @@ const executionConfig: Record<ExecutionType, {
     icon:     "📋",
     btnClass: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
     hint:     "Log compliance check",
+  },
+  order: {
+    label:    "Order",
+    icon:     "📦",
+    btnClass: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100",
+    hint:     "Place supplier order",
+  },
+  inspect: {
+    label:    "Inspect",
+    icon:     "🔍",
+    btnClass: "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100",
+    hint:     "Conduct inspection",
   },
 };
 
@@ -113,14 +113,14 @@ function QuickActionModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm rounded-xl bg-white shadow-2xl"
+        className="w-full max-w-sm rounded-xl bg-white dark:bg-stone-900 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-stone-100 px-5 py-4 flex items-center gap-3">
+        <div className="border-b border-stone-100 dark:border-stone-800 px-5 py-4 flex items-center gap-3">
           <span className="text-2xl">{cfg.icon}</span>
           <div>
-            <h3 className="font-semibold text-stone-900">{cfg.label} Action</h3>
-            <p className="mt-0.5 text-sm text-stone-500 truncate">{action.title}</p>
+            <h3 className="font-semibold text-stone-900 dark:text-stone-100">{cfg.label} Action</h3>
+            <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400 truncate">{action.title}</p>
           </div>
         </div>
 
@@ -263,10 +263,10 @@ function AssignModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-      <div className="w-full max-w-sm rounded-xl bg-white shadow-2xl">
-        <div className="border-b border-stone-100 px-5 py-4">
-          <h3 className="font-semibold text-stone-900">Assign Action</h3>
-          <p className="mt-0.5 text-sm text-stone-500 truncate">{action.title}</p>
+      <div className="w-full max-w-sm rounded-xl bg-white dark:bg-stone-900 shadow-2xl">
+        <div className="border-b border-stone-100 dark:border-stone-800 px-5 py-4">
+          <h3 className="font-semibold text-stone-900 dark:text-stone-100">Assign Action</h3>
+          <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400 truncate">{action.title}</p>
         </div>
         <form onSubmit={submit} className="px-5 py-4 space-y-4">
           <div>
@@ -361,7 +361,7 @@ function ActionCard({
       )}
 
       <div
-        className={`rounded-xl border bg-white shadow-sm transition-opacity ${
+        className={`rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 shadow-sm transition-opacity ${
           action.status === "completed" ? "opacity-60" : ""
         }`}
       >
@@ -381,13 +381,13 @@ function ActionCard({
             <div className="flex-1 min-w-0">
               <p
                 className={`text-sm font-semibold leading-snug ${
-                  action.status === "completed" ? "line-through text-stone-400" : "text-stone-900"
+                  action.status === "completed" ? "line-through text-stone-400" : "text-stone-900 dark:text-stone-100"
                 }`}
               >
                 {action.title}
               </p>
               {action.description && (
-                <p className="mt-0.5 text-xs text-stone-500 line-clamp-2">{action.description}</p>
+                <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400 line-clamp-2">{action.description}</p>
               )}
             </div>
 
@@ -402,11 +402,30 @@ function ActionCard({
           {/* Execution type chip */}
           {execCfg && (
             <div className="flex items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500 ring-1 ring-inset ring-stone-200">
+              <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-xs font-medium text-stone-500 dark:text-stone-400 ring-1 ring-inset ring-stone-200 dark:ring-stone-700">
                 {execCfg.icon} {execCfg.label}
               </span>
             </div>
           )}
+
+          {/* Category + overdue badges */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {action.category && CATEGORY_CONFIG[action.category] && (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${CATEGORY_CONFIG[action.category].color}`}>
+                {CATEGORY_CONFIG[action.category].icon} {CATEGORY_CONFIG[action.category].label}
+              </span>
+            )}
+            {action.due_at && action.status !== "completed" && new Date(action.due_at) < new Date() && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 ring-1 ring-inset ring-red-200">
+                ⏰ Overdue
+              </span>
+            )}
+            {action.due_at && action.status !== "completed" && new Date(action.due_at) >= new Date() && (
+              <span className="text-xs text-stone-400">
+                Due {new Date(action.due_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              </span>
+            )}
+          </div>
 
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
@@ -440,6 +459,13 @@ function ActionCard({
             )}
           </div>
 
+          {/* Why it matters */}
+          {action.why_it_matters && action.status !== "completed" && (
+            <p className="text-xs text-stone-400 italic border-l-2 border-stone-200 dark:border-stone-700 pl-2">
+              {action.why_it_matters}
+            </p>
+          )}
+
           {/* Revenue impact badge — shown only on completed actions with data */}
           {action.status === "completed" && action.revenue_delta !== null && (
             <div className="flex items-center gap-1.5">
@@ -470,7 +496,7 @@ function ActionCard({
 
           {/* Action buttons */}
           {action.status !== "completed" && (
-            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-stone-100">
+            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-stone-100 dark:border-stone-800">
               {/* Quick Action — shown when execution_type is set */}
               {execCfg && (
                 <button
@@ -488,7 +514,7 @@ function ActionCard({
               <button
                 onClick={() => setShowAssign(true)}
                 disabled={busy}
-                className="flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-40 transition-colors"
+                className="flex items-center gap-1 rounded-md border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-800 px-2.5 py-1.5 text-xs font-medium text-stone-700 dark:text-stone-300 hover:bg-stone-50 dark:hover:bg-stone-700 disabled:opacity-40 transition-colors"
               >
                 <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                   <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
@@ -552,11 +578,13 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
   const [impact,    setImpact]    = useState<ImpactWeight>("medium");
   const [who,       setWho]       = useState("");
   const [execType,  setExecType]  = useState<ExecutionType | "">("" );
+  const [category,  setCategory]  = useState<ActionCategory | "">("" );
+  const [dueAt,     setDueAt]     = useState("");
   const [busy,      startT]       = useTransition();
   const [err,       setErr]       = useState<string | null>(null);
 
   function reset() {
-    setTitle(""); setDesc(""); setImpact("medium"); setWho(""); setExecType(""); setErr(null);
+    setTitle(""); setDesc(""); setImpact("medium"); setWho(""); setExecType(""); setCategory(""); setDueAt(""); setErr(null);
   }
 
   function submit(e: React.FormEvent) {
@@ -570,6 +598,8 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
           title:          title.trim(),
           description:    desc.trim() || undefined,
           impact_weight:  impact,
+          category:       category    || undefined,
+          due_at:         dueAt       || undefined,
           assigned_to:    who.trim()  || undefined,
           execution_type: execType    || undefined,
         }),
@@ -597,8 +627,8 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
   }
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
-      <h3 className="text-sm font-semibold text-stone-900 mb-3">Create New Action</h3>
+    <div className="rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/30 p-4 shadow-sm">
+      <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 mb-3">Create New Action</h3>
       <form onSubmit={submit} className="space-y-3">
         <div>
           <input
@@ -619,8 +649,8 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
             className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400 resize-none"
           />
         </div>
-        <div className="flex gap-3">
-          <div className="flex-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
             <label className="block text-xs font-medium text-stone-600 mb-1">Impact</label>
             <select
               value={impact}
@@ -633,7 +663,29 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
               <option value="low">Low</option>
             </select>
           </div>
-          <div className="flex-1">
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ActionCategory)}
+              className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm focus:border-amber-400 focus:outline-none"
+            >
+              <option value="">None</option>
+              {Object.entries(CATEGORY_CONFIG).map(([k, v]) => (
+                <option key={k} value={k}>{v.icon} {v.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-stone-600 mb-1">Due by</label>
+            <input
+              type="datetime-local"
+              value={dueAt}
+              onChange={(e) => setDueAt(e.target.value)}
+              className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm focus:border-amber-400 focus:outline-none"
+            />
+          </div>
+          <div>
             <label className="block text-xs font-medium text-stone-600 mb-1">Assign to</label>
             <input
               type="text"
@@ -648,7 +700,7 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
         <div>
           <label className="block text-xs font-medium text-stone-600 mb-1">Quick Action type <span className="text-stone-400 font-normal">(optional)</span></label>
           <div className="flex gap-1.5 flex-wrap">
-            {(["call", "message", "staffing", "compliance"] as ExecutionType[]).map((t) => {
+            {(["call", "message", "staffing", "compliance", "order", "inspect"] as ExecutionType[]).map((t) => {
               const c = executionConfig[t];
               return (
                 <button
@@ -708,16 +760,16 @@ function PerformanceBar({
   const rate = pctCompleted;
 
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold text-stone-600 uppercase tracking-wide">
+        <h3 className="text-xs font-semibold text-stone-600 dark:text-stone-400 uppercase tracking-wide">
           Today&apos;s Progress
         </h3>
-        <span className="text-2xl font-bold text-stone-900">{rate}%</span>
+        <span className="text-2xl font-bold text-stone-900 dark:text-stone-100">{rate}%</span>
       </div>
 
       {/* Stacked progress bar */}
-      <div className="flex h-2.5 rounded-full overflow-hidden bg-stone-100">
+      <div className="flex h-2.5 rounded-full overflow-hidden bg-stone-100 dark:bg-stone-800">
         {pctCompleted > 0 && (
           <div className="bg-green-500 transition-all" style={{ width: `${pctCompleted}%` }} />
         )}
@@ -726,7 +778,7 @@ function PerformanceBar({
         )}
       </div>
 
-      <div className="mt-2 flex gap-4 text-xs text-stone-500">
+      <div className="mt-2 flex gap-4 text-xs text-stone-500 dark:text-stone-400">
         <span className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
           {completed} completed
@@ -784,7 +836,7 @@ export default function ActionsBoard({ initial }: { initial: Action[] }) {
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Filter tabs */}
-        <div className="flex gap-1 rounded-lg bg-stone-100 p-1">
+        <div className="flex gap-1 rounded-lg bg-stone-100 dark:bg-stone-800 p-1">
           {(["all", "pending", "in_progress", "completed"] as const).map((s) => {
             const labels: Record<string, string> = {
               all: `All (${actions.length})`,
@@ -798,8 +850,8 @@ export default function ActionsBoard({ initial }: { initial: Action[] }) {
                 onClick={() => setFilter(s)}
                 className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                   filter === s
-                    ? "bg-white text-stone-900 shadow-sm"
-                    : "text-stone-500 hover:text-stone-700"
+                    ? "bg-white dark:bg-stone-900 text-stone-900 dark:text-stone-100 shadow-sm"
+                    : "text-stone-500 dark:text-stone-400 hover:text-stone-700 dark:hover:text-stone-300"
                 }`}
               >
                 {labels[s]}
@@ -813,7 +865,7 @@ export default function ActionsBoard({ initial }: { initial: Action[] }) {
 
       {/* Action list */}
       {sortedFiltered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-stone-200 py-12 text-center text-sm text-stone-400">
+        <div className="rounded-xl border border-dashed border-stone-200 dark:border-stone-700 py-12 text-center text-sm text-stone-400">
           {filter === "all"
             ? "No active actions. Create one to get started."
             : `No ${filter.replace("_", " ")} actions.`}

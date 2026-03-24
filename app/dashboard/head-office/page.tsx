@@ -21,6 +21,7 @@ import {
   getGroupActionStats,
   getCriticalActionsFromSummaries,
   computeLabourTrendDirection,
+  getGroupFoodCostMetrics,
 } from "@/services/ops/headOffice";
 
 import GlobalAlertBar        from "@/components/dashboard/head-office/GlobalAlertBar";
@@ -43,17 +44,23 @@ function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function HeadOfficePage() {
-  const [summariesResult, trendsResult, actionStatsResult] = await Promise.allSettled([
+  const [summariesResult, trendsResult, actionStatsResult, foodCostResult] = await Promise.allSettled([
     getStoreSummaries(),
     getGroupTrends(7),
     getGroupActionStats(),
+    getGroupFoodCostMetrics(),
   ]);
 
   const summaries   = settled(summariesResult,   []);
   const trends      = settled(trendsResult,      { revenue: [], labour: [], risk_score: [] });
   const actionStats = settled(actionStatsResult, []);
+  const foodCost    = settled(foodCostResult,    { avg_food_cost_pct: null, food_cost_risk_count: 0 });
 
-  const metrics         = computeGroupMetrics(summaries);
+  const metrics         = {
+    ...computeGroupMetrics(summaries),
+    avg_food_cost_pct:    foodCost.avg_food_cost_pct,
+    food_cost_risk_count: foodCost.food_cost_risk_count,
+  };
   const leaderboard     = buildLeaderboard(summaries);
   const criticalActions = getCriticalActionsFromSummaries(summaries);
   const labourTrend     = computeLabourTrendDirection(trends);

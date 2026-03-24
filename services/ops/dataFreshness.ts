@@ -21,6 +21,8 @@ export interface DataFreshnessSummary {
   reviews: FreshnessItem;
   dailyOps: FreshnessItem;
   maintenance: FreshnessItem;
+  stock: FreshnessItem;
+  compliance: FreshnessItem;
   /** MICROS BI sync — null = not configured (shown as neutral, never stale) */
   micros: FreshnessItem & { configured: boolean };
 }
@@ -34,7 +36,7 @@ function daysAgo(isoDate: string | null): number | null {
 export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
   const supabase = createServerClient();
 
-  const [salesRes, reviewsRes, dailyOpsRes, maintRes, microsRes] = await Promise.all([
+  const [salesRes, reviewsRes, dailyOpsRes, maintRes, stockRes, complianceRes, microsRes] = await Promise.all([
     supabase
       .from("sales_uploads")
       .select("uploaded_at")
@@ -64,6 +66,20 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
       .maybeSingle(),
 
     supabase
+      .from("stock_movements")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+    supabase
+      .from("compliance_items")
+      .select("updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+    supabase
       .from("micros_connections")
       .select("last_successful_sync_at, status, auth_server_url")
       .order("created_at", { ascending: false })
@@ -75,6 +91,8 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
   const reviewDate = (reviewsRes.data as { created_at: string } | null)?.created_at ?? null;
   const dailyOpsDate = (dailyOpsRes.data as { created_at: string } | null)?.created_at ?? null;
   const maintDate = (maintRes.data as { updated_at: string } | null)?.updated_at ?? null;
+  const stockDate = (stockRes.data as { created_at: string } | null)?.created_at ?? null;
+  const complianceDate = (complianceRes.data as { updated_at: string } | null)?.updated_at ?? null;
   const microsRow = microsRes.data as { last_successful_sync_at: string | null; status: string; auth_server_url: string } | null;
   const microsDate = microsRow?.last_successful_sync_at ?? null;
   const microsConfigured = !!(microsRow?.auth_server_url);
@@ -111,6 +129,22 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
       stale: maintDate === null || (daysAgo(maintDate) ?? 999) > 30,
       href: "/dashboard/maintenance",
       actionLabel: "Log equipment or repair",
+    },
+    stock: {
+      label: "Stock",
+      lastUpdatedAt: stockDate,
+      daysAgo: daysAgo(stockDate),
+      stale: stockDate === null || (daysAgo(stockDate) ?? 999) > 7,
+      href: "/dashboard/inventory",
+      actionLabel: "Record stock movement",
+    },
+    compliance: {
+      label: "Compliance",
+      lastUpdatedAt: complianceDate,
+      daysAgo: daysAgo(complianceDate),
+      stale: complianceDate === null || (daysAgo(complianceDate) ?? 999) > 30,
+      href: "/dashboard/settings/compliance",
+      actionLabel: "Review compliance items",
     },
     micros: {
       label: "MICROS",

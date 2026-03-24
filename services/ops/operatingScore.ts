@@ -3,11 +3,13 @@
  *
  * getOperatingScore(locationId) → OperatingScore (0–100)
  *
- * Four weighted components:
- *   Revenue vs Target   40 pts
+ * Six weighted components:
+ *   Revenue vs Target   25 pts
  *   Labour %            20 pts
- *   Compliance status   20 pts
- *   Maintenance status  20 pts
+ *   Food Cost           20 pts
+ *   Compliance status   15 pts
+ *   Maintenance status  10 pts
+ *   Daily Ops Execution 10 pts
  *
  * All data is fetched live from the DB; results are suitable for
  * server-side rendering or caching by the caller.
@@ -24,25 +26,35 @@ export type ComplianceWorstStatus = "compliant" | "scheduled" | "due_soon" | "ex
 export type ScoreGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface RevenueComponent {
-  score:       number;          // 0 | 10 | 20 | 30 | 40
-  max:         40;
-  actual:      number | null;   // most recent day's net sales (ZAR)
-  target:      number | null;   // set target for that date
-  gap_pct:     number | null;   // (target - actual) / target * 100;  positive = below target
-  data_date:   string | null;   // YYYY-MM-DD of the daily ops report used
+  score:       number;
+  max:         25;
+  actual:      number | null;
+  target:      number | null;
+  gap_pct:     number | null;
+  data_date:   string | null;
   detail:      string;
 }
 
 export interface LabourComponent {
-  score:       number;          // 5 | 15 | 20
+  score:       number;
   max:         20;
-  labour_pct:  number | null;   // from latest daily ops report
+  labour_pct:  number | null;
   detail:      string;
 }
 
+export interface FoodCostComponent {
+  score:          number;
+  max:            20;
+  food_cost_pct:  number | null;
+  target_pct:     number | null;
+  variance_pct:   number | null;
+  stock_risk:     "none" | "low" | "medium" | "high";
+  detail:         string;
+}
+
 export interface ComplianceComponent {
-  score:        number;         // 0 | 10 | 19 | 20
-  max:          20;
+  score:        number;
+  max:          15;
   worst_status: ComplianceWorstStatus;
   total_items:  number;
   expired:      number;
@@ -52,12 +64,20 @@ export interface ComplianceComponent {
 }
 
 export interface MaintenanceComponent {
-  score:          number;       // 0 | 10 | 20
-  max:            20;
+  score:          number;
+  max:            10;
   severity:       MaintenanceSeverity;
   open_count:     number;
-  critical_count: number;       // urgent priority or high-impact level
+  critical_count: number;
   detail:         string;
+}
+
+export interface DailyOpsComponent {
+  score:            number;
+  max:              10;
+  report_age_days:  number | null;
+  freshness:        "fresh" | "aging" | "stale" | "missing";
+  detail:           string;
 }
 
 export interface OperatingScore {
@@ -67,8 +87,10 @@ export interface OperatingScore {
   components: {
     revenue:     RevenueComponent;
     labour:      LabourComponent;
+    food_cost:   FoodCostComponent;
     compliance:  ComplianceComponent;
     maintenance: MaintenanceComponent;
+    daily_ops:   DailyOpsComponent;
   };
   computed_at:  string;         // ISO timestamp
 }
@@ -83,30 +105,24 @@ function toGrade(total: number): ScoreGrade {
   return "F";
 }
 
-// ── Revenue scoring ───────────────────────────────────────────────────────────
+// ── Revenue scoring (max 25) ──────────────────────────────────────────────────
 
 /**
  * Revenue bands (gap = how far BELOW target, as %)
- *   gap ≤ 0%   (on target or above) → 40
- *   gap ≤ 5%   (within 5% short)    → 30
- *   gap ≤ 10%  (within 10% short)   → 20
- *   gap ≤ 20%  (within 20% short)   → 10
- *   gap > 20%  (more than 20% short)→  0
+ *   gap ≤ 0%  → 25   gap ≤ 5%  → 20   gap ≤ 10% → 15
+ *   gap ≤ 20% → 8    gap > 20% → 0
  */
 function scoreRevenue(actual: number | null, target: number | null): { score: number; gap_pct: number | null } {
   if (actual === null || target === null || target === 0) {
     return { score: 0, gap_pct: null };
   }
-
-  const gap_pct = ((target - actual) / target) * 100;   // positive = below target
-
+  const gap_pct = ((target - actual) / target) * 100;
   let score: number;
-  if      (gap_pct <= 0)  score = 40;
-  else if (gap_pct <= 5)  score = 30;
-  else if (gap_pct <= 10) score = 20;
-  else if (gap_pct <= 20) score = 10;
+  if      (gap_pct <= 0)  score = 25;
+  else if (gap_pct <= 5)  score = 20;
+  else if (gap_pct <= 10) score = 15;
+  else if (gap_pct <= 20) score = 8;
   else                    score = 0;
-
   return { score, gap_pct: Math.round(gap_pct * 10) / 10 };
 }
 
@@ -140,14 +156,14 @@ function labourDetail(score: number, pct: number | null): string {
   return `Labour at ${pct.toFixed(1)}% — over budget (>35%)`;
 }
 
-// ── Compliance scoring ────────────────────────────────────────────────────────
+// ── Compliance scoring (max 15) ───────────────────────────────────────────────
 
 /**
  * Compliance bands:
- *   any expired                    →  0  (active breach)
- *   any unscheduled due_soon       → 10  (unmanaged risk, no booking)
- *   any scheduled (none at risk)   → 19  (proactively managed, near-full score)
- *   all compliant / unknown        → 20
+ *   any expired                    →  0
+ *   any unscheduled due_soon       →  6
+ *   any scheduled (none at risk)   → 13
+ *   all compliant / unknown        → 15
  */
 function scoreCompliance(
   expired:   number,
@@ -155,9 +171,9 @@ function scoreCompliance(
   scheduled: number,
 ): { score: number; worst: ComplianceWorstStatus } {
   if (expired > 0)   return { score: 0,  worst: "expired"   };
-  if (dueSoon > 0)   return { score: 10, worst: "due_soon"  };
-  if (scheduled > 0) return { score: 19, worst: "scheduled" };
-  return               { score: 20, worst: "compliant" };
+  if (dueSoon > 0)   return { score: 6,  worst: "due_soon"  };
+  if (scheduled > 0) return { score: 13, worst: "scheduled" };
+  return               { score: 15, worst: "compliant" };
 }
 
 function complianceDetail(
@@ -175,7 +191,7 @@ function complianceDetail(
   return `${dueSoon} item${dueSoon === 1 ? "" : "s"} due soon — no renewal booked`;
 }
 
-// ── Maintenance scoring ───────────────────────────────────────────────────────
+// ── Maintenance scoring (max 10) ──────────────────────────────────────────────
 
 const CRITICAL_PRIORITIES    = new Set(["urgent"]);
 const CRITICAL_IMPACT_LEVELS = new Set([
@@ -187,29 +203,25 @@ const CRITICAL_IMPACT_LEVELS = new Set([
 
 /**
  * Maintenance bands:
- *   no open issues                      → 20
- *   open issues, none critical          → 10
- *   any open urgent-priority or high-   → 0
- *     impact (food_safety, compliance,
- *     service_disruption, revenue_loss)
+ *   no open issues           → 10
+ *   open, none critical      → 5
+ *   any critical / urgent    → 0
  */
 function scoreMaintenance(
   openIssues: Array<{ priority: string; impact_level: string }>
 ): { score: number; severity: MaintenanceSeverity; criticalCount: number } {
   if (openIssues.length === 0) {
-    return { score: 20, severity: "none", criticalCount: 0 };
+    return { score: 10, severity: "none", criticalCount: 0 };
   }
-
   const criticalCount = openIssues.filter(
     (i) =>
       CRITICAL_PRIORITIES.has(i.priority) ||
       CRITICAL_IMPACT_LEVELS.has(i.impact_level)
   ).length;
-
   if (criticalCount > 0) {
     return { score: 0, severity: "critical", criticalCount };
   }
-  return { score: 10, severity: "minor", criticalCount: 0 };
+  return { score: 5, severity: "minor", criticalCount: 0 };
 }
 
 function maintenanceDetail(
@@ -221,6 +233,79 @@ function maintenanceDetail(
   if (severity === "none")     return "No open maintenance issues";
   if (severity === "critical") return `${criticalCount} critical issue${criticalCount === 1 ? "" : "s"} open`;
   return `${openCount} minor issue${openCount === 1 ? "" : "s"} open`;
+}
+
+// ── Food Cost scoring (max 20) ────────────────────────────────────────────────
+
+/**
+ * Food cost bands (variance above target):
+ *   ≤ 0% (at or below target)  → 20
+ *   ≤ 2% above target          → 15
+ *   ≤ 5% above target          → 10
+ *   ≤ 10% above target         → 5
+ *   > 10% above target         → 0
+ *   no data                    → 10 (neutral)
+ */
+function scoreFoodCost(
+  actualPct: number | null,
+  targetPct: number | null,
+): { score: number; variance_pct: number | null; stock_risk: "none" | "low" | "medium" | "high" } {
+  if (actualPct === null || targetPct === null) {
+    return { score: 10, variance_pct: null, stock_risk: "none" };
+  }
+  const variance = actualPct - targetPct;
+  let score: number;
+  if      (variance <= 0) score = 20;
+  else if (variance <= 2) score = 15;
+  else if (variance <= 5) score = 10;
+  else if (variance <= 10) score = 5;
+  else                     score = 0;
+
+  const stock_risk = variance <= 0 ? "none" as const
+    : variance <= 2 ? "low" as const
+    : variance <= 5 ? "medium" as const
+    : "high" as const;
+
+  return { score, variance_pct: Math.round(variance * 10) / 10, stock_risk };
+}
+
+function foodCostDetail(score: number, actualPct: number | null, targetPct: number | null, variance: number | null): string {
+  if (actualPct === null) return "No food cost data available";
+  if (targetPct === null) return `Food cost ${actualPct.toFixed(1)}% — no target set`;
+  if (variance !== null && variance <= 0) return `Food cost ${actualPct.toFixed(1)}% — on target (${targetPct.toFixed(1)}%)`;
+  return `Food cost ${actualPct.toFixed(1)}% — ${variance?.toFixed(1)}% above target (${targetPct.toFixed(1)}%)`;
+}
+
+// ── Daily Ops scoring (max 10) ────────────────────────────────────────────────
+
+/**
+ * Daily ops freshness:
+ *   report today or yesterday       → 10  (fresh)
+ *   report 2–3 days old             → 6   (aging)
+ *   report 4–7 days old             → 3   (stale)
+ *   no report or > 7 days           → 0   (missing)
+ */
+function scoreDailyOps(
+  latestReportDate: string | null,
+  today: string,
+): { score: number; age_days: number | null; freshness: "fresh" | "aging" | "stale" | "missing" } {
+  if (!latestReportDate) {
+    return { score: 0, age_days: null, freshness: "missing" };
+  }
+  const diff = Math.floor(
+    (new Date(today).getTime() - new Date(latestReportDate).getTime()) / 86400000
+  );
+  if (diff <= 1) return { score: 10, age_days: diff, freshness: "fresh" };
+  if (diff <= 3) return { score: 6,  age_days: diff, freshness: "aging" };
+  if (diff <= 7) return { score: 3,  age_days: diff, freshness: "stale" };
+  return { score: 0, age_days: diff, freshness: "missing" };
+}
+
+function dailyOpsDetail(freshness: "fresh" | "aging" | "stale" | "missing", ageDays: number | null): string {
+  if (freshness === "missing") return ageDays !== null ? `Last report ${ageDays}d ago — stale` : "No daily ops report found";
+  if (freshness === "fresh")   return ageDays === 0 ? "Today's report uploaded" : "Yesterday's report available";
+  if (freshness === "aging")   return `Report ${ageDays}d old — update recommended`;
+  return `Report ${ageDays}d old — requires update`;
 }
 
 // ── Main function ─────────────────────────────────────────────────────────────
@@ -240,9 +325,10 @@ export async function getOperatingScore(
   salesOverride?: SalesOverride | null,
 ): Promise<OperatingScore> {
   const supabase = createServerClient();
+  const todayStr = new Date().toISOString().slice(0, 10);
 
-  // ── Fetch all four data sources in parallel ───────────────────────────────
-  const [opsResult, complianceResult, maintenanceResult] = await Promise.all([
+  // ── Fetch all data sources in parallel ────────────────────────────────────
+  const [opsResult, complianceResult, maintenanceResult, foodCostResult] = await Promise.all([
 
     // Latest daily operations report (sales + labour)
     supabase
@@ -262,6 +348,16 @@ export async function getOperatingScore(
       .from("maintenance_logs")
       .select("priority, impact_level")
       .in("repair_status", ["open", "in_progress", "awaiting_parts"]),
+
+    // Latest food cost snapshot
+    supabase
+      .from("food_cost_snapshots")
+      .select("estimated_food_cost_pct, target_food_cost_pct")
+      .order("date", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then((r) => r)
+      .catch(() => ({ data: null, error: null })),
   ]);
 
   // ── Parse ops report ──────────────────────────────────────────────────────
@@ -281,7 +377,6 @@ export async function getOperatingScore(
     actualSales = opsReport?.sales_net_vat  ?? null;
     dataDate    = opsReport?.report_date    ?? null;
 
-    // ── Fetch revenue target for the same date ──────────────────────────────
     targetSales = null;
     if (dataDate) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -294,11 +389,11 @@ export async function getOperatingScore(
     }
   }
 
-  // ── Score revenue ─────────────────────────────────────────────────────────
+  // ── Score revenue (25 pts) ────────────────────────────────────────────────
   const { score: revenueScore, gap_pct } = scoreRevenue(actualSales, targetSales);
   const revenueComponent: RevenueComponent = {
     score:     revenueScore,
-    max:       40,
+    max:       25,
     actual:    actualSales,
     target:    targetSales,
     gap_pct,
@@ -306,7 +401,7 @@ export async function getOperatingScore(
     detail:    revenueDetail(revenueScore, gap_pct, actualSales, targetSales),
   };
 
-  // ── Score labour ──────────────────────────────────────────────────────────
+  // ── Score labour (20 pts) ─────────────────────────────────────────────────
   const labourScore = scoreLabour(labourPct);
   const labourComponent: LabourComponent = {
     score:      labourScore,
@@ -315,7 +410,22 @@ export async function getOperatingScore(
     detail:     labourDetail(labourScore, labourPct),
   };
 
-  // ── Score compliance (live status recomputed from date fields) ────────────────────
+  // ── Score food cost (20 pts) ──────────────────────────────────────────────
+  const fcData = foodCostResult.data as { estimated_food_cost_pct: number | null; target_food_cost_pct: number | null } | null;
+  const actualFoodCostPct = fcData?.estimated_food_cost_pct ?? null;
+  const targetFoodCostPct = fcData?.target_food_cost_pct ?? null;
+  const { score: foodCostScore, variance_pct: fcVariance, stock_risk } = scoreFoodCost(actualFoodCostPct, targetFoodCostPct);
+  const foodCostComponent: FoodCostComponent = {
+    score:         foodCostScore,
+    max:           20,
+    food_cost_pct: actualFoodCostPct,
+    target_pct:    targetFoodCostPct,
+    variance_pct:  fcVariance,
+    stock_risk,
+    detail:        foodCostDetail(foodCostScore, actualFoodCostPct, targetFoodCostPct, fcVariance),
+  };
+
+  // ── Score compliance (15 pts) ─────────────────────────────────────────────
   const complianceRows = (complianceResult.data as unknown as {
     next_due_date: string | null;
     scheduled_service_date?: string | null;
@@ -329,7 +439,7 @@ export async function getOperatingScore(
   const { score: complianceScore, worst: worstStatus } = scoreCompliance(expiredCount, dueSoonCount, scheduledCount);
   const complianceComponent: ComplianceComponent = {
     score:        complianceScore,
-    max:          20,
+    max:          15,
     worst_status: worstStatus,
     total_items:  complianceItems.length,
     expired:      expiredCount,
@@ -338,20 +448,33 @@ export async function getOperatingScore(
     detail:       complianceDetail(complianceScore, worstStatus, expiredCount, dueSoonCount, scheduledCount, complianceItems.length),
   };
 
-  // ── Score maintenance ─────────────────────────────────────────────────────
+  // ── Score maintenance (10 pts) ────────────────────────────────────────────
   const openIssues = (maintenanceResult.data ?? []) as { priority: string; impact_level: string }[];
   const { score: maintScore, severity, criticalCount } = scoreMaintenance(openIssues);
   const maintenanceComponent: MaintenanceComponent = {
     score:          maintScore,
-    max:            20,
+    max:            10,
     severity,
     open_count:     openIssues.length,
     critical_count: criticalCount,
     detail:         maintenanceDetail(maintScore, severity, openIssues.length, criticalCount),
   };
 
+  // ── Score daily ops freshness (10 pts) ────────────────────────────────────
+  const { score: opsScore, age_days, freshness } = scoreDailyOps(
+    opsReport?.report_date ?? null,
+    todayStr,
+  );
+  const dailyOpsComponent: DailyOpsComponent = {
+    score:           opsScore,
+    max:             10,
+    report_age_days: age_days,
+    freshness,
+    detail:          dailyOpsDetail(freshness, age_days),
+  };
+
   // ── Total ─────────────────────────────────────────────────────────────────
-  const total = revenueScore + labourScore + complianceScore + maintScore;
+  const total = revenueScore + labourScore + foodCostScore + complianceScore + maintScore + opsScore;
 
   return {
     total,
@@ -360,8 +483,10 @@ export async function getOperatingScore(
     components: {
       revenue:     revenueComponent,
       labour:      labourComponent,
+      food_cost:   foodCostComponent,
       compliance:  complianceComponent,
       maintenance: maintenanceComponent,
+      daily_ops:   dailyOpsComponent,
     },
     computed_at: new Date().toISOString(),
   };

@@ -361,13 +361,15 @@ export default async function DailyOpsSummaryPanel() {
 
       {/* Score component breakdown */}
       {score && (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {(
             [
-              { key: "revenue",     label: "Revenue",     max: 40, color: "bg-emerald-400" },
+              { key: "revenue",     label: "Revenue",     max: 25, color: "bg-emerald-400" },
               { key: "labour",      label: "Labour",      max: 20, color: "bg-sky-400"     },
-              { key: "compliance",  label: "Compliance",  max: 20, color: "bg-violet-400"  },
-              { key: "maintenance", label: "Maintenance", max: 20, color: "bg-amber-400"   },
+              { key: "food_cost",   label: "Food Cost",   max: 20, color: "bg-orange-400"  },
+              { key: "compliance",  label: "Compliance",  max: 15, color: "bg-violet-400"  },
+              { key: "maintenance", label: "Maintenance", max: 10, color: "bg-amber-400"   },
+              { key: "daily_ops",   label: "Daily Ops",   max: 10, color: "bg-cyan-400"    },
             ] as const
           ).map(({ key, label, max, color }) => {
             const comp  = score.components[key];

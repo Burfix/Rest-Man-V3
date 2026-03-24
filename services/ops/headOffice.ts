@@ -62,6 +62,8 @@ export interface GroupMetrics {
   total_actions_overdue:   number;
   total_actions_completed: number;
   group_completion_pct:    number | null;
+  avg_food_cost_pct:       number | null;
+  food_cost_risk_count:    number;   // stores with food cost above target
 }
 
 export interface StoreLeaderboardEntry extends StoreSummary {
@@ -223,6 +225,8 @@ export function computeGroupMetrics(summaries: StoreSummary[]): GroupMetrics {
     group_revenue_gap_pct:   totalTarget != null && totalTarget > 0 && totalRevenue != null
       ? Math.round(((totalTarget - totalRevenue) / totalTarget) * 100)
       : null,
+    avg_food_cost_pct:       null,    // populated by page-level query
+    food_cost_risk_count:    0,
   };
 }
 
@@ -385,4 +389,45 @@ export async function getGroupActionStats(): Promise<StoreActionStats[]> {
       completion_pct: s.total > 0 ? Math.round((s.completed / s.total) * 100) : null,
     };
   });
+}
+
+/**
+ * Get the latest food cost snapshot across all stores.
+ * Returns avg food cost % and count of stores above target.
+ */
+export async function getGroupFoodCostMetrics(): Promise<{
+  avg_food_cost_pct: number | null;
+  food_cost_risk_count: number;
+}> {
+  try {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("food_cost_snapshots")
+      .select("store_id, estimated_food_cost_pct, target_food_cost_pct, date")
+      .order("date", { ascending: false })
+      .limit(50);
+
+    if (!data || data.length === 0) return { avg_food_cost_pct: null, food_cost_risk_count: 0 };
+
+    // Keep latest per store
+    const latest: Record<string, { est: number; target: number }> = {};
+    for (const row of data) {
+      if (!latest[row.store_id] && row.estimated_food_cost_pct != null) {
+        latest[row.store_id] = {
+          est: Number(row.estimated_food_cost_pct),
+          target: Number(row.target_food_cost_pct ?? 30),
+        };
+      }
+    }
+
+    const entries = Object.values(latest);
+    if (entries.length === 0) return { avg_food_cost_pct: null, food_cost_risk_count: 0 };
+
+    const avg = Math.round((entries.reduce((s, e) => s + e.est, 0) / entries.length) * 10) / 10;
+    const riskCount = entries.filter(e => e.est > e.target).length;
+
+    return { avg_food_cost_pct: avg, food_cost_risk_count: riskCount };
+  } catch {
+    return { avg_food_cost_pct: null, food_cost_risk_count: 0 };
+  }
 }

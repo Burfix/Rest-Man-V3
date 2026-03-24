@@ -15,6 +15,7 @@ import ForecastVsActualCard from "./ForecastVsActualCard";
 import RiskRadarCard from "./RiskRadarCard";
 import PrepGuidanceCard from "./PrepGuidanceCard";
 import PromotionInsightCard from "./PromotionInsightCard";
+import FoodCostRiskCard from "./FoodCostRiskCard";
 
 export default function GMCoPilot() {
   const [briefing, setBriefing] = useState<GMBriefing | null>(null);
@@ -99,11 +100,14 @@ export default function GMCoPilot() {
         </div>
       </div>
 
-      {/* Zone 4: Prep Guidance + Promo Insight */}
+      {/* Zone 4: Food Cost + Prep Guidance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <FoodCostRiskCard />
         <PrepGuidanceCard items={briefing.prepGuidance} />
-        <PromotionInsightCard promos={briefing.promoInsights} />
       </div>
+
+      {/* Zone 5: Promo Insight */}
+      <PromotionInsightCard promos={briefing.promoInsights} />
     </div>
   );
 }

@@ -6,7 +6,8 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import ActionsBoard, { type Action } from "@/components/dashboard/actions/ActionsBoard";
+import ActionsBoard from "@/components/dashboard/actions/ActionsBoard";
+import type { Action } from "@/types/actions";
 import DailyOpsSummaryPanel from "@/components/dashboard/actions/DailyOpsSummaryPanel";
 
 export const dynamic   = "force-dynamic";
@@ -68,6 +69,9 @@ export default async function ActionsPage() {
   const pendingCount    = actions.filter((a) => a.status === "pending").length;
   const inProgressCount = actions.filter((a) => a.status === "in_progress").length;
   const completedCount  = actions.filter((a) => a.status === "completed").length;
+  const overdueCount    = actions.filter((a) =>
+    a.status !== "completed" && a.due_at && new Date(a.due_at) < new Date()
+  ).length;
 
   function fmtTime(mins: number | null): string {
     if (mins === null) return "—";
@@ -97,7 +101,7 @@ export default async function ActionsPage() {
 
       {/* KPI strip */}
       {!loadError && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
             <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">Pending</p>
             <p className="mt-1 text-3xl font-bold text-stone-900">{pendingCount}</p>
@@ -106,6 +110,12 @@ export default async function ActionsPage() {
             <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">In Progress</p>
             <p className="mt-1 text-3xl font-bold text-blue-700">{inProgressCount}</p>
           </div>
+          {overdueCount > 0 && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+              <p className="text-xs font-medium text-red-600 uppercase tracking-wide">Overdue</p>
+              <p className="mt-1 text-3xl font-bold text-red-700">{overdueCount}</p>
+            </div>
+          )}
           <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 shadow-sm">
             <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Completed Today</p>
             <p className="mt-1 text-3xl font-bold text-green-700">{completedCount}</p>
