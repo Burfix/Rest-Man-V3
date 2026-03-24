@@ -12,6 +12,7 @@ export interface InventoryItem {
   unit:              string;
   current_stock:     number;
   minimum_threshold: number;
+  par_level:         number;
   avg_daily_usage:   number;
   supplier_name:     string | null;
   typical_order_qty: number | null;
@@ -100,4 +101,20 @@ export interface FoodCostSummary {
   status:         "on_target" | "above_target" | "high" | "no_data";
   trend_7d:       { date: string; pct: number }[];
   stock_risk:     StockRiskSummary;
+}
+
+// ── Stock-on-Hand status (GM dashboard view) ────────────────────────────────
+
+export type StockOnHandStatus = "critical" | "running_low" | "healthy";
+
+export interface StockOnHandItem {
+  id:            string;
+  item_name:     string;
+  stock_on_hand: number;
+  unit:          string;
+  min_level:     number;
+  par_level:     number;
+  status:        StockOnHandStatus;
+  last_updated:  string;
+  category:      string;
 }

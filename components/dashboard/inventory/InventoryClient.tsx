@@ -81,22 +81,6 @@ export default function InventoryClient() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-sm">
-            <span className="text-lg text-white">🥩</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-stone-900 dark:text-stone-100">Inventory & Food Cost</h1>
-            <p className="text-xs text-stone-500 dark:text-stone-400">Stock levels, food cost tracking & ordering</p>
-          </div>
-        </div>
-        <button onClick={fetchData} className="flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-700 px-3 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors">
-          ↻ Refresh
-        </button>
-      </div>
-
       {/* KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <KpiTile label="Food Cost %" value={foodCost?.current_pct !== null ? `${foodCost?.current_pct?.toFixed(1)}%` : "—"} subtext={foodCost?.target_pct ? `Target: ${foodCost.target_pct.toFixed(1)}%` : ""} />
