@@ -1,11 +1,11 @@
 /**
  * DashboardTopBar — Operations Command Bar
  *
- * Premium identity header with a compact 5-tile KPI row.
+ * Premium identity header with a compact 6-tile KPI row.
  * Replaces CommandStatusBar with richer operational copy and
  * a stronger command-centre aesthetic.
  *
- * Tiles: Compliance · Maintenance · Revenue · Labour · Today
+ * Tiles: Compliance · Maintenance · Revenue · Labour · Inventory · Today
  */
 
 import { cn, formatDisplayDate } from "@/lib/utils";
@@ -42,6 +42,21 @@ interface Props {
   } | null;
   revenueTrend?:  TrendSignal | null;
   labourTrend?:   TrendSignal | null;
+  labourLive?: {
+    labourPct:    number;
+    totalPay:     number;
+    totalHours:   number;
+    activeStaff:  number;
+    lastSyncAt?:  string | null;
+  } | null;
+  inventoryIntel?: {
+    criticalCount: number;
+    lowCount:      number;
+    healthyCount:  number;
+    noPOCount:     number;
+    totalItems:    number;
+    riskScore:     number;
+  } | null;
 }
 
 const PERIOD_STYLE: Record<string, string> = {
@@ -73,8 +88,10 @@ export default function DashboardTopBar({
   microsStatus,
   revenueTrend,
   labourTrend,
+  labourLive,
+  inventoryIntel,
 }: Props) {
-  const laborPct  = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct  = labourLive?.labourPct ?? dailyOps.latestReport?.labor_cost_percent ?? null;
   const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
 
   // ── Compliance tile ─────────────────────────────────────────────────────
@@ -161,7 +178,24 @@ export default function DashboardTopBar({
     laborPct == null ? "text-stone-400 dark:text-stone-600"       :
     laborPct <= 35   ? "text-emerald-600 dark:text-emerald-500"   :
     laborPct <= 45   ? "text-amber-600 dark:text-amber-400"       :
-    "text-red-600 dark:text-red-400";
+    "text-red-600 dark:text-red-400";  const labourSyncMins = labourLive?.lastSyncAt
+    ? Math.floor((Date.now() - new Date(labourLive.lastSyncAt).getTime()) / 60_000)
+    : null;
+  // ── Inventory tile ────────────────────────────────────────────────────────
+  const inv = inventoryIntel;
+  const invHasData = inv != null && inv.totalItems > 0;
+  const invMetric = invHasData ? String(inv.criticalCount + inv.lowCount) : "—";
+  const invMetricSub = invHasData ? (inv.criticalCount + inv.lowCount === 1 ? "at risk" : "at risk") : undefined;
+  const invSub =
+    !invHasData              ? "No items tracked" :
+    inv.criticalCount > 0    ? `${inv.criticalCount} stockout${inv.criticalCount > 1 ? "s" : ""}` :
+    inv.lowCount > 0         ? `${inv.lowCount} running low` :
+    `${inv.healthyCount} items healthy`;
+  const invSubColor =
+    !invHasData              ? "text-stone-400 dark:text-stone-600" :
+    inv.criticalCount > 0    ? "text-red-600 dark:text-red-400" :
+    inv.lowCount > 0         ? "text-amber-600 dark:text-amber-400" :
+    "text-emerald-600 dark:text-emerald-500";
 
   // ── Today tile ────────────────────────────────────────────────────────────
   const todaySub =
@@ -206,10 +240,20 @@ export default function DashboardTopBar({
       metric:     labourMetric,
       sub:        labourSub,
       subColor:   labourSubColor,
-      href:       "/dashboard/operations",
-      sourceType: microsLive ? "labour_sync" as const : dailyOps.latestReport ? "csv_upload" as const : undefined,
-      sourceAge:  microsLive ? microsAgeLabel : undefined,
+      href:       "/dashboard/labour",
+      sourceType: labourLive ? "labour_sync" as const : microsLive ? "labour_sync" as const : dailyOps.latestReport ? "csv_upload" as const : undefined,
+      sourceAge:  labourLive
+        ? (labourSyncMins != null ? (labourSyncMins < 1 ? "now" : labourSyncMins < 60 ? `${labourSyncMins}m` : `${Math.floor(labourSyncMins / 60)}h`) : microsAgeLabel)
+        : microsLive ? microsAgeLabel : undefined,
       trend:      labourTrend ?? undefined,
+    },
+    {
+      label:      "Inventory",
+      metric:     invMetric,
+      metricSub:  invMetricSub,
+      sub:        invSub,
+      subColor:   invSubColor,
+      href:       "/dashboard/inventory",
     },
     {
       label:      "Today",
@@ -259,7 +303,7 @@ export default function DashboardTopBar({
       </div>
 
       {/* ── KPI tiles ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 divide-x divide-y divide-stone-100 dark:divide-stone-800">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-stone-100 dark:divide-stone-800">
         {kpis.map((kpi) => (
           <a
             key={kpi.label}

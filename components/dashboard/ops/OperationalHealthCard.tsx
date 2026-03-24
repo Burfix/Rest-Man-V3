@@ -14,6 +14,7 @@
 
 import { cn } from "@/lib/utils";
 import { computeHealthScore } from "@/lib/commandCenter";
+import type { InventoryIntelParam } from "@/lib/commandCenter";
 import type {
   ComplianceSummary,
   MaintenanceSummary,
@@ -40,6 +41,8 @@ interface Props {
     sales:   { lastUpdated: string | null; stale: boolean } | null;
     labour?: { lastUpdated: string | null; stale: boolean } | null;
   } | null;
+  labourPctOverride?: number | null;
+  inventoryIntel?: InventoryIntelParam | null;
 }
 
 export default function OperationalHealthCard({
@@ -51,6 +54,8 @@ export default function OperationalHealthCard({
   salesSnapshot,
   microsStatus,
   freshness,
+  labourPctOverride,
+  inventoryIntel,
 }: Props) {
   const { total, status, breakdown } = computeHealthScore({
     compliance,
@@ -58,6 +63,8 @@ export default function OperationalHealthCard({
     forecast,
     dailyOps,
     reviews,
+    labourPctOverride,
+    inventoryIntel,
   });
 
   // ── Guidance: top risk driver + fastest fix ────────────────────────────
@@ -87,6 +94,15 @@ export default function OperationalHealthCard({
   } else if (compliance.due_soon > 0) {
     topRiskDriver = `${compliance.due_soon} certificate${compliance.due_soon > 1 ? "s" : ""} expiring within 30 days`;
     fastestFix    = "Begin renewal — allow 2–4 weeks for authority processing";
+  }
+
+  // Inventory risk driver — only if nothing more critical above
+  if (!topRiskDriver && inventoryIntel && inventoryIntel.criticalCount > 0) {
+    topRiskDriver = `${inventoryIntel.criticalCount} stockout${inventoryIntel.criticalCount > 1 ? "s" : ""} impacting menu availability`;
+    fastestFix    = "Order emergency stock or identify menu substitutes";
+  } else if (!topRiskDriver && inventoryIntel && inventoryIntel.noPOCount > 0) {
+    topRiskDriver = `${inventoryIntel.noPOCount} low-stock item${inventoryIntel.noPOCount > 1 ? "s" : ""} without purchase orders`;
+    fastestFix    = "Raise POs for at-risk items before next service";
   }
 
   // ── Freshness / confidence note ────────────────────────────────────────
@@ -149,6 +165,11 @@ export default function OperationalHealthCard({
     breakdown.revenue >= 50    ? "bg-amber-400"                        :
     "bg-red-500";
 
+  // Inventory bar: based on inventory score from health computation
+  const invHasData  = inventoryIntel != null && inventoryIntel.totalItems > 0;
+  const invCritical = inventoryIntel?.criticalCount ?? 0;
+  const invLow      = inventoryIntel?.lowCount ?? 0;
+
   // Service readiness bar: based on staffing score from health computation
   const svcLabel =
     !hasOpsData                 ? "No ops data"  :
@@ -200,6 +221,20 @@ export default function OperationalHealthCard({
       dimmed:   !revIsSetup,
     },
     {
+      label:    "Inventory",
+      value:    invHasData ? `${breakdown.inventory}%` : "—",
+      status:   !invHasData            ? "No items tracked" :
+                invCritical > 0        ? "Stockouts"        :
+                invLow > 0            ? "Low stock"         :
+                "Healthy",
+      barColor: !invHasData            ? "bg-stone-200 dark:bg-stone-700" :
+                invCritical > 0        ? "bg-red-500"   :
+                invLow > 0            ? "bg-amber-400" :
+                "bg-emerald-500",
+      pct:      invHasData ? breakdown.inventory : 0,
+      dimmed:   !invHasData,
+    },
+    {
       label:    "Service Readiness",
       value:    svcValue,
       status:   svcLabel,
@@ -238,7 +273,7 @@ export default function OperationalHealthCard({
             />
           </div>
           <p className="mt-1.5 text-[10px] text-stone-400 dark:text-stone-600 leading-tight">
-            Compliance · maintenance · revenue · service data
+            Compliance · maintenance · revenue · inventory · service data
           </p>
         </div>
       </div>

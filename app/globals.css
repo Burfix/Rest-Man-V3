@@ -52,3 +52,25 @@ body {
   transition-property: all;
 }
 
+/* ── Premium Operating Brain refinements ───────────────────────────────────── */
+
+/* Softer card borders */
+.dark [class*="rounded-2xl"][class*="border"] {
+  border-color: rgba(120, 113, 108, 0.15);
+}
+
+/* Premium scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+

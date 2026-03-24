@@ -15,6 +15,29 @@ import type {
   VenueEvent,
 } from "@/types";
 
+// ── Inventory intelligence param (injected from services/inventory/intelligence) ──
+
+export interface InventoryIntelParam {
+  criticalCount:        number;
+  lowCount:             number;
+  healthyCount:         number;
+  noPOCount:            number;
+  totalItems:           number;
+  riskScore:            number; // 0–10
+  estimatedLostRevenue: number;
+  /** Top at-risk items for action detail */
+  topRisks: Array<{
+    name:           string;
+    riskLevel:      "critical" | "warning" | "healthy";
+    stockOnHand:    number;
+    threshold:      number;
+    unit:           string;
+    supplier:       string | null;
+    hasOpenPO:      boolean;
+    affectedDishes: string[];
+  }>;
+}
+
 // ── Action types ─────────────────────────────────────────────────────────────
 
 export type ActionSeverity = "critical" | "urgent" | "action" | "watch";
@@ -23,6 +46,7 @@ export type ActionCategory =
   | "maintenance"
   | "revenue"
   | "staffing"
+  | "inventory"
   | "events"
   | "data";
 
@@ -185,9 +209,11 @@ export function generateConfidenceSummary(params: {
   } | null;
   dailyOps: DailyOperationsDashboardSummary;
   today:    string; // YYYY-MM-DD
+  labourLive?: boolean;
 }): ConfidenceSummary {
   const { microsStatus, dailyOps, today } = params;
   const ms = microsStatus;
+  const labourIsLive = params.labourLive ?? false;
 
   // Live POS + fresh (< 15 min) — only when isLiveDataAvailable is verified
   if (
@@ -196,7 +222,7 @@ export function generateConfidenceSummary(params: {
     ms.minutesSinceSync < 15
   ) {
     const age = ms.minutesSinceSync < 1 ? "now" : `${ms.minutesSinceSync}m`;
-    const labourDetail = dailyOps.latestReport ? "Labour live" : "Labour pending";
+    const labourDetail = labourIsLive ? "Labour live" : dailyOps.latestReport ? "Labour live" : "Labour pending";
     return { level: "high", detail: `Sales ${age} · ${labourDetail}` };
   }
 
@@ -210,7 +236,8 @@ export function generateConfidenceSummary(params: {
   }
   if (ms?.isLiveDataAvailable === true && ms.minutesSinceSync != null && ms.minutesSinceSync < 60) {
     const age = `${ms.minutesSinceSync}m`;
-    return { level: "medium", detail: `Sales ${age} · Labour from CSV` };
+    const labourLabel = labourIsLive ? "Labour live" : "Labour from CSV";
+    return { level: "medium", detail: `Sales ${age} · ${labourLabel}` };
   }
 
   // Manual / CSV upload path
@@ -241,12 +268,26 @@ export function generateTwoHourOutlook(params: {
   dailyOps:      DailyOperationsDashboardSummary;
   today:         { total: number; totalCovers: number };
   servicePeriod: string;
+  inventoryIntel?: InventoryIntelParam | null;
 }): TwoHourOutlook {
-  const { forecast, dailyOps, today } = params;
+  const { forecast, dailyOps, today, inventoryIntel } = params;
   const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
 
   if (!forecast) {
     return { text: "Limited live data — manual check required", confidence: "none" };
+  }
+
+  // Inventory stockout risk
+  if (inventoryIntel && inventoryIntel.criticalCount > 0) {
+    const dishes = inventoryIntel.topRisks
+      .filter((i) => i.riskLevel === "critical")
+      .flatMap((i) => i.affectedDishes)
+      .filter((v, i, a) => a.indexOf(v) === i)
+      .slice(0, 3);
+    return {
+      text: `${inventoryIntel.criticalCount} stockout${inventoryIntel.criticalCount > 1 ? "s" : ""} impacting${dishes.length > 0 ? ` ${dishes.join(", ")}` : " menu items"} — R${inventoryIntel.estimatedLostRevenue.toLocaleString()} revenue at risk`,
+      confidence: "high",
+    };
   }
 
   const gapAbs      = forecast.sales_gap ?? null;
@@ -316,9 +357,11 @@ export function generateCommandHeadline(params: {
   dailyOps:    DailyOperationsDashboardSummary;
   today:       { total: number; totalCovers: number };
   servicePeriod: string;
+  labourPctOverride?: number | null;
+  inventoryIntel?: InventoryIntelParam | null;
 }): CommandHeadline {
-  const { compliance, maintenance, forecast, dailyOps, today, servicePeriod } = params;
-  const laborPct     = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const { compliance, maintenance, forecast, dailyOps, today, servicePeriod, inventoryIntel } = params;
+  const laborPct     = params.labourPctOverride ?? dailyOps.latestReport?.labor_cost_percent ?? null;
   const gapPct       = forecast?.sales_gap_pct ?? null;
   const gapAbs       = forecast?.sales_gap     ?? null;
 
@@ -354,6 +397,17 @@ export function generateCommandHeadline(params: {
       severity:     "urgent",
       text:         `Service disruption — ${issue ? issue.unit_name : "equipment"} issue requires fix ${tp}`,
       subtext:      "Resolve before next service period to protect guest experience.",
+      timePressure: tp,
+    };
+  }
+
+  // ── Inventory stockout ────────────────────────────────────────────────
+  if (inventoryIntel && inventoryIntel.criticalCount > 0) {
+    const tp = `before ${servicePeriod === "Dinner" ? "dinner service" : "next service"}`;
+    return {
+      severity:     "urgent",
+      text:         `${inventoryIntel.criticalCount} stockout${inventoryIntel.criticalCount > 1 ? "s" : ""} — menu items unavailable ${tp}`,
+      subtext:      `Estimated R${inventoryIntel.estimatedLostRevenue.toLocaleString()} revenue at risk. Order or substitute immediately.`,
       timePressure: tp,
     };
   }
@@ -575,10 +629,11 @@ const SEVERITY_WEIGHT: Record<ActionSeverity, number> = {
 const CATEGORY_WEIGHT: Record<ActionCategory, number> = {
   compliance:  0,
   maintenance: 1,
-  revenue:     2,
-  staffing:    3,
-  events:      4,
-  data:        5,
+  inventory:   2,
+  revenue:     3,
+  staffing:    4,
+  events:      5,
+  data:        6,
 };
 
 // ── Build priority actions ────────────────────────────────────────────────────
@@ -591,8 +646,10 @@ export function buildPriorityActions(params: {
   reviews:     SevenDayReviewSummary;
   events:      VenueEvent[];
   today:       string; // YYYY-MM-DD
+  labourPctOverride?: number | null;
+  inventoryIntel?: InventoryIntelParam | null;
 }): DashboardAction[] {
-  const { compliance, maintenance, forecast, dailyOps, reviews, events, today } = params;
+  const { compliance, maintenance, forecast, dailyOps, reviews, events, today, labourPctOverride, inventoryIntel } = params;
   const actions: DashboardAction[] = [];
 
   // ── Compliance ────────────────────────────────────────────────────────────
@@ -805,7 +862,7 @@ export function buildPriorityActions(params: {
   }
 
   // ── Staffing ──────────────────────────────────────────────────────────────
-  const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct = labourPctOverride ?? dailyOps.latestReport?.labor_cost_percent ?? null;
   if (laborPct != null && laborPct > 35) {
     const severity: ActionSeverity = laborPct > 50 ? "urgent" : "action";
     actions.push({
@@ -814,8 +871,8 @@ export function buildPriorityActions(params: {
       title:          `Labour cost at ${laborPct.toFixed(1)}% — requires action`,
       message:        "Labour cost exceeds 35% threshold — margin pressure is high.",
       recommendation: "Review shift coverage and reduce overlap before next service.",
-      href:           "/dashboard/operations",
-      primaryAction:   { label: "Review staffing", href: "/dashboard/operations" },
+      href:           "/dashboard/labour",
+      primaryAction:   { label: "Review staffing", href: "/dashboard/labour" },
       impactWeight:   laborPct > 50 ? "high_impact" : "quick_win",
       impactLabel:    IMPACT_LABELS[laborPct > 50 ? "high_impact" : "quick_win"],
       isHighRisk:     laborPct > 50,
@@ -824,6 +881,65 @@ export function buildPriorityActions(params: {
         : `Avoid adding shifts until labour drops below 35%`,
       serviceWindowMinutes: minutesToServiceClose(),
     });
+  }
+
+  // ── Inventory ─────────────────────────────────────────────────────────────
+  if (inventoryIntel && inventoryIntel.totalItems > 0) {
+    // Stockout items (critical)
+    if (inventoryIntel.criticalCount > 0) {
+      const topCrit = inventoryIntel.topRisks.filter((i) => i.riskLevel === "critical").slice(0, 3);
+      const names = topCrit.map((i) => i.name).join(", ");
+      const dishes = topCrit.flatMap((i) => i.affectedDishes).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3);
+      actions.push({
+        severity:       "critical",
+        category:       "inventory",
+        title:          `${inventoryIntel.criticalCount} stockout${inventoryIntel.criticalCount > 1 ? "s" : ""} — menu items unavailable`,
+        message:        `${names} — ${dishes.length > 0 ? `affects ${dishes.join(", ")}` : "service impact likely"}. Est. revenue at risk: R${inventoryIntel.estimatedLostRevenue.toLocaleString()}.`,
+        recommendation: "Place emergency order or find substitute ingredients immediately.",
+        href:           "/dashboard/inventory",
+        primaryAction:   { label: "Order now", href: "/dashboard/inventory" },
+        secondaryActions: [{ label: "View stock", href: "/dashboard/inventory" }],
+        impactWeight:   "blocker",
+        impactLabel:    IMPACT_LABELS["blocker"],
+        isHighRisk:     true,
+        recoveryMetric: `R${inventoryIntel.estimatedLostRevenue.toLocaleString()} revenue at risk`,
+        serviceWindowMinutes: minutesToServiceClose(),
+      });
+    }
+
+    // Low stock without PO
+    if (inventoryIntel.noPOCount > 0) {
+      const topNoPO = inventoryIntel.topRisks.filter((i) => !i.hasOpenPO && i.riskLevel !== "healthy").slice(0, 3);
+      const names = topNoPO.map((i) => `${i.name} (${i.stockOnHand} ${i.unit})`).join(", ");
+      actions.push({
+        severity:       inventoryIntel.criticalCount > 0 ? "urgent" : "action",
+        category:       "inventory",
+        title:          `${inventoryIntel.noPOCount} low-stock item${inventoryIntel.noPOCount > 1 ? "s" : ""} without purchase order`,
+        message:        names || "At-risk items have no purchase order in progress.",
+        recommendation: "Create purchase orders to prevent stockouts before next delivery window.",
+        href:           "/dashboard/inventory",
+        primaryAction:   { label: "Create PO", href: "/dashboard/inventory" },
+        impactWeight:   "high_impact",
+        impactLabel:    IMPACT_LABELS["high_impact"],
+      });
+    }
+
+    // Low stock items (warning level) — only if no critical actions already raised
+    if (inventoryIntel.lowCount > 0 && inventoryIntel.criticalCount === 0) {
+      const topLow = inventoryIntel.topRisks.filter((i) => i.riskLevel === "warning").slice(0, 3);
+      const names = topLow.map((i) => i.name).join(", ");
+      actions.push({
+        severity:       "action",
+        category:       "inventory",
+        title:          `${inventoryIntel.lowCount} item${inventoryIntel.lowCount > 1 ? "s" : ""} running low`,
+        message:        `${names} — stock below reorder threshold.`,
+        recommendation: "Review and place orders before lead time expires.",
+        href:           "/dashboard/inventory",
+        primaryAction:   { label: "Review stock", href: "/dashboard/inventory" },
+        impactWeight:   "quick_win",
+        impactLabel:    IMPACT_LABELS["quick_win"],
+      });
+    }
   }
 
   // ── Data completeness ─────────────────────────────────────────────────────
@@ -907,6 +1023,7 @@ export interface HealthScoreBreakdown {
   compliance:  number; // 0–100
   maintenance: number;
   revenue:     number;
+  inventory:   number;
   staffing:    number;
   dataReady:   number;
 }
@@ -923,8 +1040,10 @@ export function computeHealthScore(params: {
   forecast:    RevenueForecast | null;
   dailyOps:    DailyOperationsDashboardSummary;
   reviews:     SevenDayReviewSummary;
+  labourPctOverride?: number | null;
+  inventoryIntel?: InventoryIntelParam | null;
 }): RestaurantHealthScore {
-  const { compliance, maintenance, forecast, dailyOps, reviews } = params;
+  const { compliance, maintenance, forecast, dailyOps, reviews, labourPctOverride, inventoryIntel } = params;
 
   // ── Compliance score (30%) ────────────────────────────────────────────────
   let complianceScore = 100;
@@ -958,7 +1077,7 @@ export function computeHealthScore(params: {
 
   // ── Staffing score (15%) ──────────────────────────────────────────────────
   let staffingScore = 75; // neutral baseline
-  const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct = labourPctOverride ?? dailyOps.latestReport?.labor_cost_percent ?? null;
   if (laborPct != null) {
     if (laborPct <= 30)      staffingScore = 100;
     else if (laborPct <= 35) staffingScore = 85;
@@ -975,13 +1094,20 @@ export function computeHealthScore(params: {
   if (forecast && forecast.factors.signal_count > 0) dataReadyScore += 35, dataItems++;
   if (dataItems === 0) dataReadyScore = 20;
 
+  // ── Inventory score (10%) ─────────────────────────────────────────────────
+  let inventoryScore = 70; // neutral baseline when no data
+  if (inventoryIntel && inventoryIntel.totalItems > 0) {
+    inventoryScore = inventoryIntel.riskScore * 10; // 0–10 → 0–100
+  }
+
   // ── Weighted total ────────────────────────────────────────────────────────
   const total = Math.round(
-    complianceScore  * 0.30 +
-    maintenanceScore * 0.20 +
-    revenueScore     * 0.20 +
+    complianceScore  * 0.25 +
+    maintenanceScore * 0.15 +
+    revenueScore     * 0.15 +
+    inventoryScore   * 0.10 +
     staffingScore    * 0.15 +
-    dataReadyScore   * 0.15
+    dataReadyScore   * 0.20
   );
 
   const status: RestaurantHealthScore["status"] =
@@ -997,6 +1123,7 @@ export function computeHealthScore(params: {
       compliance:  Math.round(complianceScore),
       maintenance: Math.round(maintenanceScore),
       revenue:     Math.round(revenueScore),
+      inventory:   Math.round(inventoryScore),
       staffing:    Math.round(staffingScore),
       dataReady:   Math.round(dataReadyScore),
     },

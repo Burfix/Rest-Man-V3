@@ -54,6 +54,7 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/settings/targets", label: "Revenue Targets", icon: "🎯" },
       { href: "/dashboard/sales",            label: "Sales",           icon: "💰" },
       { href: "/dashboard/sales/historical", label: "Historical",      icon: "📈" },
+      { href: "/dashboard/labour",           label: "Labour",          icon: "👷" },
       { href: "/dashboard/forecast",         label: "GM Co-Pilot",     icon: "🧭" },
     ],
   },

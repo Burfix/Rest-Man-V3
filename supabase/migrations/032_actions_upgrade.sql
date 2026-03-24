@@ -36,8 +36,11 @@ CREATE INDEX IF NOT EXISTS idx_actions_category
 CREATE INDEX IF NOT EXISTS idx_actions_due
   ON actions (due_at ASC) WHERE due_at IS NOT NULL AND status != 'completed';
 
+-- Overdue actions are queried at runtime; a partial index on (due_at, status)
+-- for non-completed rows is sufficient — the due_at < now() filter is applied
+-- at query time, not in the index predicate.
 CREATE INDEX IF NOT EXISTS idx_actions_overdue
-  ON actions (due_at, status) WHERE due_at < now() AND status != 'completed';
+  ON actions (due_at, status) WHERE status != 'completed' AND due_at IS NOT NULL;
 
 -- ── Comments ──────────────────────────────────────────────────────────────────
 

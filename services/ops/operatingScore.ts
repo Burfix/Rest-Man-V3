@@ -3,13 +3,14 @@
  *
  * getOperatingScore(locationId) → OperatingScore (0–100)
  *
- * Six weighted components:
- *   Revenue vs Target   25 pts
- *   Labour %            20 pts
- *   Food Cost           20 pts
- *   Compliance status   15 pts
- *   Maintenance status  10 pts
- *   Daily Ops Execution 10 pts
+ * Seven weighted components:
+ *   Revenue vs Target     20 pts
+ *   Labour %              20 pts
+ *   Food Cost             15 pts
+ *   Compliance status     15 pts
+ *   Inventory Risk        10 pts
+ *   Maintenance status    10 pts
+ *   Daily Ops Execution   10 pts
  *
  * All data is fetched live from the DB; results are suitable for
  * server-side rendering or caching by the caller.
@@ -27,7 +28,7 @@ export type ScoreGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface RevenueComponent {
   score:       number;
-  max:         25;
+  max:         20;
   actual:      number | null;
   target:      number | null;
   gap_pct:     number | null;
@@ -44,7 +45,7 @@ export interface LabourComponent {
 
 export interface FoodCostComponent {
   score:          number;
-  max:            20;
+  max:            15;
   food_cost_pct:  number | null;
   target_pct:     number | null;
   variance_pct:   number | null;
@@ -80,17 +81,29 @@ export interface DailyOpsComponent {
   detail:           string;
 }
 
+export interface InventoryRiskComponent {
+  score:          number;
+  max:            10;
+  critical_count: number;
+  low_count:      number;
+  healthy_count:  number;
+  total_items:    number;
+  no_po_count:    number;
+  detail:         string;
+}
+
 export interface OperatingScore {
   total:        number;         // 0–100
   grade:        ScoreGrade;
   location_id:  string;
   components: {
-    revenue:     RevenueComponent;
-    labour:      LabourComponent;
-    food_cost:   FoodCostComponent;
-    compliance:  ComplianceComponent;
-    maintenance: MaintenanceComponent;
-    daily_ops:   DailyOpsComponent;
+    revenue:        RevenueComponent;
+    labour:         LabourComponent;
+    food_cost:      FoodCostComponent;
+    compliance:     ComplianceComponent;
+    inventory_risk: InventoryRiskComponent;
+    maintenance:    MaintenanceComponent;
+    daily_ops:      DailyOpsComponent;
   };
   computed_at:  string;         // ISO timestamp
 }
@@ -105,12 +118,12 @@ function toGrade(total: number): ScoreGrade {
   return "F";
 }
 
-// ── Revenue scoring (max 25) ──────────────────────────────────────────────────
+// ── Revenue scoring (max 20) ──────────────────────────────────────────────────
 
 /**
  * Revenue bands (gap = how far BELOW target, as %)
- *   gap ≤ 0%  → 25   gap ≤ 5%  → 20   gap ≤ 10% → 15
- *   gap ≤ 20% → 8    gap > 20% → 0
+ *   gap ≤ 0%  → 20   gap ≤ 5%  → 16   gap ≤ 10% → 12
+ *   gap ≤ 20% → 6    gap > 20% → 0
  */
 function scoreRevenue(actual: number | null, target: number | null): { score: number; gap_pct: number | null } {
   if (actual === null || target === null || target === 0) {
@@ -118,10 +131,10 @@ function scoreRevenue(actual: number | null, target: number | null): { score: nu
   }
   const gap_pct = ((target - actual) / target) * 100;
   let score: number;
-  if      (gap_pct <= 0)  score = 25;
-  else if (gap_pct <= 5)  score = 20;
-  else if (gap_pct <= 10) score = 15;
-  else if (gap_pct <= 20) score = 8;
+  if      (gap_pct <= 0)  score = 20;
+  else if (gap_pct <= 5)  score = 16;
+  else if (gap_pct <= 10) score = 12;
+  else if (gap_pct <= 20) score = 6;
   else                    score = 0;
   return { score, gap_pct: Math.round(gap_pct * 10) / 10 };
 }
@@ -235,30 +248,30 @@ function maintenanceDetail(
   return `${openCount} minor issue${openCount === 1 ? "" : "s"} open`;
 }
 
-// ── Food Cost scoring (max 20) ────────────────────────────────────────────────
+// ── Food Cost scoring (max 15) ────────────────────────────────────────────────
 
 /**
  * Food cost bands (variance above target):
- *   ≤ 0% (at or below target)  → 20
- *   ≤ 2% above target          → 15
- *   ≤ 5% above target          → 10
- *   ≤ 10% above target         → 5
+ *   ≤ 0% (at or below target)  → 15
+ *   ≤ 2% above target          → 12
+ *   ≤ 5% above target          → 8
+ *   ≤ 10% above target         → 4
  *   > 10% above target         → 0
- *   no data                    → 10 (neutral)
+ *   no data                    → 8 (neutral)
  */
 function scoreFoodCost(
   actualPct: number | null,
   targetPct: number | null,
 ): { score: number; variance_pct: number | null; stock_risk: "none" | "low" | "medium" | "high" } {
   if (actualPct === null || targetPct === null) {
-    return { score: 10, variance_pct: null, stock_risk: "none" };
+    return { score: 8, variance_pct: null, stock_risk: "none" };
   }
   const variance = actualPct - targetPct;
   let score: number;
-  if      (variance <= 0) score = 20;
-  else if (variance <= 2) score = 15;
-  else if (variance <= 5) score = 10;
-  else if (variance <= 10) score = 5;
+  if      (variance <= 0) score = 15;
+  else if (variance <= 2) score = 12;
+  else if (variance <= 5) score = 8;
+  else if (variance <= 10) score = 4;
   else                     score = 0;
 
   const stock_risk = variance <= 0 ? "none" as const
@@ -320,9 +333,27 @@ export interface SalesOverride {
   dataDate: string;
 }
 
+export interface LabourOverride {
+  labourPct: number;
+  totalPay: number;
+  totalHours: number;
+  activeStaff: number;
+}
+
+export interface InventoryOverride {
+  riskScore:      number; // 0–10
+  criticalCount:  number;
+  lowCount:       number;
+  healthyCount:   number;
+  totalItems:     number;
+  noPOCount:      number;
+}
+
 export async function getOperatingScore(
   locationId: string,
   salesOverride?: SalesOverride | null,
+  labourOverride?: LabourOverride | null,
+  inventoryOverride?: InventoryOverride | null,
 ): Promise<OperatingScore> {
   const supabase = createServerClient();
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -390,11 +421,11 @@ export async function getOperatingScore(
     }
   }
 
-  // ── Score revenue (25 pts) ────────────────────────────────────────────────
+  // ── Score revenue (20 pts) ────────────────────────────────────────────────
   const { score: revenueScore, gap_pct } = scoreRevenue(actualSales, targetSales);
   const revenueComponent: RevenueComponent = {
     score:     revenueScore,
-    max:       25,
+    max:       20,
     actual:    actualSales,
     target:    targetSales,
     gap_pct,
@@ -402,23 +433,24 @@ export async function getOperatingScore(
     detail:    revenueDetail(revenueScore, gap_pct, actualSales, targetSales),
   };
 
-  // ── Score labour (20 pts) ─────────────────────────────────────────────────
-  const labourScore = scoreLabour(labourPct);
+  // ── Score labour (20 pts) — prefer live MICROS over CSV ────────────────────
+  const liveLabourPct = labourOverride?.labourPct ?? labourPct;
+  const labourScore = scoreLabour(liveLabourPct);
   const labourComponent: LabourComponent = {
     score:      labourScore,
     max:        20,
-    labour_pct: labourPct,
-    detail:     labourDetail(labourScore, labourPct),
+    labour_pct: liveLabourPct,
+    detail:     labourDetail(labourScore, liveLabourPct),
   };
 
-  // ── Score food cost (20 pts) ──────────────────────────────────────────────
+  // ── Score food cost (15 pts) ──────────────────────────────────────────────
   const fcData = foodCostResult.data as { estimated_food_cost_pct: number | null; target_food_cost_pct: number | null } | null;
   const actualFoodCostPct = fcData?.estimated_food_cost_pct ?? null;
   const targetFoodCostPct = fcData?.target_food_cost_pct ?? null;
   const { score: foodCostScore, variance_pct: fcVariance, stock_risk } = scoreFoodCost(actualFoodCostPct, targetFoodCostPct);
   const foodCostComponent: FoodCostComponent = {
     score:         foodCostScore,
-    max:           20,
+    max:           15,
     food_cost_pct: actualFoodCostPct,
     target_pct:    targetFoodCostPct,
     variance_pct:  fcVariance,
@@ -474,20 +506,40 @@ export async function getOperatingScore(
     detail:          dailyOpsDetail(freshness, age_days),
   };
 
+  // ── Score inventory risk (10 pts) ─────────────────────────────────────────
+  const invData = inventoryOverride ?? { riskScore: 7, criticalCount: 0, lowCount: 0, healthyCount: 0, totalItems: 0, noPOCount: 0 };
+  const inventoryScore = invData.riskScore;
+  const inventoryDetail =
+    invData.totalItems === 0 ? "No inventory items tracked" :
+    invData.criticalCount > 0 ? `${invData.criticalCount} stockout${invData.criticalCount > 1 ? "s" : ""} — service at risk` :
+    invData.lowCount > 0 ? `${invData.lowCount} item${invData.lowCount > 1 ? "s" : ""} running low` :
+    "All stock levels healthy";
+  const inventoryRiskComponent: InventoryRiskComponent = {
+    score:          inventoryScore,
+    max:            10,
+    critical_count: invData.criticalCount,
+    low_count:      invData.lowCount,
+    healthy_count:  invData.healthyCount,
+    total_items:    invData.totalItems,
+    no_po_count:    invData.noPOCount,
+    detail:         inventoryDetail,
+  };
+
   // ── Total ─────────────────────────────────────────────────────────────────
-  const total = revenueScore + labourScore + foodCostScore + complianceScore + maintScore + opsScore;
+  const total = revenueScore + labourScore + foodCostScore + complianceScore + inventoryScore + maintScore + opsScore;
 
   return {
     total,
     grade:       toGrade(total),
     location_id: locationId,
     components: {
-      revenue:     revenueComponent,
-      labour:      labourComponent,
-      food_cost:   foodCostComponent,
-      compliance:  complianceComponent,
-      maintenance: maintenanceComponent,
-      daily_ops:   dailyOpsComponent,
+      revenue:        revenueComponent,
+      labour:         labourComponent,
+      food_cost:      foodCostComponent,
+      compliance:     complianceComponent,
+      inventory_risk: inventoryRiskComponent,
+      maintenance:    maintenanceComponent,
+      daily_ops:      dailyOpsComponent,
     },
     computed_at: new Date().toISOString(),
   };

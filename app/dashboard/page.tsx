@@ -1,13 +1,13 @@
 /**
- * Operations Command Dashboard — GM daily operations command center.
+ * ForgeStack Operating Brain — GM daily operations command surface.
  *
- * Layout (7 zones, top-to-bottom priority order):
- *   1. DashboardTopBar     — identity + service period + 5 KPI tiles
- *   2. FreshnessBar        — data recency indicators
- *   3. CriticalActionsPanel — ranked morning briefing (action-first)
- *   4. Risk + Brief grid   — OperationalRiskCard | ServiceBriefCard
- *   5. Today + Health grid — TodayAtVenueCard   | OperationalHealthCard
- *   6. SecondaryInsights   — reviews, sales, ops analytics (below fold)
+ * Layout (6 zones, top-to-bottom priority order):
+ *   0. OperatingBrainHeader   — venue identity + service period + alerts
+ *   1. Operating Cockpit      — 3-col: Glance | CommandFeed | BusinessStatus
+ *   2. DataHealthIndicator    — compact data freshness
+ *   3. ForecastWindowCard     — next 2 hours predictive insight
+ *   4. RecommendedActionsQueue — execution queue (Now/Shift/Today/Week)
+ *   5. SecondaryInsights      — reviews, maintenance, setup (below fold)
  */
 
 import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
@@ -24,21 +24,22 @@ import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { deriveMicrosIntegrationStatus, canUseMicrosLiveData } from "@/lib/integrations/status";
 import { getOperatingScore } from "@/services/ops/operatingScore";
 import { getCurrentSalesSnapshot } from "@/lib/sales/service";
+import { getStoredDailySummary } from "@/services/micros/labour/summary";
+import { getMicrosEnvConfig } from "@/lib/micros/config";
+import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 
-import FreshnessBar               from "@/components/dashboard/ops/FreshnessBar";
-import OperatingScoreWidget       from "@/components/dashboard/ops/OperatingScoreWidget";
-import DailyAccountabilityPanel   from "@/components/dashboard/ops/DailyAccountabilityPanel";
-import CommandHeadlineBanner from "@/components/dashboard/ops/CommandHeadlineBanner";
-import DashboardTopBar       from "@/components/dashboard/ops/DashboardTopBar";
-import CriticalActionsPanel  from "@/components/dashboard/ops/CriticalActionsPanel";
-import TwoHourOutlookPanel   from "@/components/dashboard/ops/TwoHourOutlook";
-import OperationalRiskCard   from "@/components/dashboard/ops/OperationalRiskCard";
-import ServiceBriefCard      from "@/components/dashboard/ops/ServiceBriefCard";
-import TodayAtVenueCard      from "@/components/dashboard/ops/TodayAtVenueCard";
-import OperationalHealthCard from "@/components/dashboard/ops/OperationalHealthCard";
-import SecondaryInsights     from "@/components/dashboard/SecondaryInsights";
-import ManualSalesUploadForm from "@/components/dashboard/ops/ManualSalesUploadForm";
-import SalesSyncButton       from "@/components/dashboard/ops/SalesSyncButton";
+import OperatingBrainHeader    from "@/components/dashboard/ops/OperatingBrainHeader";
+import TodayAtAGlancePanel     from "@/components/dashboard/ops/TodayAtAGlancePanel";
+import CommandFeed             from "@/components/dashboard/ops/CommandFeed";
+import BusinessStatusRail      from "@/components/dashboard/ops/BusinessStatusRail";
+import DataHealthIndicator     from "@/components/dashboard/ops/DataHealthIndicator";
+import CommandHeadlineBanner   from "@/components/dashboard/ops/CommandHeadlineBanner";
+import ForecastWindowCard      from "@/components/dashboard/ops/ForecastWindowCard";
+import RecommendedActionsQueue from "@/components/dashboard/ops/RecommendedActionsQueue";
+import InventoryStatusWidget   from "@/components/dashboard/ops/InventoryStatusWidget";
+import SecondaryInsights       from "@/components/dashboard/SecondaryInsights";
+import ManualSalesUploadForm   from "@/components/dashboard/ops/ManualSalesUploadForm";
+import SalesSyncButton         from "@/components/dashboard/ops/SalesSyncButton";
 
 import {
   getServicePeriod,
@@ -49,6 +50,9 @@ import {
   computeRevenueTrend,
   computeLabourTrend,
 } from "@/lib/commandCenter";
+
+import { toCommandFeedItems } from "@/types/operating-brain";
+import type { StatusItem } from "@/components/dashboard/ops/BusinessStatusRail";
 
 import type {
   TodayBookingsSummary,
@@ -148,6 +152,7 @@ export default async function OperationsDashboard() {
     forecastResult,
     complianceResult,
     microsResult,
+    inventoryResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getSevenDayReviewSummary(),
@@ -159,6 +164,7 @@ export default async function OperationsDashboard() {
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),
+    getInventoryIntelligence(),
   ]);
 
   const { value: today, error: todayErr }           = settled(todayResult, EMPTY_TODAY);
@@ -171,6 +177,7 @@ export default async function OperationsDashboard() {
   const { value: forecast }                         = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }                = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }                     = settled(microsResult, null);
+  const { value: inventoryIntel }                   = settled(inventoryResult, null);
 
   // ─── Unified sales snapshot (single source of truth for revenue UI) ──────
   const today_iso     = todayISO();
@@ -184,14 +191,68 @@ export default async function OperationsDashboard() {
     today.totalCovers,
   );
 
-  // ─── Operating score (needs salesOverride from snapshot) ──────────────────
+  // ─── Live labour data from MICROS sync ───────────────────────────────────
+  const microsCfg = getMicrosEnvConfig();
+  const labourSummary = microsCfg.enabled && microsCfg.locRef
+    ? await getStoredDailySummary(microsCfg.locRef, today_iso).catch(() => null)
+    : null;
+
+  // ─── Operating score (needs salesOverride + labourOverride) ───────────────
   const salesOverride = salesSnapshot.source !== "forecast"
     ? { netSales: salesSnapshot.netSales, targetSales: salesSnapshot.targetSales, dataDate: salesSnapshot.businessDate }
+    : null;
+
+  const labourOverride = labourSummary?.labourPercentOfSales != null
+    ? {
+        labourPct:    labourSummary.labourPercentOfSales,
+        totalPay:     labourSummary.totalLabourCost,
+        totalHours:   labourSummary.totalLabourHours,
+        activeStaff:  labourSummary.activeStaffCount,
+      }
+    : null;
+
+  // ─── Inventory intelligence param (for command center functions) ──────────
+  const inventoryOverride = inventoryIntel
+    ? {
+        riskScore:     inventoryIntel.riskScore,
+        criticalCount: inventoryIntel.criticalItems.length,
+        lowCount:      inventoryIntel.lowItems.length,
+        healthyCount:  inventoryIntel.healthyCount,
+        totalItems:    inventoryIntel.totalItems,
+        noPOCount:     inventoryIntel.noPOItems.length,
+      }
+    : null;
+
+  const inventoryIntelParam = inventoryIntel
+    ? {
+        criticalCount:        inventoryIntel.criticalItems.length,
+        lowCount:             inventoryIntel.lowItems.length,
+        healthyCount:         inventoryIntel.healthyCount,
+        noPOCount:            inventoryIntel.noPOItems.length,
+        totalItems:           inventoryIntel.totalItems,
+        riskScore:            inventoryIntel.riskScore,
+        estimatedLostRevenue: inventoryIntel.estimatedLostRevenue,
+        topRisks: [...inventoryIntel.criticalItems, ...inventoryIntel.lowItems].slice(0, 5).map((item) => {
+          const menuImpact = inventoryIntel.menuImpact.find((m) => m.ingredientId === item.id);
+          return {
+            name:           item.name,
+            riskLevel:      item.risk_level,
+            stockOnHand:    item.current_stock,
+            threshold:      item.minimum_threshold,
+            unit:           item.unit,
+            supplier:       item.supplier_name,
+            hasOpenPO:      !inventoryIntel.noPOItems.some((npo) => npo.id === item.id),
+            affectedDishes: menuImpact?.affectedDishes ?? [],
+          };
+        }),
+      }
     : null;
 
   const operatingScore = await getOperatingScore(
     "00000000-0000-0000-0000-000000000001",
     salesOverride,
+    labourOverride,
+    inventoryOverride,
   ).catch(() => null);
 
   const errors = [todayErr, reviewsErr, salesErr, maintenanceErr, eventsErr, dailyOpsErr]
@@ -209,6 +270,8 @@ export default async function OperationsDashboard() {
     reviews,
     events,
     today:       today_iso,
+    labourPctOverride: labourSummary?.labourPercentOfSales ?? null,
+    inventoryIntel: inventoryIntelParam,
   });
 
   const commandHeadline = generateCommandHeadline({
@@ -218,6 +281,8 @@ export default async function OperationsDashboard() {
     dailyOps,
     today:         { total: today.total, totalCovers: today.totalCovers },
     servicePeriod,
+    labourPctOverride: labourSummary?.labourPercentOfSales ?? null,
+    inventoryIntel: inventoryIntelParam,
   });
 
   // ─── Central integration health — SINGLE SOURCE OF TRUTH ─────────────────
@@ -239,6 +304,7 @@ export default async function OperationsDashboard() {
     } : null,
     dailyOps,
     today: today_iso,
+    labourLive: labourSummary != null && !labourSummary.isStale,
   });
 
   const twoHourOutlook = generateTwoHourOutlook({
@@ -246,81 +312,184 @@ export default async function OperationsDashboard() {
     dailyOps,
     today:         { total: today.total, totalCovers: today.totalCovers },
     servicePeriod,
+    inventoryIntel: inventoryIntelParam,
   });
 
   const revenueTrend = computeRevenueTrend(forecast);
-  const labourTrend  = computeLabourTrend(dailyOps.latestReport?.labor_cost_percent ?? null);
+  const labourTrend  = computeLabourTrend(labourSummary?.labourPercentOfSales ?? dailyOps.latestReport?.labor_cost_percent ?? null);
 
   const totalAlerts = priorityActions.filter(
     (a) => a.severity === "critical" || a.severity === "urgent"
   ).length;
 
+  // ─── Operating Brain derived values ───────────────────────────────────────
+
+  // Risk level — derived from operating score + critical actions
+  const riskLevel =
+    totalAlerts >= 3 || (operatingScore && operatingScore.total < 40) ? "critical" as const :
+    totalAlerts >= 1 || (operatingScore && operatingScore.total < 55) ? "elevated" as const :
+    (operatingScore && operatingScore.total < 70) ? "moderate" as const :
+    "low" as const;
+
+  // Day summary — plain English sentence
+  const daySummary = commandHeadline.text;
+
+  // Last sync label
+  const lastSyncLabel =
+    salesSnapshot.freshnessMinutes != null
+      ? salesSnapshot.freshnessMinutes < 1 ? "just now"
+        : salesSnapshot.freshnessMinutes < 60 ? `${salesSnapshot.freshnessMinutes}m ago`
+        : `${Math.floor(salesSnapshot.freshnessMinutes / 60)}h ago`
+      : "unknown";
+
+  // Labour sync age label
+  const labourSyncAge = labourSummary?.lastSyncAt
+    ? (() => {
+        const mins = Math.floor((Date.now() - new Date(labourSummary.lastSyncAt!).getTime()) / 60_000);
+        return mins < 1 ? "now" : mins < 60 ? `${mins}m ago` : `${Math.floor(mins / 60)}h ago`;
+      })()
+    : null;
+
+  // Command feed items — transformed from priority actions
+  const feedItems = toCommandFeedItems(priorityActions);
+
+  // ─── Business Status Rail items ──────────────────────────────────────────
+
+  const laborPct = labourSummary?.labourPercentOfSales ?? dailyOps.latestReport?.labor_cost_percent ?? null;
+  const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
+
+  /** Compact currency formatter */
+  function compactZAR(v: number): string {
+    if (v >= 1_000_000) return `R ${(v / 1_000_000).toFixed(1)}M`;
+    if (v >= 10_000)    return `R ${Math.round(v / 1_000)}K`;
+    if (v >= 1_000)     return `R ${(v / 1_000).toFixed(1)}K`;
+    return `R ${Math.round(v)}`;
+  }
+
+  const businessItems: StatusItem[] = [
+    {
+      key:     "revenue",
+      label:   "Revenue",
+      metric:  salesSnapshot ? compactZAR(salesSnapshot.netSales) : forecast ? compactZAR(forecast.forecast_sales) : "—",
+      subtext: salesSnapshot?.targetVariancePercent != null
+        ? salesSnapshot.targetVariancePercent >= 0 ? "On target" : `${Math.abs(salesSnapshot.targetVariancePercent).toFixed(0)}% behind`
+        : "No target set",
+      tone:    salesSnapshot?.targetVariancePercent == null ? "neutral"
+        : salesSnapshot.targetVariancePercent >= 0 ? "good"
+        : Math.abs(salesSnapshot.targetVariancePercent) >= 20 ? "danger" : "warning",
+      href:    "/dashboard/sales",
+      trend:   revenueTrend ?? undefined,
+      sourceType: salesSnapshot.source === "micros" && salesSnapshot.isLive ? "micros_live"
+        : salesSnapshot.source === "manual" ? "manual_upload"
+        : undefined,
+    },
+    {
+      key:     "labour",
+      label:   "Labour",
+      metric:  laborPct != null ? `${laborPct.toFixed(1)}%` : "—",
+      subtext: laborPct == null ? "No data" : laborPct <= 30 ? "Within range" : laborPct <= 45 ? "Elevated" : "High — act now",
+      tone:    laborPct == null ? "neutral" : laborPct <= 35 ? "good" : laborPct <= 45 ? "warning" : "danger",
+      href:    "/dashboard/labour",
+      trend:   labourTrend ?? undefined,
+    },
+    {
+      key:     "inventory",
+      label:   "Inventory",
+      metric:  inventoryIntelParam ? String(inventoryIntelParam.criticalCount + inventoryIntelParam.lowCount) : "—",
+      metricSub: inventoryIntelParam ? "at risk" : undefined,
+      subtext: !inventoryIntelParam ? "No items" : inventoryIntelParam.criticalCount > 0 ? `${inventoryIntelParam.criticalCount} stockout` : inventoryIntelParam.lowCount > 0 ? `${inventoryIntelParam.lowCount} low` : "All healthy",
+      tone:    !inventoryIntelParam ? "neutral" : inventoryIntelParam.criticalCount > 0 ? "danger" : inventoryIntelParam.lowCount > 0 ? "warning" : "good",
+      href:    "/dashboard/inventory",
+    },
+    {
+      key:     "maintenance",
+      label:   "Maintenance",
+      metric:  maintenance.totalEquipment > 0 ? String(totalOpen) : "—",
+      metricSub: totalOpen === 1 ? "issue" : totalOpen > 1 ? "issues" : undefined,
+      subtext: maintenance.outOfService > 0 ? `${maintenance.outOfService} OOS` : totalOpen > 0 ? `${maintenance.totalEquipment} tracked` : maintenance.totalEquipment > 0 ? "All operational" : "Not tracked",
+      tone:    maintenance.outOfService > 0 ? "danger" : totalOpen > 0 ? "warning" : maintenance.totalEquipment > 0 ? "good" : "neutral",
+      href:    "/dashboard/maintenance",
+    },
+    {
+      key:     "compliance",
+      label:   "Compliance",
+      metric:  complianceSummary.total > 0 ? `${complianceSummary.compliance_pct}%` : "—",
+      subtext: complianceSummary.expired > 0 ? `${complianceSummary.expired} expired` : complianceSummary.due_soon > 0 ? `${complianceSummary.due_soon} due soon` : complianceSummary.total > 0 ? "All current" : "None tracked",
+      tone:    complianceSummary.expired > 0 ? "danger" : complianceSummary.due_soon > 0 ? "warning" : complianceSummary.total > 0 ? "good" : "neutral",
+      href:    "/dashboard/compliance",
+    },
+    {
+      key:     "bookings",
+      label:   "Today",
+      metric:  String(today.total),
+      metricSub: today.total === 1 ? "booking" : "bookings",
+      subtext: today.total > 0 ? `${today.totalCovers} covers confirmed` : "Walk-in trade",
+      tone:    today.total > 0 ? "good" : "warning",
+      href:    "/dashboard/bookings",
+    },
+  ];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
 
-      {/* ── 0. Operating Score + Accountability row ── */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <OperatingScoreWidget
-          score={operatingScore}
-          salesSource={salesSnapshot ? {
-            label: salesSnapshot.sourceLabel,
-            freshnessState: salesSnapshot.freshnessState,
-            freshnessMinutes: salesSnapshot.freshnessMinutes,
-          } : undefined}
-        />
-        <DailyAccountabilityPanel />
-      </div>
-
-      {/* ── 1. Operations Command Bar ── */}
-      <DashboardTopBar
+      {/* ── 0. Operating Brain Header ── */}
+      <OperatingBrainHeader
+        venueName="Si Cantina Sociale"
         date={today_iso}
         servicePeriod={servicePeriod}
-        compliance={complianceSummary}
-        maintenance={maintenance}
-        forecast={forecast}
-        dailyOps={dailyOps}
-        events={events}
-        today={today}
-        totalAlerts={totalAlerts}
-        salesSnapshot={salesSnapshot}
-        microsStatus={ms ? {
-          isConfigured:        ms.isConfigured,
-          isLiveDataAvailable: microsLiveData,
-          minutesSinceSync:    ms.minutesSinceSync ?? null,
-          lastSyncError:       ms.connection?.last_sync_error ?? null,
-          liveSales:           ms.latestDailySales?.business_date === today_iso ? ms.latestDailySales.net_sales : null,
-        } : null}
-        revenueTrend={revenueTrend}
-        labourTrend={labourTrend}
+        alertCount={totalAlerts}
       />
 
-      {/* ── 2. Data Freshness Row ── */}
-      {freshness && (
-        <FreshnessBar
-          freshness={freshness}
-          microsIsLive={microsLiveData}
-        />
-      )}
+      {/* ── 1. Operating Cockpit — 3-column layout ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-5">
+
+        {/* LEFT: Today at a Glance */}
+        <div className="order-2 lg:order-1 lg:col-span-3">
+          <TodayAtAGlancePanel
+            score={operatingScore}
+            riskLevel={riskLevel}
+            servicePeriod={servicePeriod}
+            lastSync={lastSyncLabel}
+            daySummary={daySummary}
+          />
+        </div>
+
+        {/* CENTER: Command Feed (main focal point — shown first on mobile) */}
+        <div className="order-1 lg:order-2 lg:col-span-5">
+          <CommandFeed items={feedItems} maxVisible={5} />
+        </div>
+
+        {/* RIGHT: Business Status */}
+        <div className="order-3 lg:order-3 lg:col-span-4">
+          <BusinessStatusRail items={businessItems} />
+        </div>
+      </div>
 
       {/* ── Command Headline ── */}
       <CommandHeadlineBanner headline={commandHeadline} confidence={confidenceSummary} />
 
-      {/* ── Two-Hour Outlook ── */}
-      <TwoHourOutlookPanel outlook={twoHourOutlook} />
+      {/* ── 2. Data Health ── */}
+      {freshness && (
+        <DataHealthIndicator
+          freshness={freshness}
+          microsIsLive={microsLiveData}
+          labourSyncAge={labourSyncAge ?? undefined}
+        />
+      )}
 
-      {/* ── Live sales data strip — shows when MICROS or manual data is available ── */}
+      {/* ── Live sales strip — when MICROS or manual data is available ── */}
       {salesSnapshot.source !== "forecast" && (
         <div className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border px-4 py-2.5 text-xs",
+          "flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 rounded-xl border px-4 sm:px-5 py-2.5 sm:py-3 text-xs",
           salesSnapshot.isLive
-            ? "border-emerald-200 bg-emerald-50"
+            ? "border-emerald-200 dark:border-emerald-800/50 bg-emerald-50/50 dark:bg-emerald-950/10"
             : salesSnapshot.isStale
-            ? "border-amber-200 bg-amber-50"
-            : "border-stone-200 bg-stone-50",
+            ? "border-amber-200 dark:border-amber-800/50 bg-amber-50/50 dark:bg-amber-950/10"
+            : "border-stone-200 dark:border-stone-800 bg-stone-50/50 dark:bg-stone-900/50",
         )}>
           <span className={cn(
-            "flex items-center gap-1 font-semibold",
-            salesSnapshot.isLive ? "text-emerald-700" : salesSnapshot.isStale ? "text-amber-700" : "text-stone-600",
+            "flex items-center gap-1.5 font-semibold",
+            salesSnapshot.isLive ? "text-emerald-700 dark:text-emerald-400" : salesSnapshot.isStale ? "text-amber-700 dark:text-amber-400" : "text-stone-600 dark:text-stone-400",
           )}>
             <span className={cn(
               "h-1.5 w-1.5 rounded-full shrink-0",
@@ -333,12 +502,12 @@ export default async function OperationsDashboard() {
               : ` · ${Math.floor(salesSnapshot.freshnessMinutes / 60)}h ago`
             )}
           </span>
-          <span className="text-stone-400">·</span>
-          <span className="text-stone-600">Sales: <span className="font-semibold text-stone-900">R {salesSnapshot.netSales.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
-          <span className="text-stone-600">Covers: <span className="font-semibold text-stone-900">{salesSnapshot.covers}</span></span>
-          <span className="text-stone-600">Checks: <span className="font-semibold text-stone-900">{salesSnapshot.checks}</span></span>
+          <span className="text-stone-300 dark:text-stone-700">·</span>
+          <span className="text-stone-600 dark:text-stone-400">Sales: <span className="font-semibold text-stone-900 dark:text-stone-100">R {salesSnapshot.netSales.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span></span>
+          <span className="text-stone-600 dark:text-stone-400">Covers: <span className="font-semibold text-stone-900 dark:text-stone-100">{salesSnapshot.covers}</span></span>
+          <span className="text-stone-600 dark:text-stone-400">Checks: <span className="font-semibold text-stone-900 dark:text-stone-100">{salesSnapshot.checks}</span></span>
           {salesSnapshot.labourCostPercent != null && salesSnapshot.labourCostPercent > 0 && (
-            <span className="text-stone-600">Labour: <span className={`font-semibold ${salesSnapshot.labourCostPercent > 50 ? "text-amber-700" : "text-stone-900"}`}>{salesSnapshot.labourCostPercent.toFixed(1)}%</span></span>
+            <span className="text-stone-600 dark:text-stone-400">Labour: <span className={cn("font-semibold", salesSnapshot.labourCostPercent > 50 ? "text-amber-700 dark:text-amber-400" : "text-stone-900 dark:text-stone-100")}>{salesSnapshot.labourCostPercent.toFixed(1)}%</span></span>
           )}
           <SalesSyncButton microsConfigured={cfgStatus.configured && cfgStatus.enabled} compact />
         </div>
@@ -354,7 +523,7 @@ export default async function OperationsDashboard() {
 
       {/* ── Non-fatal DB errors ── */}
       {errors.length > 0 && (
-        <div className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 px-5 py-3.5 text-sm text-amber-800 dark:text-amber-300">
           <p className="font-semibold">Some sections could not load:</p>
           <ul className="mt-1 list-inside list-disc text-xs">
             {errors.map((e, i) => (
@@ -364,60 +533,18 @@ export default async function OperationsDashboard() {
         </div>
       )}
 
-      {/* ── 3. Critical Actions — GM Morning Briefing ── */}
-      <CriticalActionsPanel actions={priorityActions} />
+      {/* ── 3. Forecast Window ── */}
+      <ForecastWindowCard outlook={twoHourOutlook} />
 
-      {/* ── 4. Operational Risk + Service Brief ── */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <OperationalRiskCard
-          compliance={complianceSummary}
-          maintenance={maintenance}
-        />
-        <ServiceBriefCard
-          today={today}
-          events={events}
-          forecast={forecast}
-          dailyOps={dailyOps}
-          date={today_iso}
-          servicePeriod={servicePeriod}
-          salesSnapshot={salesSnapshot}
-        />
-      </div>
+      {/* ── 4. Recommended Actions Queue ── */}
+      <RecommendedActionsQueue actions={priorityActions} />
 
-      {/* ── 5. Today at Venue + Operational Health ── */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <TodayAtVenueCard
-          today={today}
-          events={events}
-          dailyOps={dailyOps}
-          maintenance={maintenance}
-          date={today_iso}
-          forecast={forecast}
-          microsSource={microsLiveData ? "micros_live" : null}
-          microsSyncedAt={ms?.connection?.last_sync_at ?? null}
-          salesSnapshot={salesSnapshot}
-        />
-        <OperationalHealthCard
-          compliance={complianceSummary}
-          maintenance={maintenance}
-          forecast={forecast}
-          reviews={reviews}
-          dailyOps={dailyOps}
-          salesSnapshot={salesSnapshot}
-          microsStatus={ms ? {
-            isConfigured:        ms.isConfigured,
-            isLiveDataAvailable: microsLiveData,
-            minutesSinceSync:    ms.minutesSinceSync ?? null,
-            lastSyncError:       ms.connection?.last_sync_error ?? null,
-          } : undefined}
-          freshness={freshness ? {
-            sales:  freshness.sales  ? { lastUpdated: freshness.sales.lastUpdatedAt,  stale: freshness.sales.stale }  : null,
-            labour: freshness.dailyOps ? { lastUpdated: freshness.dailyOps.lastUpdatedAt, stale: freshness.dailyOps.stale } : null,
-          } : undefined}
-        />
-      </div>
+      {/* ── Inventory Status ── */}
+      {inventoryIntel && inventoryIntel.totalItems > 0 && (
+        <InventoryStatusWidget inventory={inventoryIntel} />
+      )}
 
-      {/* ── 6. Secondary Intelligence (below fold) ── */}
+      {/* ── 5. Secondary Intelligence (below fold) ── */}
       <SecondaryInsights
         reviews={reviews}
         maintenance={maintenance}

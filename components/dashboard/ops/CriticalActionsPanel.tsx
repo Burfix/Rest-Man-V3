@@ -61,6 +61,7 @@ const SEVERITY: Record<ActionSeverity, {
 const CATEGORY_ICON: Record<ActionCategory, string> = {
   compliance:  "📋",
   maintenance: "🔧",
+  inventory:   "📦",
   revenue:     "📈",
   staffing:    "👥",
   events:      "🎭",

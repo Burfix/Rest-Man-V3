@@ -3,7 +3,7 @@ import UserProfile from "@/components/dashboard/UserProfile";
 import ThemeToggle from "@/components/dashboard/ThemeToggle";
 
 export const metadata = {
-  title: "Dashboard — Ops Engine",
+  title: "ForgeStack Operating Brain",
 };
 
 export default function DashboardLayout({
