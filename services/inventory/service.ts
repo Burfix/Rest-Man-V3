@@ -3,6 +3,12 @@
  *
  * Central service for stock management, food cost tracking,
  * and risk assessment. All data flows through this service.
+ *
+ * NOTE: Tables inventory_items, stock_movements, food_cost_snapshots,
+ * purchase_orders, purchase_order_items are created by migration 031.
+ * Until the generated Supabase types are refreshed, we use (as any) on
+ * .from() calls for these tables. This is safe because the service
+ * casts data to our own types/inventory.ts interfaces.
  */
 
 import { createServerClient } from "@/lib/supabase/server";
@@ -18,6 +24,8 @@ import type {
   StockMovement,
   StockMovementType,
 } from "@/types/inventory";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ── Stock risk computation ──────────────────────────────────────────────────
 
@@ -56,7 +64,7 @@ function computeStockRisk(item: InventoryItem): InventoryItemWithRisk {
 export async function getInventoryItems(storeId = DEFAULT_ORG_ID): Promise<InventoryItemWithRisk[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
-    .from("inventory_items")
+    .from("inventory_items" as any)
     .select("*")
     .eq("store_id", storeId)
     .order("name");
@@ -65,7 +73,7 @@ export async function getInventoryItems(storeId = DEFAULT_ORG_ID): Promise<Inven
     console.error("[inventory] Failed to fetch items:", error.message);
     return [];
   }
-  return (data as InventoryItem[]).map(computeStockRisk);
+  return (data as unknown as InventoryItem[]).map(computeStockRisk);
 }
 
 export async function getStockRiskSummary(storeId = DEFAULT_ORG_ID): Promise<StockRiskSummary> {
@@ -89,14 +97,14 @@ export async function getFoodCostSummary(storeId = DEFAULT_ORG_ID): Promise<Food
 
   const [snapshotResult, trendResult, stockRisk] = await Promise.all([
     supabase
-      .from("food_cost_snapshots")
+      .from("food_cost_snapshots" as any)
       .select("*")
       .eq("store_id", storeId)
       .order("date", { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
-      .from("food_cost_snapshots")
+      .from("food_cost_snapshots" as any)
       .select("date, estimated_food_cost_pct")
       .eq("store_id", storeId)
       .order("date", { ascending: false })
@@ -104,8 +112,8 @@ export async function getFoodCostSummary(storeId = DEFAULT_ORG_ID): Promise<Food
     getStockRiskSummary(storeId),
   ]);
 
-  const latest = snapshotResult.data as FoodCostSnapshot | null;
-  const trend = ((trendResult.data ?? []) as Pick<FoodCostSnapshot, "date" | "estimated_food_cost_pct">[])
+  const latest = snapshotResult.data as unknown as FoodCostSnapshot | null;
+  const trend = ((trendResult.data ?? []) as unknown as Pick<FoodCostSnapshot, "date" | "estimated_food_cost_pct">[])
     .filter((r) => r.estimated_food_cost_pct !== null)
     .map((r) => ({ date: r.date, pct: r.estimated_food_cost_pct! }))
     .reverse();
@@ -145,7 +153,7 @@ export async function createStockMovement(
 
   // Insert movement
   const { data, error } = await supabase
-    .from("stock_movements")
+    .from("stock_movements" as any)
     .insert({
       inventory_item_id: itemId,
       type,
@@ -163,28 +171,28 @@ export async function createStockMovement(
 
   // Update current_stock on inventory_items
   const delta = type === "delivery" || type === "adjustment" ? quantity : -Math.abs(quantity);
-  await supabase.rpc("increment_stock", { item_id: itemId, delta }).catch(() => {
+  await (supabase as any).rpc("increment_stock", { item_id: itemId, delta }).catch(() => {
     // Fallback: manual update if RPC doesn't exist
     supabase
-      .from("inventory_items")
+      .from("inventory_items" as any)
       .select("current_stock")
       .eq("id", itemId)
       .single()
-      .then(({ data: item }) => {
+      .then(({ data: item }: any) => {
         if (item) {
           const newStock = Math.max(0, (item as { current_stock: number }).current_stock + delta);
-          supabase.from("inventory_items").update({ current_stock: newStock, updated_at: new Date().toISOString() }).eq("id", itemId).then(() => {});
+          (supabase as any).from("inventory_items").update({ current_stock: newStock, updated_at: new Date().toISOString() }).eq("id", itemId).then(() => {});
         }
       });
   });
 
-  return data as StockMovement;
+  return data as unknown as StockMovement;
 }
 
 export async function getPurchaseOrders(storeId = DEFAULT_ORG_ID): Promise<PurchaseOrder[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
-    .from("purchase_orders")
+    .from("purchase_orders" as any)
     .select("*, purchase_order_items(*)")
     .eq("store_id", storeId)
     .order("created_at", { ascending: false })
@@ -194,7 +202,7 @@ export async function getPurchaseOrders(storeId = DEFAULT_ORG_ID): Promise<Purch
     console.error("[inventory] getPurchaseOrders error:", error.message);
     return [];
   }
-  return (data ?? []) as PurchaseOrder[];
+  return (data ?? []) as unknown as PurchaseOrder[];
 }
 
 export async function createPurchaseOrder(
@@ -205,7 +213,7 @@ export async function createPurchaseOrder(
   const supabase = createServerClient();
 
   const { data: po, error } = await supabase
-    .from("purchase_orders")
+    .from("purchase_orders" as any)
     .insert({ store_id: storeId, supplier_name: supplierName, status: "draft" })
     .select()
     .single();
@@ -216,16 +224,16 @@ export async function createPurchaseOrder(
   }
 
   const poItems = items.map((i) => ({
-    purchase_order_id: (po as PurchaseOrder).id,
+    purchase_order_id: (po as unknown as PurchaseOrder).id,
     inventory_item_id: i.inventory_item_id,
     quantity: i.quantity,
     unit_cost: i.unit_cost ?? null,
     total_cost: i.unit_cost ? i.unit_cost * i.quantity : null,
   }));
 
-  await supabase.from("purchase_order_items").insert(poItems);
+  await (supabase as any).from("purchase_order_items").insert(poItems);
 
-  return po as PurchaseOrder;
+  return po as unknown as PurchaseOrder;
 }
 
 export async function updatePurchaseOrderStatus(
@@ -238,7 +246,7 @@ export async function updatePurchaseOrderStatus(
   if (status === "received") updates.received_at = new Date().toISOString();
 
   const { error } = await supabase
-    .from("purchase_orders")
+    .from("purchase_orders" as any)
     .update(updates)
     .eq("id", poId);
 
@@ -250,12 +258,12 @@ export async function updatePurchaseOrderStatus(
   // If received, update stock levels for all items
   if (status === "received") {
     const { data: poItems } = await supabase
-      .from("purchase_order_items")
+      .from("purchase_order_items" as any)
       .select("inventory_item_id, quantity")
       .eq("purchase_order_id", poId);
 
     if (poItems) {
-      for (const item of poItems as { inventory_item_id: string; quantity: number }[]) {
+      for (const item of poItems as unknown as { inventory_item_id: string; quantity: number }[]) {
         await createStockMovement(item.inventory_item_id, "delivery", item.quantity, `PO ${poId} received`);
       }
     }

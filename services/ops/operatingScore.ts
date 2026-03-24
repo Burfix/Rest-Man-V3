@@ -350,13 +350,14 @@ export async function getOperatingScore(
       .in("repair_status", ["open", "in_progress", "awaiting_parts"]),
 
     // Latest food cost snapshot
-    supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase as any)
       .from("food_cost_snapshots")
       .select("estimated_food_cost_pct, target_food_cost_pct")
       .order("date", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then((r) => r)
+      .then((r: any) => r)
       .catch(() => ({ data: null, error: null })),
   ]);
 

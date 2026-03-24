@@ -66,7 +66,7 @@ export async function getActionStats(): Promise<ActionStats> {
   todayStart.setHours(0, 0, 0, 0);
 
   const [activeRes, overdueRes, todayCompletedRes, weekRes] = await Promise.all([
-    sb.from("actions").select("id, status, impact_weight, due_at").is("archived_at", null),
+    sb.from("actions").select("id, status, impact_weight").is("archived_at", null),
     sb.from("actions").select("id")
       .is("archived_at", null)
       .neq("status", "completed")
@@ -80,12 +80,12 @@ export async function getActionStats(): Promise<ActionStats> {
       .gte("completed_at", new Date(Date.now() - 7 * 86400000).toISOString()),
   ]);
 
-  const active = (activeRes.data ?? []) as Array<{ id: string; status: string; impact_weight: string; due_at: string | null }>;
+  const active = (activeRes.data ?? []) as unknown as Array<{ id: string; status: string; impact_weight: string }>;
   const pending    = active.filter(a => a.status === "pending").length;
   const inProgress = active.filter(a => a.status === "in_progress").length;
   const completed  = active.filter(a => a.status === "completed").length;
   const urgentOpen = active.filter(a => a.status !== "completed" && ["critical", "high"].includes(a.impact_weight)).length;
-  const overdue    = overdueRes.data?.length ?? 0;
+  const overdue    = (overdueRes.data?.length ?? 0);
   const completedToday = todayCompletedRes.data?.length ?? 0;
   const total = active.length;
 
@@ -211,16 +211,17 @@ export async function generateStockActions(): Promise<Action[]> {
   const sb = createServerClient();
 
   // Find critical stock items
-  const { data: items } = await sb
-    .from("inventory_items")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: items } = await (sb.from("inventory_items" as any) as any)
     .select("id, name, current_stock, avg_daily_usage, minimum_threshold, supplier_name")
     .gt("avg_daily_usage", 0);
 
   if (!items || items.length === 0) return [];
 
+  type StockRow = { id: string; name: string; current_stock: number; avg_daily_usage: number; minimum_threshold: number | null; supplier_name: string | null };
   const created: Action[] = [];
 
-  for (const item of items) {
+  for (const item of items as StockRow[]) {
     const daysRemaining = item.current_stock / item.avg_daily_usage;
     const belowMinimum = item.current_stock <= (item.minimum_threshold ?? 0);
 

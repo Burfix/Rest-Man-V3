@@ -401,17 +401,19 @@ export async function getGroupFoodCostMetrics(): Promise<{
 }> {
   try {
     const supabase = createServerClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data } = await supabase
-      .from("food_cost_snapshots")
+      .from("food_cost_snapshots" as any)
       .select("store_id, estimated_food_cost_pct, target_food_cost_pct, date")
       .order("date", { ascending: false })
       .limit(50);
 
     if (!data || data.length === 0) return { avg_food_cost_pct: null, food_cost_risk_count: 0 };
 
+    type FCRow = { store_id: string; estimated_food_cost_pct: number | null; target_food_cost_pct: number | null; date: string };
     // Keep latest per store
     const latest: Record<string, { est: number; target: number }> = {};
-    for (const row of data) {
+    for (const row of data as unknown as FCRow[]) {
       if (!latest[row.store_id] && row.estimated_food_cost_pct != null) {
         latest[row.store_id] = {
           est: Number(row.estimated_food_cost_pct),
