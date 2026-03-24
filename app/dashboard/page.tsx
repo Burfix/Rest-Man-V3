@@ -24,6 +24,9 @@ import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { deriveMicrosIntegrationStatus, canUseMicrosLiveData } from "@/lib/integrations/status";
 import { getOperatingScore } from "@/services/ops/operatingScore";
 import { getCurrentSalesSnapshot } from "@/lib/sales/service";
+import { getInventoryIntelligence } from "@/services/inventory/intelligence";
+import { getStoredDailySummary } from "@/services/micros/labour/summary";
+import type { InventoryIntelParam } from "@/lib/commandCenter";
 
 import FreshnessBar               from "@/components/dashboard/ops/FreshnessBar";
 import OperatingScoreWidget       from "@/components/dashboard/ops/OperatingScoreWidget";
@@ -147,6 +150,8 @@ export default async function OperationsDashboard() {
     forecastResult,
     complianceResult,
     microsResult,
+    inventoryResult,
+    labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getSevenDayReviewSummary(),
@@ -158,6 +163,8 @@ export default async function OperationsDashboard() {
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),
+    getInventoryIntelligence(),
+    getStoredDailySummary(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"),
   ]);
 
   const { value: today, error: todayErr }           = settled(todayResult, EMPTY_TODAY);
@@ -170,6 +177,8 @@ export default async function OperationsDashboard() {
   const { value: forecast }                         = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }                = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }                     = settled(microsResult, null);
+  const { value: inventoryIntel }                   = settled(inventoryResult, null);
+  const { value: labourSummary }                    = settled(labourResult, null);
 
   // ─── Unified sales snapshot (single source of truth for revenue UI) ──────
   const today_iso     = todayISO();
@@ -199,6 +208,37 @@ export default async function OperationsDashboard() {
   // ─── Command Center computations ─────────────────────────────────────────
   const servicePeriod = getServicePeriod("Africa/Johannesburg");
 
+  // ─── Inventory intelligence → InventoryIntelParam ────────────────────────
+  const inventoryIntelParam: InventoryIntelParam | null = inventoryIntel && inventoryIntel.totalItems > 0
+    ? {
+        criticalCount:        inventoryIntel.criticalItems.length,
+        lowCount:             inventoryIntel.lowItems.length,
+        healthyCount:         inventoryIntel.healthyCount,
+        noPOCount:            inventoryIntel.noPOItems.length,
+        totalItems:           inventoryIntel.totalItems,
+        riskScore:            inventoryIntel.riskScore,
+        estimatedLostRevenue: inventoryIntel.estimatedLostRevenue,
+        topRisks: [...inventoryIntel.criticalItems, ...inventoryIntel.lowItems]
+          .slice(0, 5)
+          .map((item) => {
+            const menuImpact = inventoryIntel.menuImpact.find((m) => m.ingredientId === item.id);
+            return {
+              name:           item.name,
+              riskLevel:      item.risk_level,
+              stockOnHand:    item.current_stock,
+              threshold:      item.minimum_threshold,
+              unit:           item.unit,
+              supplier:       item.supplier_name,
+              hasOpenPO:      !inventoryIntel.noPOItems.some((npo) => npo.id === item.id),
+              affectedDishes: menuImpact?.affectedDishes ?? [],
+            };
+          }),
+      }
+    : null;
+
+  // ─── Live labour % from MICROS timecards (overrides stale CSV data) ──────
+  const labourPctOverride = labourSummary?.labourPercentOfSales ?? null;
+
   // Ranked priority actions from all operational signals
   const priorityActions = buildPriorityActions({
     compliance:  complianceSummary,
@@ -207,7 +247,9 @@ export default async function OperationsDashboard() {
     dailyOps,
     reviews,
     events,
-    today:       today_iso,
+    today:          today_iso,
+    inventoryIntel: inventoryIntelParam,
+    labourPctOverride,
   });
 
   const commandHeadline = generateCommandHeadline({
