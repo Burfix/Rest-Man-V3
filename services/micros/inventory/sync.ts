@@ -120,41 +120,74 @@ export async function syncInventoryFromMicros(
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
 
-      // Check which items already exist (match on micros_item_id + store_id)
+      // Try matching on micros_item_id first; fall back to name if column doesn't exist yet
       const microsIds = batch.map((r) => r.micros_item_id);
-      const { data: existing } = await supabase
+      const names = batch.map((r) => r.name);
+
+      let existingMap = new Map<string, string>();
+
+      // Try micros_item_id lookup
+      const { data: byMicrosId, error: microsIdErr } = await supabase
         .from("inventory_items" as any)
-        .select("id, micros_item_id")
+        .select("id, micros_item_id, name")
         .eq("store_id", storeId)
         .in("micros_item_id", microsIds);
 
-      const existingMap = new Map(
-        ((existing ?? []) as any[]).map((e: any) => [e.micros_item_id, e.id]),
-      );
+      if (!microsIdErr && byMicrosId) {
+        // micros_item_id column exists — use it
+        existingMap = new Map(
+          (byMicrosId as any[]).map((e: any) => [e.micros_item_id, e.id]),
+        );
+      } else {
+        // Fallback: match by name (column may not exist yet)
+        const { data: byName } = await supabase
+          .from("inventory_items" as any)
+          .select("id, name")
+          .eq("store_id", storeId)
+          .in("name", names);
+
+        if (byName) {
+          existingMap = new Map(
+            (byName as any[]).map((e: any) => [e.name, e.id]),
+          );
+        }
+      }
+
+      const hasMicrosCol = !microsIdErr;
 
       // Separate into inserts (new items) and updates (existing items)
       const toInsert: any[] = [];
       const toUpdate: any[] = [];
 
       for (const row of batch) {
-        const existingId = existingMap.get(row.micros_item_id);
+        const matchKey = hasMicrosCol ? row.micros_item_id : row.name;
+        const existingId = existingMap.get(matchKey);
         if (existingId) {
           // Update only stock-related fields — preserve local overrides
-          toUpdate.push({
+          const updateFields: any = {
             id: existingId,
             current_stock: row.current_stock,
             minimum_threshold: row.minimum_threshold,
             par_level: row.par_level,
             updated_at: row.updated_at,
-          });
+          };
+          // Set micros_item_id if column exists and row was matched by name
+          if (hasMicrosCol) {
+            updateFields.micros_item_id = row.micros_item_id;
+          }
+          toUpdate.push(updateFields);
         } else {
           // New item from MICROS — insert with defaults
-          toInsert.push({
+          const insertRow: any = {
             ...row,
             avg_daily_usage: 0,
             lead_time_days: 1,
             target_days_cover: 3,
-          });
+          };
+          if (!hasMicrosCol) {
+            delete insertRow.micros_item_id;
+          }
+          toInsert.push(insertRow);
         }
       }
 
