@@ -61,13 +61,12 @@ const SCORE_PALETTE: Record<ScoreGrade, {
 // ── Component bars config ─────────────────────────────────────────────────────
 
 const COMPONENT_BARS = [
-  { key: "revenue",        label: "Revenue",     max: 20, bar: "bg-emerald-500 dark:bg-emerald-400" },
-  { key: "labour",         label: "Labour",      max: 20, bar: "bg-sky-500 dark:bg-sky-400"         },
-  { key: "food_cost",      label: "Food Cost",   max: 15, bar: "bg-orange-500 dark:bg-orange-400"   },
-  { key: "compliance",     label: "Compliance",  max: 15, bar: "bg-violet-500 dark:bg-violet-400"   },
-  { key: "inventory_risk", label: "Inventory",   max: 10, bar: "bg-rose-500 dark:bg-rose-400"       },
-  { key: "maintenance",    label: "Maintenance", max: 10, bar: "bg-amber-500 dark:bg-amber-400"     },
-  { key: "daily_ops",      label: "Daily Ops",   max: 10, bar: "bg-cyan-500 dark:bg-cyan-400"       },
+  { key: "revenue",     label: "Revenue",     max: 25, bar: "bg-emerald-500 dark:bg-emerald-400" },
+  { key: "labour",      label: "Labour",      max: 20, bar: "bg-sky-500 dark:bg-sky-400"         },
+  { key: "food_cost",   label: "Food Cost",   max: 20, bar: "bg-orange-500 dark:bg-orange-400"   },
+  { key: "compliance",  label: "Compliance",  max: 15, bar: "bg-violet-500 dark:bg-violet-400"   },
+  { key: "maintenance", label: "Maintenance", max: 10, bar: "bg-amber-500 dark:bg-amber-400"     },
+  { key: "daily_ops",   label: "Daily Ops",   max: 10, bar: "bg-cyan-500 dark:bg-cyan-400"       },
 ] as const;
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -140,8 +139,8 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
           </span>
         </div>
 
-        {/* Component bars — 4+3 layout for 7 categories */}
-        <div className="flex-1 grid grid-cols-4 gap-x-4 gap-y-2.5">
+        {/* Component bars — 3 columns for 6 categories */}
+        <div className="flex-1 grid grid-cols-3 gap-x-4 gap-y-2.5">
           {COMPONENT_BARS.map(({ key, label, max, bar }) => {
             const comp = score.components[key];
             const pct  = Math.round((comp.score / max) * 100);
