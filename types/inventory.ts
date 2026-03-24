@@ -20,6 +20,8 @@ export interface InventoryItem {
   lead_time_days:    number;
   target_days_cover: number;
   unit_cost:         number | null;
+  /** Oracle MICROS menu item number (miNum) — null for locally-added items */
+  micros_item_id:    string | null;
   created_at:        string;
   updated_at:        string;
 }
