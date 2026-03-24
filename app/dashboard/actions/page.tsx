@@ -1,55 +1,111 @@
 /**
- * Actions — execution-driven operations board
+ * ForgeStack Operating Brain v1 — Actions
  *
- * Server component: fetches active actions + performance metrics.
- * Client component (ActionsBoard) handles all mutations.
+ * Execution queue: shift summary → time-horizon groups → mutation board.
+ * Server component fetches actions + runs decision engine for context.
  */
 
 import { createServerClient } from "@/lib/supabase/server";
 import ActionsBoard from "@/components/dashboard/actions/ActionsBoard";
+import ShiftSummaryBanner from "@/components/actions/ShiftSummaryBanner";
+import ActionQueueGroup from "@/components/actions/ActionQueueGroup";
 import type { Action } from "@/types/actions";
-import DailyOpsSummaryPanel from "@/components/dashboard/actions/DailyOpsSummaryPanel";
 
-export const dynamic   = "force-dynamic";
+import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
+import { getLatestSalesSummary } from "@/services/ops/salesSummary";
+import { getMaintenanceSummary } from "@/services/ops/maintenanceSummary";
+import { getDailyOperationsDashboardSummary } from "@/services/ops/dailyOperationsSummary";
+import { generateRevenueForecast } from "@/services/revenue/forecast";
+import { getComplianceSummary } from "@/services/ops/complianceSummary";
+import { getMicrosStatus } from "@/services/micros/status";
+import { getCurrentSalesSnapshot } from "@/lib/sales/service";
+import { getInventoryIntelligence } from "@/services/inventory/intelligence";
+import { getStoredDailySummary } from "@/services/micros/labour/summary";
+import { evaluateOperations } from "@/services/decision-engine";
+
+import type {
+  TodayBookingsSummary,
+  SalesSummary,
+  MaintenanceSummary,
+  DailyOperationsDashboardSummary,
+  RevenueForecast,
+  ComplianceSummary,
+} from "@/types";
+import type { MicrosStatusSummary } from "@/types/micros";
+import { todayISO } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// ── Performance metric fetcher ────────────────────────────────────────────────
+// ─── Settle helper ──────────────────────────────────────────────────────────
 
-async function getPerformance() {
-  try {
-    const supabase = createServerClient();
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const sevenDaysAgoStr = sevenDaysAgo.toISOString().slice(0, 10);
-
-    const { data: recentCompleted } = await supabase
-      .from("actions")
-      .select("created_at, completed_at")
-      .not("completed_at", "is", null)
-      .gte("completed_at", `${sevenDaysAgoStr}T00:00:00.000Z`)
-      .limit(500);
-
-    let avgResolutionMinutes: number | null = null;
-    if (recentCompleted && recentCompleted.length > 0) {
-      const totalMs = recentCompleted.reduce((sum: number, a: { created_at: string; completed_at: string | null }) => {
-        if (!a.completed_at || !a.created_at) return sum;
-        return sum + (new Date(a.completed_at).getTime() - new Date(a.created_at).getTime());
-      }, 0);
-      avgResolutionMinutes = Math.round(totalMs / recentCompleted.length / 60_000);
-    }
-
-    return { avgResolutionMinutes, totalCompletedLast7: recentCompleted?.length ?? 0 };
-  } catch {
-    return { avgResolutionMinutes: null, totalCompletedLast7: 0 };
-  }
+function settled<T>(
+  result: PromiseSettledResult<T>,
+  fallback: T,
+): { value: T } {
+  return result.status === "fulfilled"
+    ? { value: result.value }
+    : { value: fallback };
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+const EMPTY_TODAY: TodayBookingsSummary = {
+  total: 0, totalCovers: 0, largeBookings: 0, eventLinked: 0,
+  escalationsToday: 0, bookings: [],
+};
+const EMPTY_SALES: SalesSummary = { upload: null, topItems: [], bottomItems: [] };
+const EMPTY_DAILY_OPS: DailyOperationsDashboardSummary = {
+  latestReport: null, reportDate: null, uploadedAt: null,
+};
+const EMPTY_COMPLIANCE: ComplianceSummary = {
+  total: 0, compliant: 0, scheduled: 0, due_soon: 0, expired: 0, unknown: 0,
+  compliance_pct: 0, critical_items: [], due_soon_items: [], scheduled_items: [],
+};
+const EMPTY_MAINTENANCE: MaintenanceSummary = {
+  totalEquipment: 0, openRepairs: 0, inProgress: 0, awaitingParts: 0,
+  outOfService: 0, urgentIssues: [], resolvedThisWeek: 0,
+  avgFixTimeDays: null, monthlyActualCost: null, topProblemAsset: null,
+  foodSafetyRisks: 0, serviceDisruptions: 0, complianceRisks: 0,
+};
+
+// ─── Time horizon grouping ──────────────────────────────────────────────────
+
+function groupByHorizon(actions: Action[]) {
+  const now = new Date();
+  const endOfShift = new Date();
+  endOfShift.setHours(23, 59, 59, 999);
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  const urgent: Action[] = [];
+  const thisShift: Action[] = [];
+  const today: Action[] = [];
+  const thisWeek: Action[] = [];
+
+  for (const a of actions) {
+    if (a.status === "completed") continue;
+    const isOverdue = a.due_at && new Date(a.due_at) < now;
+    const isCritical = a.impact_weight === "critical" || a.impact_weight === "high";
+
+    if (isOverdue || a.impact_weight === "critical") {
+      urgent.push(a);
+    } else if (a.due_at && new Date(a.due_at) <= endOfShift && isCritical) {
+      thisShift.push(a);
+    } else if (a.due_at && new Date(a.due_at) <= endOfDay) {
+      today.push(a);
+    } else {
+      thisWeek.push(a);
+    }
+  }
+
+  return { urgent, thisShift, today, thisWeek };
+}
+
+// ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ActionsPage() {
+  // Fetch actions from Supabase
   let actions: Action[] = [];
   let loadError: string | null = null;
-  let perf = { avgResolutionMinutes: null as number | null, totalCompletedLast7: 0 };
 
   try {
     const supabase = createServerClient();
@@ -61,87 +117,143 @@ export default async function ActionsPage() {
 
     if (error) throw error;
     actions = (data ?? []) as Action[];
-    perf    = await getPerformance();
   } catch (err) {
     loadError = err instanceof Error ? err.message : "Unknown error";
   }
 
-  const pendingCount    = actions.filter((a) => a.status === "pending").length;
-  const inProgressCount = actions.filter((a) => a.status === "in_progress").length;
-  const completedCount  = actions.filter((a) => a.status === "completed").length;
-  const overdueCount    = actions.filter((a) =>
-    a.status !== "completed" && a.due_at && new Date(a.due_at) < new Date()
-  ).length;
+  // Fetch operational context for the banner
+  const [
+    todayResult,
+    maintenanceResult,
+    dailyOpsResult,
+    forecastResult,
+    complianceResult,
+    microsResult,
+    inventoryResult,
+    labourResult,
+  ] = await Promise.allSettled([
+    getTodayBookingsSummary(),
+    getMaintenanceSummary(),
+    getDailyOperationsDashboardSummary(),
+    generateRevenueForecast(todayISO()),
+    getComplianceSummary(),
+    getMicrosStatus(),
+    getInventoryIntelligence(),
+    getStoredDailySummary(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"),
+  ]);
 
-  function fmtTime(mins: number | null): string {
-    if (mins === null) return "—";
-    if (mins < 60) return `${mins}m`;
-    return `${Math.floor(mins / 60)}h ${mins % 60}m`;
-  }
+  const { value: today }              = settled(todayResult, EMPTY_TODAY);
+  const { value: maintenance }        = settled(maintenanceResult, EMPTY_MAINTENANCE);
+  const { value: dailyOps }           = settled(dailyOpsResult, EMPTY_DAILY_OPS);
+  const { value: forecast }           = settled(forecastResult, null as RevenueForecast | null);
+  const { value: complianceSummary }  = settled(complianceResult, EMPTY_COMPLIANCE);
+  const { value: microsStatus }       = settled(microsResult, null);
+  const { value: inventoryIntel }     = settled(inventoryResult, null);
+  const { value: labourSummary }      = settled(labourResult, null);
+
+  const today_iso = todayISO();
+  const ms = microsStatus as MicrosStatusSummary | null;
+  const salesSnapshot = await getCurrentSalesSnapshot(
+    today_iso, ms, forecast, today.total, today.totalCovers,
+  );
+
+  const now = Date.now();
+  const salesAgeMinutes = salesSnapshot.freshnessMinutes ?? undefined;
+  const labourAgeMinutes = labourSummary?.lastSyncAt
+    ? Math.round((now - new Date(labourSummary.lastSyncAt).getTime()) / 60_000)
+    : undefined;
+  const inventoryAgeMinutes = inventoryIntel?.lastSynced
+    ? Math.round((now - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
+    : undefined;
+  const dailyOpsAgeDays = dailyOps.reportDate
+    ? Math.round((now - new Date(dailyOps.reportDate).getTime()) / 86_400_000)
+    : undefined;
+  const labourPct = labourSummary?.labourPercentOfSales
+    ?? salesSnapshot.labourCostPercent
+    ?? dailyOps.latestReport?.labor_cost_percent
+    ?? 0;
+
+  const engineOutput = evaluateOperations({
+    revenue: {
+      actual: salesSnapshot.netSales,
+      target: salesSnapshot.targetSales ?? 0,
+      variancePercent: (salesSnapshot.targetSales ?? 0) > 0
+        ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
+        : 0,
+      covers: salesSnapshot.covers,
+      avgSpend: salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0,
+    },
+    labour: { labourPercent: labourPct, targetPercent: 32, syncAgeMinutes: labourAgeMinutes },
+    inventory: {
+      criticalCount: inventoryIntel?.criticalItems.length ?? 0,
+      lowCount: inventoryIntel?.lowItems.length ?? 0,
+      noOpenPOCount: inventoryIntel?.noPOItems.length ?? 0,
+      syncAgeMinutes: inventoryAgeMinutes,
+    },
+    maintenance: {
+      openIssues: maintenance.openRepairs,
+      urgentIssues: maintenance.urgentIssues.length,
+      topIssue: maintenance.topProblemAsset ?? maintenance.urgentIssues[0]?.unit_name ?? undefined,
+      serviceBlocking: maintenance.serviceDisruptions > 0,
+    },
+    compliance: {
+      score: complianceSummary.compliance_pct,
+      currentPercent: complianceSummary.compliance_pct,
+      renewalsScheduled: complianceSummary.scheduled,
+      criticalMissing: complianceSummary.expired,
+    },
+    forecast: {
+      forecastSales: forecast?.forecast_sales ?? undefined,
+      forecastCovers: forecast?.forecast_covers ?? undefined,
+      actualVsForecastPercent: forecast?.sales_gap_pct != null ? -forecast.sales_gap_pct : undefined,
+      confidence: forecast?.confidence,
+    },
+    bookings: {
+      lunchBookings: today.total > 0 ? Math.floor(today.total * 0.4) : undefined,
+      dinnerBookings: today.total > 0 ? Math.ceil(today.total * 0.6) : undefined,
+    },
+    freshness: { salesAgeMinutes, labourAgeMinutes, inventoryAgeMinutes, dailyOpsAgeDays },
+  });
+
+  // Group active actions by time horizon
+  const activeActions = actions.filter((a) => a.status !== "completed");
+  const overdueCount = activeActions.filter(
+    (a) => a.due_at && new Date(a.due_at) < new Date(),
+  ).length;
+  const urgentCount = activeActions.filter(
+    (a) => a.impact_weight === "critical" || (a.due_at && new Date(a.due_at) < new Date()),
+  ).length;
+  const groups = groupByHorizon(actions);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-stone-900">Actions</h1>
-        <p className="mt-1 text-sm text-stone-500">
-          Operational execution board — track every action from creation to completion.
-        </p>
-      </div>
+    <div className="space-y-4">
 
-      {/* Daily Ops Summary — morning brief / evening debrief */}
-      <DailyOpsSummaryPanel />
+      {/* Shift Summary Banner — operational context */}
+      <ShiftSummaryBanner
+        commandBar={engineOutput.operatingCommandBar}
+        totalActions={activeActions.length}
+        urgentCount={urgentCount}
+        overdueCount={overdueCount}
+      />
 
       {/* Error banner */}
       {loadError && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-          ⚠ Could not load actions: <code className="font-mono">{loadError}</code>
+        <div className="rounded-lg border border-red-800/30 bg-red-950/40 px-4 py-3 text-sm text-red-400">
+          Could not load actions: {loadError}
         </div>
       )}
 
-      {/* KPI strip */}
+      {/* Time-horizon groups — execution queue view */}
       {!loadError && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">Pending</p>
-            <p className="mt-1 text-3xl font-bold text-stone-900">{pendingCount}</p>
-          </div>
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 shadow-sm">
-            <p className="text-xs font-medium text-blue-600 uppercase tracking-wide">In Progress</p>
-            <p className="mt-1 text-3xl font-bold text-blue-700">{inProgressCount}</p>
-          </div>
-          {overdueCount > 0 && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
-              <p className="text-xs font-medium text-red-600 uppercase tracking-wide">Overdue</p>
-              <p className="mt-1 text-3xl font-bold text-red-700">{overdueCount}</p>
-            </div>
-          )}
-          <div className="rounded-xl border border-green-100 bg-green-50 px-4 py-3 shadow-sm">
-            <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Completed Today</p>
-            <p className="mt-1 text-3xl font-bold text-green-700">{completedCount}</p>
-          </div>
-          <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm">
-            <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">Avg Resolution</p>
-            <p className="mt-1 text-3xl font-bold text-stone-900">{fmtTime(perf.avgResolutionMinutes)}</p>
-            <p className="text-xs text-stone-400">last 7 days</p>
-          </div>
+        <div className="space-y-3">
+          <ActionQueueGroup title="Now — Urgent" actions={groups.urgent} />
+          <ActionQueueGroup title="This Shift" actions={groups.thisShift} />
+          <ActionQueueGroup title="Today" actions={groups.today} />
+          <ActionQueueGroup title="This Week" actions={groups.thisWeek} />
         </div>
       )}
 
-      {/* Daily reset hint */}
-      {!loadError && (
-        <div className="flex items-center gap-2 rounded-lg border border-stone-100 bg-stone-50 px-4 py-2.5 text-xs text-stone-500">
-          <svg className="h-4 w-4 shrink-0 text-stone-400" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clipRule="evenodd"/>
-          </svg>
-          <span>
-            Completed actions are archived daily at midnight.{" "}
-            <strong>Pending and in-progress actions carry forward automatically.</strong>
-          </span>
-        </div>
-      )}
-
-      {/* Board */}
+      {/* Full board — mutations + assignment */}
       {!loadError && <ActionsBoard initial={actions} />}
     </div>
   );
