@@ -35,6 +35,8 @@ export default function StockOnHand() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
 
 
   const fetchData = useCallback(async () => {
@@ -55,6 +57,21 @@ export default function StockOnHand() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const syncFromMicros = useCallback(async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const res = await fetch("/api/micros/inventory-sync", { method: "POST" });
+      const data = await res.json();
+      setSyncMsg(data.ok ? `✓ ${data.message}` : `✗ ${data.message}`);
+      if (data.ok) await fetchData();
+    } catch {
+      setSyncMsg("✗ Sync failed — check connection");
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchData]);
 
 
 
@@ -196,6 +213,24 @@ export default function StockOnHand() {
           )}
 
           <button
+            onClick={syncFromMicros}
+            disabled={syncing}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              syncing
+                ? "border-orange-800/40 text-orange-700 cursor-wait"
+                : "border-orange-800/60 text-orange-400 hover:bg-orange-900/20 hover:text-orange-300",
+            )}
+          >
+            <svg
+              className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+            {syncing ? "Syncing…" : "Sync MICROS"}
+          </button>
+          <button
             onClick={fetchData}
             disabled={refreshing}
             className={cn(
@@ -216,7 +251,17 @@ export default function StockOnHand() {
         </div>
       </div>
 
-
+      {/* ── MICROS sync result banner ──────────────────────────────────── */}
+      {syncMsg && (
+        <div className={cn(
+          "rounded-lg px-4 py-2 text-xs font-medium",
+          syncMsg.startsWith("✓")
+            ? "bg-emerald-950/30 text-emerald-400 border border-emerald-800/30"
+            : "bg-red-950/30 text-red-400 border border-red-800/30",
+        )}>
+          {syncMsg}
+        </div>
+      )}
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 overflow-hidden">

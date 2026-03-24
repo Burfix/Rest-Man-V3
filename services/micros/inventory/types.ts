@@ -6,47 +6,68 @@
  * Based on Oracle MICROS Inventory Management POS Web Services API Guide
  * (E91248_07, Back Office 20.1).
  *
- * The BI API endpoint `getMenuItemInventoryCount` returns current inventory
- * counts for menu items at a given location.
+ * Endpoint: GetStockOnHandList
+ * Returns: StockOnHandListResult = Result<StockOnHand[]>
  */
 
-// ── Oracle response shapes ──────────────────────────────────────────────────
+// ── Oracle Quantity type ────────────────────────────────────────────────────
 
-/** Raw menu-item inventory count object from Oracle */
-export interface OracleMenuItemInventoryCount {
-  /** Oracle menu item number (unique within the location) */
-  miNum: number;
-  /** Menu item name as configured in Oracle */
-  miName: string;
-  /** Current stock/inventory count (can be fractional for weight-based items) */
-  currentCount: number;
-  /** Minimum count threshold (triggers low-stock warning in Oracle) */
-  minimumCount?: number;
-  /** Par level — target restock level */
-  parCount?: number;
-  /** Unit of measure (e.g. "kg", "ea", "ltr", "cs") */
-  unitOfMeasure?: string;
-  /** ISO UTC timestamp of the last physical count */
-  lastCountDtUTC?: string;
-  /** Menu item class/category name in Oracle */
-  menuItemClassName?: string;
-  /** Menu item major group number */
-  majorGroupNum?: number;
-  /** Menu item major group name */
-  majorGroupName?: string;
-  /** Oracle-assigned item definition number */
-  miDefNum?: number;
+/** Oracle Quantity — contains numeric value and unit of measure */
+export interface OracleQuantity {
+  Value?: number;
+  value?: number;
+  Unit?: string;
+  unit?: string;
 }
 
-/** Top-level response from POST getMenuItemInventoryCount */
-export interface OracleInventoryCountResponse {
-  /** Server timestamp (ISO UTC) */
-  curUTC: string;
-  /** Location reference echoed back */
-  locRef: string;
-  /** Array of inventory count records; null if location has no items */
-  menuItemInventoryCounts: OracleMenuItemInventoryCount[] | null;
+// ── Oracle CostCenter type ──────────────────────────────────────────────────
+
+/** Oracle CostCenter structure returned inside StockOnHand items */
+export interface OracleCostCenter {
+  ID?: number;
+  id?: number;
+  Name?: string;
+  name?: string;
 }
+
+// ── StockOnHand item from Oracle ────────────────────────────────────────────
+
+/**
+ * A single Stock-on-Hand record from Oracle MICROS.
+ * Per Table 30 — StockOnHand Parameters (E91248_07).
+ */
+export interface OracleStockOnHand {
+  /** CostCenter structure */
+  CostCenter?: OracleCostCenter;
+  costCenter?: OracleCostCenter;
+  /** Item Number (Int64) */
+  ItemNumber?: number;
+  itemNumber?: number;
+  /** Item Name (String) */
+  Item?: string;
+  item?: string;
+  /** Stock on Hand Quantity & Unit */
+  Qty?: OracleQuantity;
+  qty?: OracleQuantity;
+}
+
+// ── GetStockOnHandList response wrapper ─────────────────────────────────────
+
+/** Standard Oracle Result wrapper */
+export interface OracleResult<T> {
+  /** Whether the API call succeeded */
+  Success?: boolean;
+  success?: boolean;
+  /** Error message if call failed */
+  Message?: string;
+  message?: string;
+  /** The payload array */
+  Data?: T;
+  data?: T;
+}
+
+/** Top-level response from GetStockOnHandList */
+export type StockOnHandListResult = OracleResult<OracleStockOnHand[]>;
 
 // ── Sync result ─────────────────────────────────────────────────────────────
 
