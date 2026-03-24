@@ -3,54 +3,17 @@
  *
  * Orchestrates inventory sync from Oracle MICROS → Supabase inventory_items.
  *
- * Flow:
- *  1. Call getMenuItemInventoryCount from the BIAPI
- *  2. Normalize Oracle items to our InventoryItem schema
- *  3. Upsert into inventory_items (match on micros_item_id + store_id)
- *  4. Log sync run in micros_sync_runs
- *
- * Per Oracle MICROS Inventory Management POS Web Services API Guide (E91248_07).
+ * NOTE: The Oracle Inventory Management module (getMenuItemInventoryCount) is NOT
+ * available on the BIAPI. The BI API only supports: getGuestChecks,
+ * getTimeCardDetails, getJobCodeDimensions. This sync returns early until the
+ * Inventory Management module is provisioned on this tenant.
  */
 
 import { createServerClient } from "@/lib/supabase/server";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { getMicrosConnection } from "@/services/micros/status";
-import { getMenuItemInventoryCount } from "./client";
 import { todayISO } from "@/lib/utils";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
-import type {
-  OracleMenuItemInventoryCount,
-  InventorySyncResult,
-} from "./types";
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-// ── Normalise Oracle item → Supabase row ────────────────────────────────────
-
-/**
- * Maps an Oracle menu item inventory count to our inventory_items schema.
- * Uses miNum as the stable Oracle identifier for upsert matching.
- */
-function normalizeInventoryItem(
-  oracleItem: OracleMenuItemInventoryCount,
-  storeId: string,
-) {
-  const currentStock = oracleItem.currentCount ?? 0;
-  const minThreshold = oracleItem.minimumCount ?? 0;
-  const parLevel     = oracleItem.parCount ?? minThreshold * 2;
-
-  return {
-    store_id:            storeId,
-    micros_item_id:      String(oracleItem.miNum),
-    name:                oracleItem.miName,
-    category:            oracleItem.menuItemClassName ?? oracleItem.majorGroupName ?? "Uncategorised",
-    unit:                oracleItem.unitOfMeasure ?? "ea",
-    current_stock:       currentStock,
-    minimum_threshold:   minThreshold,
-    par_level:           parLevel,
-    updated_at:          oracleItem.lastCountDtUTC ?? new Date().toISOString(),
-  };
-}
+import type { InventorySyncResult } from "./types";
 
 // ── Public sync function ────────────────────────────────────────────────────
 
@@ -80,172 +43,27 @@ export async function syncInventoryFromMicros(
   });
 
   try {
-    // Fetch inventory counts from Oracle MICROS
-    const raw = await getMenuItemInventoryCount({
-      busDt: businessDate,
-      locRef: cfg.locRef,
-    });
-
-    const oracleItems = raw.menuItemInventoryCounts ?? [];
-    const itemCount = oracleItems.length;
-
-    if (itemCount === 0) {
-      await supabase
-        .from("micros_sync_runs")
-        .update({
-          completed_at: new Date().toISOString(),
-          status: "success",
-          records_fetched: 0,
-          records_inserted: 0,
-        })
-        .eq("id", syncRunId);
-
-      return {
-        success: true,
-        message: "No inventory items returned from MICROS.",
-        businessDate,
-        itemsSynced: 0,
-      };
-    }
-
-    // Normalise all items
-    const storeId = DEFAULT_ORG_ID;
-    const rows = oracleItems.map((oi) => normalizeInventoryItem(oi, storeId));
-
-    // Upsert in batches of 100
-    let created = 0;
-    let updated = 0;
-    const batchSize = 100;
-
-    for (let i = 0; i < rows.length; i += batchSize) {
-      const batch = rows.slice(i, i + batchSize);
-
-      // Try matching on micros_item_id first; fall back to name if column doesn't exist yet
-      const microsIds = batch.map((r) => r.micros_item_id);
-      const names = batch.map((r) => r.name);
-
-      let existingMap = new Map<string, string>();
-
-      // Try micros_item_id lookup
-      const { data: byMicrosId, error: microsIdErr } = await supabase
-        .from("inventory_items" as any)
-        .select("id, micros_item_id, name")
-        .eq("store_id", storeId)
-        .in("micros_item_id", microsIds);
-
-      if (!microsIdErr && byMicrosId) {
-        // micros_item_id column exists — use it
-        existingMap = new Map(
-          (byMicrosId as any[]).map((e: any) => [e.micros_item_id, e.id]),
-        );
-      } else {
-        // Fallback: match by name (column may not exist yet)
-        const { data: byName } = await supabase
-          .from("inventory_items" as any)
-          .select("id, name")
-          .eq("store_id", storeId)
-          .in("name", names);
-
-        if (byName) {
-          existingMap = new Map(
-            (byName as any[]).map((e: any) => [e.name, e.id]),
-          );
-        }
-      }
-
-      const hasMicrosCol = !microsIdErr;
-
-      // Separate into inserts (new items) and updates (existing items)
-      const toInsert: any[] = [];
-      const toUpdate: any[] = [];
-
-      for (const row of batch) {
-        const matchKey = hasMicrosCol ? row.micros_item_id : row.name;
-        const existingId = existingMap.get(matchKey);
-        if (existingId) {
-          // Update only stock-related fields — preserve local overrides
-          const updateFields: any = {
-            id: existingId,
-            current_stock: row.current_stock,
-            minimum_threshold: row.minimum_threshold,
-            par_level: row.par_level,
-            updated_at: row.updated_at,
-          };
-          // Set micros_item_id if column exists and row was matched by name
-          if (hasMicrosCol) {
-            updateFields.micros_item_id = row.micros_item_id;
-          }
-          toUpdate.push(updateFields);
-        } else {
-          // New item from MICROS — insert with defaults
-          const insertRow: any = {
-            ...row,
-            avg_daily_usage: 0,
-            lead_time_days: 1,
-            target_days_cover: 3,
-          };
-          if (!hasMicrosCol) {
-            delete insertRow.micros_item_id;
-          }
-          toInsert.push(insertRow);
-        }
-      }
-
-      if (toInsert.length > 0) {
-        const { error } = await supabase
-          .from("inventory_items" as any)
-          .insert(toInsert);
-        if (error) {
-          console.error("[inventory-sync] Insert error:", error.message);
-        } else {
-          created += toInsert.length;
-        }
-      }
-
-      // Update existing items one-by-one (Supabase doesn't support bulk update)
-      for (const upd of toUpdate) {
-        const { id, ...fields } = upd;
-        const { error } = await supabase
-          .from("inventory_items" as any)
-          .update(fields)
-          .eq("id", id);
-        if (error) {
-          console.error(`[inventory-sync] Update error for ${id}:`, error.message);
-        } else {
-          updated++;
-        }
-      }
-    }
-
-    // Mark sync run as success
+    // ── DISABLED: getMenuItemInventoryCount does not exist on the BIAPI ──
+    // The Oracle Inventory Management module is separate from the BI API.
+    // The BI API only supports: getGuestChecks, getTimeCardDetails, getJobCodeDimensions.
+    // Until the Inventory Management module is provisioned, this sync cannot run.
     await supabase
       .from("micros_sync_runs")
       .update({
         completed_at: new Date().toISOString(),
-        status: "success",
-        records_fetched: itemCount,
-        records_inserted: created + updated,
+        status: "skipped",
+        error_message: "getMenuItemInventoryCount is not available on the BIAPI. Inventory Management module not provisioned.",
       })
       .eq("id", syncRunId);
 
-    // Update connection last_sync_at
-    const now = new Date().toISOString();
-    await supabase
-      .from("micros_connections")
-      .update({
-        last_sync_at: now,
-        last_successful_sync_at: now,
-      })
-      .eq("id", connection.id);
-
     return {
-      success: true,
-      message: `Synced ${itemCount} inventory items from MICROS (${created} new, ${updated} updated)`,
+      success: false,
+      message:
+        "Inventory sync unavailable — the Oracle Inventory Management module is not provisioned on this BIAPI tenant. Stock data is managed locally.",
       businessDate,
-      itemsSynced: itemCount,
-      itemsCreated: created,
-      itemsUpdated: updated,
+      itemsSynced: 0,
     };
+
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
 
