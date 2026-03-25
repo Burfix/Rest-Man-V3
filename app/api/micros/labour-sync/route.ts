@@ -7,6 +7,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { todayISO } from "@/lib/utils";
 import { runLabourFullSync, runLabourDeltaSync } from "@/services/micros/labour/sync";
@@ -16,6 +19,9 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "POST /api/micros/labour-sync");
+  if (guard.error) return guard.error;
+
   const cfgStatus = getMicrosConfigStatus();
   if (!cfgStatus.enabled || !cfgStatus.configured) {
     return NextResponse.json({

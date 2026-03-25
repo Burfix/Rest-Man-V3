@@ -62,10 +62,10 @@ const SOURCE_REMEDIATION: Record<string, string> = {
 
 async function syncAll(): Promise<{ ok: number; failed: number }> {
   const endpoints = [
-    { url: "/api/micros/sync", method: "POST" },
-    { url: "/api/micros/labour-sync", method: "POST", body: JSON.stringify({ mode: "delta" }) },
-    { url: "/api/forecast/briefing", method: "GET" },
-    { url: "/api/ops/operating-score", method: "GET" },
+    { url: "/api/micros/sync",           method: "POST" },
+    { url: "/api/micros/labour-sync",    method: "POST", body: JSON.stringify({ mode: "delta" }) },
+    { url: "/api/micros/inventory-sync", method: "POST" },
+    { url: "/api/reviews/sync",          method: "POST" },
   ];
 
   const results = await Promise.allSettled(
