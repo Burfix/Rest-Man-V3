@@ -18,6 +18,8 @@ import { getCurrentSalesSnapshot } from "@/lib/sales/service";
 import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { todayISO } from "@/lib/utils";
+import { getSiteConfig } from "@/lib/config/site";
+import { persistDecisions, supersedeOldDecisions } from "./decision-store";
 
 import { getServiceWindow } from "./service-window";
 import { getServiceState } from "./service-state";
@@ -65,11 +67,7 @@ function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
   return result.status === "fulfilled" ? result.value : fallback;
 }
 
-// ── Configuration ─────────────────────────────────────────────────────────
-
-const TARGET_LABOUR_PCT = 32;
-const TARGET_AVG_SPEND = 280;
-const SEATING_CAPACITY = 200;
+// ── Configuration (from database) ─────────────────────────────────────────
 
 // ══════════════════════════════════════════════════════════════════════════
 // Main Orchestrator
@@ -78,6 +76,12 @@ const SEATING_CAPACITY = 200;
 export async function runCopilot(): Promise<CopilotOutput> {
   const now = new Date();
   const today_iso = todayISO();
+
+  // ── 0. Load site config (replaces hardcoded constants) ────────────────
+  const cfg = await getSiteConfig();
+  const TARGET_LABOUR_PCT = cfg.target_labour_pct;
+  const TARGET_AVG_SPEND = cfg.target_avg_spend;
+  const SEATING_CAPACITY = cfg.seating_capacity;
 
   // ── 1. Parallel data fetch ────────────────────────────────────────────
   const [
@@ -290,6 +294,15 @@ export async function runCopilot(): Promise<CopilotOutput> {
       : 1,
     reviewSentimentPct: 75, // TODO: wire real review data
   });
+
+  // ── 13. Persist decisions (async, non-blocking) ───────────────────────
+  const siteId = cfg.site_id;
+  persistDecisions(decisions, siteId).then((idMap) => {
+    if (idMap.size > 0) {
+      const currentHashes = Array.from(idMap.values());
+      supersedeOldDecisions(siteId, currentHashes).catch(() => {});
+    }
+  }).catch(() => {});
 
   // ── Return full output ───────────────────────────────────────────────
   return {

@@ -1,22 +1,47 @@
 /**
  * Next.js middleware — Supabase Auth session guard.
  *
- * All /dashboard/** routes require an authenticated Supabase session.
- * Unauthenticated requests are redirected to /login.
+ * Protected routes:
+ *   /dashboard/**  → redirect to /login if unauthenticated
+ *   /api/**        → 401 JSON response if unauthenticated
  *
- * /login and /auth/** are explicitly excluded from protection.
+ * Public API routes (no auth required):
+ *   /api/webhooks/**          → inbound webhooks (WhatsApp, etc.)
+ *   /api/bookings/reminders/** → cron-triggered
+ *   /api/actions/daily-reset  → cron-triggered
  */
 
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+// API paths that must remain public (webhooks, cron jobs)
+const PUBLIC_API_PREFIXES = [
+  "/api/webhooks/",
+  "/api/bookings/reminders/",
+  "/api/actions/daily-reset",
+];
+
+function isPublicApi(pathname: string): boolean {
+  return PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
 export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isApiRoute = pathname.startsWith("/api/");
+
+  // Skip auth for public API endpoints
+  if (isApiRoute && isPublicApi(pathname)) {
+    return NextResponse.next();
+  }
+
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
     const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
 
-    // If env vars are not set or look invalid, fail open to /login
     if (!url || !anonKey || !url.startsWith("https://")) {
+      if (isApiRoute) {
+        return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
+      }
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
@@ -30,7 +55,6 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          // Propagate cookie mutations to both request and response
           request.cookies.set({ name, value, ...options });
           response = NextResponse.next({ request: { headers: request.headers } });
           response.cookies.set({ name, value, ...options });
@@ -43,12 +67,19 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    // getUser() validates the JWT with Supabase; never trust only the local cookie.
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
     if (!user) {
+      // API routes: 401 JSON response
+      if (isApiRoute) {
+        return NextResponse.json(
+          { error: "Authentication required" },
+          { status: 401 },
+        );
+      }
+      // Dashboard routes: redirect to login
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("next", request.nextUrl.pathname);
       return NextResponse.redirect(loginUrl);
@@ -56,12 +87,14 @@ export async function middleware(request: NextRequest) {
 
     return response;
   } catch {
-    // Middleware crash — fail open to /login rather than returning 500
+    if (isApiRoute) {
+      return NextResponse.json({ error: "Authentication error" }, { status: 401 });
+    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 }
 
 export const config = {
-  matcher: ["/dashboard", "/dashboard/:path*"],
+  matcher: ["/dashboard", "/dashboard/:path*", "/api/:path*"],
 };
 

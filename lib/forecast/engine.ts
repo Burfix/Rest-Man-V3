@@ -159,11 +159,13 @@ export function generateHourlyForecast(
 
 // ── Labour guidance ────────────────────────────────────────────────────────
 
-const TARGET_LABOUR_PCT = 22;
+// Labour target is loaded from site config at call sites.
+// The function accepts the target as a parameter now.
 
 export function generateLabourGuidance(
   input: ForecastInput,
   salesForecast: number,
+  targetLabourPct: number = 30,
 ): LabourGuidance {
   const pct = input.latestLabourPct;
   const actions: string[] = [];
@@ -194,7 +196,7 @@ export function generateLabourGuidance(
   }
 
   return {
-    targetLabourPct: TARGET_LABOUR_PCT,
+    targetLabourPct: targetLabourPct,
     forecastLabourPct: pct,
     status,
     message,

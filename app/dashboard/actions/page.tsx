@@ -22,6 +22,7 @@ import { getCurrentSalesSnapshot } from "@/lib/sales/service";
 import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { evaluateOperations } from "@/services/decision-engine";
+import { getSiteConfig } from "@/lib/config/site";
 
 import type {
   TodayBookingsSummary,
@@ -173,6 +174,8 @@ export default async function ActionsPage() {
     ?? dailyOps.latestReport?.labor_cost_percent
     ?? 0;
 
+  const siteConfig = await getSiteConfig();
+
   const engineOutput = evaluateOperations({
     revenue: {
       actual: salesSnapshot.netSales,
@@ -183,7 +186,7 @@ export default async function ActionsPage() {
       covers: salesSnapshot.covers,
       avgSpend: salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0,
     },
-    labour: { labourPercent: labourPct, targetPercent: 32, syncAgeMinutes: labourAgeMinutes },
+    labour: { labourPercent: labourPct, targetPercent: siteConfig.target_labour_pct, syncAgeMinutes: labourAgeMinutes },
     inventory: {
       criticalCount: inventoryIntel?.criticalItems.length ?? 0,
       lowCount: inventoryIntel?.lowItems.length ?? 0,

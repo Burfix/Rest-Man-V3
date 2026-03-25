@@ -140,10 +140,54 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── 7. Auto-escalate aging actions ──────────────────────────────────────
+    // Actions pending >24h with critical/high severity → auto-escalate
+    const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: agingActions } = await supabase
+      .from("actions")
+      .select("id, title, impact_weight, status, created_at")
+      .is("archived_at", null)
+      .eq("status", "pending")
+      .in("impact_weight", ["critical", "high"])
+      .lt("created_at", cutoff24h);
+
+    let autoEscalated = 0;
+    if (agingActions && agingActions.length > 0) {
+      const agingIds = agingActions.map((a) => a.id);
+      const { error: escErr } = await supabase
+        .from("actions")
+        .update({
+          status: "escalated",
+          escalated_at: new Date().toISOString(),
+        })
+        .in("id", agingIds);
+
+      if (!escErr) {
+        autoEscalated = agingIds.length;
+        // Write events for each escalated action
+        const events = agingIds.map((id) => ({
+          action_id: id,
+          event_type: "escalated",
+          actor: "system",
+          notes: "Auto-escalated: pending >24h with critical/high severity",
+        }));
+        await (supabase.from("action_events" as any) as any).insert(events);
+      }
+    }
+
+    // ── 8. Expire stale copilot decisions ──────────────────────────────────
+    let expiredDecisions = 0;
+    try {
+      const { expireStaleDecisions } = await import("@/lib/copilot/decision-store");
+      expiredDecisions = await expireStaleDecisions(DEFAULT_SITE_ID);
+    } catch {}
+
     return NextResponse.json({
-      success:         true,
-      archived:        idsToArchive.length,
-      carried_forward: carriedForward ?? 0,
+      success:          true,
+      archived:         idsToArchive.length,
+      carried_forward:  carriedForward ?? 0,
+      auto_escalated:   autoEscalated,
+      expired_decisions: expiredDecisions,
       stats: {
         date:                  yesterday,
         total_created:         createdYesterday ?? 0,

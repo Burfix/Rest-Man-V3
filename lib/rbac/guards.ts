@@ -23,6 +23,27 @@ import { hasPermission, ROLE_PERMISSIONS } from "./roles";
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
 /**
+ * Convenience guard for API routes. Authenticates user and optionally
+ * checks a permission. Throws AuthError (catch with authErrorResponse).
+ *
+ *   const user = await requireAuth();
+ *   const user = await requireAuth(PERMISSIONS.CREATE_ACTION);
+ */
+export async function requireAuth(
+  permission?: Permission,
+  siteId?: string,
+): Promise<{ id: string; email: string; role: UserRole | null }> {
+  const user = await getAuthenticatedUser();
+  let role: UserRole | null = null;
+  if (permission) {
+    role = await requirePermission(user.id, permission, siteId);
+  } else {
+    role = await getUserRole(user.id);
+  }
+  return { ...user, role };
+}
+
+/**
  * Reads the authenticated user from the Supabase session cookie.
  * Throws 401 if not authenticated.
  */

@@ -29,6 +29,7 @@ import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { evaluateOperations } from "@/services/decision-engine";
 import { getServicePeriod } from "@/lib/commandCenter";
+import { getSiteConfig } from "@/lib/config/site";
 
 import ControlBar              from "@/components/operating-brain/ControlBar";
 import OperatingScoreHero     from "@/components/operating-brain/OperatingScoreHero";
@@ -196,6 +197,9 @@ export default async function OperationsDashboard() {
 
   const servicePeriod = getServicePeriod("Africa/Johannesburg");
 
+  // ─── Site config (single source of truth for targets) ────────────────────
+  const siteConfig = await getSiteConfig();
+
   // ─── Compute freshness ages ──────────────────────────────────────────────
   const now = Date.now();
   const salesAgeMinutes = salesSnapshot.freshnessMinutes ?? undefined;
@@ -228,7 +232,7 @@ export default async function OperationsDashboard() {
     },
     labour: {
       labourPercent: labourPct,
-      targetPercent: 32,
+      targetPercent: siteConfig.target_labour_pct,
       activeStaff: labourSummary?.activeStaffCount ?? undefined,
       syncAgeMinutes: labourAgeMinutes,
     },

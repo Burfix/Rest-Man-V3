@@ -25,6 +25,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard",             label: "Command Center", icon: "⚡" },
       { href: "/dashboard/head-office", label: "Head Office",    icon: "🏢" },
+      { href: "/dashboard/forecast",    label: "GM Co-Pilot",    icon: "🧭" },
       { href: "/dashboard/actions",     label: "Actions",        icon: "✅" },
     ],
   },
@@ -35,8 +36,6 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/maintenance", label: "Maintenance",      icon: "🔧" },
       { href: "/dashboard/inventory",   label: "Inventory & Stock", icon: "📦" },
       { href: "/dashboard/operations",  label: "Daily Ops",        icon: "📊" },
-      { href: "/dashboard/heatmap",     label: "Zone Heatmap",     icon: "🗺️" },
-      { href: "#",                      label: "Incidents",        icon: "🚨", soon: true },
     ],
   },
   {
@@ -45,17 +44,13 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/bookings",    label: "Bookings",    icon: "📅" },
       { href: "/dashboard/escalations", label: "Escalations", icon: "⚠️" },
       { href: "/dashboard/events",      label: "Events",      icon: "🎉" },
-      { href: "#",                      label: "Floor Notes",  icon: "📝", soon: true },
     ],
   },
   {
     group: "Finance",
     items: [
       { href: "/dashboard/settings/targets", label: "Revenue Targets", icon: "🎯" },
-      { href: "/dashboard/sales",            label: "Sales",           icon: "💰" },
-      { href: "/dashboard/sales/historical", label: "Historical",      icon: "📈" },
       { href: "/dashboard/labour",           label: "Labour",          icon: "👷" },
-      { href: "/dashboard/forecast",         label: "GM Co-Pilot",     icon: "🧭" },
     ],
   },
   {

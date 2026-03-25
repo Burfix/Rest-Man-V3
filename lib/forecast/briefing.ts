@@ -23,7 +23,7 @@ import { formatCurrency, getDayName } from "@/lib/utils";
  * Generate the full GM Briefing for a given date.
  * This is the primary entry point for the GM Co-Pilot engine.
  */
-export function buildGMBriefing(input: ForecastInput): GMBriefing {
+export function buildGMBriefing(input: ForecastInput, targetLabourPct?: number): GMBriefing {
   // Core forecasts
   const salesResult = generateSalesForecast(input);
   const coversForecast = generateCoversForecast(input);
@@ -31,8 +31,8 @@ export function buildGMBriefing(input: ForecastInput): GMBriefing {
   // Hourly demand curve
   const demand = generateHourlyForecast(input, salesResult.total, coversForecast);
 
-  // Labour guidance
-  const labour = generateLabourGuidance(input, salesResult.total);
+  // Labour guidance (target from site config or default)
+  const labour = generateLabourGuidance(input, salesResult.total, targetLabourPct);
 
   // Risk assessment
   const riskAssessment = generateRiskAssessment(input, demand);

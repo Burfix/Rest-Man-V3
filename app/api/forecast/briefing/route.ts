@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { todayISO } from "@/lib/utils";
 import { getForecastInputs, buildGMBriefing, getMockGMBriefing } from "@/lib/forecast";
+import { getSiteConfig } from "@/lib/config/site";
 import type { GMBriefing } from "@/types/forecast";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     } else {
       try {
         const input = await getForecastInputs(undefined, date);
-        briefing = buildGMBriefing(input);
+        const cfg = await getSiteConfig();
+        briefing = buildGMBriefing(input, cfg.target_labour_pct);
       } catch (inputErr) {
         // Fallback to mock if real data fetch fails
         console.error("[forecast/briefing] Input fetch failed, using mock:", inputErr);

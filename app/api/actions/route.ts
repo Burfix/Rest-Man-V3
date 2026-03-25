@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
 import { ACTION_STATUSES, type ActionStatus } from "@/lib/actions/lifecycle";
+import { getExistingActionForDecision, linkDecisionToAction } from "@/lib/copilot/decision-store";
 
 const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
 const VALID_CATEGORIES    = ["revenue", "labour", "food_cost", "stock", "maintenance", "compliance", "daily_ops", "service", "general"] as const;
@@ -63,6 +64,18 @@ export async function POST(req: NextRequest) {
 
     if (!title || !String(title).trim()) {
       return NextResponse.json({ error: "title is required" }, { status: 400 });
+    }
+
+    // Decision dedup: if a decision_id is provided, check if it already has an action
+    const decisionId = body.decision_id as string | undefined;
+    if (decisionId) {
+      const existingActionId = await getExistingActionForDecision(decisionId);
+      if (existingActionId) {
+        return NextResponse.json(
+          { action: { id: existingActionId }, deduplicated: true },
+          { status: 200 },
+        );
+      }
     }
 
     // Resolve status — respect request, default to pending
@@ -130,12 +143,18 @@ export async function POST(req: NextRequest) {
     }
 
     // Write creation event
+    const actionId = (data as { id: string }).id;
     await (supabase.from("action_events" as any) as any).insert({
-      action_id:  (data as { id: string }).id,
+      action_id:  actionId,
       event_type: resolvedStatus === "in_progress" ? "started" : "created",
       actor:      "system",
       metadata:   { initial_status: resolvedStatus },
     });
+
+    // Link decision to action if decision_id provided
+    if (decisionId) {
+      linkDecisionToAction(decisionId, actionId).catch(() => {});
+    }
 
     return NextResponse.json({ action: data }, { status: 201 });
   } catch (err) {
