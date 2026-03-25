@@ -4,12 +4,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
-
-const VALID_EVENT_TYPES = [
-  "created", "started", "completed", "escalated",
-  "cancelled", "reopened", "assigned", "note",
-] as const;
+import { apiGuard } from "@/lib/auth/api-guard";
+import { createActionEventSchema, validateBody } from "@/lib/validation/schemas";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export async function GET(
   _req: NextRequest,
@@ -18,8 +16,22 @@ export async function GET(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
+  const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/actions/[id]/events");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   try {
-    const supabase = createServerClient();
+    // Verify action belongs to user's site
+    const { data: action } = await supabase
+      .from("actions")
+      .select("id")
+      .eq("id", id)
+      .eq("site_id", ctx.siteId)
+      .single();
+
+    if (!action) {
+      return NextResponse.json({ error: "Action not found" }, { status: 404 });
+    }
 
     const { data, error } = await (supabase.from("action_events" as any) as any)
       .select("*")
@@ -27,13 +39,12 @@ export async function GET(
       .order("created_at", { ascending: true });
 
     if (error) {
-      console.error(`[GET /api/actions/${id}/events]`, error);
+      logger.error("Failed to fetch events", { route: "GET /api/actions/[id]/events", err: error, actionId: id });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-
     return NextResponse.json({ events: data ?? [] });
   } catch (err) {
-    console.error(`[GET /api/actions/${id}/events] unexpected:`, err);
+    logger.error("Unexpected error", { route: "GET /api/actions/[id]/events", err, actionId: id });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -45,54 +56,48 @@ export async function POST(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
+  const guard = await apiGuard(PERMISSIONS.CREATE_ACTION, "POST /api/actions/[id]/events");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   try {
-    const body = await req.json();
-    const { event_type, actor, notes, metadata } = body as {
-      event_type?: string;
-      actor?: string;
-      notes?: string;
-      metadata?: Record<string, unknown>;
-    };
-
-    if (!event_type || !VALID_EVENT_TYPES.includes(event_type as never)) {
-      return NextResponse.json(
-        { error: `event_type must be one of: ${VALID_EVENT_TYPES.join(", ")}` },
-        { status: 400 },
-      );
-    }
-
-    const supabase = createServerClient();
-
-    // Verify action exists
-    const { data: existing, error: fetchErr } = await supabase
+    // Verify action belongs to user's site
+    const { data: action } = await supabase
       .from("actions")
       .select("id")
       .eq("id", id)
+      .eq("site_id", ctx.siteId)
       .single();
 
-    if (fetchErr || !existing) {
+    if (!action) {
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
+    const body = await req.json();
+    const v = validateBody(createActionEventSchema, body);
+    if (!v.success) return v.response;
+    const d = v.data;
+
     const { data, error } = await (supabase.from("action_events" as any) as any)
       .insert({
-        action_id:  id,
-        event_type,
-        actor:      actor ?? "system",
-        notes:      notes ?? null,
-        metadata:   metadata ?? null,
+        action_id: id,
+        event_type: d.event_type,
+        actor: d.actor ?? ctx.email,
+        notes: d.notes ?? null,
+        metadata: d.metadata ?? null,
       })
       .select()
       .single();
 
     if (error) {
-      console.error(`[POST /api/actions/${id}/events]`, error);
+      logger.error("Failed to create event", { route: "POST /api/actions/[id]/events", err: error, actionId: id });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    logger.info("Action event created", { route: "POST /api/actions/[id]/events", actionId: id, eventType: d.event_type });
     return NextResponse.json({ event: data }, { status: 201 });
   } catch (err) {
-    console.error(`[POST /api/actions/${id}/events] unexpected:`, err);
+    logger.error("Unexpected error", { route: "POST /api/actions/[id]/events", err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

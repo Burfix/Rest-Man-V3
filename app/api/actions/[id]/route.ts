@@ -1,23 +1,15 @@
 /**
  * PATCH  /api/actions/[id]  — Transition action state with lifecycle tracking
  * DELETE /api/actions/[id]  — Delete an action
- *
- * PATCH body:
- *   { status: "in_progress" | "completed" | "escalated" | "cancelled" | "pending" }
- *   Optional: { actor?: string, notes?: string }
- *
- * Validates transitions. Writes action_event. Sets lifecycle timestamps.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { apiGuard } from "@/lib/auth/api-guard";
 import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
-import {
-  ACTION_STATUSES,
-  getTransitionError,
-  transitionToEventType,
-  type ActionStatus,
-} from "@/lib/actions/lifecycle";
+import { ACTION_STATUSES, getTransitionError, transitionToEventType, type ActionStatus } from "@/lib/actions/lifecycle";
+import { patchActionSchema, validateBody } from "@/lib/validation/schemas";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export async function PATCH(
   req: NextRequest,
@@ -26,28 +18,22 @@ export async function PATCH(
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
+  const guard = await apiGuard(PERMISSIONS.COMPLETE_ACTION, "PATCH /api/actions/[id]");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   try {
     const body = await req.json();
-    const { status, actor, notes } = body as {
-      status?: string;
-      actor?: string;
-      notes?: string;
-    };
+    const v = validateBody(patchActionSchema, body);
+    if (!v.success) return v.response;
+    const { status, actor, notes } = v.data;
 
-    if (!status || !ACTION_STATUSES.includes(status as ActionStatus)) {
-      return NextResponse.json(
-        { error: `status must be one of: ${ACTION_STATUSES.join(", ")}` },
-        { status: 400 },
-      );
-    }
-
-    const supabase = createServerClient();
-
-    // Fetch existing action
+    // Fetch existing action — tenant-scoped
     const { data: existing, error: fetchErr } = await supabase
       .from("actions")
-      .select("id, status, revenue_before")
+      .select("id, status, site_id")
       .eq("id", id)
+      .eq("site_id", ctx.siteId)
       .single();
 
     if (fetchErr || !existing) {
@@ -57,7 +43,6 @@ export async function PATCH(
     const from = existing.status as ActionStatus;
     const to = status as ActionStatus;
 
-    // Validate transition
     const transitionErr = getTransitionError(from, to);
     if (transitionErr) {
       return NextResponse.json({ error: transitionErr }, { status: 409 });
@@ -66,80 +51,91 @@ export async function PATCH(
     const now = new Date().toISOString();
     const update: Record<string, unknown> = { status: to };
 
-    // Set lifecycle timestamps
     switch (to) {
       case "in_progress":
         update.started_at = now;
         break;
       case "completed": {
-        update.completed_at = now;
-        // Capture post-action revenue for impact delta
         const rev = await getLatestRevenueFigure(supabase);
-        const revBefore = typeof existing.revenue_before === "number" ? existing.revenue_before : null;
+        update.completed_at = now;
         update.revenue_after = rev.sales;
         update.revenue_date_after = rev.date;
-        update.revenue_delta = revBefore != null && rev.sales != null ? rev.sales - revBefore : null;
         break;
       }
       case "escalated":
         update.escalated_at = now;
         break;
-      case "pending":
-        update.reopened_at = now;
-        break;
     }
 
-    const { data, error } = await supabase
+    const { data: updated, error: updateErr } = await supabase
       .from("actions")
       .update(update)
       .eq("id", id)
+      .eq("site_id", ctx.siteId)
       .select()
       .single();
 
-    if (error) {
-      console.error(`[PATCH /api/actions/${id}]`, error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (updateErr) {
+      logger.error("Failed to update action", { route: "PATCH /api/actions/[id]", err: updateErr, actionId: id });
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
     }
 
-    // Write lifecycle event
+    // Insert lifecycle event
     const eventType = transitionToEventType(from, to);
-    await (supabase.from("action_events" as any) as any).insert({
-      action_id:  id,
-      event_type: eventType,
-      actor:      actor ?? "gm",
-      notes:      notes ?? null,
-      metadata:   { from, to },
+    await (supabase.from("action_events" as any) as any)
+      .insert({
+        action_id: id,
+        event_type: eventType,
+        from_status: from,
+        to_status: to,
+        actor: actor ?? ctx.email,
+        notes: notes ?? null,
+      })
+      .then(() => {});
+
+    logger.info("Action transitioned", {
+      route: "PATCH /api/actions/[id]",
+      actionId: id,
+      from,
+      to,
+      siteId: ctx.siteId,
+      userId: ctx.userId,
     });
 
-    return NextResponse.json({ action: data });
+    return NextResponse.json({ action: updated });
   } catch (err) {
-    console.error(`[PATCH /api/actions/${id}] unexpected:`, err);
+    logger.error("Unexpected error", { route: "PATCH /api/actions/[id]", err, actionId: id });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
+  const guard = await apiGuard(PERMISSIONS.ESCALATE_ACTION, "DELETE /api/actions/[id]");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   try {
-    const supabase = createServerClient();
     const { error } = await supabase
       .from("actions")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("site_id", ctx.siteId);
 
     if (error) {
-      console.error(`[DELETE /api/actions/${id}]`, error);
+      logger.error("Failed to delete action", { route: "DELETE /api/actions/[id]", err: error, actionId: id });
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    logger.info("Action deleted", { route: "DELETE /api/actions/[id]", actionId: id, siteId: ctx.siteId });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error(`[DELETE /api/actions/${id}] unexpected:`, err);
+    logger.error("Unexpected error", { route: "DELETE /api/actions/[id]", err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

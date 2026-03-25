@@ -19,19 +19,32 @@ const PUBLIC_API_PREFIXES = [
   "/api/webhooks/",
   "/api/bookings/reminders/",
   "/api/actions/daily-reset",
+  "/api/compliance/status",
+  "/api/micros/sync",
 ];
 
 function isPublicApi(pathname: string): boolean {
   return PUBLIC_API_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
+function generateRequestId(): string {
+  return crypto.randomUUID();
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApiRoute = pathname.startsWith("/api/");
+  const requestId = generateRequestId();
+
+  // Inject request ID into request headers for downstream use
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-request-id", requestId);
 
   // Skip auth for public API endpoints
   if (isApiRoute && isPublicApi(pathname)) {
-    return NextResponse.next();
+    const resp = NextResponse.next({ request: { headers: requestHeaders } });
+    resp.headers.set("x-request-id", requestId);
+    return resp;
   }
 
   try {
@@ -46,7 +59,7 @@ export async function middleware(request: NextRequest) {
     }
 
     let response = NextResponse.next({
-      request: { headers: request.headers },
+      request: { headers: requestHeaders },
     });
 
     const supabase = createServerClient(url, anonKey, {
@@ -56,12 +69,12 @@ export async function middleware(request: NextRequest) {
         },
         set(name: string, value: string, options: CookieOptions) {
           request.cookies.set({ name, value, ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           response.cookies.set({ name, value, ...options });
         },
         remove(name: string, options: CookieOptions) {
           request.cookies.set({ name, value: "", ...options });
-          response = NextResponse.next({ request: { headers: request.headers } });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           response.cookies.set({ name, value: "", ...options });
         },
       },
@@ -85,6 +98,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
+    response.headers.set("x-request-id", requestId);
     return response;
   } catch {
     if (isApiRoute) {

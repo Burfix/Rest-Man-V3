@@ -1,14 +1,7 @@
-/**
- * GET /api/forecast/briefing — Generate today's GM Co-Pilot briefing
- *
- * Query params:
- *   ?date=YYYY-MM-DD   (optional, defaults to today)
- *   ?mock=true          (optional, force mock data)
- *
- * Returns a complete GMBriefing JSON payload.
- */
-
 import { NextRequest, NextResponse } from "next/server";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 import { todayISO } from "@/lib/utils";
 import { getForecastInputs, buildGMBriefing, getMockGMBriefing } from "@/lib/forecast";
 import { getSiteConfig } from "@/lib/config/site";
@@ -16,7 +9,10 @@ import type { GMBriefing } from "@/types/forecast";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/forecast/briefing");
+  if (guard.error) return guard.error;
+
   try {
     const params = req.nextUrl.searchParams;
     const date = params.get("date") ?? todayISO();
@@ -32,18 +28,14 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         const cfg = await getSiteConfig();
         briefing = buildGMBriefing(input, cfg.target_labour_pct);
       } catch (inputErr) {
-        // Fallback to mock if real data fetch fails
-        console.error("[forecast/briefing] Input fetch failed, using mock:", inputErr);
+        logger.warn("Forecast input fetch failed, using mock", { route: "GET /api/forecast/briefing", err: inputErr });
         briefing = getMockGMBriefing(date);
       }
     }
 
     return NextResponse.json(briefing);
   } catch (err) {
-    console.error("[forecast/briefing]", err);
-    return NextResponse.json(
-      { error: "Failed to generate forecast briefing" },
-      { status: 500 },
-    );
+    logger.error("Failed to generate forecast briefing", { route: "GET /api/forecast/briefing", err });
+    return NextResponse.json({ error: "Failed to generate forecast briefing" }, { status: 500 });
   }
 }

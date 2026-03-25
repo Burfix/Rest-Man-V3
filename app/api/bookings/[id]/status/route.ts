@@ -1,95 +1,39 @@
-/**
- * PATCH /api/bookings/[id]/status
- *
- * Updates a reservation's status and optionally sends a WhatsApp notification.
- *
- * Body: { status: "confirmed" | "cancelled", notify?: boolean }
- * Auth: Supabase session (dashboard staff only)
- *
- * Returns: { reservation, waSent }
- */
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
-import {
-  getReservationById,
-  updateReservationStatus,
-} from "@/services/bookings/service";
-import {
-  sendBookingConfirmedNotice,
-  sendBookingCancellationNotice,
-} from "@/services/notifications/whatsappBookings";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { patchBookingStatusSchema, validateBody } from "@/lib/validation/schemas";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
+import { getReservationById, updateReservationStatus } from "@/services/bookings/service";
+import { sendBookingConfirmedNotice, sendBookingCancellationNotice } from "@/services/notifications/whatsappBookings";
 import type { ReservationStatus } from "@/types";
 
-const ALLOWED_STATUSES: ReservationStatus[] = ["confirmed", "cancelled", "pending"];
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  const guard = await apiGuard(PERMISSIONS.CREATE_ACTION, "PATCH /api/bookings/[id]/status");
+  if (guard.error) return guard.error;
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-): Promise<NextResponse> {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const supabase = createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // ── Parse body ────────────────────────────────────────────────────────────
-  let body: { status?: unknown; notify?: unknown };
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+    const body = await request.json();
+    const v = validateBody(patchBookingStatusSchema, body);
+    if (!v.success) return v.response;
+    const { status, notify = true } = v.data;
 
-  const { status, notify = true } = body;
-
-  if (!status || !ALLOWED_STATUSES.includes(status as ReservationStatus)) {
-    return NextResponse.json(
-      { error: `status must be one of: ${ALLOWED_STATUSES.join(", ")}` },
-      { status: 400 }
-    );
-  }
-
-  const reservationId = params.id;
-  if (!reservationId) {
-    return NextResponse.json({ error: "Missing reservation id" }, { status: 400 });
-  }
-
-  // ── Fetch current reservation ─────────────────────────────────────────────
-  let reservation;
-  try {
-    reservation = await getReservationById(reservationId);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
-  if (!reservation) {
-    return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
-  }
-
-  // ── Update status ─────────────────────────────────────────────────────────
-  try {
-    await updateReservationStatus(reservationId, status as ReservationStatus);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
-
-  // ── Send WhatsApp notification (non-blocking) ──────────────────────────────
-  let waSent = false;
-  if (notify) {
-    const updatedReservation = { ...reservation, status: status as ReservationStatus };
-    if (status === "confirmed") {
-      waSent = await sendBookingConfirmedNotice(updatedReservation);
-    } else if (status === "cancelled") {
-      waSent = await sendBookingCancellationNotice(updatedReservation);
+    const reservation = await getReservationById(params.id);
+    if (!reservation) {
+      return NextResponse.json({ error: "Reservation not found" }, { status: 404 });
     }
-  }
 
-  return NextResponse.json(
-    { reservation: { ...reservation, status }, waSent },
-    { status: 200 }
-  );
+    await updateReservationStatus(params.id, status as ReservationStatus);
+
+    let waSent = false;
+    if (notify) {
+      const updated = { ...reservation, status: status as ReservationStatus };
+      if (status === "confirmed") waSent = await sendBookingConfirmedNotice(updated);
+      else if (status === "cancelled") waSent = await sendBookingCancellationNotice(updated);
+    }
+
+    return NextResponse.json({ reservation: { ...reservation, status }, waSent });
+  } catch (err) {
+    logger.error("Failed to update booking status", { route: "PATCH /api/bookings/[id]/status", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.46.0",
     "@supabase/ssr": "^0.4.0",
     "@supabase/supabase-js": "^2.43.5",
     "@types/nodemailer": "^7.0.11",
@@ -22,7 +23,8 @@
     "react-dom": "^18",
     "recharts": "^3.8.0",
     "resend": "^6.9.3",
-    "tailwind-merge": "^2.4.0"
+    "tailwind-merge": "^2.4.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@types/node": "^20",

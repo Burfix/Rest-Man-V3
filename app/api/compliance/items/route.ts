@@ -1,66 +1,62 @@
-/**
- * GET  /api/compliance/items   — list all compliance items with documents
- * POST /api/compliance/items   — create a new (custom) compliance item
- */
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
-import { getAllComplianceItems, computeStatus } from "@/services/ops/complianceSummary";
-import type { ComplianceItem } from "@/types";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { createComplianceItemSchema, validateBody } from "@/lib/validation/schemas";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
-// ── GET ───────────────────────────────────────────────────────────────────────
+export async function GET() {
+  const guard = await apiGuard(PERMISSIONS.VIEW_COMPLIANCE, "GET /api/compliance/items");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
 
-export async function GET(): Promise<NextResponse> {
   try {
-    const items = await getAllComplianceItems();
-    return NextResponse.json({ items });
+    const { data, error } = await (supabase as any)
+      .from("compliance_items")
+      .select("*, compliance_documents(*)")
+      .eq("site_id", ctx.siteId)
+      .order("next_due_date", { ascending: true });
+
+    if (error) throw error;
+    return NextResponse.json({ items: data ?? [] });
   } catch (err) {
-    console.error("[GET /api/compliance/items]", err);
-    return NextResponse.json({ error: "Failed to fetch compliance items" }, { status: 500 });
+    logger.error("Failed to fetch compliance items", { route: "GET /api/compliance/items", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-// ── POST ──────────────────────────────────────────────────────────────────────
+export async function POST(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.EDIT_COMPLIANCE_ITEM, "POST /api/compliance/items");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
 
-export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
-    const body = await req.json() as Partial<ComplianceItem>;
-
-    const { display_name, category, description, last_inspection_date, next_due_date, responsible_party, notes } = body;
-
-    if (!display_name || typeof display_name !== "string" || display_name.trim().length === 0) {
-      return NextResponse.json({ error: "display_name is required" }, { status: 400 });
-    }
-
-    const supabase = createServerClient();
-    const status = computeStatus(next_due_date ?? null);
+    const body = await req.json();
+    const v = validateBody(createComplianceItemSchema, body);
+    if (!v.success) return v.response;
+    const d = v.data;
 
     const { data, error } = await (supabase as any)
       .from("compliance_items")
       .insert({
-        category:             category?.trim() || "custom",
-        display_name:         display_name.trim(),
-        description:          description?.trim() ?? null,
-        status,
-        last_inspection_date: last_inspection_date ?? null,
-        next_due_date:        next_due_date ?? null,
-        responsible_party:    responsible_party?.trim() ?? null,
-        notes:                notes?.trim() ?? null,
-        is_default:           false,
+        site_id: ctx.siteId,
+        display_name: d.display_name.trim(),
+        category: d.category ?? null,
+        description: d.description?.trim() || null,
+        last_inspection_date: d.last_inspection_date ?? null,
+        next_due_date: d.next_due_date ?? null,
+        responsible_party: d.responsible_party?.trim() || null,
+        notes: d.notes?.trim() || null,
       })
       .select()
       .single();
 
-    if (error) {
-      console.error("[POST /api/compliance/items]", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ item: { ...data, status, documents: [] } }, { status: 201 });
+    if (error) throw error;
+    logger.info("Compliance item created", { route: "POST /api/compliance/items", siteId: ctx.siteId });
+    return NextResponse.json({ item: data }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/compliance/items]", err);
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    logger.error("Failed to create compliance item", { route: "POST /api/compliance/items", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -1,13 +1,7 @@
-/**
- * POST /api/micros/sync
- *
- * Triggers a MICROS data sync from Oracle BIAPI → Supabase.
- * Can be called manually from the UI or by a Vercel cron.
- *
- * GET handler is for Vercel Cron (which sends GET requests).
- */
-
 import { NextRequest, NextResponse } from "next/server";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 import { MicrosSyncService } from "@/services/micros/MicrosSyncService";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { todayISO } from "@/lib/utils";
@@ -17,6 +11,9 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "POST /api/micros/sync");
+  if (guard.error) return guard.error;
+
   const cfgStatus = getMicrosConfigStatus();
   if (!cfgStatus.enabled || !cfgStatus.configured) {
     return NextResponse.json({
@@ -31,22 +28,19 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
     date = body.date;
-  } catch {
-    // no body is fine
-  }
-
-  const isCron = req.headers.get("authorization") === `Bearer ${process.env.CRON_SECRET}`;
+  } catch { /* no body is fine */ }
 
   const svc = new MicrosSyncService();
   const result = await svc.runFullSync(date ?? todayISO());
 
+  logger.info("MICROS sync completed", { route: "POST /api/micros/sync", success: result.success });
   return NextResponse.json({
     ok: result.success,
     message: result.message,
     businessDate: result.businessDate,
     recordsSynced: result.recordsSynced,
     errors: result.errors ?? [],
-    source: isCron ? "cron" : "manual",
+    source: "manual",
     checkedAt: new Date().toISOString(),
   });
 }

@@ -1,94 +1,43 @@
-/**
- * POST /api/reviews
- *
- * Body (JSON):
- *   { platform, review_date, rating, reviewer_name?, review_text?, sentiment? }
- *
- * Returns: { review: Review }
- */
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { createReviewSchema, validateBody } from "@/lib/validation/schemas";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.RESPOND_TO_REVIEWS, "POST /api/reviews");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   try {
     const body = await req.json();
-    const {
-      platform,
-      review_date,
-      rating,
-      reviewer_name,
-      review_text,
-      sentiment,
-    } = body as {
-      platform?: string;
-      review_date?: string;
-      rating?: number | string;
-      reviewer_name?: string;
-      review_text?: string;
-      sentiment?: string;
-    };
+    const v = validateBody(createReviewSchema, body);
+    if (!v.success) return v.response;
+    const d = v.data;
 
-    const validPlatforms = ["google", "other"];
-    if (!platform || !validPlatforms.includes(platform)) {
-      return NextResponse.json(
-        { error: `platform must be one of: ${validPlatforms.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    if (!review_date) {
-      return NextResponse.json({ error: "review_date is required." }, { status: 400 });
-    }
-
-    const ratingNum = typeof rating === "string" ? parseInt(rating, 10) : rating;
-    if (!ratingNum || ratingNum < 1 || ratingNum > 5 || isNaN(ratingNum)) {
-      return NextResponse.json(
-        { error: "rating must be a number between 1 and 5." },
-        { status: 400 }
-      );
-    }
-
-    const validSentiments = ["positive", "neutral", "negative"];
-    if (sentiment && !validSentiments.includes(sentiment)) {
-      return NextResponse.json(
-        { error: `sentiment must be one of: ${validSentiments.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    // Auto-infer sentiment from rating if not provided
-    const inferredSentiment =
-      sentiment ||
-      (ratingNum >= 4 ? "positive" : ratingNum === 3 ? "neutral" : "negative");
-
-    const supabase = createServerClient();
+    const inferredSentiment = d.sentiment || (d.rating >= 4 ? "positive" : d.rating === 3 ? "neutral" : "negative");
 
     const { data: review, error } = await supabase
       .from("reviews")
       .insert({
-        platform,
-        review_date,
-        rating: ratingNum,
-        reviewer_name: reviewer_name?.trim() || null,
-        review_text: review_text?.trim() || null,
+        site_id: ctx.siteId,
+        platform: d.platform,
+        review_date: d.review_date,
+        rating: d.rating,
+        reviewer_name: d.reviewer_name?.trim() || null,
+        review_text: d.review_text?.trim() || null,
         sentiment: inferredSentiment,
         tags: [],
-        flagged: ratingNum < 4,  // auto-flag anything under 4 stars
+        flagged: d.rating < 4,
       })
       .select()
       .single();
 
-    if (error || !review) {
-      return NextResponse.json(
-        { error: error?.message ?? "Failed to add review." },
-        { status: 500 }
-      );
-    }
-
+    if (error) throw error;
+    logger.info("Review created", { route: "POST /api/reviews", siteId: ctx.siteId });
     return NextResponse.json({ review }, { status: 201 });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Unexpected error";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    logger.error("Failed to create review", { route: "POST /api/reviews", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

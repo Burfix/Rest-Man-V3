@@ -1,14 +1,8 @@
-/**
- * /api/revenue/targets
- *
- * GET  ?from=YYYY-MM-DD&days=N  — returns targets for the given window (default: today + 30 days)
- * POST                          — upsert a single target (body: { target_date, target_sales?, target_covers?, notes? })
- * DELETE ?id=UUID               — remove a target by id
- */
-
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { createRevenueTargetSchema, validateBody } from "@/lib/validation/schemas";
+import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 import { SalesTarget } from "@/types";
 
 function todaySAST(): string {
@@ -20,97 +14,89 @@ function isoDate(v: unknown): string | null {
   return /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? v.trim() : null;
 }
 
-// ── GET: upcoming targets ─────────────────────────────────────────────────────
-
 export async function GET(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.VIEW_FINANCIALS, "GET /api/revenue/targets");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   const { searchParams } = req.nextUrl;
-  const from   = isoDate(searchParams.get("from")) ?? todaySAST();
-  const days   = Math.min(365, Math.max(1, parseInt(searchParams.get("days") ?? "30", 10)));
-  const d      = new Date(from + "T12:00:00Z");
+  const from = isoDate(searchParams.get("from")) ?? todaySAST();
+  const days = Math.min(365, Math.max(1, parseInt(searchParams.get("days") ?? "30", 10)));
+  const d = new Date(from + "T12:00:00Z");
   d.setUTCDate(d.getUTCDate() + days);
-  const to   = d.toISOString().slice(0, 10);
+  const to = d.toISOString().slice(0, 10);
 
-  const supabase = createServerClient();
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from("sales_targets") as any)
+      .select("*")
+      .eq("organization_id", ctx.orgId)
+      .gte("target_date", from)
+      .lte("target_date", to)
+      .order("target_date", { ascending: true });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from("sales_targets") as any)
-    .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
-    .gte("target_date", from)
-    .lte("target_date", to)
-    .order("target_date", { ascending: true });
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ targets: (data ?? []) as SalesTarget[] });
+    if (error) throw error;
+    return NextResponse.json({ targets: (data ?? []) as SalesTarget[] });
+  } catch (err) {
+    logger.error("Failed to fetch revenue targets", { route: "GET /api/revenue/targets", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
-
-// ── POST: upsert target ───────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  let body: Record<string, unknown>;
+  const guard = await apiGuard(PERMISSIONS.MANAGE_STORE_SETTINGS, "POST /api/revenue/targets");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    const body = await req.json();
+    const v = validateBody(createRevenueTargetSchema, body);
+    if (!v.success) return v.response;
+    const d = v.data;
+
+    const payload = {
+      organization_id: ctx.orgId,
+      target_date: d.target_date,
+      target_sales: d.target_sales ?? null,
+      target_covers: d.target_covers ?? null,
+      notes: d.notes ?? null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from("sales_targets") as any)
+      .upsert(payload, { onConflict: "organization_id,target_date" })
+      .select("*")
+      .single();
+
+    if (error) throw error;
+    logger.info("Revenue target upserted", { route: "POST /api/revenue/targets", siteId: ctx.siteId });
+    return NextResponse.json({ target: data as SalesTarget }, { status: 201 });
+  } catch (err) {
+    logger.error("Failed to upsert revenue target", { route: "POST /api/revenue/targets", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  const targetDate = isoDate(body.target_date);
-  if (!targetDate) {
-    return NextResponse.json(
-      { error: "target_date is required and must be YYYY-MM-DD" },
-      { status: 400 }
-    );
-  }
-
-  const targetSales  = body.target_sales  != null ? parseFloat(String(body.target_sales))  : null;
-  const targetCovers = body.target_covers != null ? parseFloat(String(body.target_covers)) : null;
-  const notes        = typeof body.notes === "string" ? body.notes.trim() || null : null;
-
-  if (targetSales !== null && (isNaN(targetSales) || targetSales < 0)) {
-    return NextResponse.json({ error: "target_sales must be a non-negative number" }, { status: 400 });
-  }
-  if (targetCovers !== null && (isNaN(targetCovers) || targetCovers < 0)) {
-    return NextResponse.json({ error: "target_covers must be a non-negative number" }, { status: 400 });
-  }
-
-  const supabase = createServerClient();
-  const now      = new Date().toISOString();
-
-  const payload = {
-    organization_id: DEFAULT_ORG_ID,
-    target_date:     targetDate,
-    target_sales:    targetSales,
-    target_covers:   targetCovers,
-    notes,
-    updated_at:      now,
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from("sales_targets") as any)
-    .upsert(payload, { onConflict: "organization_id,target_date" })
-    .select("*")
-    .single();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ target: data as SalesTarget }, { status: 201 });
 }
 
-// ── DELETE: remove target ─────────────────────────────────────────────────────
-
 export async function DELETE(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.MANAGE_STORE_SETTINGS, "DELETE /api/revenue/targets");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
+
   const id = req.nextUrl.searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ error: "id query parameter is required" }, { status: 400 });
+  if (!id) return NextResponse.json({ error: "id query parameter is required" }, { status: 400 });
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from("sales_targets") as any)
+      .delete()
+      .eq("id", id)
+      .eq("organization_id", ctx.orgId);
+
+    if (error) throw error;
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    logger.error("Failed to delete revenue target", { route: "DELETE /api/revenue/targets", err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  const supabase = createServerClient();
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (supabase.from("sales_targets") as any)
-    .delete()
-    .eq("id", id)
-    .eq("organization_id", DEFAULT_ORG_ID); // guard: only delete own org's targets
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ success: true });
 }
