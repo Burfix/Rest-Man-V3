@@ -64,24 +64,47 @@ export default function AllDecisions({ decisions }: Props) {
 
 function CompactDecision({ decision: d }: { decision: GMDecision }) {
   const [status, setStatus] = useState(d.status);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleComplete() {
+    if (loading) return;
+    setLoading(true);
     try {
-      const res = await fetch("/api/actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: d.title,
-          description: d.directInstruction,
-          category: d.category,
-          priority: d.severity,
-          status: "done",
-          source: "copilot",
-        }),
-      });
-      if (res.ok) setStatus("completed");
+      if (!actionId) {
+        // First interaction — create as completed
+        const res = await fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: d.title,
+            direct_instruction: d.directInstruction,
+            category: d.category,
+            severity: d.severity,
+            status: "completed",
+            owner: d.owner,
+            source_type: "copilot",
+            expected_impact_text: d.expectedImpactText,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setActionId(json.action.id);
+          setStatus("completed");
+        }
+      } else {
+        // Subsequent — PATCH to completed
+        const res = await fetch(`/api/actions/${actionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "completed" }),
+        });
+        if (res.ok) setStatus("completed");
+      }
     } catch {
       // Silent fallback
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -112,7 +135,8 @@ function CompactDecision({ decision: d }: { decision: GMDecision }) {
       ) : (
         <button
           onClick={handleComplete}
-          className="text-[10px] text-stone-500 hover:text-emerald-400 flex-shrink-0 transition-colors"
+          disabled={loading}
+          className="text-[10px] text-stone-500 hover:text-emerald-400 flex-shrink-0 transition-colors disabled:opacity-50"
         >
           Done
         </button>

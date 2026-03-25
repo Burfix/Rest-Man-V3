@@ -1,38 +1,49 @@
 /**
- * PATCH /api/actions/[id]
+ * PATCH  /api/actions/[id]  — Transition action state with lifecycle tracking
+ * DELETE /api/actions/[id]  — Delete an action
  *
- * Update an action's status, assignment, or details.
+ * PATCH body:
+ *   { status: "in_progress" | "completed" | "escalated" | "cancelled" | "pending" }
+ *   Optional: { actor?: string, notes?: string }
  *
- * Body (JSON):
- *   { op: "assign" | "start" | "complete" | "update", ...fields }
- *
- *   op=assign:   { assigned_to: string }
- *   op=start:    (no extra fields — sets status→in_progress, started_at=now)
- *   op=complete: (no extra fields — sets status→completed, completed_at=now)
- *   op=update:   { title?, description?, impact_weight?, assigned_to? }
+ * Validates transitions. Writes action_event. Sets lifecycle timestamps.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getLatestRevenueFigure } from "@/lib/revenueSnapshot";
-
-const VALID_IMPACT_LEVELS = ["critical", "high", "medium", "low"] as const;
+import {
+  ACTION_STATUSES,
+  getTransitionError,
+  transitionToEventType,
+  type ActionStatus,
+} from "@/lib/actions/lifecycle";
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = params;
+  const { id } = await params;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   try {
     const body = await req.json();
-    const { op, title, description, impact_weight, assigned_to } =
-      body as Record<string, string | undefined>;
+    const { status, actor, notes } = body as {
+      status?: string;
+      actor?: string;
+      notes?: string;
+    };
+
+    if (!status || !ACTION_STATUSES.includes(status as ActionStatus)) {
+      return NextResponse.json(
+        { error: `status must be one of: ${ACTION_STATUSES.join(", ")}` },
+        { status: 400 },
+      );
+    }
 
     const supabase = createServerClient();
 
-    // Verify action exists
+    // Fetch existing action
     const { data: existing, error: fetchErr } = await supabase
       .from("actions")
       .select("id, status, revenue_before")
@@ -43,66 +54,39 @@ export async function PATCH(
       return NextResponse.json({ error: "Action not found" }, { status: 404 });
     }
 
-    let update: Record<string, string | number | null> = {};
+    const from = existing.status as ActionStatus;
+    const to = status as ActionStatus;
 
-    switch (op) {
-      case "assign": {
-        if (!assigned_to?.trim()) {
-          return NextResponse.json({ error: "assigned_to is required for assign op" }, { status: 400 });
-        }
-        update = { assigned_to: assigned_to.trim() };
+    // Validate transition
+    const transitionErr = getTransitionError(from, to);
+    if (transitionErr) {
+      return NextResponse.json({ error: transitionErr }, { status: 409 });
+    }
+
+    const now = new Date().toISOString();
+    const update: Record<string, unknown> = { status: to };
+
+    // Set lifecycle timestamps
+    switch (to) {
+      case "in_progress":
+        update.started_at = now;
         break;
-      }
-
-      case "start": {
-        if (existing.status === "completed") {
-          return NextResponse.json({ error: "Cannot restart a completed action" }, { status: 409 });
-        }
-        update = {
-          status:     "in_progress",
-          started_at: new Date().toISOString(),
-        };
-        break;
-      }
-
-      case "complete": {
+      case "completed": {
+        update.completed_at = now;
+        // Capture post-action revenue for impact delta
         const rev = await getLatestRevenueFigure(supabase);
         const revBefore = typeof existing.revenue_before === "number" ? existing.revenue_before : null;
-        const revAfter  = rev.sales;
-        const revDelta  = revBefore !== null && revAfter !== null ? revAfter - revBefore : null;
-
-        update = {
-          status:             "completed",
-          completed_at:       new Date().toISOString(),
-          revenue_after:      revAfter,
-          revenue_date_after: rev.date,
-          revenue_delta:      revDelta,
-        };
-        if (!existing.status || existing.status === "pending") {
-          update.started_at = new Date().toISOString();
-        }
+        update.revenue_after = rev.sales;
+        update.revenue_date_after = rev.date;
+        update.revenue_delta = revBefore != null && rev.sales != null ? rev.sales - revBefore : null;
         break;
       }
-
-      case "update": {
-        if (impact_weight && !VALID_IMPACT_LEVELS.includes(impact_weight as never)) {
-          return NextResponse.json(
-            { error: `impact_weight must be one of: ${VALID_IMPACT_LEVELS.join(", ")}` },
-            { status: 400 }
-          );
-        }
-        if (title !== undefined) update.title = title.trim();
-        if (description !== undefined) update.description = description?.trim() || null;
-        if (impact_weight !== undefined) update.impact_weight = impact_weight;
-        if (assigned_to !== undefined) update.assigned_to = assigned_to?.trim() || null;
+      case "escalated":
+        update.escalated_at = now;
         break;
-      }
-
-      default:
-        return NextResponse.json(
-          { error: "op must be one of: assign | start | complete | update" },
-          { status: 400 }
-        );
+      case "pending":
+        update.reopened_at = now;
+        break;
     }
 
     const { data, error } = await supabase
@@ -117,6 +101,16 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Write lifecycle event
+    const eventType = transitionToEventType(from, to);
+    await (supabase.from("action_events" as any) as any).insert({
+      action_id:  id,
+      event_type: eventType,
+      actor:      actor ?? "gm",
+      notes:      notes ?? null,
+      metadata:   { from, to },
+    });
+
     return NextResponse.json({ action: data });
   } catch (err) {
     console.error(`[PATCH /api/actions/${id}] unexpected:`, err);
@@ -126,9 +120,9 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const { id } = params;
+  const { id } = await params;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
   try {

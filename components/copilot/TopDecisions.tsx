@@ -57,27 +57,51 @@ export default function TopDecisions({ decisions }: Props) {
 
 function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: number }) {
   const [status, setStatus] = useState(d.status);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const sev = SEV_STYLE[d.severity];
 
-  async function handleAction(op: "start" | "complete") {
+  async function handleAction(targetStatus: "in_progress" | "completed" | "escalated") {
+    if (loading) return;
+    setLoading(true);
     try {
-      const res = await fetch(`/api/actions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: d.title,
-          description: d.directInstruction,
-          category: d.category,
-          priority: d.severity,
-          status: op === "start" ? "in_progress" : "done",
-          source: "copilot",
-        }),
-      });
-      if (res.ok) {
-        setStatus(op === "start" ? "in_progress" : "completed");
+      if (!actionId) {
+        // First interaction — create the action
+        const res = await fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: d.title,
+            direct_instruction: d.directInstruction,
+            category: d.category,
+            severity: d.severity,
+            status: targetStatus,
+            owner: d.owner,
+            source_type: "copilot",
+            expected_impact_text: d.expectedImpactText,
+            expected_impact_value: d.expectedImpactValue,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setActionId(json.action.id);
+          setStatus(targetStatus === "in_progress" ? "in_progress" : targetStatus);
+        }
+      } else {
+        // Subsequent interaction — PATCH existing action
+        const res = await fetch(`/api/actions/${actionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: targetStatus }),
+        });
+        if (res.ok) {
+          setStatus(targetStatus);
+        }
       }
     } catch {
       // Silent fallback
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -137,22 +161,36 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
         <div className="flex items-center gap-2">
           {status === "pending" && (
             <button
-              onClick={() => handleAction("start")}
-              className="text-xs font-medium bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1 rounded transition-colors"
+              onClick={() => handleAction("in_progress")}
+              disabled={loading}
+              className="text-xs font-medium bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1 rounded transition-colors disabled:opacity-50"
             >
               Start
             </button>
           )}
           {(status === "pending" || status === "in_progress") && (
             <button
-              onClick={() => handleAction("complete")}
-              className="text-xs font-medium bg-emerald-800/50 hover:bg-emerald-700/50 text-emerald-300 px-3 py-1 rounded transition-colors"
+              onClick={() => handleAction("completed")}
+              disabled={loading}
+              className="text-xs font-medium bg-emerald-800/50 hover:bg-emerald-700/50 text-emerald-300 px-3 py-1 rounded transition-colors disabled:opacity-50"
             >
               Complete
             </button>
           )}
+          {status !== "completed" && status !== "escalated" && (
+            <button
+              onClick={() => handleAction("escalated")}
+              disabled={loading}
+              className="text-xs font-medium bg-red-800/30 hover:bg-red-700/30 text-red-300 px-3 py-1 rounded transition-colors disabled:opacity-50"
+            >
+              Escalate
+            </button>
+          )}
           {status === "completed" && (
             <span className="text-xs text-emerald-400 font-medium">✓ Done</span>
+          )}
+          {status === "escalated" && (
+            <span className="text-xs text-red-400 font-medium">↑ Escalated</span>
           )}
           {status === "in_progress" && (
             <span className="text-xs text-amber-400 font-medium">In Progress</span>

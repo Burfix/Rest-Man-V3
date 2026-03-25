@@ -55,30 +55,51 @@ export default function MobileDecisions({ decisions }: Props) {
 
 function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank: number }) {
   const [status, setStatus] = useState(d.status);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const sev = SEV_STYLE[d.severity];
 
-  async function handleAction(op: "start" | "complete" | "escalate") {
+  async function handleAction(targetStatus: "in_progress" | "completed" | "escalated") {
+    if (loading) return;
+    setLoading(true);
     try {
-      const res = await fetch("/api/actions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: d.title,
-          description: d.directInstruction,
-          category: d.category,
-          priority: d.severity,
-          status: op === "start" ? "in_progress" : op === "complete" ? "done" : "escalated",
-          source: "copilot",
-        }),
-      });
-      if (res.ok) {
-        setStatus(
-          op === "start" ? "in_progress" :
-          op === "complete" ? "completed" : "escalated",
-        );
+      if (!actionId) {
+        // First interaction — create the action
+        const res = await fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: d.title,
+            direct_instruction: d.directInstruction,
+            category: d.category,
+            severity: d.severity,
+            status: targetStatus,
+            owner: d.owner,
+            source_type: "copilot",
+            expected_impact_text: d.expectedImpactText,
+            expected_impact_value: d.expectedImpactValue,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setActionId(json.action.id);
+          setStatus(targetStatus === "in_progress" ? "in_progress" : targetStatus);
+        }
+      } else {
+        // Subsequent interaction — PATCH existing action
+        const res = await fetch(`/api/actions/${actionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: targetStatus }),
+        });
+        if (res.ok) {
+          setStatus(targetStatus);
+        }
       }
     } catch {
       // Silent fallback
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -119,24 +140,27 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
       <div className="flex gap-2">
         {status === "pending" && (
           <button
-            onClick={() => handleAction("start")}
-            className="flex-1 h-10 rounded-lg bg-stone-800 border border-stone-700 text-sm font-medium text-stone-200 active:bg-stone-700 transition"
+            onClick={() => handleAction("in_progress")}
+            disabled={loading}
+            className="flex-1 h-10 rounded-lg bg-stone-800 border border-stone-700 text-sm font-medium text-stone-200 active:bg-stone-700 transition disabled:opacity-50"
           >
             Start
           </button>
         )}
         {(status === "pending" || status === "in_progress") && (
           <button
-            onClick={() => handleAction("complete")}
-            className="flex-1 h-10 rounded-lg bg-emerald-900/40 border border-emerald-800/40 text-sm font-medium text-emerald-300 active:bg-emerald-900/60 transition"
+            onClick={() => handleAction("completed")}
+            disabled={loading}
+            className="flex-1 h-10 rounded-lg bg-emerald-900/40 border border-emerald-800/40 text-sm font-medium text-emerald-300 active:bg-emerald-900/60 transition disabled:opacity-50"
           >
             Done
           </button>
         )}
         {status !== "completed" && status !== "escalated" && (
           <button
-            onClick={() => handleAction("escalate")}
-            className="h-10 px-3 rounded-lg bg-red-900/30 border border-red-800/30 text-sm font-medium text-red-300 active:bg-red-900/50 transition"
+            onClick={() => handleAction("escalated")}
+            disabled={loading}
+            className="h-10 px-3 rounded-lg bg-red-900/30 border border-red-800/30 text-sm font-medium text-red-300 active:bg-red-900/50 transition disabled:opacity-50"
           >
             Escalate
           </button>
