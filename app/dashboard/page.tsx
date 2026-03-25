@@ -1,13 +1,14 @@
 /**
- * ForgeStack Operating Brain v1 — Command Center
+ * ForgeStack Operating Brain v2 — Real-Time Operational Control System
  *
- * Layout (locked IA):
- *   1. OperatingCommandBar  — hero status strip
- *   2. SinceLastCheck       — habit-loop delta strip
- *   3. MainGrid:
- *      Primary:  CommandFeed → WhatToDoNow → ServicePulse
- *      Secondary: BusinessStatusRail → DataHealthIndicator → OperatingScoreBreakdown
- *   4. SecondaryDrilldowns  — reviews, maintenance, sales analytics (below fold)
+ * Layout:
+ *   1. ControlBar           — revenue risk + time pressure + score strip
+ *   2. OperatingScoreHero   — dominant visual center
+ *   3. SinceLastCheck       — delta strip
+ *   4. MainGrid:
+ *      Primary:  CommandFeed (with execute buttons) → ServicePulse
+ *      Secondary: BusinessStatusRail → FeedbackLoop → DataHealthWarning
+ *   5. SecondaryDrilldowns  — reviews, maintenance, sales analytics
  */
 
 import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
@@ -29,14 +30,14 @@ import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { evaluateOperations } from "@/services/decision-engine";
 import { getServicePeriod } from "@/lib/commandCenter";
 
-import OperatingCommandBar    from "@/components/operating-brain/OperatingCommandBar";
+import ControlBar              from "@/components/operating-brain/ControlBar";
+import OperatingScoreHero     from "@/components/operating-brain/OperatingScoreHero";
 import SinceLastCheck         from "@/components/operating-brain/SinceLastCheck";
-import CommandFeed            from "@/components/operating-brain/CommandFeed";
-import WhatToDoNow            from "@/components/operating-brain/WhatToDoNow";
+import CommandFeed            from "@/components/operating-brain/CommandFeedV2";
 import ServicePulse           from "@/components/operating-brain/ServicePulse";
 import BusinessStatusRail     from "@/components/operating-brain/BusinessStatusRail";
-import DataHealthIndicator    from "@/components/operating-brain/DataHealthIndicator";
-import OperatingScoreBreakdown from "@/components/operating-brain/OperatingScoreBreakdown";
+import FeedbackLoop           from "@/components/operating-brain/FeedbackLoop";
+import DataHealthWarning      from "@/components/operating-brain/DataHealthWarning";
 import SecondaryInsights      from "@/components/dashboard/SecondaryInsights";
 
 import type {
@@ -281,30 +282,52 @@ export default async function OperationsDashboard() {
 
   const scoreTotal = operatingScore?.total ?? engineOutput.operatingScoreBreakdown.reduce((s, b) => s + b.score, 0);
 
+  const barStatus = engineOutput.operatingCommandBar.status;
+  const revenueVariance = (salesSnapshot.targetSales ?? 0) > 0
+    ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
+    : 0;
+
+  // Determine top risk for hero
+  const topRisk = engineOutput.commandFeed.length > 0
+    ? engineOutput.commandFeed[0].title
+    : undefined;
+
   return (
     <div className="space-y-4">
 
-      {/* ── 1. Operating Command Bar ── */}
-      <OperatingCommandBar bar={engineOutput.operatingCommandBar} score={scoreTotal} />
+      {/* ── 1. Control Bar — Revenue Risk | Time Pressure | Score ── */}
+      <ControlBar
+        revenueAtRisk={engineOutput.operatingCommandBar.revenueAtRisk ?? 0}
+        variancePercent={revenueVariance}
+        timePressure={engineOutput.operatingCommandBar.timeToPeakLabel ?? servicePeriod}
+        score={scoreTotal}
+        status={barStatus}
+        servicePeriod={servicePeriod}
+      />
 
-      {/* ── 2. Since Last Check ── */}
+      {/* ── 2. Operating Score Hero — Dominant Visual Center ── */}
+      <div className="flex justify-center py-2">
+        <OperatingScoreHero
+          score={scoreTotal}
+          status={barStatus}
+          issueCount={engineOutput.operatingCommandBar.issueCount}
+          topRisk={topRisk}
+        />
+      </div>
+
+      {/* ── 3. Since Last Check ── */}
       <SinceLastCheck items={engineOutput.sinceLastCheck} />
 
-      {/* ── 3. Main Grid: Primary + Secondary ── */}
+      {/* ── 4. Main Grid: Primary + Secondary ── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
         {/* Primary Column (dominant) */}
         <div className="lg:col-span-8 space-y-4">
           <CommandFeed decisions={engineOutput.commandFeed} />
-          <WhatToDoNow decisions={engineOutput.whatToDoNow} />
           <ServicePulse
             actual={salesSnapshot.netSales}
             target={salesSnapshot.targetSales ?? 0}
-            variancePercent={
-              (salesSnapshot.targetSales ?? 0) > 0
-                ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
-                : 0
-            }
+            variancePercent={revenueVariance}
             covers={salesSnapshot.covers}
             avgSpend={salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0}
             peakWindow={undefined}
@@ -315,15 +338,15 @@ export default async function OperationsDashboard() {
           />
         </div>
 
-        {/* Secondary Column (quiet but useful) */}
+        {/* Secondary Column */}
         <div className="lg:col-span-4 space-y-4">
           <BusinessStatusRail status={engineOutput.businessStatus} />
-          <DataHealthIndicator health={engineOutput.dataHealth} />
-          <OperatingScoreBreakdown breakdown={engineOutput.operatingScoreBreakdown} />
+          <FeedbackLoop />
+          <DataHealthWarning health={engineOutput.dataHealth} />
         </div>
       </div>
 
-      {/* ── 4. Secondary Drilldowns (below fold) ── */}
+      {/* ── 5. Secondary Drilldowns (below fold) ── */}
       <SecondaryInsights
         reviews={reviews}
         maintenance={maintenance}
