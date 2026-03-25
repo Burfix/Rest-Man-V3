@@ -237,6 +237,38 @@ export interface EscalationResult {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Service Score (Gamification)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export type ServiceLabel =
+  | "Service Leader"
+  | "Most Improved"
+  | "Best Shift Recovery"
+  | "Top Conversion Store"
+  | "Strongest Guest Spend";
+
+export interface ServiceScoreBreakdown {
+  floorEnergy: number;
+  walkInConversion: number;
+  upsellRate: number;
+  bookingConversion: number;
+  avgSpendVsTarget: number;
+  tableTurnRate: number;
+  reviewSentiment: number;
+}
+
+export interface ServiceScoreOutput {
+  totalScore: number;
+  serviceGrade: ScoreGrade;
+  breakdown: ServiceScoreBreakdown;
+  biggestDriverUp: string | null;
+  biggestDriverDown: string | null;
+  movementVsYesterday: number | null;
+  movementVsLastSameShift: number | null;
+  labels: ServiceLabel[];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // Full Copilot Output (what the page consumes)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -244,6 +276,7 @@ export interface CopilotOutput {
   brief: GMBrief;
   serviceState: ServiceState;
   serviceImpact: ServiceRevenueImpact;
+  serviceScore: ServiceScoreOutput;
   insights: GMInsight[];
   decisions: GMDecision[];
   trustState: DataTrustState;

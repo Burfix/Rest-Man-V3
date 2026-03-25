@@ -3,11 +3,15 @@
  *
  * "Revenue follows service quality."
  *
- * Layout:
+ * Desktop Layout:
  *   Hero (briefing + urgency + metrics)
  *   ├─ Main: Top Decisions → All Decisions → Insights
  *   └─ Sidebar: Operating Score → Business Status → Service Pulse → Data Health
  *   Footer: Timestamp
+ *
+ * Mobile Layout (stacked, thumb-friendly):
+ *   MobileHero → MobileDecisions → MobileServicePulse →
+ *   MobileBusinessSnapshot → MobileShiftReview → Timestamp
  */
 
 import { runCopilot } from "@/lib/copilot/orchestrator";
@@ -22,40 +26,87 @@ import DataHealth        from "@/components/copilot/DataHealth";
 import OperatingScoreCard from "@/components/copilot/OperatingScoreCard";
 import CopilotTimestamp  from "@/components/copilot/CopilotTimestamp";
 
+import MobileHero             from "@/components/copilot/mobile/MobileHero";
+import MobileDecisions        from "@/components/copilot/mobile/MobileDecisions";
+import MobileServicePulse     from "@/components/copilot/mobile/MobileServicePulse";
+import MobileBusinessSnapshot from "@/components/copilot/mobile/MobileBusinessSnapshot";
+import MobileShiftReview      from "@/components/copilot/mobile/MobileShiftReview";
+
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function GMCoPilotPage() {
   const copilot = await runCopilot();
 
+  // Build a simple shift review from the current data
+  const actionsTotal = copilot.decisions.length;
+  const actionsCompleted = copilot.decisions.filter(
+    (d) => d.status === "completed",
+  ).length;
+
   return (
-    <div className="space-y-4">
-      {/* 1. Hero — urgency, headline, key metrics */}
-      <CopilotHero brief={copilot.brief} />
+    <>
+      {/* ═══════════════════════════════════════════════════════════════════
+         DESKTOP LAYOUT — hidden on mobile, visible on lg+
+         ═══════════════════════════════════════════════════════════════════ */}
+      <div className="hidden lg:block space-y-4">
+        <CopilotHero brief={copilot.brief} />
 
-      {/* 2. Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Main column (2/3) */}
-        <div className="lg:col-span-2 space-y-4">
-          <TopDecisions decisions={copilot.decisions} />
-          <AllDecisions decisions={copilot.decisions} />
-          <InsightsPanel insights={copilot.insights} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 space-y-4">
+            <TopDecisions decisions={copilot.decisions} />
+            <AllDecisions decisions={copilot.decisions} />
+            <InsightsPanel insights={copilot.insights} />
+          </div>
+
+          <div className="space-y-4">
+            <OperatingScoreCard score={copilot.operatingScore} />
+            <BusinessStatus brief={copilot.brief} score={copilot.operatingScore} />
+            <ServicePulseCard
+              serviceState={copilot.serviceState}
+              serviceImpact={copilot.serviceImpact}
+            />
+            <DataHealth trust={copilot.trustState} />
+          </div>
         </div>
 
-        {/* Sidebar (1/3) */}
-        <div className="space-y-4">
-          <OperatingScoreCard score={copilot.operatingScore} />
-          <BusinessStatus brief={copilot.brief} score={copilot.operatingScore} />
-          <ServicePulseCard
-            serviceState={copilot.serviceState}
-            serviceImpact={copilot.serviceImpact}
-          />
-          <DataHealth trust={copilot.trustState} />
-        </div>
+        <CopilotTimestamp generatedAt={copilot.generatedAt} />
       </div>
 
-      {/* 3. Timestamp */}
-      <CopilotTimestamp generatedAt={copilot.generatedAt} />
-    </div>
+      {/* ═══════════════════════════════════════════════════════════════════
+         MOBILE LAYOUT — visible on mobile, hidden on lg+
+         ═══════════════════════════════════════════════════════════════════ */}
+      <div className="lg:hidden space-y-3 pb-6">
+        <MobileHero
+          brief={copilot.brief}
+          serviceScore={copilot.serviceScore}
+        />
+        <MobileDecisions decisions={copilot.decisions} />
+        <MobileServicePulse
+          serviceState={copilot.serviceState}
+          serviceImpact={copilot.serviceImpact}
+          serviceScore={copilot.serviceScore}
+        />
+        <MobileBusinessSnapshot
+          brief={copilot.brief}
+          score={copilot.operatingScore}
+        />
+        <MobileShiftReview
+          shiftType={
+            copilot.brief.serviceWindow.includes("lunch") ? "lunch" :
+            copilot.brief.serviceWindow.includes("dinner") ? "dinner" : "full_day"
+          }
+          serviceScore={copilot.serviceScore.totalScore}
+          serviceGrade={copilot.serviceScore.serviceGrade}
+          revenueRecovered={0}
+          actionsCompleted={actionsCompleted}
+          actionsTotal={actionsTotal}
+          carryForwardActions={actionsTotal - actionsCompleted}
+          isRecoveryShift={false}
+          shiftSummary={copilot.brief.summary}
+        />
+        <CopilotTimestamp generatedAt={copilot.generatedAt} />
+      </div>
+    </>
   );
 }

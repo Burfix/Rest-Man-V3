@@ -27,6 +27,7 @@ import { generateGMInsights } from "./gm-insights";
 import { generateGMDecisions } from "./gm-decisions";
 import { getDecisionTrustState } from "./data-trust";
 import { getCopilotOperatingScore } from "./operating-score";
+import { getServiceScore } from "./service-score";
 
 import type { CopilotOutput } from "./types";
 import type {
@@ -281,11 +282,21 @@ export async function runCopilot(): Promise<CopilotOutput> {
     complianceDueSoon: complianceSummary.due_soon,
   });
 
+  // ── 12. Service score (gamification) ─────────────────────────────────
+  const serviceScore = getServiceScore({
+    signals: serviceState.signals,
+    avgSpendVsTargetRatio: targetSales > 0
+      ? avgSpend / TARGET_AVG_SPEND
+      : 1,
+    reviewSentimentPct: 75, // TODO: wire real review data
+  });
+
   // ── Return full output ───────────────────────────────────────────────
   return {
     brief,
     serviceState,
     serviceImpact,
+    serviceScore,
     insights,
     decisions,
     trustState,
