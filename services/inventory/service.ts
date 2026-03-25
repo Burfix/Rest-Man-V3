@@ -12,7 +12,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
+import { logger } from "@/lib/logger";
 import type {
   InventoryItem,
   InventoryItemWithRisk,
@@ -61,7 +61,7 @@ function computeStockRisk(item: InventoryItem): InventoryItemWithRisk {
 
 // ── Public API ──────────────────────────────────────────────────────────────
 
-export async function getInventoryItems(storeId = DEFAULT_ORG_ID): Promise<InventoryItemWithRisk[]> {
+export async function getInventoryItems(storeId: string): Promise<InventoryItemWithRisk[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("inventory_items" as any)
@@ -70,13 +70,13 @@ export async function getInventoryItems(storeId = DEFAULT_ORG_ID): Promise<Inven
     .order("name");
 
   if (error) {
-    console.error("[inventory] Failed to fetch items:", error.message);
+    logger.error("[inventory] Failed to fetch items", { storeId, error: error.message });
     return [];
   }
   return (data as unknown as InventoryItem[]).map(computeStockRisk);
 }
 
-export async function getStockRiskSummary(storeId = DEFAULT_ORG_ID): Promise<StockRiskSummary> {
+export async function getStockRiskSummary(storeId: string): Promise<StockRiskSummary> {
   const items = await getInventoryItems(storeId);
   const critical = items.filter((i) => i.risk_level === "critical");
   const warning  = items.filter((i) => i.risk_level === "warning");
@@ -92,7 +92,7 @@ export async function getStockRiskSummary(storeId = DEFAULT_ORG_ID): Promise<Sto
   };
 }
 
-export async function getFoodCostSummary(storeId = DEFAULT_ORG_ID): Promise<FoodCostSummary> {
+export async function getFoodCostSummary(storeId: string): Promise<FoodCostSummary> {
   const supabase = createServerClient();
 
   const [snapshotResult, trendResult, stockRisk] = await Promise.all([
@@ -165,7 +165,7 @@ export async function createStockMovement(
     .single();
 
   if (error) {
-    console.error("[inventory] createStockMovement error:", error.message);
+    logger.error("[inventory] createStockMovement error", { itemId, type, error: error.message });
     return null;
   }
 
@@ -189,7 +189,7 @@ export async function createStockMovement(
   return data as unknown as StockMovement;
 }
 
-export async function getPurchaseOrders(storeId = DEFAULT_ORG_ID): Promise<PurchaseOrder[]> {
+export async function getPurchaseOrders(storeId: string): Promise<PurchaseOrder[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("purchase_orders" as any)
@@ -199,7 +199,7 @@ export async function getPurchaseOrders(storeId = DEFAULT_ORG_ID): Promise<Purch
     .limit(20);
 
   if (error) {
-    console.error("[inventory] getPurchaseOrders error:", error.message);
+    logger.error("[inventory] getPurchaseOrders error", { storeId, error: error.message });
     return [];
   }
   return (data ?? []) as unknown as PurchaseOrder[];
@@ -208,7 +208,7 @@ export async function getPurchaseOrders(storeId = DEFAULT_ORG_ID): Promise<Purch
 export async function createPurchaseOrder(
   supplierName: string,
   items: { inventory_item_id: string; quantity: number; unit_cost?: number }[],
-  storeId = DEFAULT_ORG_ID,
+  storeId: string,
 ): Promise<PurchaseOrder | null> {
   const supabase = createServerClient();
 
@@ -219,7 +219,7 @@ export async function createPurchaseOrder(
     .single();
 
   if (error || !po) {
-    console.error("[inventory] createPurchaseOrder error:", error?.message);
+    logger.error("[inventory] createPurchaseOrder error", { storeId, supplierName, error: error?.message });
     return null;
   }
 
@@ -251,7 +251,7 @@ export async function updatePurchaseOrderStatus(
     .eq("id", poId);
 
   if (error) {
-    console.error("[inventory] updatePurchaseOrderStatus error:", error.message);
+    logger.error("[inventory] updatePurchaseOrderStatus error", { poId, status, error: error.message });
     return false;
   }
 

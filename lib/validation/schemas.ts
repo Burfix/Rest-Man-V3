@@ -252,6 +252,14 @@ export const manualSalesSchema = z.object({
   uploaded_by: z.string().max(200).optional().nullable(),
 });
 
+// ── Inventory Sync ────────────────────────────────────────────────────────────
+
+export const inventorySyncSchema = z.object({
+  businessDate: dateString.optional(),
+  locationCode: z.string().max(100).optional(),
+  forceFullSync: z.boolean().optional(),
+});
+
 // ── MICROS Settings ───────────────────────────────────────────────────────────
 
 export const microsSettingsSchema = z.object({

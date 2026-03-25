@@ -9,11 +9,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/inventory");
   if (guard.error) return guard.error;
+  const { ctx } = guard;
 
   try {
     const [items, foodCost] = await Promise.all([
-      getInventoryItems(),
-      getFoodCostSummary(),
+      getInventoryItems(ctx.siteId),
+      getFoodCostSummary(ctx.siteId),
     ]);
     return NextResponse.json({ items, foodCost });
   } catch (err) {

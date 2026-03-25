@@ -47,6 +47,9 @@ export const PERMISSIONS = {
   MANAGE_INTEGRATIONS:      "manage_integrations",
   RUN_INTEGRATION_SYNC:     "run_integration_sync",
 
+  // Inventory
+  SYNC_INVENTORY:           "sync_inventory",
+
   // Reviews
   RESPOND_TO_REVIEWS:       "respond_to_reviews",
 } as const;
@@ -92,6 +95,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.UPLOAD_COMPLIANCE,
     PERMISSIONS.EDIT_COMPLIANCE_ITEM,
     PERMISSIONS.MANAGE_STORE_SETTINGS,
+    PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
   ],
 
@@ -108,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.UPDATE_MAINTENANCE,
     PERMISSIONS.CLOSE_MAINTENANCE,
     PERMISSIONS.UPLOAD_COMPLIANCE,
+    PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
   ],
 
