@@ -75,8 +75,30 @@ export async function syncInventoryFromMicros(
   });
 
   try {
-    // Fetch stock-on-hand from Oracle MICROS Inventory Management API
-    const result = await getStockOnHandList();
+    // ── IM API not provisioned on this tenant ──
+    // GetStockOnHandList requires the Oracle Inventory Management module
+    // which is separate from the BI API and not currently available.
+    // The BI API (simphony-home) only supports: getGuestChecks,
+    // getTimeCardDetails, getJobCodeDimensions.
+    // Stock data is managed locally until IM module is provisioned.
+    await supabase
+      .from("micros_sync_runs")
+      .update({
+        completed_at: new Date().toISOString(),
+        status: "skipped",
+        error_message: "Oracle Inventory Management module not provisioned. GetStockOnHandList requires a separate IM license.",
+      })
+      .eq("id", syncRunId);
+
+    return {
+      success: false,
+      message: "Inventory sync unavailable — Oracle Inventory Management module not provisioned on this tenant. Stock data is managed locally.",
+      businessDate,
+      itemsSynced: 0,
+    };
+
+    // When IM module is provisioned, uncomment and set MICROS_IM_SERVER:
+    /* const result = await getStockOnHandList();
 
     // Handle Oracle Result<StockOnHand[]> wrapper
     const success = result.Success ?? result.success;
@@ -242,6 +264,7 @@ export async function syncInventoryFromMicros(
       itemsCreated: created,
       itemsUpdated: updated,
     };
+    */
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
 
