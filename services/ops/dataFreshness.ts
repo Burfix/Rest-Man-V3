@@ -19,7 +19,6 @@ export interface FreshnessItem {
 export interface DataFreshnessSummary {
   sales: FreshnessItem;
   reviews: FreshnessItem;
-  dailyOps: FreshnessItem;
   maintenance: FreshnessItem;
   stock: FreshnessItem;
   compliance: FreshnessItem;
@@ -36,7 +35,7 @@ function daysAgo(isoDate: string | null): number | null {
 export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
   const supabase = createServerClient();
 
-  const [salesRes, reviewsRes, dailyOpsRes, maintRes, stockRes, complianceRes, microsRes] = await Promise.all([
+  const [salesRes, reviewsRes, maintRes, stockRes, complianceRes, microsRes] = await Promise.all([
     supabase
       .from("sales_uploads")
       .select("uploaded_at")
@@ -46,13 +45,6 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
 
     supabase
       .from("reviews")
-      .select("created_at")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-
-    supabase
-      .from("daily_operations_reports")
       .select("created_at")
       .order("created_at", { ascending: false })
       .limit(1)
@@ -89,7 +81,6 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
 
   const salesDate = (salesRes.data as { uploaded_at: string } | null)?.uploaded_at ?? null;
   const reviewDate = (reviewsRes.data as { created_at: string } | null)?.created_at ?? null;
-  const dailyOpsDate = (dailyOpsRes.data as { created_at: string } | null)?.created_at ?? null;
   const maintDate = (maintRes.data as { updated_at: string } | null)?.updated_at ?? null;
   const stockDate = (stockRes.data as { created_at: string } | null)?.created_at ?? null;
   const complianceDate = (complianceRes.data as { updated_at: string } | null)?.updated_at ?? null;
@@ -113,14 +104,6 @@ export async function getDataFreshnessSummary(): Promise<DataFreshnessSummary> {
       stale: reviewDate === null || (daysAgo(reviewDate) ?? 999) > 14,
       href: "/dashboard/reviews",
       actionLabel: "Sync or import reviews",
-    },
-    dailyOps: {
-      label: "Daily operations",
-      lastUpdatedAt: dailyOpsDate,
-      daysAgo: daysAgo(dailyOpsDate),
-      stale: dailyOpsDate === null || (daysAgo(dailyOpsDate) ?? 999) > 2,
-      href: "/dashboard/operations",
-      actionLabel: "Upload Toast export",
     },
     maintenance: {
       label: "Maintenance",

@@ -59,7 +59,6 @@ export default function SecondaryInsights({
             hasEquipment={hasEquipment}
             hasSales={false}
             hasReviews={hasReviews}
-            hasDailyOps={false}
           />
         )}
       </div>

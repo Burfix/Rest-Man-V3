@@ -33,7 +33,6 @@ export default function DataHealthIndicator({ freshness, microsIsLive, labourSyn
   const [showDetail, setShowDetail] = useState(false);
 
   const allItems = [
-    freshness.dailyOps,
     freshness.sales,
     freshness.reviews,
     freshness.maintenance,

@@ -13,7 +13,6 @@ import { generateLabourInsight } from "@/lib/commandCenter";
 import type {
   TodayBookingsSummary,
   VenueEvent,
-  DailyOperationsDashboardSummary,
   MaintenanceSummary,
   RevenueForecast,
 } from "@/types";
@@ -22,7 +21,6 @@ import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 interface Props {
   today:          TodayBookingsSummary;
   events:         VenueEvent[];
-  dailyOps:       DailyOperationsDashboardSummary;
   maintenance:    MaintenanceSummary;
   date:           string;
   forecast?:      RevenueForecast | null;
@@ -80,7 +78,6 @@ function DataRow({
 export default function TodayAtVenueCard({
   today,
   events,
-  dailyOps,
   maintenance,
   date,
   forecast,
@@ -89,8 +86,6 @@ export default function TodayAtVenueCard({
   salesSnapshot,
 }: Props) {
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
-  const report     = dailyOps.latestReport;
-
   const lunchBkgs = today.bookings.filter((b) => {
     const h = parseInt((b.booking_time ?? "00:00").split(":")[0], 10);
     return h >= 11 && h < 16;
@@ -102,7 +97,7 @@ export default function TodayAtVenueCard({
   const lunchCovers  = lunchBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
   const dinnerCovers = dinnerBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
 
-  const laborPct = report?.labor_cost_percent ?? null;
+  const laborPct = null as number | null;
   const laborColor =
     laborPct == null ? "text-stone-400 dark:text-stone-600"       :
     laborPct > 45    ? "text-red-600 dark:text-red-400"           :
@@ -200,7 +195,7 @@ export default function TodayAtVenueCard({
           sub={
             labourInsight
               ? labourInsight.interpretation
-              : laborPct != null ? "of revenue" : "Upload daily ops report"
+              : laborPct != null ? "of revenue" : "No labour data"
           }
           valueColor={laborColor}
           badge={laborBadge}

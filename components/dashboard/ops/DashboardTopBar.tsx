@@ -15,7 +15,6 @@ import type {
   ComplianceSummary,
   MaintenanceSummary,
   RevenueForecast,
-  DailyOperationsDashboardSummary,
   VenueEvent,
   TodayBookingsSummary,
 } from "@/types";
@@ -28,7 +27,6 @@ interface Props {
   compliance:     ComplianceSummary;
   maintenance:    MaintenanceSummary;
   forecast:       RevenueForecast | null;
-  dailyOps:       DailyOperationsDashboardSummary;
   events:         VenueEvent[];
   today:          TodayBookingsSummary;
   totalAlerts:    number;
@@ -66,7 +64,6 @@ export default function DashboardTopBar({
   compliance,
   maintenance,
   forecast,
-  dailyOps,
   salesSnapshot,
   today,
   totalAlerts,
@@ -74,7 +71,7 @@ export default function DashboardTopBar({
   revenueTrend,
   labourTrend,
 }: Props) {
-  const laborPct  = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct  = null as number | null;
   const totalOpen = maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts;
 
   // ── Compliance tile ─────────────────────────────────────────────────────
@@ -207,7 +204,7 @@ export default function DashboardTopBar({
       sub:        labourSub,
       subColor:   labourSubColor,
       href:       "/dashboard/operations",
-      sourceType: microsLive ? "labour_sync" as const : dailyOps.latestReport ? "csv_upload" as const : undefined,
+      sourceType: microsLive ? "labour_sync" as const : undefined,
       sourceAge:  microsLive ? microsAgeLabel : undefined,
       trend:      labourTrend ?? undefined,
     },

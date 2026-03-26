@@ -18,7 +18,6 @@ import type {
   RevenueForecast,
   TodayBookingsSummary,
   VenueEvent,
-  DailyOperationsDashboardSummary,
 } from "@/types";
 
 interface Props {
@@ -27,7 +26,6 @@ interface Props {
   forecast:    RevenueForecast | null;
   today:       TodayBookingsSummary;
   events:      VenueEvent[];
-  dailyOps:    DailyOperationsDashboardSummary;
   date:        string; // YYYY-MM-DD
 }
 

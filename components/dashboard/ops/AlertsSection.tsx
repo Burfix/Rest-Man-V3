@@ -37,11 +37,6 @@ const typeIcon: Record<PriorityAlert["type"], string> = {
   out_of_service: "⛔",
   no_sales_upload: "📊",
   large_booking: "👥",
-  no_daily_ops_report: "📋",
-  high_labor_cost: "💰",
-  low_margin: "📉",
-  negative_cash_due: "💸",
-  low_operating_margin: "📉",
 };
 
 export default function AlertsSection({ alerts }: Props) {

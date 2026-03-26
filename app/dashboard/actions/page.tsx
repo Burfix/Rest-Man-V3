@@ -14,7 +14,6 @@ import type { Action } from "@/types/actions";
 import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
 import { getLatestSalesSummary } from "@/services/ops/salesSummary";
 import { getMaintenanceSummary } from "@/services/ops/maintenanceSummary";
-import { getDailyOperationsDashboardSummary } from "@/services/ops/dailyOperationsSummary";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 import { getMicrosStatus } from "@/services/micros/status";
@@ -28,7 +27,6 @@ import type {
   TodayBookingsSummary,
   SalesSummary,
   MaintenanceSummary,
-  DailyOperationsDashboardSummary,
   RevenueForecast,
   ComplianceSummary,
 } from "@/types";
@@ -54,9 +52,6 @@ const EMPTY_TODAY: TodayBookingsSummary = {
   escalationsToday: 0, bookings: [],
 };
 const EMPTY_SALES: SalesSummary = { upload: null, topItems: [], bottomItems: [] };
-const EMPTY_DAILY_OPS: DailyOperationsDashboardSummary = {
-  latestReport: null, reportDate: null, uploadedAt: null,
-};
 const EMPTY_COMPLIANCE: ComplianceSummary = {
   total: 0, compliant: 0, scheduled: 0, due_soon: 0, expired: 0, unknown: 0,
   compliance_pct: 0, critical_items: [], due_soon_items: [], scheduled_items: [],
@@ -126,7 +121,6 @@ export default async function ActionsPage() {
   const [
     todayResult,
     maintenanceResult,
-    dailyOpsResult,
     forecastResult,
     complianceResult,
     microsResult,
@@ -135,7 +129,6 @@ export default async function ActionsPage() {
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(),
-    getDailyOperationsDashboardSummary(),
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),
@@ -145,7 +138,6 @@ export default async function ActionsPage() {
 
   const { value: today }              = settled(todayResult, EMPTY_TODAY);
   const { value: maintenance }        = settled(maintenanceResult, EMPTY_MAINTENANCE);
-  const { value: dailyOps }           = settled(dailyOpsResult, EMPTY_DAILY_OPS);
   const { value: forecast }           = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }  = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }       = settled(microsResult, null);
@@ -166,12 +158,8 @@ export default async function ActionsPage() {
   const inventoryAgeMinutes = inventoryIntel?.lastSynced
     ? Math.round((now - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
     : undefined;
-  const dailyOpsAgeDays = dailyOps.reportDate
-    ? Math.round((now - new Date(dailyOps.reportDate).getTime()) / 86_400_000)
-    : undefined;
   const labourPct = labourSummary?.labourPercentOfSales
     ?? salesSnapshot.labourCostPercent
-    ?? dailyOps.latestReport?.labor_cost_percent
     ?? 0;
 
   const siteConfig = await getSiteConfig();
@@ -215,7 +203,7 @@ export default async function ActionsPage() {
       lunchBookings: today.total > 0 ? Math.floor(today.total * 0.4) : undefined,
       dinnerBookings: today.total > 0 ? Math.ceil(today.total * 0.6) : undefined,
     },
-    freshness: { salesAgeMinutes, labourAgeMinutes, inventoryAgeMinutes, dailyOpsAgeDays },
+    freshness: { salesAgeMinutes, labourAgeMinutes, inventoryAgeMinutes },
   });
 
   // Group active actions by time horizon

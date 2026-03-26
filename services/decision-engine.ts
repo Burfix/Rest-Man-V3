@@ -66,7 +66,6 @@ export type EvaluateOperationsInput = {
     salesAgeMinutes?: number;
     labourAgeMinutes?: number;
     inventoryAgeMinutes?: number;
-    dailyOpsAgeDays?: number;
     reviewsAgeDays?: number;
   };
 };
@@ -200,7 +199,6 @@ function effectiveConfidence(
   const staleThresholds = [
     freshness.salesAgeMinutes != null && freshness.salesAgeMinutes > 120,
     freshness.labourAgeMinutes != null && freshness.labourAgeMinutes > 120,
-    freshness.dailyOpsAgeDays != null && freshness.dailyOpsAgeDays > 1,
   ];
   const staleCount = staleThresholds.filter(Boolean).length;
   if (staleCount >= 2) return "low";
@@ -384,13 +382,6 @@ export function evaluateOperations(
     staleWarnings.push(
       `Labour data is ${freshnessLabel(input.freshness.labourAgeMinutes)}`,
     );
-  if (
-    input.freshness.dailyOpsAgeDays != null &&
-    input.freshness.dailyOpsAgeDays > 1
-  )
-    staleWarnings.push(
-      `Daily ops report is ${input.freshness.dailyOpsAgeDays}d old`,
-    );
 
   if (staleWarnings.length > 0) {
     decisions.push({
@@ -399,7 +390,7 @@ export function evaluateOperations(
       category: "service",
       title: "Decisions using stale data",
       explanation: staleWarnings.join(". ") + ".",
-      action: "Sync latest data or upload daily ops report",
+      action: "Sync latest data from MICROS",
       impact: {
         type: "service_risk",
         label: "Low confidence in current recommendations",
@@ -700,7 +691,6 @@ export function evaluateOperations(
   addFreshness("Sales", input.freshness.salesAgeMinutes);
   addFreshness("Labour", input.freshness.labourAgeMinutes);
   addFreshness("Inventory", input.freshness.inventoryAgeMinutes);
-  addFreshness("Daily Ops", undefined, input.freshness.dailyOpsAgeDays);
   addFreshness("Reviews", undefined, input.freshness.reviewsAgeDays);
 
   const staleCount = details.filter((d) => d.tone === "critical").length;

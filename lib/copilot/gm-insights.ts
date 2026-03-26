@@ -33,7 +33,6 @@ export interface InsightInput {
   complianceDueSoon: number;
   salesAgeMinutes: number | null;
   labourAgeMinutes: number | null;
-  dailyOpsAgeDays: number | null;
   floorEnergyScore: number;
   upsellRate: number;         // avgSpend / targetAvgSpend ratio
   walkInConversionRate: number;
@@ -137,7 +136,6 @@ export function generateGMInsights(input: InsightInput): GMInsight[] {
   const staleFlags: string[] = [];
   if (input.salesAgeMinutes != null && input.salesAgeMinutes > 480) staleFlags.push("sales");
   if (input.labourAgeMinutes != null && input.labourAgeMinutes > 480) staleFlags.push("labour");
-  if (input.dailyOpsAgeDays != null && input.dailyOpsAgeDays > 2) staleFlags.push("daily ops");
 
   if (staleFlags.length > 0) {
     insights.push({

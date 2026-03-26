@@ -47,7 +47,6 @@ interface Props {
 
 export default function FreshnessBar({ freshness, microsIsLive = false }: Props) {
   const items: FreshnessItem[] = [
-    freshness.dailyOps,
     freshness.sales,
     freshness.reviews,
     freshness.maintenance,

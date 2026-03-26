@@ -13,7 +13,6 @@ export interface TrustInput {
   salesAgeMinutes: number | null;
   labourAgeMinutes: number | null;
   inventoryAgeMinutes: number | null;
-  dailyOpsAgeDays: number | null;
   reviewsAgeDays: number | null;
   bookingsLive: boolean;
 }
@@ -44,12 +43,6 @@ export function getDecisionTrustState(input: TrustInput): DataTrustState {
       ageMinutes: input.inventoryAgeMinutes,
       thresholdMinutes: 1440,         // 24 hours
       impact: "Stock risk assessment may miss recent consumption",
-    },
-    {
-      name: "Daily Ops",
-      ageMinutes: input.dailyOpsAgeDays != null ? input.dailyOpsAgeDays * 1440 : null,
-      thresholdMinutes: 2880,         // 2 days
-      impact: "Daily ops report overdue — operational context incomplete",
     },
     {
       name: "Reviews",

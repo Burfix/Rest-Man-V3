@@ -24,7 +24,6 @@ const actionCategory = z.enum([
   "stock",
   "maintenance",
   "compliance",
-  "daily_ops",
   "service",
   "general",
 ]);

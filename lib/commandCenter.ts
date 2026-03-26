@@ -10,7 +10,6 @@ import type {
   ComplianceSummary,
   MaintenanceSummary,
   RevenueForecast,
-  DailyOperationsDashboardSummary,
   SevenDayReviewSummary,
   VenueEvent,
 } from "@/types";
@@ -207,11 +206,10 @@ export function generateConfidenceSummary(params: {
     minutesSinceSync:    number | null;
     lastSyncError?:      string | null;
   } | null;
-  dailyOps: DailyOperationsDashboardSummary;
   today:    string; // YYYY-MM-DD
   labourLive?: boolean;
 }): ConfidenceSummary {
-  const { microsStatus, dailyOps, today } = params;
+  const { microsStatus, today } = params;
   const ms = microsStatus;
   const labourIsLive = params.labourLive ?? false;
 
@@ -222,7 +220,7 @@ export function generateConfidenceSummary(params: {
     ms.minutesSinceSync < 15
   ) {
     const age = ms.minutesSinceSync < 1 ? "now" : `${ms.minutesSinceSync}m`;
-    const labourDetail = labourIsLive ? "Labour live" : dailyOps.latestReport ? "Labour live" : "Labour pending";
+    const labourDetail = labourIsLive ? "Labour live" : "Labour pending";
     return { level: "high", detail: `Sales ${age} · ${labourDetail}` };
   }
 
@@ -240,20 +238,8 @@ export function generateConfidenceSummary(params: {
     return { level: "medium", detail: `Sales ${age} · ${labourLabel}` };
   }
 
-  // Manual / CSV upload path
-  if (dailyOps.latestReport) {
-    const ageDays = Math.floor(
-      (new Date(today + "T12:00:00Z").getTime() -
-        new Date((dailyOps.latestReport.report_date ?? today) + "T12:00:00Z").getTime()) /
-        86_400_000
-    );
-    if (ageDays <= 1) {
-      return { level: "medium", detail: `Manual mode · Report ${ageDays === 0 ? "today" : "yesterday"}` };
-    }
-    return { level: "low", detail: `Manual mode · Report ${ageDays}d ago` };
-  }
-
-  return { level: "low", detail: "Awaiting data — upload required" };
+  // No live MICROS data
+  return { level: "low", detail: "Awaiting data — connect MICROS" };
 }
 
 // ── Two-Hour Outlook ──────────────────────────────────────────────────────────
@@ -265,13 +251,13 @@ export interface TwoHourOutlook {
 
 export function generateTwoHourOutlook(params: {
   forecast:      RevenueForecast | null;
-  dailyOps:      DailyOperationsDashboardSummary;
   today:         { total: number; totalCovers: number };
   servicePeriod: string;
+  labourPctOverride?: number | null;
   inventoryIntel?: InventoryIntelParam | null;
 }): TwoHourOutlook {
-  const { forecast, dailyOps, today, inventoryIntel } = params;
-  const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const { forecast, today, inventoryIntel } = params;
+  const laborPct = params.labourPctOverride ?? null;
 
   if (!forecast) {
     return { text: "Limited live data — manual check required", confidence: "none" };
@@ -354,14 +340,13 @@ export function generateCommandHeadline(params: {
   compliance:  ComplianceSummary;
   maintenance: MaintenanceSummary;
   forecast:    RevenueForecast | null;
-  dailyOps:    DailyOperationsDashboardSummary;
   today:       { total: number; totalCovers: number };
   servicePeriod: string;
   labourPctOverride?: number | null;
   inventoryIntel?: InventoryIntelParam | null;
 }): CommandHeadline {
-  const { compliance, maintenance, forecast, dailyOps, today, servicePeriod, inventoryIntel } = params;
-  const laborPct     = params.labourPctOverride ?? dailyOps.latestReport?.labor_cost_percent ?? null;
+  const { compliance, maintenance, forecast, today, servicePeriod, inventoryIntel } = params;
+  const laborPct     = params.labourPctOverride ?? null;
   const gapPct       = forecast?.sales_gap_pct ?? null;
   const gapAbs       = forecast?.sales_gap     ?? null;
 
@@ -642,14 +627,13 @@ export function buildPriorityActions(params: {
   compliance:  ComplianceSummary;
   maintenance: MaintenanceSummary;
   forecast:    RevenueForecast | null;
-  dailyOps:    DailyOperationsDashboardSummary;
   reviews:     SevenDayReviewSummary;
   events:      VenueEvent[];
   today:       string; // YYYY-MM-DD
   labourPctOverride?: number | null;
   inventoryIntel?: InventoryIntelParam | null;
 }): DashboardAction[] {
-  const { compliance, maintenance, forecast, dailyOps, reviews, events, today, labourPctOverride, inventoryIntel } = params;
+  const { compliance, maintenance, forecast, reviews, events, today, labourPctOverride, inventoryIntel } = params;
   const actions: DashboardAction[] = [];
 
   // ── Compliance ────────────────────────────────────────────────────────────
@@ -862,7 +846,7 @@ export function buildPriorityActions(params: {
   }
 
   // ── Staffing ──────────────────────────────────────────────────────────────
-  const laborPct = labourPctOverride ?? dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct = labourPctOverride ?? null;
   if (laborPct != null && laborPct > 35) {
     const severity: ActionSeverity = laborPct > 50 ? "urgent" : "action";
     actions.push({
@@ -943,41 +927,6 @@ export function buildPriorityActions(params: {
   }
 
   // ── Data completeness ─────────────────────────────────────────────────────
-  if (!dailyOps.latestReport) {
-    actions.push({
-      severity:       "action",
-      category:       "data",
-      title:          "Daily operations report missing",
-      message:        "No daily ops report has been uploaded — labor and margin data unavailable.",
-      recommendation: "Upload today's Toast Daily Operations report.",
-      href:           "/dashboard/operations",
-      primaryAction:   { label: "Upload report", href: "/dashboard/operations" },
-      secondaryActions: [{ label: "Mark ignored", href: "/dashboard/operations" }],
-      impactWeight:   "quick_win",
-      impactLabel:    IMPACT_LABELS["quick_win"],
-    });
-  } else {
-    // Check for stale report
-    const ageDays = Math.round(
-      (new Date(today + "T12:00:00Z").getTime() -
-        new Date((dailyOps.latestReport.report_date ?? today) + "T12:00:00Z").getTime()) /
-        86_400_000
-    );
-    if (ageDays > 2) {
-      actions.push({
-        severity:       "watch",
-        category:       "data",
-        title:          `Daily ops report ${ageDays} days old — requires update`,
-        message:        `Last report was for ${dailyOps.latestReport.report_date}. Operational data may be stale.`,
-        recommendation: "Upload the latest Daily Operations CSV from Toast.",
-        href:           "/dashboard/operations",
-        primaryAction:   { label: "Upload report", href: "/dashboard/operations" },
-        impactWeight:   "quick_win",
-        impactLabel:    IMPACT_LABELS["quick_win"],
-      });
-    }
-  }
-
   if (reviews.totalReviews === 0) {
     actions.push({
       severity:       "watch",
@@ -1038,12 +987,11 @@ export function computeHealthScore(params: {
   compliance:  ComplianceSummary;
   maintenance: MaintenanceSummary;
   forecast:    RevenueForecast | null;
-  dailyOps:    DailyOperationsDashboardSummary;
   reviews:     SevenDayReviewSummary;
   labourPctOverride?: number | null;
   inventoryIntel?: InventoryIntelParam | null;
 }): RestaurantHealthScore {
-  const { compliance, maintenance, forecast, dailyOps, reviews, labourPctOverride, inventoryIntel } = params;
+  const { compliance, maintenance, forecast, reviews, labourPctOverride, inventoryIntel } = params;
 
   // ── Compliance score (30%) ────────────────────────────────────────────────
   let complianceScore = 100;
@@ -1077,7 +1025,7 @@ export function computeHealthScore(params: {
 
   // ── Staffing score (15%) ──────────────────────────────────────────────────
   let staffingScore = 75; // neutral baseline
-  const laborPct = labourPctOverride ?? dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct = labourPctOverride ?? null;
   if (laborPct != null) {
     if (laborPct <= 30)      staffingScore = 100;
     else if (laborPct <= 35) staffingScore = 85;
@@ -1089,9 +1037,8 @@ export function computeHealthScore(params: {
   // ── Data readiness score (15%) ────────────────────────────────────────────
   let dataReadyScore = 0;
   let dataItems = 0;
-  if (dailyOps.latestReport) dataReadyScore += 35, dataItems++;
-  if (reviews.totalReviews > 0) dataReadyScore += 30, dataItems++;
-  if (forecast && forecast.factors.signal_count > 0) dataReadyScore += 35, dataItems++;
+  if (reviews.totalReviews > 0) dataReadyScore += 45, dataItems++;
+  if (forecast && forecast.factors.signal_count > 0) dataReadyScore += 55, dataItems++;
   if (dataItems === 0) dataReadyScore = 20;
 
   // ── Inventory score (10%) ─────────────────────────────────────────────────

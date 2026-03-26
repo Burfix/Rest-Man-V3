@@ -10,7 +10,6 @@
 import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
 import { getLatestSalesSummary } from "@/services/ops/salesSummary";
 import { getMaintenanceSummary } from "@/services/ops/maintenanceSummary";
-import { getDailyOperationsDashboardSummary } from "@/services/ops/dailyOperationsSummary";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 import { getMicrosStatus } from "@/services/micros/status";
@@ -36,7 +35,6 @@ import type {
   TodayBookingsSummary,
   SalesSummary,
   MaintenanceSummary,
-  DailyOperationsDashboardSummary,
   RevenueForecast,
   ComplianceSummary,
 } from "@/types";
@@ -49,9 +47,6 @@ const EMPTY_TODAY: TodayBookingsSummary = {
   escalationsToday: 0, bookings: [],
 };
 const EMPTY_SALES: SalesSummary = { upload: null, topItems: [], bottomItems: [] };
-const EMPTY_DAILY_OPS: DailyOperationsDashboardSummary = {
-  latestReport: null, reportDate: null, uploadedAt: null,
-};
 const EMPTY_COMPLIANCE: ComplianceSummary = {
   total: 0, compliant: 0, scheduled: 0, due_soon: 0, expired: 0, unknown: 0,
   compliance_pct: 0, critical_items: [], due_soon_items: [], scheduled_items: [],
@@ -85,13 +80,12 @@ export async function runCopilot(): Promise<CopilotOutput> {
 
   // ── 1. Parallel data fetch ────────────────────────────────────────────
   const [
-    todayResult, maintenanceResult, dailyOpsResult,
+    todayResult, maintenanceResult,
     forecastResult, complianceResult, microsResult,
     inventoryResult, labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(),
-    getDailyOperationsDashboardSummary(),
     generateRevenueForecast(today_iso),
     getComplianceSummary(),
     getMicrosStatus(),
@@ -103,7 +97,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
 
   const today = settled(todayResult, EMPTY_TODAY);
   const maintenance = settled(maintenanceResult, EMPTY_MAINTENANCE);
-  const dailyOps = settled(dailyOpsResult, EMPTY_DAILY_OPS);
   const forecast = settled(forecastResult, null as RevenueForecast | null);
   const complianceSummary = settled(complianceResult, EMPTY_COMPLIANCE);
   const microsStatus = settled(microsResult, null) as MicrosStatusSummary | null;
@@ -125,13 +118,9 @@ export async function runCopilot(): Promise<CopilotOutput> {
   const inventoryAgeMinutes = inventoryIntel?.lastSynced
     ? Math.round((nowMs - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
     : null;
-  const dailyOpsAgeDays = dailyOps.reportDate
-    ? Math.round((nowMs - new Date(dailyOps.reportDate).getTime()) / 86_400_000)
-    : null;
 
   const labourPct = labourSummary?.labourPercentOfSales
     ?? salesSnapshot.labourCostPercent
-    ?? dailyOps.latestReport?.labor_cost_percent
     ?? 0;
 
   const netSales = salesSnapshot.netSales;
@@ -209,7 +198,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     complianceDueSoon: complianceSummary.due_soon,
     salesAgeMinutes,
     labourAgeMinutes,
-    dailyOpsAgeDays,
   });
 
   // ── 8. GM Brief ──────────────────────────────────────────────────────
@@ -254,7 +242,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     complianceDueSoon: complianceSummary.due_soon,
     salesAgeMinutes,
     labourAgeMinutes,
-    dailyOpsAgeDays,
     floorEnergyScore: serviceState.signals.floorEnergyScore,
     upsellRate: serviceState.signals.upsellRate,
     walkInConversionRate: serviceState.signals.walkInConversionRate,
@@ -266,7 +253,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     salesAgeMinutes,
     labourAgeMinutes,
     inventoryAgeMinutes,
-    dailyOpsAgeDays,
     reviewsAgeDays: null,
     bookingsLive: today.total > 0,
   });

@@ -16,7 +16,6 @@ import type {
   ComplianceSummary,
   MaintenanceSummary,
   RevenueForecast,
-  DailyOperationsDashboardSummary,
   VenueEvent,
   TodayBookingsSummary,
   OperationalAlert,
@@ -28,7 +27,6 @@ interface Props {
   compliance:    ComplianceSummary;
   maintenance:   MaintenanceSummary;
   forecast:      RevenueForecast | null;
-  dailyOps:      DailyOperationsDashboardSummary;
   events:        VenueEvent[];
   today:         TodayBookingsSummary;
   opsAlerts:     OperationalAlert[];
@@ -64,7 +62,6 @@ function buildCells(
   compliance:  ComplianceSummary,
   maintenance: MaintenanceSummary,
   forecast:    RevenueForecast | null,
-  dailyOps:    DailyOperationsDashboardSummary,
   events:      VenueEvent[],
   today:       TodayBookingsSummary,
   date:        string
@@ -113,19 +110,12 @@ function buildCells(
     "Target not set";
 
   // ── Staff ─────────────────────────────────────────────────────────────────
-  const laborPct = dailyOps.latestReport?.labor_cost_percent ?? null;
-  const staffVar: StatusVariant =
-    laborPct == null  ? "neutral"  :
-    laborPct > 45     ? "critical" :
-    laborPct > 35     ? "warning"  : "ok";
-  const staffMetric =
-    laborPct != null ? `${laborPct.toFixed(1)}%` : `${today.total} bkgs`;
+  const staffVar: StatusVariant = "neutral";
+  const staffMetric = `${today.total} bkgs`;
   const staffSupport =
-    laborPct != null
-      ? "labour cost"
-      : today.total > 0
+    today.total > 0
       ? `${today.totalCovers} covers today`
-      : "Upload ops report";
+      : "No bookings";
 
   // ── Events ────────────────────────────────────────────────────────────────
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
@@ -160,7 +150,6 @@ export default function CommandStatusBar({
   compliance,
   maintenance,
   forecast,
-  dailyOps,
   events,
   today,
   opsAlerts,
@@ -170,7 +159,7 @@ export default function CommandStatusBar({
     (a) => !a.resolved && (a.severity === "critical" || a.severity === "high")
   ).length;
 
-  const cells = buildCells(compliance, maintenance, forecast, dailyOps, events, today, date);
+  const cells = buildCells(compliance, maintenance, forecast, events, today, date);
   const hasRisk = cells.some((c) => c.variant === "critical");
 
   return (

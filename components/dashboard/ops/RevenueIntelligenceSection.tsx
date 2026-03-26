@@ -45,7 +45,7 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
             No forecasting data available yet
           </p>
           <p className="mt-1 text-xs text-stone-400 max-w-sm mx-auto">
-            Upload historical daily sales and daily operations reports to enable
+            Upload historical daily sales to enable
             revenue forecasting and recommendations.
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-4 text-xs">
@@ -54,12 +54,6 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
               className="text-stone-600 underline hover:text-stone-900"
             >
               Upload historical sales →
-            </Link>
-            <Link
-              href="/dashboard/operations"
-              className="text-stone-600 underline hover:text-stone-900"
-            >
-              Upload daily ops report →
             </Link>
           </div>
         </div>

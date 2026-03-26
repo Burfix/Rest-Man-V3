@@ -3,14 +3,13 @@
  *
  * getOperatingScore(locationId) → OperatingScore (0–100)
  *
- * Seven weighted components:
- *   Revenue vs Target     20 pts
- *   Labour %              20 pts
+ * Six weighted components:
+ *   Revenue vs Target     25 pts
+ *   Labour %              25 pts
  *   Food Cost             15 pts
  *   Compliance status     15 pts
  *   Inventory Risk        10 pts
  *   Maintenance status    10 pts
- *   Daily Ops Execution   10 pts
  *
  * All data is fetched live from the DB; results are suitable for
  * server-side rendering or caching by the caller.
@@ -28,7 +27,7 @@ export type ScoreGrade = "A" | "B" | "C" | "D" | "F";
 
 export interface RevenueComponent {
   score:       number;
-  max:         20;
+  max:         25;
   actual:      number | null;
   target:      number | null;
   gap_pct:     number | null;
@@ -38,7 +37,7 @@ export interface RevenueComponent {
 
 export interface LabourComponent {
   score:       number;
-  max:         20;
+  max:         25;
   labour_pct:  number | null;
   detail:      string;
 }
@@ -73,14 +72,6 @@ export interface MaintenanceComponent {
   detail:         string;
 }
 
-export interface DailyOpsComponent {
-  score:            number;
-  max:              10;
-  report_age_days:  number | null;
-  freshness:        "fresh" | "aging" | "stale" | "missing";
-  detail:           string;
-}
-
 export interface InventoryRiskComponent {
   score:          number;
   max:            10;
@@ -103,7 +94,6 @@ export interface OperatingScore {
     compliance:     ComplianceComponent;
     inventory_risk: InventoryRiskComponent;
     maintenance:    MaintenanceComponent;
-    daily_ops:      DailyOpsComponent;
   };
   computed_at:  string;         // ISO timestamp
 }
@@ -131,10 +121,10 @@ function scoreRevenue(actual: number | null, target: number | null): { score: nu
   }
   const gap_pct = ((target - actual) / target) * 100;
   let score: number;
-  if      (gap_pct <= 0)  score = 20;
-  else if (gap_pct <= 5)  score = 16;
-  else if (gap_pct <= 10) score = 12;
-  else if (gap_pct <= 20) score = 6;
+  if      (gap_pct <= 0)  score = 25;
+  else if (gap_pct <= 5)  score = 20;
+  else if (gap_pct <= 10) score = 15;
+  else if (gap_pct <= 20) score = 8;
   else                    score = 0;
   return { score, gap_pct: Math.round(gap_pct * 10) / 10 };
 }
@@ -151,15 +141,15 @@ function revenueDetail(score: number, gap_pct: number | null, actual: number | n
 
 /**
  * Labour bands (cost as % of net sales):
- *   ≤ 30%       → 20
- *   30% – 35%   → 15
- *   > 35%       → 5
+ *   ≤ 30%       → 25
+ *   30% – 35%   → 18
+ *   > 35%       → 6
  */
 function scoreLabour(pct: number | null): number {
   if (pct === null) return 0;
-  if (pct <= 30)    return 20;
-  if (pct <= 35)    return 15;
-  return 5;
+  if (pct <= 30)    return 25;
+  if (pct <= 35)    return 18;
+  return 6;
 }
 
 function labourDetail(score: number, pct: number | null): string {
@@ -289,38 +279,6 @@ function foodCostDetail(score: number, actualPct: number | null, targetPct: numb
   return `Food cost ${actualPct.toFixed(1)}% — ${variance?.toFixed(1)}% above target (${targetPct.toFixed(1)}%)`;
 }
 
-// ── Daily Ops scoring (max 10) ────────────────────────────────────────────────
-
-/**
- * Daily ops freshness:
- *   report today or yesterday       → 10  (fresh)
- *   report 2–3 days old             → 6   (aging)
- *   report 4–7 days old             → 3   (stale)
- *   no report or > 7 days           → 0   (missing)
- */
-function scoreDailyOps(
-  latestReportDate: string | null,
-  today: string,
-): { score: number; age_days: number | null; freshness: "fresh" | "aging" | "stale" | "missing" } {
-  if (!latestReportDate) {
-    return { score: 0, age_days: null, freshness: "missing" };
-  }
-  const diff = Math.floor(
-    (new Date(today).getTime() - new Date(latestReportDate).getTime()) / 86400000
-  );
-  if (diff <= 1) return { score: 10, age_days: diff, freshness: "fresh" };
-  if (diff <= 3) return { score: 6,  age_days: diff, freshness: "aging" };
-  if (diff <= 7) return { score: 3,  age_days: diff, freshness: "stale" };
-  return { score: 0, age_days: diff, freshness: "missing" };
-}
-
-function dailyOpsDetail(freshness: "fresh" | "aging" | "stale" | "missing", ageDays: number | null): string {
-  if (freshness === "missing") return ageDays !== null ? `Last report ${ageDays}d ago — stale` : "No daily ops report found";
-  if (freshness === "fresh")   return ageDays === 0 ? "Today's report uploaded" : "Yesterday's report available";
-  if (freshness === "aging")   return `Report ${ageDays}d old — update recommended`;
-  return `Report ${ageDays}d old — requires update`;
-}
-
 // ── Main function ─────────────────────────────────────────────────────────────
 
 /**
@@ -359,15 +317,7 @@ export async function getOperatingScore(
   const todayStr = new Date().toISOString().slice(0, 10);
 
   // ── Fetch all data sources in parallel ────────────────────────────────────
-  const [opsResult, complianceResult, maintenanceResult, foodCostResult] = await Promise.all([
-
-    // Latest daily operations report (sales + labour)
-    supabase
-      .from("daily_operations_reports")
-      .select("report_date, sales_net_vat, labor_cost_percent")
-      .order("report_date", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+  const [complianceResult, maintenanceResult, foodCostResult] = await Promise.all([
 
     // Compliance items — live status recomputed from date fields
     supabase
@@ -392,11 +342,7 @@ export async function getOperatingScore(
       .catch(() => ({ data: null, error: null })),
   ]);
 
-  // ── Parse ops report ──────────────────────────────────────────────────────
-  const opsReport  = opsResult.data as { report_date: string; sales_net_vat: number | null; labor_cost_percent: number | null } | null;
-  const labourPct   = opsReport?.labor_cost_percent ?? null;
-
-  // ── Resolve revenue: prefer salesOverride (MICROS/manual) over CSV ────────
+  // ── Resolve revenue: prefer salesOverride (MICROS/manual) ────────────────
   let actualSales: number | null;
   let targetSales: number | null;
   let dataDate: string | null;
@@ -406,26 +352,26 @@ export async function getOperatingScore(
     targetSales = salesOverride.targetSales;
     dataDate    = salesOverride.dataDate;
   } else {
-    actualSales = opsReport?.sales_net_vat  ?? null;
-    dataDate    = opsReport?.report_date    ?? null;
-
+    actualSales = null;
+    dataDate    = null;
     targetSales = null;
-    if (dataDate) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data: targetData } = await (supabase.from("sales_targets") as any)
-        .select("target_sales")
-        .eq("organization_id", DEFAULT_ORG_ID)
-        .eq("target_date", dataDate)
-        .maybeSingle();
-      targetSales = (targetData?.target_sales as number | null) ?? null;
-    }
   }
 
-  // ── Score revenue (20 pts) ────────────────────────────────────────────────
+  if (!targetSales && dataDate) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: targetData } = await (supabase.from("sales_targets") as any)
+      .select("target_sales")
+      .eq("organization_id", DEFAULT_ORG_ID)
+      .eq("target_date", dataDate)
+      .maybeSingle();
+    targetSales = (targetData?.target_sales as number | null) ?? null;
+  }
+
+  // ── Score revenue (25 pts) ────────────────────────────────────────────────
   const { score: revenueScore, gap_pct } = scoreRevenue(actualSales, targetSales);
   const revenueComponent: RevenueComponent = {
     score:     revenueScore,
-    max:       20,
+    max:       25,
     actual:    actualSales,
     target:    targetSales,
     gap_pct,
@@ -433,12 +379,12 @@ export async function getOperatingScore(
     detail:    revenueDetail(revenueScore, gap_pct, actualSales, targetSales),
   };
 
-  // ── Score labour (20 pts) — prefer live MICROS over CSV ────────────────────
-  const liveLabourPct = labourOverride?.labourPct ?? labourPct;
+  // ── Score labour (25 pts) — prefer live MICROS ────────────────────────────
+  const liveLabourPct = labourOverride?.labourPct ?? null;
   const labourScore = scoreLabour(liveLabourPct);
   const labourComponent: LabourComponent = {
     score:      labourScore,
-    max:        20,
+    max:        25,
     labour_pct: liveLabourPct,
     detail:     labourDetail(labourScore, liveLabourPct),
   };
@@ -493,19 +439,6 @@ export async function getOperatingScore(
     detail:         maintenanceDetail(maintScore, severity, openIssues.length, criticalCount),
   };
 
-  // ── Score daily ops freshness (10 pts) ────────────────────────────────────
-  const { score: opsScore, age_days, freshness } = scoreDailyOps(
-    opsReport?.report_date ?? null,
-    todayStr,
-  );
-  const dailyOpsComponent: DailyOpsComponent = {
-    score:           opsScore,
-    max:             10,
-    report_age_days: age_days,
-    freshness,
-    detail:          dailyOpsDetail(freshness, age_days),
-  };
-
   // ── Score inventory risk (10 pts) ─────────────────────────────────────────
   const invData = inventoryOverride ?? { riskScore: 7, criticalCount: 0, lowCount: 0, healthyCount: 0, totalItems: 0, noPOCount: 0 };
   const inventoryScore = invData.riskScore;
@@ -526,7 +459,7 @@ export async function getOperatingScore(
   };
 
   // ── Total ─────────────────────────────────────────────────────────────────
-  const total = revenueScore + labourScore + foodCostScore + complianceScore + inventoryScore + maintScore + opsScore;
+  const total = revenueScore + labourScore + foodCostScore + complianceScore + inventoryScore + maintScore;
 
   return {
     total,
@@ -539,7 +472,6 @@ export async function getOperatingScore(
       compliance:     complianceComponent,
       inventory_risk: inventoryRiskComponent,
       maintenance:    maintenanceComponent,
-      daily_ops:      dailyOpsComponent,
     },
     computed_at: new Date().toISOString(),
   };

@@ -10,7 +10,6 @@ import { cn, formatCurrency } from "@/lib/utils";
 import type {
   TodayBookingsSummary,
   VenueEvent,
-  DailyOperationsDashboardSummary,
   MaintenanceSummary,
   RevenueForecast,
 } from "@/types";
@@ -18,7 +17,6 @@ import type {
 interface Props {
   today:       TodayBookingsSummary;
   events:      VenueEvent[];
-  dailyOps:    DailyOperationsDashboardSummary;
   maintenance: MaintenanceSummary;
   date:        string; // YYYY-MM-DD
   forecast?:   RevenueForecast | null;
@@ -56,13 +54,11 @@ function Row({
 export default function TodayOpsPanel({
   today,
   events,
-  dailyOps,
   maintenance,
   date,
   forecast,
 }: Props) {
   const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
-  const report     = dailyOps.latestReport;
 
   // Split bookings by service period
   const lunchBkgs  = today.bookings.filter((b) => {
@@ -76,7 +72,7 @@ export default function TodayOpsPanel({
   const lunchCovers  = lunchBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
   const dinnerCovers = dinnerBkgs.reduce((s, b) => s + (b.guest_count ?? 0), 0);
 
-  const laborPct   = report?.labor_cost_percent ?? null;
+  const laborPct   = null as number | null;
   const laborColor =
     laborPct == null   ? "text-stone-400" :
     laborPct > 45      ? "text-red-600"   :

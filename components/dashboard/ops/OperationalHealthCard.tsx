@@ -19,7 +19,6 @@ import type {
   MaintenanceSummary,
   RevenueForecast,
   SevenDayReviewSummary,
-  DailyOperationsDashboardSummary,
 } from "@/types";
 import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 
@@ -28,7 +27,6 @@ interface Props {
   maintenance:  MaintenanceSummary;
   forecast:     RevenueForecast | null;
   reviews:      SevenDayReviewSummary;
-  dailyOps:     DailyOperationsDashboardSummary;
   salesSnapshot?: NormalizedSalesSnapshot | null;
   microsStatus?: {
     minutesSinceSync:    number | null;
@@ -47,7 +45,6 @@ export default function OperationalHealthCard({
   maintenance,
   forecast,
   reviews,
-  dailyOps,
   salesSnapshot,
   microsStatus,
   freshness,
@@ -56,7 +53,6 @@ export default function OperationalHealthCard({
     compliance,
     maintenance,
     forecast,
-    dailyOps,
     reviews,
   });
 
@@ -123,7 +119,7 @@ export default function OperationalHealthCard({
 
   const hasForecast = !!forecast;
   const hasTarget   = forecast?.target_sales != null;
-  const hasOpsData  = !!dailyOps.latestReport;
+  const hasOpsData  = false;
   const isAutoTarget = forecast?.target_source === "auto";
 
   // Revenue bar: three states — no forecast, no target (and no auto-derivable), scored

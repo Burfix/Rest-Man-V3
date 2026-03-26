@@ -16,7 +16,6 @@ import { getSevenDayReviewSummary } from "@/services/ops/reviewsSummary";
 import { getLatestSalesSummary } from "@/services/ops/salesSummary";
 import { getMaintenanceSummary } from "@/services/ops/maintenanceSummary";
 import { getUpcomingEvents } from "@/services/ops/eventsSummary";
-import { getDailyOperationsDashboardSummary } from "@/services/ops/dailyOperationsSummary";
 import { getDataFreshnessSummary } from "@/services/ops/dataFreshness";
 import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
@@ -47,7 +46,6 @@ import type {
   SalesSummary,
   MaintenanceSummary,
   VenueEvent,
-  DailyOperationsDashboardSummary,
   RevenueForecast,
   ComplianceSummary,
 } from "@/types";
@@ -90,12 +88,6 @@ const EMPTY_REVIEWS: SevenDayReviewSummary = {
 
 const EMPTY_SALES: SalesSummary = { upload: null, topItems: [], bottomItems: [] };
 
-const EMPTY_DAILY_OPS: DailyOperationsDashboardSummary = {
-  latestReport: null,
-  reportDate: null,
-  uploadedAt: null,
-};
-
 const EMPTY_COMPLIANCE: ComplianceSummary = {
   total: 0,
   compliant: 0,
@@ -134,7 +126,6 @@ export default async function OperationsDashboard() {
     salesResult,
     maintenanceResult,
     eventsResult,
-    dailyOpsResult,
     freshnessResult,
     forecastResult,
     complianceResult,
@@ -147,7 +138,6 @@ export default async function OperationsDashboard() {
     getLatestSalesSummary(),
     getMaintenanceSummary(),
     getUpcomingEvents(),
-    getDailyOperationsDashboardSummary(),
     getDataFreshnessSummary(),
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
@@ -160,7 +150,6 @@ export default async function OperationsDashboard() {
   const { value: reviews }                           = settled(reviewsResult, EMPTY_REVIEWS);
   const { value: maintenance }                       = settled(maintenanceResult, EMPTY_MAINTENANCE);
   const { value: events }                            = settled(eventsResult, [] as VenueEvent[]);
-  const { value: dailyOps }                          = settled(dailyOpsResult, EMPTY_DAILY_OPS);
   const { value: freshness }                         = settled(freshnessResult, null);
   const { value: forecast }                          = settled(forecastResult, null as RevenueForecast | null);
   const { value: complianceSummary }                 = settled(complianceResult, EMPTY_COMPLIANCE);
@@ -209,14 +198,10 @@ export default async function OperationsDashboard() {
   const inventoryAgeMinutes = inventoryIntel?.lastSynced
     ? Math.round((now - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
     : undefined;
-  const dailyOpsAgeDays = dailyOps.reportDate
-    ? Math.round((now - new Date(dailyOps.reportDate).getTime()) / 86_400_000)
-    : undefined;
 
-  // ─── Labour % ────────────────────────────────────────────────────────────
+  // ─── Labour % ────────────────────────────────────────────────────────────────────
   const labourPct = labourSummary?.labourPercentOfSales
     ?? salesSnapshot.labourCostPercent
-    ?? dailyOps.latestReport?.labor_cost_percent
     ?? 0;
 
   // ─── Decision Engine — single evaluation pass ───────────────────────────
@@ -280,7 +265,6 @@ export default async function OperationsDashboard() {
       salesAgeMinutes,
       labourAgeMinutes,
       inventoryAgeMinutes,
-      dailyOpsAgeDays,
     },
   });
 

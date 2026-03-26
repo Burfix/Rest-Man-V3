@@ -482,11 +482,8 @@ export type AlertType =
   | "urgent_repair"
   | "no_sales_upload"
   | "large_booking"
-  | "no_daily_ops_report"
-  | "high_labor_cost"
-  | "low_margin"
-  | "negative_cash_due"
-  | "low_operating_margin";
+  | "no_sales_upload"
+  | "large_booking";
 
 export interface PriorityAlert {
   type: AlertType;
@@ -494,117 +491,6 @@ export interface PriorityAlert {
   summary: string;
   href: string;
   count?: number;
-}
-
-// ============================================================
-// Daily Operations Report
-// ============================================================
-
-export interface DailyOperationsReport {
-  id: string;
-  report_date: string;           // YYYY-MM-DD
-  source_file_name: string | null;
-
-  // top-line KPIs
-  sales_net_vat: number | null;
-  margin_percent: number | null;
-  cogs_percent: number | null;
-  labor_cost_percent: number | null;
-  guest_count: number | null;
-  check_count: number | null;
-
-  // financial control
-  gross_sales_before_discounts: number | null;
-  total_discounts: number | null;
-  gross_sales_after_discounts: number | null;
-  tax_collected: number | null;
-  service_charges: number | null;
-  non_revenue_total: number | null;
-
-  // cost / margin
-  cost_of_goods_sold: number | null;
-  labor_cost: number | null;
-  operating_margin: number | null;
-
-  // exceptions
-  returns_count: number | null;
-  returns_amount: number | null;
-  voids_count: number | null;
-  voids_amount: number | null;
-  manager_voids_count: number | null;
-  manager_voids_amount: number | null;
-  error_corrects_count: number | null;
-  error_corrects_amount: number | null;
-  cancels_count: number | null;
-  cancels_amount: number | null;
-
-  // service performance
-  guests_average_spend: number | null;
-  checks_average_spend: number | null;
-  table_turns_count: number | null;
-  table_turns_average_spend: number | null;
-  average_dining_time_hours: number | null;
-
-  // tips & cash
-  direct_charged_tips: number | null;
-  direct_cash_tips: number | null;
-  indirect_tips: number | null;
-  total_tips: number | null;
-  tips_paid: number | null;
-  cash_in: number | null;
-  paid_in: number | null;
-  paid_out: number | null;
-  cash_due: number | null;
-  deposits: number | null;
-  over_short: number | null;
-
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DailyOperationsLabor {
-  id: string;
-  daily_report_id: string;
-  job_code_name: string;
-  regular_hours: number | null;
-  overtime_hours: number | null;
-  total_hours: number | null;
-  regular_pay: number | null;
-  overtime_pay: number | null;
-  total_pay: number | null;
-  labor_cost_percent: number | null;
-  created_at: string;
-}
-
-export interface DailyOperationsRevenueCenter {
-  id: string;
-  daily_report_id: string;
-  revenue_center_name: string;
-  sales_net_vat: number | null;
-  percent_of_total_sales: number | null;
-  guests: number | null;
-  percent_of_total_guests: number | null;
-  average_spend_per_guest: number | null;
-  checks: number | null;
-  percent_of_total_checks: number | null;
-  average_spend_per_check: number | null;
-  table_turns: number | null;
-  percent_of_total_table_turns: number | null;
-  average_spend_per_table_turn: number | null;
-  average_turn_time: number | null;
-  created_at: string;
-}
-
-export interface DailyOperationsDetail {
-  report: DailyOperationsReport;
-  laborRows: DailyOperationsLabor[];
-  revenueCenters: DailyOperationsRevenueCenter[];
-}
-
-export interface DailyOperationsDashboardSummary {
-  latestReport: DailyOperationsReport | null;
-  reportDate: string | null;
-  uploadedAt: string | null;
 }
 
 // ============================================================

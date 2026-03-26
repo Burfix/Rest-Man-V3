@@ -13,7 +13,6 @@ import type {
   TodayBookingsSummary,
   VenueEvent,
   RevenueForecast,
-  DailyOperationsDashboardSummary,
 } from "@/types";
 import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
 
@@ -21,7 +20,6 @@ interface Props {
   today:          TodayBookingsSummary;
   events:         VenueEvent[];
   forecast:       RevenueForecast | null;
-  dailyOps:       DailyOperationsDashboardSummary;
   date:           string;
   servicePeriod:  string;
   salesSnapshot?: NormalizedSalesSnapshot | null;
@@ -37,7 +35,6 @@ export default function ServiceBriefCard({
   today,
   events,
   forecast,
-  dailyOps,
   date,
   servicePeriod,
   salesSnapshot,
@@ -75,7 +72,7 @@ export default function ServiceBriefCard({
 
   const topRec    = (forecast?.recommendations ?? [])[0] ?? null;
   const recCount  = (forecast?.recommendations ?? []).length;
-  const laborPct  = dailyOps.latestReport?.labor_cost_percent ?? null;
+  const laborPct  = null as number | null;
 
   const isWalkInCritical =
     (lunchBkgs.length === 0 || dinnerBkgs.length === 0) ||

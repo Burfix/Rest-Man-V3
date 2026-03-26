@@ -12,28 +12,26 @@ import Link from "next/link";
 import { cn, formatCurrency } from "@/lib/utils";
 import type {
   RevenueForecast,
-  DailyOperationsDashboardSummary,
   TodayBookingsSummary,
   VenueEvent,
 } from "@/types";
 
 interface Props {
   forecast:  RevenueForecast | null;
-  dailyOps:  DailyOperationsDashboardSummary;
   today:     TodayBookingsSummary;
   events:    VenueEvent[];
   date:      string; // YYYY-MM-DD
 }
 
-export default function OperatingContextRow({ forecast, dailyOps, today, events, date }: Props) {
+export default function OperatingContextRow({ forecast, today, events, date }: Props) {
   return (
     <div>
       <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-stone-400">
         Today&apos;s Operating Context
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <RevenueContextCard  forecast={forecast} dailyOps={dailyOps} />
-        <StaffingCard        dailyOps={dailyOps} />
+        <RevenueContextCard  forecast={forecast} />
+        <StaffingCard />
         <BookingsCard        today={today} />
         <EventsContextCard   events={events} date={date} />
       </div>
@@ -45,15 +43,12 @@ export default function OperatingContextRow({ forecast, dailyOps, today, events,
 
 function RevenueContextCard({
   forecast,
-  dailyOps,
 }: {
   forecast: RevenueForecast | null;
-  dailyOps: DailyOperationsDashboardSummary;
 }) {
-  const report    = dailyOps.latestReport;
-  const avgSpend  = report?.guests_average_spend ?? report?.checks_average_spend ?? null;
-  const margin    = report?.margin_percent ?? null;
-  const hasActual = report !== null;
+  const avgSpend  = null as number | null;
+  const margin    = null as number | null;
+  const hasActual = false;
 
   return (
     <ContextCard icon="💰" title="Revenue" href="/dashboard/settings/targets">
@@ -93,9 +88,8 @@ function RevenueContextCard({
 
 // ── Staffing ────────────────────────────────────────────────────────────────────
 
-function StaffingCard({ dailyOps }: { dailyOps: DailyOperationsDashboardSummary }) {
-  const report     = dailyOps.latestReport;
-  const laborPct   = report?.labor_cost_percent ?? null;
+function StaffingCard() {
+  const laborPct   = null as number | null;
   const threshold  = 30; // typical restaurant labour threshold
 
   const isRed   = laborPct !== null && laborPct > threshold + 5;
@@ -121,17 +115,9 @@ function StaffingCard({ dailyOps }: { dailyOps: DailyOperationsDashboardSummary 
              isAmber ? "Near threshold" :
              isGood  ? `✓ Within target` : ""}
           </p>
-          {report?.labor_cost != null && (
-            <div className="mt-3 border-t border-stone-100 pt-3">
-              <MetaRow label="Labour R" value={formatCurrency(report.labor_cost)} />
-              {report.guest_count != null && (
-                <MetaRow label="Guests" value={report.guest_count.toString()} />
-              )}
-            </div>
-          )}
         </>
       ) : (
-        <NoData label="Upload daily ops" />
+        <NoData label="No labour data" />
       )}
     </ContextCard>
   );

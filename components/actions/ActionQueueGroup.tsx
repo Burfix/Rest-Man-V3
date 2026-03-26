@@ -33,7 +33,6 @@ const CATEGORY_LABEL: Record<string, string> = {
   stock: "Stock",
   maintenance: "Maintenance",
   compliance: "Compliance",
-  daily_ops: "Ops",
   service: "Service",
   general: "General",
 };

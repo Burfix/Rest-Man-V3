@@ -15,14 +15,12 @@ interface Props {
   hasEquipment: boolean;
   hasSales: boolean;
   hasReviews: boolean;
-  hasDailyOps: boolean;
 }
 
 export default function SetupProgressSection({
   hasEquipment,
   hasSales,
   hasReviews,
-  hasDailyOps,
 }: Props) {
   const items: SetupItem[] = [
     {
@@ -42,12 +40,6 @@ export default function SetupProgressSection({
       done: hasReviews,
       href: "/dashboard/reviews",
       cta: "Sync reviews",
-    },
-    {
-      label: "Daily operations report",
-      done: hasDailyOps,
-      href: "/dashboard/operations",
-      cta: "Upload Toast export",
     },
   ];
 

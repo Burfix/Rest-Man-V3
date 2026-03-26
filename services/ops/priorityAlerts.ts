@@ -10,14 +10,6 @@ import { SERVICE_CHARGE_THRESHOLD } from "@/lib/constants";
 
 const SEVERITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
-const DAILY_OPS_THRESHOLDS = {
-  LABOR_HIGH_PCT: 65,
-  MARGIN_LOW_PCT: 8,
-  OPERATING_MARGIN_LOW: 500,
-  CASH_DUE_ALERT: -2000,
-  STALE_REPORT_HOURS: 28,
-};
-
 export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
   const supabase = createServerClient();
   const today = todayISO();
@@ -32,7 +24,6 @@ export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
     urgentMaintResult,
     outOfServiceResult,
     latestUploadResult,
-    latestDailyOpsResult,
   ] = await Promise.all([
     // Today's escalations
     supabase
@@ -74,14 +65,6 @@ export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
       .from("sales_uploads")
       .select("id, uploaded_at")
       .order("uploaded_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-
-    // Latest daily operations report
-    supabase
-      .from("daily_operations_reports")
-      .select("id, report_date, labor_cost_percent, margin_percent, operating_margin, cash_due, created_at")
-      .order("report_date", { ascending: false })
       .limit(1)
       .maybeSingle(),
   ]);
@@ -148,7 +131,6 @@ export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
   }
 
   // — Sales data freshness —
-  // Compare uploaded_at (actual upload timestamp) to today to determine staleness.
   const latestUpload = latestUploadResult.data as
     | { id: string; uploaded_at: string }
     | null
@@ -162,7 +144,6 @@ export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
       href: "/dashboard/sales",
     });
   } else {
-    // Flag if the most recent upload was more than 8 days ago
     const todayMs = new Date(today + "T00:00:00").getTime();
     const uploadMs = new Date(latestUpload.uploaded_at).getTime();
     const diffDays = Math.floor((todayMs - uploadMs) / 86_400_000);
@@ -186,90 +167,6 @@ export async function getPriorityAlerts(): Promise<PriorityAlert[]> {
       href: "/dashboard/bookings",
       count: largeCount,
     });
-  }
-
-  // — Daily Operations alerts —
-  const latestDailyOps = latestDailyOpsResult.data as {
-    id: string;
-    report_date: string;
-    labor_cost_percent: number | null;
-    margin_percent: number | null;
-    operating_margin: number | null;
-    cash_due: number | null;
-    created_at: string;
-  } | null | undefined;
-
-  if (!latestDailyOps) {
-    alerts.push({
-      type: "no_daily_ops_report",
-      severity: "medium",
-      summary: "No daily operations report uploaded — upload today's Toast export",
-      href: "/dashboard/operations",
-    });
-  } else {
-    // Staleness check (28 hrs)
-    const reportAgeHrs =
-      (Date.now() - new Date(latestDailyOps.created_at).getTime()) / 3_600_000;
-    if (reportAgeHrs > DAILY_OPS_THRESHOLDS.STALE_REPORT_HOURS) {
-      alerts.push({
-        type: "no_daily_ops_report",
-        severity: "low",
-        summary: `Daily operations report may be outdated — last uploaded ${Math.floor(reportAgeHrs / 24)} day${Math.floor(reportAgeHrs / 24) !== 1 ? "s" : ""} ago`,
-        href: "/dashboard/operations",
-      });
-    }
-
-    // High labor
-    if (
-      latestDailyOps.labor_cost_percent != null &&
-      latestDailyOps.labor_cost_percent > DAILY_OPS_THRESHOLDS.LABOR_HIGH_PCT
-    ) {
-      alerts.push({
-        type: "high_labor_cost",
-        severity: "high",
-        summary: `Labor cost is elevated at ${latestDailyOps.labor_cost_percent.toFixed(1)}% (threshold: ${DAILY_OPS_THRESHOLDS.LABOR_HIGH_PCT}%)`,
-        href: `/dashboard/operations/${latestDailyOps.report_date}`,
-      });
-    }
-
-    // Low margin %
-    if (
-      latestDailyOps.margin_percent != null &&
-      latestDailyOps.margin_percent < DAILY_OPS_THRESHOLDS.MARGIN_LOW_PCT
-    ) {
-      alerts.push({
-        type: "low_margin",
-        severity: "high",
-        summary: `Operating margin is below target at ${latestDailyOps.margin_percent.toFixed(1)}% (threshold: ${DAILY_OPS_THRESHOLDS.MARGIN_LOW_PCT}%)`,
-        href: `/dashboard/operations/${latestDailyOps.report_date}`,
-      });
-    }
-
-    // Low absolute operating margin
-    if (
-      latestDailyOps.operating_margin != null &&
-      latestDailyOps.operating_margin < DAILY_OPS_THRESHOLDS.OPERATING_MARGIN_LOW
-    ) {
-      alerts.push({
-        type: "low_operating_margin",
-        severity: "medium",
-        summary: `Operating margin is only R${latestDailyOps.operating_margin.toFixed(2)} — below R${DAILY_OPS_THRESHOLDS.OPERATING_MARGIN_LOW} target`,
-        href: `/dashboard/operations/${latestDailyOps.report_date}`,
-      });
-    }
-
-    // Cash due alert (deeply negative = unusual payout)
-    if (
-      latestDailyOps.cash_due != null &&
-      latestDailyOps.cash_due < DAILY_OPS_THRESHOLDS.CASH_DUE_ALERT
-    ) {
-      alerts.push({
-        type: "negative_cash_due",
-        severity: "medium",
-        summary: `Cash due is unusually negative (R${latestDailyOps.cash_due.toFixed(2)}) — review required`,
-        href: `/dashboard/operations/${latestDailyOps.report_date}`,
-      });
-    }
   }
 
   return alerts.sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);

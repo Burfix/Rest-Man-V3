@@ -11,7 +11,6 @@ export type ActionCategory =
   | "stock"
   | "maintenance"
   | "compliance"
-  | "daily_ops"
   | "service"
   | "general";
 
@@ -79,7 +78,6 @@ export const CATEGORY_CONFIG: Record<ActionCategory, { label: string; icon: stri
   stock:       { label: "Stock",       icon: "📦", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 ring-amber-200 dark:ring-amber-800" },
   maintenance: { label: "Maintenance", icon: "🔧", color: "text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-950/30 ring-slate-200 dark:ring-slate-800" },
   compliance:  { label: "Compliance",  icon: "📋", color: "text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 ring-rose-200 dark:ring-rose-800" },
-  daily_ops:   { label: "Daily Ops",   icon: "📊", color: "text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 ring-violet-200 dark:ring-violet-800" },
   service:     { label: "Service",     icon: "🛎️", color: "text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/30 ring-sky-200 dark:ring-sky-800" },
   general:     { label: "General",     icon: "📌", color: "text-stone-600 dark:text-stone-400 bg-stone-50 dark:bg-stone-800 ring-stone-200 dark:ring-stone-700" },
 };
