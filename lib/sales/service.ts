@@ -19,7 +19,6 @@ import type { NormalizedSalesSnapshot, SalesDataSource } from "./types";
 import {
   classifyFreshness,
   freshnessSourceLabel,
-  FRESHNESS_STALE_MAX_MINUTES,
 } from "./freshness";
 
 // ── Manual upload row shape ─────────────────────────────────────────────────
@@ -237,15 +236,11 @@ export async function getCurrentSalesSnapshot(
   bookingsToday: number | null,
   bookedCoversToday: number | null,
 ): Promise<NormalizedSalesSnapshot> {
-  // 1. Try MICROS live data
+  // 1. Try MICROS live data — use it for today regardless of sync age
   if (microsStatus?.latestDailySales) {
     const daily = microsStatus.latestDailySales;
     const mins = microsStatus.minutesSinceSync;
-    if (
-      daily.business_date === businessDate &&
-      mins != null &&
-      mins <= FRESHNESS_STALE_MAX_MINUTES
-    ) {
+    if (daily.business_date === businessDate) {
       return buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
     }
   }

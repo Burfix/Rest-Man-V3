@@ -1,16 +1,16 @@
 /**
  * lib/sales/freshness.ts — Freshness policy for sales data
  *
- * Thresholds:
+ * Thresholds (for UI indicator only — does NOT gate data visibility):
  *   LIVE    = data updated ≤ 20 minutes ago
- *   STALE   = data updated 21–60 minutes ago
- *   OFFLINE = no data or last update > 60 minutes ago
+ *   STALE   = data updated 21–120 minutes ago
+ *   OFFLINE = no data or last update > 120 minutes ago
  */
 
 import type { SalesFreshnessState } from "./types";
 
 export const FRESHNESS_LIVE_MAX_MINUTES = 20;
-export const FRESHNESS_STALE_MAX_MINUTES = 60;
+export const FRESHNESS_STALE_MAX_MINUTES = 120;
 
 export function classifyFreshness(minutesSinceUpdate: number | null): SalesFreshnessState {
   if (minutesSinceUpdate == null) return "offline";
