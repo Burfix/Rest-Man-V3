@@ -8,6 +8,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { MicrosApiClient } from "@/lib/micros/client";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
+import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
 import { getMicrosConnection } from "@/services/micros/status";
 import { aggregateGuestChecksToDailySales } from "./normalize";
 import { todayISO } from "@/lib/utils";
@@ -35,6 +36,25 @@ export class MicrosSyncService {
     }
 
     const supabase = createServerClient();
+
+    // ── Seed in-memory token cache from DB (survives cold-starts) ───────
+    try {
+      const { data: tokenRow } = await supabase
+        .from("micros_connections")
+        .select("access_token, token_expires_at")
+        .eq("id", connection.id)
+        .maybeSingle();
+
+      if (tokenRow?.access_token && tokenRow?.token_expires_at) {
+        const expiresAt = new Date(tokenRow.token_expires_at).getTime();
+        if (expiresAt > Date.now()) {
+          seedMicrosTokenCache(tokenRow.access_token, expiresAt);
+        }
+      }
+    } catch {
+      // Non-fatal — will fall back to full PKCE auth
+    }
+
     const syncRunId = crypto.randomUUID();
 
     // Log sync start
@@ -116,8 +136,9 @@ export class MicrosSyncService {
         })
         .eq("id", syncRunId);
 
-      // Update connection status
+      // Update connection status + persist token for cold-start resilience
       const now = new Date().toISOString();
+      const tokenInfo = getCachedMicrosToken();
       await supabase
         .from("micros_connections")
         .update({
@@ -125,6 +146,10 @@ export class MicrosSyncService {
           last_sync_at: now,
           last_successful_sync_at: now,
           last_sync_error: null,
+          ...(tokenInfo ? {
+            access_token: tokenInfo.idToken,
+            token_expires_at: new Date(tokenInfo.expiresAt).toISOString(),
+          } : {}),
         })
         .eq("id", connection.id);
 

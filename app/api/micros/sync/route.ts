@@ -30,19 +30,25 @@ export async function POST(req: NextRequest) {
     date = body.date;
   } catch { /* no body is fine */ }
 
-  const svc = new MicrosSyncService();
-  const result = await svc.runFullSync(date ?? todayISO());
+  try {
+    const svc = new MicrosSyncService();
+    const result = await svc.runFullSync(date ?? todayISO());
 
-  logger.info("MICROS sync completed", { route: "POST /api/micros/sync", success: result.success });
-  return NextResponse.json({
-    ok: result.success,
-    message: result.message,
-    businessDate: result.businessDate,
-    recordsSynced: result.recordsSynced,
-    errors: result.errors ?? [],
-    source: "manual",
-    checkedAt: new Date().toISOString(),
-  });
+    logger.info("MICROS sync completed", { route: "POST /api/micros/sync", success: result.success });
+    return NextResponse.json({
+      ok: result.success,
+      message: result.message,
+      businessDate: result.businessDate,
+      recordsSynced: result.recordsSynced,
+      errors: result.errors ?? [],
+      source: "manual",
+      checkedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("MICROS sync crashed", { route: "POST /api/micros/sync", err });
+    return NextResponse.json({ ok: false, message: msg, errors: [msg], source: "manual" }, { status: 500 });
+  }
 }
 
 /** Vercel Cron sends GET requests, protected by CRON_SECRET. */
@@ -57,14 +63,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "MICROS not configured" });
   }
 
-  const svc = new MicrosSyncService();
-  const result = await svc.runFullSync(todayISO());
+  try {
+    const svc = new MicrosSyncService();
+    const result = await svc.runFullSync(todayISO());
 
-  return NextResponse.json({
-    ok: result.success,
-    message: result.message,
-    businessDate: result.businessDate,
-    recordsSynced: result.recordsSynced,
-    source: "cron",
-  });
+    return NextResponse.json({
+      ok: result.success,
+      message: result.message,
+      businessDate: result.businessDate,
+      recordsSynced: result.recordsSynced,
+      source: "cron",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("MICROS cron sync crashed", { route: "GET /api/micros/sync", err });
+    return NextResponse.json({ ok: false, message: msg, source: "cron" }, { status: 500 });
+  }
 }

@@ -111,6 +111,29 @@ export function clearMicrosTokenCache(): void {
   cachedTokens = null;
 }
 
+/**
+ * Seed the in-memory cache with a token loaded from the database.
+ * Call this before `getMicrosIdToken()` to avoid a full PKCE flow
+ * on serverless cold-starts.
+ */
+export function seedMicrosTokenCache(idToken: string, expiresAt: number): void {
+  cachedTokens = {
+    idToken,
+    accessToken: "",
+    refreshToken: "",
+    expiresAt,
+  };
+}
+
+/**
+ * Returns the current cached id_token + expiry so the caller can
+ * persist it to the database after a successful sync.
+ */
+export function getCachedMicrosToken(): { idToken: string; expiresAt: number } | null {
+  if (!cachedTokens) return null;
+  return { idToken: cachedTokens.idToken, expiresAt: cachedTokens.expiresAt };
+}
+
 export function getMicrosTokenStatus() {
   return {
     valid: !!cachedTokens && cachedTokens.expiresAt > Date.now(),
