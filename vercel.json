@@ -8,6 +8,10 @@
     {
       "path": "/api/micros/sync",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/reports/weekly",
+      "schedule": "0 6 * * 1"
     }
   ]
 }

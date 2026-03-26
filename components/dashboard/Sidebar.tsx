@@ -25,6 +25,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard",             label: "Command Center", icon: "⚡" },
       { href: "/dashboard/head-office", label: "Head Office",    icon: "🏢" },
+      { href: "/dashboard/head-office/reports", label: "Weekly Report", icon: "📊" },
       { href: "/dashboard/forecast",    label: "GM Co-Pilot",    icon: "🧭" },
       { href: "/dashboard/actions",     label: "Actions",        icon: "✅" },
     ],
