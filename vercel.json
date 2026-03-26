@@ -10,6 +10,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/micros/labour-sync",
+      "schedule": "5 4 * * *"
+    },
+    {
       "path": "/api/reports/weekly",
       "schedule": "0 6 * * 1"
     }

@@ -195,8 +195,8 @@ export async function syncMicrosInventory(
   logger.info("Inventory sync starting", logMeta);
   const startMs = Date.now();
 
-  // 1. Write sync batch record
-  await (supabase as any).from("inventory_sync_batches").insert({
+  // 1. Write sync batch record (non-fatal if table doesn't exist yet)
+  const { error: batchErr } = await (supabase as any).from("inventory_sync_batches").insert({
     id: batchId,
     site_id: siteId,
     started_at: syncedAt,
@@ -209,6 +209,7 @@ export async function syncMicrosInventory(
     updated_count: 0,
     failed_count: 0,
   });
+  const hasBatchTable = !batchErr;
 
   try {
     // 2. Load site-specific MICROS connection config

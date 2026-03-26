@@ -19,6 +19,7 @@ export const runtime = "nodejs";
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
+  try {
   const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "POST /api/micros/labour-sync");
   if (guard.error) return guard.error;
 
@@ -57,10 +58,15 @@ export async function POST(req: NextRequest) {
     errors: result.errors ?? [],
     checkedAt: new Date().toISOString(),
   });
+  } catch (err) {
+    logger.error("Labour sync route crash", { err });
+    return NextResponse.json({ ok: false, message: "Labour sync crashed — see logs" }, { status: 500 });
+  }
 }
 
 /** Vercel Cron sends GET requests, protected by CRON_SECRET. */
 export async function GET(req: NextRequest) {
+  try {
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret || req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -81,4 +87,8 @@ export async function GET(req: NextRequest) {
     timecardsUpserted: result.timecardsUpserted ?? 0,
     source: "cron",
   });
+  } catch (err) {
+    logger.error("Labour sync cron crash", { err });
+    return NextResponse.json({ ok: false, message: "Labour cron failed" }, { status: 500 });
+  }
 }

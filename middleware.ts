@@ -21,6 +21,9 @@ const PUBLIC_API_PREFIXES = [
   "/api/actions/daily-reset",
   "/api/compliance/status",
   "/api/micros/sync",
+  "/api/micros/labour-sync",
+  "/api/micros/inventory-sync",
+  "/api/reports/weekly",
 ];
 
 function isPublicApi(pathname: string): boolean {

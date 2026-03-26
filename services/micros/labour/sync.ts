@@ -13,6 +13,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
+import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
 import { todayISO } from "@/lib/utils";
 import { getTimeCardDetails, getJobCodeDimensions } from "./client";
 import { normalizeTimecards, normalizeJobCodes } from "./normalize";
@@ -189,6 +190,21 @@ export async function runLabourFullSync(
   const businessDate = date ?? todayISO();
   const errors: string[] = [];
 
+  // Seed in-memory token cache from DB to avoid PKCE on cold-starts
+  try {
+    const sb = createServerClient();
+    const { data: tokenRow } = await sb
+      .from("micros_connections")
+      .select("id, access_token, token_expires_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (tokenRow?.access_token && tokenRow?.token_expires_at) {
+      const expiresAt = new Date(tokenRow.token_expires_at).getTime();
+      if (expiresAt > Date.now()) seedMicrosTokenCache(tokenRow.access_token, expiresAt);
+    }
+  } catch { /* non-fatal */ }
+
   try {
     // 1. Sync job codes
     let jobCodeCount = 0;
@@ -252,6 +268,21 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
   const locRef = cfg.locRef;
   const errors: string[] = [];
+
+  // Seed in-memory token cache from DB (same as full sync)
+  try {
+    const sb = createServerClient();
+    const { data: tokenRow } = await sb
+      .from("micros_connections")
+      .select("id, access_token, token_expires_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (tokenRow?.access_token && tokenRow?.token_expires_at) {
+      const expiresAt = new Date(tokenRow.token_expires_at).getTime();
+      if (expiresAt > Date.now()) seedMicrosTokenCache(tokenRow.access_token, expiresAt);
+    }
+  } catch { /* non-fatal */ }
 
   try {
     const state = await getSyncState(locRef);

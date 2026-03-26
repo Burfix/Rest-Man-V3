@@ -46,7 +46,10 @@ export async function getTimeCardDetails(
 
   const body: Record<string, string> = { locRef };
 
+  // Oracle requires at least busDt or postedDt — always include busDt as
+  // fallback so delta syncs using changedSinceUTC don't fail with HTTP 400.
   if (params.busDt) body.busDt = params.busDt;
+  else if (!params.postedDt) body.busDt = new Date().toISOString().split("T")[0];
   if (params.postedDt) body.postedDt = params.postedDt;
   if (params.changedSinceUTC) body.changedSinceUTC = params.changedSinceUTC;
 
