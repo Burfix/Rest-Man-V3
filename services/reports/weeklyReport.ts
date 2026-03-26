@@ -90,11 +90,12 @@ function fmt(d: string): string { return d; } // date passthrough
 
 interface SiteRow { id: string; name: string; city: string | null; }
 
-async function getActiveSites(): Promise<SiteRow[]> {
+async function getActiveSites(orgId: string): Promise<SiteRow[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("sites")
     .select("id, name, city")
+    .eq("organisation_id", orgId)
     .eq("is_active", true)
     .order("name");
   if (error) throw new Error(`[WeeklyReport] sites: ${error.message}`);
@@ -196,16 +197,18 @@ function extractImpactValue(action: ActionRow): number | null {
 export async function getWeeklyPerformance(
   orgId: string,
   weekRange: WeekRange,
+  _sites?: SiteRow[],
 ): Promise<WeeklyPerformance> {
-  const sites = await getActiveSites();
+  const sites = _sites ?? await getActiveSites(orgId);
   const siteIds = sites.map((s) => s.id);
   if (siteIds.length === 0) {
     return emptyPerformance(weekRange);
   }
 
+  const prev = prevWeekRange(weekRange);
   const [snapshots, prevSnapshots, actions] = await Promise.all([
     getSnapshotsForWeek(siteIds, weekRange),
-    getSnapshotsForWeek(siteIds, prevWeekRange(weekRange)),
+    getSnapshotsForWeek(siteIds, prev),
     getActionsForWeek(siteIds, weekRange),
   ]);
 
@@ -242,6 +245,7 @@ export async function getWeeklyPerformance(
   const { data: opsRows } = await supabase
     .from("daily_operations_reports" as any)
     .select("guests_average_spend, guest_count")
+    .in("site_id", siteIds)
     .gte("report_date", weekRange.start)
     .lte("report_date", weekRange.end);
   const ops = (opsRows ?? []) as any[];
@@ -252,14 +256,16 @@ export async function getWeeklyPerformance(
   const { data: prevOpsRows } = await supabase
     .from("daily_operations_reports" as any)
     .select("guests_average_spend")
-    .gte("report_date", prevWeekRange(weekRange).start)
-    .lte("report_date", prevWeekRange(weekRange).end);
+    .in("site_id", siteIds)
+    .gte("report_date", prev.start)
+    .lte("report_date", prev.end);
   const prevAvgSpend = avg(((prevOpsRows ?? []) as any[]).map((o) => o.guests_average_spend != null ? Number(o.guests_average_spend) : null));
 
   // Reviews avg rating for the week
   const { data: reviewRows } = await supabase
     .from("reviews")
     .select("rating")
+    .in("site_id", siteIds)
     .gte("review_date", weekRange.start)
     .lte("review_date", weekRange.end);
   const avgRating = avg(((reviewRows ?? []) as any[]).map((r) => Number(r.rating)));
@@ -312,8 +318,9 @@ function getLatestSnapshotPerSite(snapshots: SnapshotRow[]): Record<string, Snap
 export async function getStoreWeeklyRanking(
   orgId: string,
   weekRange: WeekRange,
+  _sites?: SiteRow[],
 ): Promise<StoreWeeklyRank[]> {
-  const sites = await getActiveSites();
+  const sites = _sites ?? await getActiveSites(orgId);
   const siteIds = sites.map((s) => s.id);
   if (siteIds.length === 0) return [];
 
@@ -387,8 +394,9 @@ export async function getStoreWeeklyRanking(
 export async function getGMWeeklyPerformance(
   orgId: string,
   weekRange: WeekRange,
+  _sites?: SiteRow[],
 ): Promise<GMWeeklyPerformance[]> {
-  const sites = await getActiveSites();
+  const sites = _sites ?? await getActiveSites(orgId);
   const siteIds = sites.map((s) => s.id);
   if (siteIds.length === 0) return [];
 
@@ -456,8 +464,9 @@ export async function getGMWeeklyPerformance(
 export async function getWeeklyImpactSummary(
   orgId: string,
   weekRange: WeekRange,
+  _sites?: SiteRow[],
 ): Promise<WeeklyImpactSummary> {
-  const sites = await getActiveSites();
+  const sites = _sites ?? await getActiveSites(orgId);
   const siteIds = sites.map((s) => s.id);
   const siteMap = Object.fromEntries(sites.map((s) => [s.id, s]));
 
@@ -534,31 +543,46 @@ export async function getWeeklyImpactSummary(
 export async function getWeeklyServiceInsights(
   orgId: string,
   weekRange: WeekRange,
+  _sites?: SiteRow[],
 ): Promise<ServiceInsights> {
   const supabase = createServerClient();
-  const sites = await getActiveSites();
+  const sites = _sites ?? await getActiveSites(orgId);
+  const siteIds = sites.map((s) => s.id);
   const prev = prevWeekRange(weekRange);
+
+  if (siteIds.length === 0) {
+    return {
+      avgSpend: null, avgSpendPrevWeek: null, avgSpendTrend: "flat",
+      totalCovers: null, coversPrevWeek: null,
+      avgRating: null, ratingPrevWeek: null, ratingTrend: "flat",
+      topPerformingStore: null, lowestPerformingStore: null,
+    };
+  }
 
   // Daily ops reports for avg spend + covers
   const [opsRes, prevOpsRes, reviewRes, prevReviewRes] = await Promise.all([
     supabase
       .from("daily_operations_reports" as any)
       .select("guests_average_spend, guest_count")
+      .in("site_id", siteIds)
       .gte("report_date", weekRange.start)
       .lte("report_date", weekRange.end),
     supabase
       .from("daily_operations_reports" as any)
       .select("guests_average_spend, guest_count")
+      .in("site_id", siteIds)
       .gte("report_date", prev.start)
       .lte("report_date", prev.end),
     supabase
       .from("reviews")
       .select("rating, site_id")
+      .in("site_id", siteIds)
       .gte("review_date", weekRange.start)
       .lte("review_date", weekRange.end),
     supabase
       .from("reviews")
       .select("rating")
+      .in("site_id", siteIds)
       .gte("review_date", prev.start)
       .lte("review_date", prev.end),
   ]);
@@ -745,12 +769,15 @@ export async function generateWeeklyReport(
 
   logger.info("[WeeklyReport] Generating report", { orgId, week: week.start });
 
+  // Fetch sites once and pass through to all aggregation functions
+  const sites = await getActiveSites(orgId);
+
   const [summary, storeRanking, gmPerformance, impactSummary, serviceInsights] = await Promise.all([
-    getWeeklyPerformance(orgId, week),
-    getStoreWeeklyRanking(orgId, week),
-    getGMWeeklyPerformance(orgId, week),
-    getWeeklyImpactSummary(orgId, week),
-    getWeeklyServiceInsights(orgId, week),
+    getWeeklyPerformance(orgId, week, sites),
+    getStoreWeeklyRanking(orgId, week, sites),
+    getGMWeeklyPerformance(orgId, week, sites),
+    getWeeklyImpactSummary(orgId, week, sites),
+    getWeeklyServiceInsights(orgId, week, sites),
   ]);
 
   const interventionList = buildInterventions(storeRanking, gmPerformance);

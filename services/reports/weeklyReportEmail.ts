@@ -50,11 +50,22 @@ function severityBg(severity: string): string {
   return "#44403c";
 }
 
+/** Escape user-provided strings for safe HTML interpolation. */
+function esc(text: string | null | undefined): string {
+  if (!text) return "";
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 // ── HTML Builder ───────────────────────────────────────────────────────────────
 
 export function buildWeeklyReportEmail(report: WeeklyReport): string {
   const { summary: s, storeRanking, gmPerformance, executionStats, impactSummary, serviceInsights, interventionList, nextWeekFocus, weekRange } = report;
-  const venueName = process.env.VENUE_NAME ?? "ForgeStack";
+  const venueName = esc(process.env.VENUE_NAME ?? "ForgeStack");
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -130,7 +141,7 @@ export function buildWeeklyReportEmail(report: WeeklyReport): string {
         ${storeRanking.map((store, i) => `
         <tr style="border-bottom:1px solid #292524;${i < 3 ? "background:#1a2e1a;" : store.avgExecutionScore != null && store.avgExecutionScore < 45 ? "background:#2e1a1a;" : ""}">
           <td style="padding:6px 8px;font-weight:700;color:#a8a29e;">${store.rank}</td>
-          <td style="padding:6px 8px;color:#fafaf9;font-weight:500;">${store.storeName}</td>
+          <td style="padding:6px 8px;color:#fafaf9;font-weight:500;">${esc(store.storeName)}</td>
           <td style="padding:6px 8px;text-align:right;font-weight:700;color:${gradeColor(gradeForScore(store.avgExecutionScore))};">${store.avgExecutionScore ?? "—"}</td>
           <td style="padding:6px 8px;text-align:right;color:#d6d3d1;">${money(store.totalRevenue)}</td>
           <td style="padding:6px 8px;text-align:right;color:#d6d3d1;">${pct(store.completionRate)}</td>
@@ -153,8 +164,8 @@ export function buildWeeklyReportEmail(report: WeeklyReport): string {
         </tr>
         ${gmPerformance.map((gm) => `
         <tr style="border-bottom:1px solid #292524;">
-          <td style="padding:6px 8px;color:#fafaf9;">${gm.gmName ?? "—"}</td>
-          <td style="padding:6px 8px;color:#a8a29e;">${gm.storeName}</td>
+          <td style="padding:6px 8px;color:#fafaf9;">${esc(gm.gmName) || "—"}</td>
+          <td style="padding:6px 8px;color:#a8a29e;">${esc(gm.storeName)}</td>
           <td style="padding:6px 8px;text-align:right;font-weight:700;color:${gradeColor(gradeForScore(gm.executionScore))};">${gm.executionScore ?? "—"}</td>
           <td style="padding:6px 8px;text-align:right;color:${(gm.scoreDelta ?? 0) > 0 ? "#22c55e" : (gm.scoreDelta ?? 0) < 0 ? "#ef4444" : "#a8a29e"};">${gm.scoreDelta != null ? (gm.scoreDelta > 0 ? "+" : "") + gm.scoreDelta : "—"}</td>
           <td style="padding:6px 8px;text-align:right;color:#d6d3d1;">${pct(gm.completionRate)}</td>
@@ -174,7 +185,7 @@ export function buildWeeklyReportEmail(report: WeeklyReport): string {
         <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
           ${impactSummary.byCategory.slice(0, 5).map((c) => `
           <span style="background:#44403c;border-radius:4px;padding:2px 8px;font-size:11px;color:#d6d3d1;">
-            ${c.category}: ${money(c.totalImpact)}
+            ${esc(c.category)}: ${money(c.totalImpact)}
           </span>`).join("")}
         </div>` : ""}
       </div>
@@ -210,8 +221,8 @@ export function buildWeeklyReportEmail(report: WeeklyReport): string {
       <h2 style="font-size:15px;font-weight:700;color:#fafaf9;margin:0 0 12px;">⚠ Interventions Required</h2>
       ${interventionList.slice(0, 8).map((item) => `
       <div style="background:${severityBg(item.severity)};border-radius:6px;padding:10px 12px;margin-bottom:6px;">
-        <div style="font-size:12px;font-weight:600;color:#fafaf9;">${item.store} — ${item.issue}</div>
-        <div style="font-size:11px;color:#d6d3d1;margin-top:2px;">→ ${item.recommendation}</div>
+        <div style="font-size:12px;font-weight:600;color:#fafaf9;">${esc(item.store)} — ${esc(item.issue)}</div>
+        <div style="font-size:11px;color:#d6d3d1;margin-top:2px;">→ ${esc(item.recommendation)}</div>
       </div>`).join("")}
     </div>` : ""}
 
@@ -221,8 +232,8 @@ export function buildWeeklyReportEmail(report: WeeklyReport): string {
       <h2 style="font-size:15px;font-weight:700;color:#fafaf9;margin:0 0 12px;">🎯 Next Week Focus</h2>
       ${nextWeekFocus.map((f, i) => `
       <div style="padding:8px 0;${i < nextWeekFocus.length - 1 ? "border-bottom:1px solid #292524;" : ""}">
-        <div style="font-size:12px;font-weight:600;color:#fafaf9;">${f.area}</div>
-        <div style="font-size:11px;color:#a8a29e;">${f.description}</div>
+        <div style="font-size:12px;font-weight:600;color:#fafaf9;">${esc(f.area)}</div>
+        <div style="font-size:11px;color:#a8a29e;">${esc(f.description)}</div>
       </div>`).join("")}
     </div>` : ""}
 

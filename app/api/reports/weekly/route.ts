@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
-import { generateWeeklyReport, getWeekRange } from "@/services/reports/weeklyReport";
+import { generateWeeklyReport } from "@/services/reports/weeklyReport";
 import { sendWeeklyReportEmail } from "@/services/reports/weeklyReportEmail";
 
 export const dynamic = "force-dynamic";
