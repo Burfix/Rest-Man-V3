@@ -115,12 +115,18 @@ export function clearMicrosTokenCache(): void {
  * Seed the in-memory cache with a token loaded from the database.
  * Call this before `getMicrosIdToken()` to avoid a full PKCE flow
  * on serverless cold-starts.
+ *
+ * Pass refreshToken when available — enables token refresh without full PKCE.
  */
-export function seedMicrosTokenCache(idToken: string, expiresAt: number): void {
+export function seedMicrosTokenCache(
+  idToken: string,
+  expiresAt: number,
+  refreshToken?: string,
+): void {
   cachedTokens = {
     idToken,
     accessToken: "",
-    refreshToken: "",
+    refreshToken: refreshToken ?? "",
     expiresAt,
   };
 }
@@ -129,9 +135,17 @@ export function seedMicrosTokenCache(idToken: string, expiresAt: number): void {
  * Returns the current cached id_token + expiry so the caller can
  * persist it to the database after a successful sync.
  */
-export function getCachedMicrosToken(): { idToken: string; expiresAt: number } | null {
+export function getCachedMicrosToken(): {
+  idToken: string;
+  expiresAt: number;
+  refreshToken: string;
+} | null {
   if (!cachedTokens) return null;
-  return { idToken: cachedTokens.idToken, expiresAt: cachedTokens.expiresAt };
+  return {
+    idToken: cachedTokens.idToken,
+    expiresAt: cachedTokens.expiresAt,
+    refreshToken: cachedTokens.refreshToken,
+  };
 }
 
 export function getMicrosTokenStatus() {
@@ -558,10 +572,17 @@ export async function getMicrosIdToken(): Promise<string> {
           cachedTokens.refreshToken
         );
         return cachedTokens.idToken;
-      } catch {
+      } catch (refreshErr) {
         // Refresh failed -- fall through to full auth
+        console.warn(
+          `[MicrosAuth] Token refresh failed, falling back to full PKCE:`,
+          refreshErr instanceof Error ? refreshErr.message : String(refreshErr),
+        );
         cachedTokens = null;
       }
+    } else {
+      // No refresh token available — must do full PKCE
+      cachedTokens = null;
     }
   }
 

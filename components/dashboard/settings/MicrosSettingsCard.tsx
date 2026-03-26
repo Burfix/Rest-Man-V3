@@ -166,12 +166,18 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
 
   async function handleSyncNow() {
     setSyncState({ status: "testing" });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55_000); // 55s — just under Vercel max
+
     try {
-      const res  = await fetch("/api/micros/sync", {
+      const res = await fetch("/api/micros/sync", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({}),
+        signal:  controller.signal,
       });
+      clearTimeout(timeout);
+
       const json = await res.json();
       if (json.ok) {
         setSyncState({ status: "success", message: json.message ?? "Sync complete." });
@@ -184,7 +190,14 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
         });
       }
     } catch (err) {
-      setSyncState({ status: "error", message: err instanceof Error ? err.message : "Unexpected error." });
+      clearTimeout(timeout);
+      const isAbort = err instanceof DOMException && err.name === "AbortError";
+      setSyncState({
+        status:  "error",
+        message: isAbort
+          ? "Sync request timed out. The sync may still be running — refresh the page in a moment."
+          : err instanceof Error ? err.message : "Unexpected error.",
+      });
     }
   }
 

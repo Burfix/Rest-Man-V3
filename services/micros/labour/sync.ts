@@ -15,6 +15,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
 import { todayISO } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import { getTimeCardDetails, getJobCodeDimensions } from "./client";
 import { normalizeTimecards, normalizeJobCodes } from "./normalize";
 import { buildDailySummary } from "./summary";
@@ -201,9 +202,14 @@ export async function runLabourFullSync(
       .maybeSingle();
     if (tokenRow?.access_token && tokenRow?.token_expires_at) {
       const expiresAt = new Date(tokenRow.token_expires_at).getTime();
-      if (expiresAt > Date.now()) seedMicrosTokenCache(tokenRow.access_token, expiresAt);
+      const refreshToken = (tokenRow as Record<string, unknown>)?.refresh_token as string | undefined;
+      if (expiresAt > Date.now()) {
+        seedMicrosTokenCache(tokenRow.access_token, expiresAt, refreshToken);
+      }
     }
-  } catch { /* non-fatal */ }
+  } catch {
+    // Non-fatal — refresh_token column may not exist yet
+  }
 
   try {
     // 1. Sync job codes
@@ -240,6 +246,25 @@ export async function runLabourFullSync(
       errors.length > 0 ? errors.join("; ") : null,
     );
 
+    // 5. Persist token to DB for cold-start resilience
+    try {
+      const tokenInfo = getCachedMicrosToken();
+      if (tokenInfo) {
+        const sb = createServerClient();
+        const update: Record<string, unknown> = {
+          access_token: tokenInfo.idToken,
+          token_expires_at: new Date(tokenInfo.expiresAt).toISOString(),
+        };
+        if (tokenInfo.refreshToken) update.refresh_token = tokenInfo.refreshToken;
+        await sb.from("micros_connections").update(update).order("created_at", { ascending: false }).limit(1);
+      }
+    } catch { /* non-fatal — refresh_token column may not exist */ }
+
+    logger.info("Labour full sync completed", {
+      businessDate, timecards: upserted, jobCodes: jobCodeCount,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+
     return {
       success: true,
       mode: "full",
@@ -251,6 +276,7 @@ export async function runLabourFullSync(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    logger.error("Labour full sync failed", { businessDate, error: msg });
     await upsertSyncState(locRef, null, businessDate, msg).catch(() => {});
     return {
       success: false,
@@ -280,9 +306,14 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
       .maybeSingle();
     if (tokenRow?.access_token && tokenRow?.token_expires_at) {
       const expiresAt = new Date(tokenRow.token_expires_at).getTime();
-      if (expiresAt > Date.now()) seedMicrosTokenCache(tokenRow.access_token, expiresAt);
+      const refreshToken = (tokenRow as Record<string, unknown>)?.refresh_token as string | undefined;
+      if (expiresAt > Date.now()) {
+        seedMicrosTokenCache(tokenRow.access_token, expiresAt, refreshToken);
+      }
     }
-  } catch { /* non-fatal */ }
+  } catch {
+    // Non-fatal — refresh_token column may not exist yet
+  }
 
   try {
     const state = await getSyncState(locRef);
@@ -320,6 +351,11 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
       errors.length > 0 ? errors.join("; ") : null,
     );
 
+    logger.info("Labour delta sync completed", {
+      timecards: upserted, affectedDates: affectedDates.length,
+      errors: errors.length > 0 ? errors : undefined,
+    });
+
     return {
       success: true,
       mode: "delta",
@@ -329,6 +365,7 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    logger.error("Labour delta sync failed", { error: msg });
     await upsertSyncState(locRef, null, null, msg).catch(() => {});
     return {
       success: false,
