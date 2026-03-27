@@ -30,6 +30,9 @@ import {
   SALSA_NIGHT_INTERVAL_DAYS,
 } from "@/lib/constants";
 
+// Re-export for callers that need the fallback
+export { DEFAULT_ORG_ID };
+
 // ── Date helpers ───────────────────────────────────────────────────────────────
 
 /**
@@ -212,13 +215,13 @@ export async function getEventMultiplierForDate(
   return { multiplier: DEFAULT_EVENT_MULTIPLIER, eventName: null };
 }
 
-export async function getSalesTarget(dateStr: string): Promise<SalesTarget | null> {
+export async function getSalesTarget(dateStr: string, orgId: string = DEFAULT_ORG_ID): Promise<SalesTarget | null> {
   const supabase = createServerClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase.from("sales_targets") as any)
     .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", orgId)
     .eq("target_date", dateStr)
     .maybeSingle();
 
@@ -465,7 +468,8 @@ export function generateForecastRecommendations(
 // ── Main generator ─────────────────────────────────────────────────────────────
 
 export async function generateRevenueForecast(
-  dateStr: string
+  dateStr: string,
+  orgId: string = DEFAULT_ORG_ID,
 ): Promise<RevenueForecast> {
   const supabase = createServerClient();
 
@@ -487,7 +491,7 @@ export async function generateRevenueForecast(
     getConfirmedCoversForDate(dateStr),
     getHistoricalAvgSpendPerGuest(dateStr),
     getEventMultiplierForDate(dateStr),
-    getSalesTarget(dateStr),
+    getSalesTarget(dateStr, orgId),
     supabase
       .from("daily_operations_reports")
       .select("labor_cost_percent, margin_percent")
@@ -616,12 +620,12 @@ export async function generateRevenueForecast(
 
 // ── Snapshot persistence (for cron / audit trail) ──────────────────────────────
 
-export async function saveForecastSnapshot(dateStr: string): Promise<void> {
-  const forecast = await generateRevenueForecast(dateStr);
+export async function saveForecastSnapshot(dateStr: string, orgId: string = DEFAULT_ORG_ID): Promise<void> {
+  const forecast = await generateRevenueForecast(dateStr, orgId);
   const supabase = createServerClient();
 
   const payload = {
-    organization_id:      DEFAULT_ORG_ID,
+    organization_id:      orgId,
     forecast_date:        forecast.date,
     forecast_sales:       forecast.forecast_sales,
     forecast_covers:      forecast.forecast_covers,
@@ -644,7 +648,7 @@ export async function saveForecastSnapshot(dateStr: string): Promise<void> {
 
 // ── Upcoming targets (for targets settings page) ───────────────────────────────
 
-export async function getUpcomingTargets(days = 30): Promise<SalesTarget[]> {
+export async function getUpcomingTargets(days = 30, orgId: string = DEFAULT_ORG_ID): Promise<SalesTarget[]> {
   const supabase = createServerClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
   const future = new Date(today + "T12:00:00Z");
@@ -654,7 +658,7 @@ export async function getUpcomingTargets(days = 30): Promise<SalesTarget[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data } = await (supabase.from("sales_targets") as any)
     .select("*")
-    .eq("organization_id", DEFAULT_ORG_ID)
+    .eq("organization_id", orgId)
     .gte("target_date", today)
     .lte("target_date", futureStr)
     .order("target_date", { ascending: true });

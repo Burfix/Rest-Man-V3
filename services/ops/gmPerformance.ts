@@ -37,17 +37,18 @@ export interface GMPerformance {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export async function getGMPerformance(): Promise<GMPerformance> {
+export async function getGMPerformance(siteId: string = DEFAULT_SITE_ID): Promise<GMPerformance> {
   const supabase = createServerClient();
 
   const [historyRes, scoreRes] = await Promise.allSettled([
     supabase
       .from("action_daily_stats")
       .select("stat_date, ops_score")
+      .eq("site_id", siteId)
       .order("stat_date", { ascending: false })
       .limit(14),
 
-    getOperatingScore(DEFAULT_SITE_ID),
+    getOperatingScore(siteId),
   ]);
 
   // Today's live score

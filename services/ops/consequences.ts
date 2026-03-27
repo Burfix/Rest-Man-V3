@@ -62,7 +62,7 @@ function daysLeftInWeek(): number {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export async function getConsequences(): Promise<ConsequenceSummary> {
+export async function getConsequences(orgId: string = DEFAULT_ORG_ID): Promise<ConsequenceSummary> {
   const supabase  = createServerClient();
   const today     = todayISO();
   const weekStart = weekStartISO();
@@ -79,7 +79,7 @@ export async function getConsequences(): Promise<ConsequenceSummary> {
         .order("report_date", { ascending: true }),
       (supabase.from("sales_targets") as any)
         .select("target_date, target_sales")
-        .eq("organization_id", DEFAULT_ORG_ID)
+        .eq("organization_id", orgId)
         .gte("target_date", weekStart)
         .lte("target_date", weekEnd),
     ]),

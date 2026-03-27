@@ -25,7 +25,7 @@ const DECISION_TTL_HOURS = 18;
  * Two decisions with the same category + title pattern will hash the same,
  * preventing duplicates within the same service day.
  */
-export function hashDecision(d: GMDecision): string {
+function hashDecision(d: GMDecision): string {
   // Normalize: strip numbers/amounts from title to group similar decisions
   const normalizedTitle = d.title
     .replace(/R[\d,.\s]+/g, "R_AMT")    // R 5,200 → R_AMT
@@ -149,68 +149,6 @@ export async function linkDecisionToAction(
   await (supabase.from("copilot_decisions" as any) as any)
     .update({ status: "actioned", action_id: actionId })
     .eq("id", decisionId);
-}
-
-/**
- * Apply persisted action statuses to a fresh set of generated decisions.
- * Matches by content hash — if a decision was previously actioned, its
- * status is restored so the UI shows the correct state on page load.
- */
-export async function applyActionedStatuses(
-  decisions: GMDecision[],
-  siteId: string = DEFAULT_SITE_ID,
-): Promise<GMDecision[]> {
-  const statusMap = await getActionedDecisionStatuses(siteId);
-  if (statusMap.size === 0) return decisions;
-  return decisions.map((d) => {
-    const hash = hashDecision(d);
-    const status = statusMap.get(hash);
-    return status ? { ...d, status } : d;
-  });
-}
-
-/**
- * Load the action statuses for decisions that have been actioned today.
- * Returns a map of decision_hash → action status, so the orchestrator can
- * mark decisions as "in_progress" / "completed" / "escalated" on page load.
- */
-export async function getActionedDecisionStatuses(
-  siteId: string = DEFAULT_SITE_ID,
-): Promise<Map<string, "pending" | "in_progress" | "completed" | "escalated">> {
-  const supabase = createServerClient();
-  const { data } = await (supabase.from("copilot_decisions" as any) as any)
-    .select("decision_hash, action_id")
-    .eq("site_id", siteId)
-    .eq("status", "actioned")
-    .not("action_id", "is", null);
-
-  const result = new Map<string, "pending" | "in_progress" | "completed" | "escalated">();
-  if (!data || (data as any[]).length === 0) return result;
-
-  const actionIds = (data as { decision_hash: string; action_id: string }[])
-    .map((r) => r.action_id);
-
-  const { data: actionRows } = await supabase
-    .from("actions")
-    .select("id, status")
-    .in("id", actionIds);
-
-  const actionStatusById = new Map<string, string>();
-  for (const row of (actionRows ?? []) as { id: string; status: string }[]) {
-    actionStatusById.set(row.id, row.status);
-  }
-
-  for (const row of data as { decision_hash: string; action_id: string }[]) {
-    const status = actionStatusById.get(row.action_id);
-    if (status) {
-      result.set(
-        row.decision_hash,
-        status as "pending" | "in_progress" | "completed" | "escalated",
-      );
-    }
-  }
-
-  return result;
 }
 
 /**

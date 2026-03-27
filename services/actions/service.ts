@@ -112,7 +112,7 @@ export async function getActionStats(): Promise<ActionStats> {
 
 /* ── Write ────────────────────────────────────────────────────────────────── */
 
-export async function createAction(input: ActionCreateInput): Promise<Action> {
+export async function createAction(input: ActionCreateInput, siteId: string = DEFAULT_SITE_ID): Promise<Action> {
   const sb = createServerClient();
   const { data, error } = await sb
     .from("actions")
@@ -130,7 +130,7 @@ export async function createAction(input: ActionCreateInput): Promise<Action> {
       source_module:   input.source_module || null,
       source_id:       input.source_id || null,
       execution_type:  input.execution_type || null,
-      site_id:         DEFAULT_SITE_ID,
+      site_id:         siteId,
       status:          "pending",
     })
     .select()

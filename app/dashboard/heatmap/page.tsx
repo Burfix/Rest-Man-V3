@@ -10,13 +10,20 @@
 
 import { getCachedZoneSummaries } from "@/services/universal/zoneSummary";
 import { DEFAULT_SITE_ID } from "@/types/universal";
+import { getUserContext } from "@/lib/auth/get-user-context";
 import ZoneHeatmap from "@/components/dashboard/ops/ZoneHeatmap";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function HeatmapPage() {
-  let zones = await getCachedZoneSummaries(DEFAULT_SITE_ID).catch(() => []);
+  let activeSiteId: string = DEFAULT_SITE_ID;
+  try {
+    const ctx = await getUserContext();
+    activeSiteId = ctx.siteId;
+  } catch {}
+
+  let zones = await getCachedZoneSummaries(activeSiteId).catch(() => []);
 
   const computedAt =
     zones.find((z) => z.last_computed_at)?.last_computed_at ?? null;
@@ -101,7 +108,7 @@ export default async function HeatmapPage() {
       <ZoneHeatmap
         initialZones={zones}
         initialComputedAt={computedAt}
-        siteId={DEFAULT_SITE_ID}
+        siteId={activeSiteId}
       />
     </div>
   );

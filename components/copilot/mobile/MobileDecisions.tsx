@@ -57,7 +57,6 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
   const [status, setStatus] = useState(d.status);
   const [actionId, setActionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [logged, setLogged] = useState(false);
   const sev = SEV_STYLE[d.severity];
 
   async function handleAction(targetStatus: "in_progress" | "completed" | "escalated") {
@@ -85,7 +84,6 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
           const json = await res.json();
           setActionId(json.action.id);
           setStatus(targetStatus === "in_progress" ? "in_progress" : targetStatus);
-          setLogged(true);
         }
       } else {
         // Subsequent interaction — PATCH existing action
@@ -96,7 +94,6 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
         });
         if (res.ok) {
           setStatus(targetStatus);
-          setLogged(true);
         }
       }
     } catch {
@@ -177,19 +174,6 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
           </div>
         )}
       </div>
-
-      {/* Logged confirmation */}
-      {logged && (
-        <div className="flex items-center justify-between rounded-md bg-emerald-950/40 border border-emerald-800/30 px-3 py-2">
-          <span className="text-xs text-emerald-400">✓ Logged to action queue</span>
-          <a
-            href="/dashboard/actions"
-            className="text-xs text-emerald-400 underline underline-offset-2"
-          >
-            View Actions →
-          </a>
-        </div>
-      )}
     </div>
   );
 }

@@ -1958,6 +1958,207 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      // ── Sync Engine V2 tables ─────────────────────────────────────
+
+      sync_locks: {
+        Row: {
+          id: string;
+          lock_key: string;
+          owner_id: string;
+          acquired_at: string;
+          expires_at: string;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          lock_key: string;
+          owner_id: string;
+          acquired_at?: string;
+          expires_at: string;
+          metadata?: Json;
+        };
+        Update: {
+          lock_key?: string;
+          owner_id?: string;
+          acquired_at?: string;
+          expires_at?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+
+      sync_runs: {
+        Row: {
+          id: string;
+          site_id: string;
+          sync_type: string;
+          source: string;
+          status: string;
+          trigger: string;
+          idempotency_key: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          duration_ms: number | null;
+          records_fetched: number;
+          records_written: number;
+          records_skipped: number;
+          records_errored: number;
+          error_message: string | null;
+          error_code: string | null;
+          checkpoint_id: string | null;
+          metadata: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          sync_type: string;
+          source?: string;
+          status?: string;
+          trigger?: string;
+          idempotency_key?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          duration_ms?: number | null;
+          records_fetched?: number;
+          records_written?: number;
+          records_skipped?: number;
+          records_errored?: number;
+          error_message?: string | null;
+          error_code?: string | null;
+          checkpoint_id?: string | null;
+          metadata?: Json;
+        };
+        Update: {
+          site_id?: string;
+          sync_type?: string;
+          source?: string;
+          status?: string;
+          trigger?: string;
+          idempotency_key?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          duration_ms?: number | null;
+          records_fetched?: number;
+          records_written?: number;
+          records_skipped?: number;
+          records_errored?: number;
+          error_message?: string | null;
+          error_code?: string | null;
+          checkpoint_id?: string | null;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+
+      sync_checkpoints: {
+        Row: {
+          id: string;
+          site_id: string;
+          sync_type: string;
+          source: string;
+          cursor_value: string;
+          cursor_type: string;
+          run_id: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          sync_type: string;
+          source?: string;
+          cursor_value: string;
+          cursor_type?: string;
+          run_id?: string | null;
+          metadata?: Json;
+        };
+        Update: {
+          site_id?: string;
+          sync_type?: string;
+          source?: string;
+          cursor_value?: string;
+          cursor_type?: string;
+          run_id?: string | null;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+
+      sync_errors: {
+        Row: {
+          id: string;
+          run_id: string;
+          site_id: string;
+          sync_type: string;
+          phase: string;
+          error_code: string | null;
+          message: string;
+          record_key: string | null;
+          context: Json;
+          retryable: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          run_id: string;
+          site_id: string;
+          sync_type: string;
+          phase: string;
+          error_code?: string | null;
+          message: string;
+          record_key?: string | null;
+          context?: Json;
+          retryable?: boolean;
+        };
+        Update: {
+          run_id?: string;
+          site_id?: string;
+          sync_type?: string;
+          phase?: string;
+          error_code?: string | null;
+          message?: string;
+          record_key?: string | null;
+          context?: Json;
+          retryable?: boolean;
+        };
+        Relationships: [];
+      };
+
+      source_ingestion_fingerprints: {
+        Row: {
+          id: string;
+          site_id: string;
+          sync_type: string;
+          record_key: string;
+          content_hash: string;
+          run_id: string | null;
+          first_seen_at: string;
+          last_seen_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          sync_type: string;
+          record_key: string;
+          content_hash: string;
+          run_id?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+        };
+        Update: {
+          site_id?: string;
+          sync_type?: string;
+          record_key?: string;
+          content_hash?: string;
+          run_id?: string | null;
+          first_seen_at?: string;
+          last_seen_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

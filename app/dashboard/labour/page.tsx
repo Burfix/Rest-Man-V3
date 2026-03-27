@@ -8,6 +8,7 @@
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { getStoredDailySummary, buildDailySummary } from "@/services/micros/labour/summary";
 import { getMockLabourSummary } from "@/services/micros/labour/mock";
+import { getMicrosConnection } from "@/services/micros/status";
 import LabourDashboardClient from "@/components/dashboard/labour/LabourDashboardClient";
 import type { LabourDashboardSummary } from "@/types/labour";
 
@@ -20,12 +21,15 @@ export default async function LabourPage() {
   let loadError: string | null = null;
   let useMock = false;
 
-  if (cfg.enabled && cfg.locRef) {
+  // Prefer DB connection locRef over env var
+  const connection = await getMicrosConnection().catch(() => null);
+  const locRef = connection?.loc_ref ?? cfg.locRef;
+
+  if (cfg.enabled && locRef) {
     try {
-      // Try stored summary first (fast), fall back to live computation
-      summary = await getStoredDailySummary(cfg.locRef);
+      summary = await getStoredDailySummary(locRef);
       if (!summary) {
-        summary = await buildDailySummary(cfg.locRef);
+        summary = await buildDailySummary(locRef);
       }
     } catch (err) {
       loadError = err instanceof Error ? err.message : "Failed to load labour data";

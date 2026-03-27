@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
       briefing = getMockGMBriefing(date);
     } else {
       try {
-        const input = await getForecastInputs(undefined, date);
-        const cfg = await getSiteConfig();
+        const input = await getForecastInputs(guard.ctx!.orgId ?? undefined, date);
+        const cfg = await getSiteConfig(guard.ctx!.siteId);
         briefing = buildGMBriefing(input, cfg.target_labour_pct);
       } catch (inputErr) {
         logger.warn("Forecast input fetch failed, using mock", { route: "GET /api/forecast/briefing", err: inputErr });

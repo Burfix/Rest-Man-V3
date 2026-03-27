@@ -68,35 +68,59 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Cron org ID — head office reports run for the default org
-  const orgId = process.env.DEFAULT_ORG_ID;
-  if (!orgId) {
-    logger.warn("[WeeklyReport] DEFAULT_ORG_ID not set — skipping cron");
-    return NextResponse.json({ ok: false, message: "DEFAULT_ORG_ID not set" });
-  }
-
   try {
-    const report = await generateWeeklyReport(orgId);
+    // Fetch all active organisations
+    const { createServerClient } = await import("@/lib/supabase/server");
+    const supabase = createServerClient();
+    const { data: orgs } = await supabase
+      .from("organisations")
+      .select("id")
+      .eq("is_active", true);
 
-    // Send to configured recipients
-    const recipientEnv = process.env.WEEKLY_REPORT_RECIPIENTS ?? process.env.RESTAURANT_EMAIL ?? "";
-    const recipients = recipientEnv.split(",").map((e) => e.trim()).filter(Boolean);
-
-    let emailSent = false;
-    if (recipients.length > 0) {
-      emailSent = await sendWeeklyReportEmail(report, recipients);
+    const orgIds = (orgs ?? []).map((o: { id: string }) => o.id);
+    if (orgIds.length === 0) {
+      // Fallback to env var for backward-compat
+      const envOrg = process.env.DEFAULT_ORG_ID;
+      if (envOrg) orgIds.push(envOrg);
     }
 
-    logger.info("[WeeklyReport] Cron completed", {
-      week: report.weekRange.weekNumber,
-      emailSent,
-      recipients: recipients.length,
-    });
+    if (orgIds.length === 0) {
+      logger.warn("[WeeklyReport] No active organisations found — skipping cron");
+      return NextResponse.json({ ok: false, message: "No active organisations" });
+    }
+
+    const results: { orgId: string; week: number; emailSent: boolean }[] = [];
+
+    for (const orgId of orgIds) {
+      try {
+        const report = await generateWeeklyReport(orgId);
+
+        // Send to configured recipients
+        const recipientEnv = process.env.WEEKLY_REPORT_RECIPIENTS ?? process.env.RESTAURANT_EMAIL ?? "";
+        const recipients = recipientEnv.split(",").map((e) => e.trim()).filter(Boolean);
+
+        let emailSent = false;
+        if (recipients.length > 0) {
+          emailSent = await sendWeeklyReportEmail(report, recipients);
+        }
+
+        logger.info("[WeeklyReport] Cron completed for org", {
+          orgId,
+          week: report.weekRange.weekNumber,
+          emailSent,
+          recipients: recipients.length,
+        });
+
+        results.push({ orgId, week: report.weekRange.weekNumber, emailSent });
+      } catch (err) {
+        logger.error("[WeeklyReport] Cron failed for org", { orgId, err });
+      }
+    }
 
     return NextResponse.json({
       ok: true,
-      week: report.weekRange.weekNumber,
-      emailSent,
+      orgs_processed: results.length,
+      results,
       source: "cron",
     });
   } catch (err) {

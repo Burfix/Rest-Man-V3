@@ -16,7 +16,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getOperatingScore } from "@/services/ops/operatingScore";
 
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
+/** Fetch all active site IDs from the database. */
+async function getAllActiveSiteIds(): Promise<string[]> {
+  const supabase = createServerClient();
+  const { data } = await supabase
+    .from("sites")
+    .select("id")
+    .eq("is_active", true);
+  return (data ?? []).map((r: { id: string }) => r.id);
+}
 
 function yesterdayJHB(): string {
   const d = new Date(
@@ -44,104 +52,128 @@ export async function POST(req: NextRequest) {
     const yesterday = yesterdayJHB();
     const today     = todayJHB();
 
-    // ── 1. Fetch completed actions for yesterday's stats ──────────────────────
-    const { data: completedYesterday, error: fetchErr } = await supabase
-      .from("actions")
-      .select("id, impact_weight, created_at, completed_at, started_at")
-      .eq("status", "completed")
-      .is("archived_at", null)
-      // completed before today
-      .lt("completed_at", `${today}T00:00:00.000Z`);
-
-    if (fetchErr) {
-      console.error("[daily-reset] fetch completed:", fetchErr);
-      return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+    // ── Resolve sites to process ────────────────────────────────────────────
+    const siteIds = await getAllActiveSiteIds();
+    if (siteIds.length === 0) {
+      return NextResponse.json({ ok: true, message: "No active sites found" });
     }
 
-    const completed = completedYesterday ?? [];
+    const siteSummaries: Record<string, unknown>[] = [];
 
-    // ── 2. Count carried-forward actions (pending/in_progress, not archived) ──
-    const { count: carriedForward } = await supabase
-      .from("actions")
-      .select("id", { count: "exact", head: true })
-      .is("archived_at", null)
-      .in("status", ["pending", "in_progress"]);
-
-    // ── 3. Count actions created yesterday ───────────────────────────────────
-    const { count: createdYesterday } = await supabase
-      .from("actions")
-      .select("id", { count: "exact", head: true })
-      .gte("created_at", `${yesterday}T00:00:00.000Z`)
-      .lt("created_at", `${today}T00:00:00.000Z`);
-
-    // ── 4. Compute avg resolution time in minutes ─────────────────────────────
-    let avgResolutionMinutes: number | null = null;
-    if (completed.length > 0) {
-      const totalMs = completed.reduce((sum, a) => {
-        if (!a.completed_at || !a.created_at) return sum;
-        return sum + (new Date(a.completed_at).getTime() - new Date(a.created_at).getTime());
-      }, 0);
-      avgResolutionMinutes = Math.round(totalMs / completed.length / 60_000);
-    }
-
-    const completionRate =
-      (createdYesterday ?? 0) > 0
-        ? Math.round((completed.length / (createdYesterday ?? 1)) * 100 * 100) / 100
-        : 0;
-
-    const impactCount = (level: string) =>
-      completed.filter((a) => a.impact_weight === level).length;
-
-    // ── 5a. Snapshot live operating score ────────────────────────────────────
-    let opsScoreValue: number | null = null;
-    try {
-      const scoreResult = await getOperatingScore(DEFAULT_SITE_ID);
-      opsScoreValue = scoreResult.total;
-    } catch {
-      // Non-fatal — log but continue
-      console.warn("[daily-reset] could not compute ops score");
-    }
-
-    // ── 5. Upsert daily stats for yesterday ───────────────────────────────────
-    const { error: statsErr } = await supabase
-      .from("action_daily_stats")
-      .upsert({
-        site_id:                DEFAULT_SITE_ID,
-        stat_date:              yesterday,
-        total_created:          createdYesterday ?? 0,
-        total_completed:        completed.length,
-        total_carried_forward:  carriedForward   ?? 0,
-        completion_rate_pct:    completionRate,
-        avg_resolution_minutes: avgResolutionMinutes,
-        critical_completed:     impactCount("critical"),
-        high_completed:         impactCount("high"),
-        medium_completed:       impactCount("medium"),
-        low_completed:          impactCount("low"),
-        ops_score:              opsScoreValue,
-        missed_actions:         carriedForward ?? 0,
-      }, { onConflict: "site_id,stat_date" });
-
-    if (statsErr) {
-      console.error("[daily-reset] upsert stats:", statsErr);
-      return NextResponse.json({ error: statsErr.message }, { status: 500 });
-    }
-
-    // ── 6. Archive completed actions ──────────────────────────────────────────
-    const idsToArchive = completed.map((a) => a.id);
-    if (idsToArchive.length > 0) {
-      const { error: archiveErr } = await supabase
+    for (const siteId of siteIds) {
+      // ── 1. Fetch completed actions for this site's yesterday stats ────────
+      const { data: completedYesterday, error: fetchErr } = await supabase
         .from("actions")
-        .update({ archived_at: new Date().toISOString() })
-        .in("id", idsToArchive);
+        .select("id, impact_weight, created_at, completed_at, started_at")
+        .eq("site_id", siteId)
+        .eq("status", "completed")
+        .is("archived_at", null)
+        .lt("completed_at", `${today}T00:00:00.000Z`);
 
-      if (archiveErr) {
-        console.error("[daily-reset] archive:", archiveErr);
-        return NextResponse.json({ error: archiveErr.message }, { status: 500 });
+      if (fetchErr) {
+        console.error(`[daily-reset][${siteId}] fetch completed:`, fetchErr);
+        continue;
       }
+
+      const completed = completedYesterday ?? [];
+
+      // ── 2. Count carried-forward actions for this site ──────────────────
+      const { count: carriedForward } = await supabase
+        .from("actions")
+        .select("id", { count: "exact", head: true })
+        .eq("site_id", siteId)
+        .is("archived_at", null)
+        .in("status", ["pending", "in_progress"]);
+
+      // ── 3. Count actions created yesterday for this site ────────────────
+      const { count: createdYesterday } = await supabase
+        .from("actions")
+        .select("id", { count: "exact", head: true })
+        .eq("site_id", siteId)
+        .gte("created_at", `${yesterday}T00:00:00.000Z`)
+        .lt("created_at", `${today}T00:00:00.000Z`);
+
+      // ── 4. Compute avg resolution time in minutes ───────────────────────
+      let avgResolutionMinutes: number | null = null;
+      if (completed.length > 0) {
+        const totalMs = completed.reduce((sum, a) => {
+          if (!a.completed_at || !a.created_at) return sum;
+          return sum + (new Date(a.completed_at).getTime() - new Date(a.created_at).getTime());
+        }, 0);
+        avgResolutionMinutes = Math.round(totalMs / completed.length / 60_000);
+      }
+
+      const completionRate =
+        (createdYesterday ?? 0) > 0
+          ? Math.round((completed.length / (createdYesterday ?? 1)) * 100 * 100) / 100
+          : 0;
+
+      const impactCount = (level: string) =>
+        completed.filter((a) => a.impact_weight === level).length;
+
+      // ── 5a. Snapshot live operating score ──────────────────────────────────
+      let opsScoreValue: number | null = null;
+      try {
+        const scoreResult = await getOperatingScore(siteId);
+        opsScoreValue = scoreResult.total;
+      } catch {
+        console.warn(`[daily-reset][${siteId}] could not compute ops score`);
+      }
+
+      // ── 5. Upsert daily stats for this site ────────────────────────────────
+      const { error: statsErr } = await supabase
+        .from("action_daily_stats")
+        .upsert({
+          site_id:                siteId,
+          stat_date:              yesterday,
+          total_created:          createdYesterday ?? 0,
+          total_completed:        completed.length,
+          total_carried_forward:  carriedForward   ?? 0,
+          completion_rate_pct:    completionRate,
+          avg_resolution_minutes: avgResolutionMinutes,
+          critical_completed:     impactCount("critical"),
+          high_completed:         impactCount("high"),
+          medium_completed:       impactCount("medium"),
+          low_completed:          impactCount("low"),
+          ops_score:              opsScoreValue,
+          missed_actions:         carriedForward ?? 0,
+        }, { onConflict: "site_id,stat_date" });
+
+      if (statsErr) {
+        console.error(`[daily-reset][${siteId}] upsert stats:`, statsErr);
+      }
+
+      // ── 6. Archive completed actions for this site ────────────────────────
+      const idsToArchive = completed.map((a) => a.id);
+      if (idsToArchive.length > 0) {
+        const { error: archiveErr } = await supabase
+          .from("actions")
+          .update({ archived_at: new Date().toISOString() })
+          .in("id", idsToArchive);
+
+        if (archiveErr) {
+          console.error(`[daily-reset][${siteId}] archive:`, archiveErr);
+        }
+      }
+
+      // ── 7. Expire stale copilot decisions for this site ───────────────────
+      let expiredDecisions = 0;
+      try {
+        const { expireStaleDecisions } = await import("@/lib/copilot/decision-store");
+        expiredDecisions = await expireStaleDecisions(siteId);
+      } catch {}
+
+      siteSummaries.push({
+        siteId,
+        archived: idsToArchive.length,
+        carried_forward: carriedForward ?? 0,
+        expired_decisions: expiredDecisions,
+        total_created: createdYesterday ?? 0,
+        total_completed: completed.length,
+      });
     }
 
-    // ── 7. Auto-escalate aging actions ──────────────────────────────────────
-    // Actions pending >24h with critical/high severity → auto-escalate
+    // ── 8. Auto-escalate aging actions (global — all sites) ──────────────
     const cutoff24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data: agingActions } = await supabase
       .from("actions")
@@ -164,7 +196,6 @@ export async function POST(req: NextRequest) {
 
       if (!escErr) {
         autoEscalated = agingIds.length;
-        // Write events for each escalated action
         const events = agingIds.map((id) => ({
           action_id: id,
           event_type: "escalated",
@@ -175,26 +206,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── 8. Expire stale copilot decisions ──────────────────────────────────
-    let expiredDecisions = 0;
-    try {
-      const { expireStaleDecisions } = await import("@/lib/copilot/decision-store");
-      expiredDecisions = await expireStaleDecisions(DEFAULT_SITE_ID);
-    } catch {}
-
     return NextResponse.json({
-      success:          true,
-      archived:         idsToArchive.length,
-      carried_forward:  carriedForward ?? 0,
-      auto_escalated:   autoEscalated,
-      expired_decisions: expiredDecisions,
-      stats: {
-        date:                  yesterday,
-        total_created:         createdYesterday ?? 0,
-        total_completed:       completed.length,
-        completion_rate_pct:   completionRate,
-        avg_resolution_minutes: avgResolutionMinutes,
-      },
+      success: true,
+      sites_processed: siteSummaries.length,
+      auto_escalated: autoEscalated,
+      date: yesterday,
+      sites: siteSummaries,
     });
   } catch (err) {
     console.error("[daily-reset] unexpected:", err);

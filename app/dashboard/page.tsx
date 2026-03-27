@@ -29,6 +29,7 @@ import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { evaluateOperations } from "@/services/decision-engine";
 import { getServicePeriod } from "@/lib/commandCenter";
 import { getSiteConfig } from "@/lib/config/site";
+import { getUserContext } from "@/lib/auth/get-user-context";
 
 import ControlBar              from "@/components/operating-brain/ControlBar";
 import OperatingScoreHero     from "@/components/operating-brain/OperatingScoreHero";
@@ -120,6 +121,18 @@ const EMPTY_MAINTENANCE: MaintenanceSummary = {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function OperationsDashboard() {
+  // ─── User context (site + org) ──────────────────────────────────────────
+  const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
+  let siteId = DEFAULT_SITE_ID;
+  let orgId: string | null = null;
+  try {
+    const ctx = await getUserContext();
+    siteId = ctx.siteId;
+    orgId = ctx.orgId;
+  } catch {
+    // Not authenticated (shouldn't happen behind middleware) — fall back to defaults
+  }
+
   const [
     todayResult,
     reviewsResult,
@@ -139,11 +152,12 @@ export default async function OperationsDashboard() {
     getMaintenanceSummary(),
     getUpcomingEvents(),
     getDataFreshnessSummary(),
-    generateRevenueForecast(todayISO()),
+    generateRevenueForecast(todayISO(), orgId ?? undefined),
     getComplianceSummary(),
     getMicrosStatus(),
-    getInventoryIntelligence(),
-    getStoredDailySummary(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"),
+    getInventoryIntelligence(siteId),
+    // locRef resolved after micros status is fetched — use placeholder
+    Promise.resolve(null as any),
   ]);
 
   const { value: today }                             = settled(todayResult, EMPTY_TODAY);
@@ -155,7 +169,11 @@ export default async function OperationsDashboard() {
   const { value: complianceSummary }                 = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }                      = settled(microsResult, null);
   const { value: inventoryIntel }                    = settled(inventoryResult, null);
-  const { value: labourSummary }                     = settled(labourResult, null);
+
+  // Resolve MICROS locRef from DB connection (not env var)
+  const msConn = microsStatus as MicrosStatusSummary | null;
+  const locRef = msConn?.connection?.loc_ref ?? process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual";
+  const labourSummary = await getStoredDailySummary(locRef).catch(() => null);
 
   // ─── Unified sales snapshot (single source of truth for revenue) ─────────
   const today_iso = todayISO();
@@ -175,8 +193,11 @@ export default async function OperationsDashboard() {
     : null;
 
   const operatingScore = await getOperatingScore(
-    "00000000-0000-0000-0000-000000000001",
+    siteId,
     salesOverride,
+    null,
+    null,
+    orgId ?? undefined,
   ).catch(() => null);
 
   // ─── Integration health ──────────────────────────────────────────────────
@@ -187,7 +208,7 @@ export default async function OperationsDashboard() {
   const servicePeriod = getServicePeriod("Africa/Johannesburg");
 
   // ─── Site config (single source of truth for targets) ────────────────────
-  const siteConfig = await getSiteConfig();
+  const siteConfig = await getSiteConfig(siteId);
 
   // ─── Compute freshness ages ──────────────────────────────────────────────
   const now = Date.now();
