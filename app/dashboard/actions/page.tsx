@@ -117,6 +117,8 @@ export default async function ActionsPage() {
     loadError = err instanceof Error ? err.message : "Unknown error";
   }
 
+  const cfg = await getSiteConfig();
+
   // Fetch operational context for the banner
   const [
     todayResult,
@@ -132,7 +134,7 @@ export default async function ActionsPage() {
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),
-    getInventoryIntelligence(),
+    getInventoryIntelligence(cfg.site_id),
     getStoredDailySummary(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"),
   ]);
 

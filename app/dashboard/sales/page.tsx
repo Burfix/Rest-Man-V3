@@ -10,6 +10,7 @@ import { SalesItem, SalesUpload } from "@/types";
 import { cn, formatCurrency, formatShortDate } from "@/lib/utils";
 import Link from "next/link";
 import SalesUploadForm from "@/components/dashboard/SalesUploadForm";
+import { getUserContext } from "@/lib/auth/get-user-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -19,8 +20,16 @@ export default async function SalesPage() {
   let latestItems: SalesItem[] = [];
   let loadError: string | null = null;
 
+  let siteId: string | undefined;
   try {
-    uploads = await getAllSalesUploads();
+    const ctx = await getUserContext();
+    siteId = ctx.siteId;
+  } catch {
+    // Not authenticated — middleware should prevent this
+  }
+
+  try {
+    uploads = await getAllSalesUploads(siteId);
     if (uploads.length > 0) {
       latestItems = await getSalesItemsByUpload(uploads[0].id);
     }

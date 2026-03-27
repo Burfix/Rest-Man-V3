@@ -185,6 +185,7 @@ export default async function OperationsDashboard() {
     forecast,
     today.total,
     today.totalCovers,
+    siteId,
   );
 
   // ─── Operating score ────────────────────────────────────────────────────

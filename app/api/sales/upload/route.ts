@@ -20,6 +20,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { getUserContext } from "@/lib/auth/get-user-context";
 
 const REQUIRED_HEADERS = ["item_name", "quantity_sold", "sales_amount"];
 
@@ -211,10 +212,21 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient();
 
+    // Resolve the site for this upload (falls back to default pilot-store ID)
+    const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
+    let siteId = DEFAULT_SITE_ID;
+    try {
+      const ctx = await getUserContext();
+      siteId = ctx.siteId || DEFAULT_SITE_ID;
+    } catch {
+      // Not authenticated — shouldn't happen behind middleware
+    }
+
     // Insert upload header row
     const { data: uploadData, error: uploadErr } = await supabase
       .from("sales_uploads")
       .insert({
+        site_id: siteId,
         week_label: weekLabel,
         week_start: weekStart,
         week_end: weekEnd,

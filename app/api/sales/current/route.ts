@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
     const totalBookings = bookings.length;
     const totalCovers = bookings.reduce((s, r) => s + (Number(r.guest_count) || 0), 0);
 
-    const snapshot = await getCurrentSalesSnapshot(date, microsStatus, forecast, totalBookings, totalCovers);
+    const snapshot = await getCurrentSalesSnapshot(date, microsStatus, forecast, totalBookings, totalCovers, ctx.siteId);
     return NextResponse.json(snapshot);
   } catch (err) {
     logger.error("Failed to load sales data", { route: "GET /api/sales/current", err });

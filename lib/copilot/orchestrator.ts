@@ -89,7 +89,7 @@ export async function runCopilot(): Promise<CopilotOutput> {
     generateRevenueForecast(today_iso),
     getComplianceSummary(),
     getMicrosStatus(),
-    getInventoryIntelligence(),
+    getInventoryIntelligence(cfg.site_id),
     getStoredDailySummary(
       process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"
     ),

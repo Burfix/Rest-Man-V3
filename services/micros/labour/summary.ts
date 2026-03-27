@@ -59,8 +59,8 @@ export async function buildDailySummary(
     .returns<SyncStateRow[]>()
     .single();
 
-  // Fetch today's net sales for labour % calculation
-  // TODO: Connect to your actual live sales source (micros_sales_daily or manual uploads)
+  // Fetch today's net sales for labour % calculation.
+  // Priority: MICROS live sync → manual upload for the day.
   let netSales: number | null = null;
   const { data: salesRow } = await sb
     .from("micros_sales_daily")
@@ -70,6 +70,18 @@ export async function buildDailySummary(
     .single();
   if (salesRow?.net_sales != null) {
     netSales = salesRow.net_sales;
+  }
+
+  // Fallback: manual upload when MICROS daily is not yet synced for today
+  if (netSales == null) {
+    const { data: manualRow } = await (sb.from("manual_sales_uploads" as any) as any)
+      .select("net_sales, gross_sales")
+      .eq("business_date", date)
+      .order("uploaded_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const row = manualRow as { net_sales: number | null; gross_sales: number } | null;
+    netSales = row?.net_sales ?? row?.gross_sales ?? null;
   }
 
   const cards = timecards ?? [];

@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
-import { runSync, microsSalesAdapter } from "@/lib/sync";
+import { runSync, microsSalesAdapter, microsLabourAdapter } from "@/lib/sync";
 import { todayISO } from "@/lib/utils";
 import type { SyncType, SyncConfig, SourceAdapter, RawRecord } from "@/lib/sync/types";
 
@@ -21,7 +21,7 @@ export const maxDuration = 30;
 // Adapter registry
 const adapters: Record<string, SourceAdapter<RawRecord>> = {
   sales: microsSalesAdapter,
-  // labour and inventory adapters will be added here
+  labour: microsLabourAdapter,
 };
 
 export async function POST(req: NextRequest) {

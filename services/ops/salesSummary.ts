@@ -48,12 +48,14 @@ export async function getLatestSalesSummary(topN = 5): Promise<SalesSummary> {
 }
 
 /** All uploads — for the /dashboard/sales history page */
-export async function getAllSalesUploads(): Promise<SalesUpload[]> {
+export async function getAllSalesUploads(siteId?: string): Promise<SalesUpload[]> {
   const supabase = createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("sales_uploads")
-    .select("*")
+    .select("*");
+  if (siteId) query = (query as any).eq("site_id", siteId);
+  const { data, error } = await (query as any)
     .order("week_start", { ascending: false });
 
   if (error) {

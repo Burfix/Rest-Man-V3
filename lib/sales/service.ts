@@ -235,6 +235,7 @@ export async function getCurrentSalesSnapshot(
   forecast: RevenueForecast | null,
   bookingsToday: number | null,
   bookedCoversToday: number | null,
+  siteId?: string,
 ): Promise<NormalizedSalesSnapshot> {
   // 1. Try MICROS live data — use it for today regardless of sync age
   if (microsStatus?.latestDailySales) {
@@ -246,7 +247,7 @@ export async function getCurrentSalesSnapshot(
   }
 
   // 2. Try manual upload for today
-  const manual = await getManualSalesForDate(businessDate);
+  const manual = await getManualSalesForDate(businessDate, siteId);
   if (manual) {
     return buildFromManual(manual, forecast, bookingsToday, bookedCoversToday);
   }
@@ -290,12 +291,14 @@ export async function getCurrentSalesSnapshot(
 
 // ── Manual upload query ─────────────────────────────────────────────────────
 
-async function getManualSalesForDate(businessDate: string): Promise<ManualSalesRow | null> {
+async function getManualSalesForDate(businessDate: string, siteId?: string): Promise<ManualSalesRow | null> {
   const supabase = createServerClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data } = await (supabase.from("manual_sales_uploads") as any)
+  let query = (supabase.from("manual_sales_uploads") as any)
     .select("*")
-    .eq("business_date", businessDate)
+    .eq("business_date", businessDate);
+  if (siteId) query = query.eq("site_id", siteId);
+  const { data } = await query
     .order("uploaded_at", { ascending: false })
     .limit(1)
     .maybeSingle();

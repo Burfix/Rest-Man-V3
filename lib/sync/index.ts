@@ -6,6 +6,7 @@
 
 export { runSync } from "./engine";
 export { microsSalesAdapter } from "./adapters/micros-sales.adapter";
+export { microsLabourAdapter } from "./adapters/micros-labour.adapter";
 export { acquireLock, releaseLock, isLocked, cleanupExpiredLocks, buildLockKey } from "./locks";
 export { loadCheckpoint, saveCheckpoint, clearCheckpoint } from "./checkpoints";
 export { filterChanged, updateFingerprints, computeHash } from "./hash";

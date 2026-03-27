@@ -11,7 +11,6 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
 import type {
   InventoryItem,
   InventoryItemWithRisk,
@@ -97,7 +96,7 @@ const AVG_DISH_REVENUE = 185; // ZAR per affected dish order
 
 // ── Core functions ──────────────────────────────────────────────────────────
 
-export async function getCriticalStockouts(storeId = DEFAULT_ORG_ID): Promise<InventoryItemWithRisk[]> {
+export async function getCriticalStockouts(storeId: string): Promise<InventoryItemWithRisk[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("inventory_items" as any)
@@ -115,7 +114,7 @@ export async function getCriticalStockouts(storeId = DEFAULT_ORG_ID): Promise<In
     .filter((i) => i.risk_level === "critical");
 }
 
-export async function getLowStockItems(storeId = DEFAULT_ORG_ID): Promise<InventoryItemWithRisk[]> {
+export async function getLowStockItems(storeId: string): Promise<InventoryItemWithRisk[]> {
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("inventory_items" as any)
@@ -133,7 +132,7 @@ export async function getLowStockItems(storeId = DEFAULT_ORG_ID): Promise<Invent
     .filter((i) => i.risk_level === "warning");
 }
 
-export async function getItemsWithoutOpenPO(storeId = DEFAULT_ORG_ID): Promise<InventoryItemWithRisk[]> {
+export async function getItemsWithoutOpenPO(storeId: string): Promise<InventoryItemWithRisk[]> {
   const supabase = createServerClient();
 
   // Fetch at-risk items and active POs in parallel
@@ -224,7 +223,7 @@ function computeInventoryRiskScore(
 // ── Main aggregator ─────────────────────────────────────────────────────────
 
 export async function getInventoryIntelligence(
-  storeId = DEFAULT_ORG_ID,
+  storeId: string,
 ): Promise<InventoryIntelligence> {
   try {
     const supabase = createServerClient();
