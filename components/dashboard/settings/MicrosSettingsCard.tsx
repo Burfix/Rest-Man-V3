@@ -67,8 +67,9 @@ const fieldCls =
 // ── Props ─────────────────────────────────────────────────────────────────
 
 interface Props {
-  connection:   MicrosConnection | null;
-  microsHealth: MicrosIntegrationStatus;
+  connection:        MicrosConnection | null;
+  microsHealth:      MicrosIntegrationStatus;
+  labourLastSyncAt?: string | null;
 }
 
 type SaveState =
@@ -85,15 +86,16 @@ type TestState =
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export default function MicrosSettingsCard({ connection: initial, microsHealth }: Props) {
+export default function MicrosSettingsCard({ connection: initial, microsHealth, labourLastSyncAt }: Props) {
   const router  = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
-  const [connection, setConnection] = useState<MicrosConnection | null>(initial);
-  const [saveState,  setSaveState]  = useState<SaveState>({ status: "idle" });
-  const [testState,  setTestState]  = useState<TestState>({ status: "idle" });
-  const [syncState,  setSyncState]  = useState<TestState>({ status: "idle" });
-  const [editing,    setEditing]    = useState(!initial);
+  const [connection,    setConnection]    = useState<MicrosConnection | null>(initial);
+  const [saveState,     setSaveState]     = useState<SaveState>({ status: "idle" });
+  const [testState,     setTestState]     = useState<TestState>({ status: "idle" });
+  const [syncState,     setSyncState]     = useState<TestState>({ status: "idle" });
+  const [labourState,   setLabourState]   = useState<TestState>({ status: "idle" });
+  const [editing,       setEditing]       = useState(!initial);
 
   // ── Save handler ────────────────────────────────────────────────────────
 
@@ -196,6 +198,49 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
         status:  "error",
         message: isAbort
           ? "Sync request timed out. The sync may still be running — refresh the page in a moment."
+          : err instanceof Error ? err.message : "Unexpected error.",
+      });
+    }
+  }
+
+  // ── Labour sync handler ────────────────────────────────────────────────
+
+  async function handleLabourSyncNow() {
+    setLabourState({ status: "testing" });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 55_000);
+
+    try {
+      const res = await fetch("/api/micros/labour-sync", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ mode: "delta" }),
+        signal:  controller.signal,
+      });
+      clearTimeout(timeout);
+
+      const json = await res.json();
+      if (json.ok) {
+        const count = json.timecardsUpserted ?? 0;
+        setLabourState({
+          status:  "success",
+          message: `Labour sync complete — ${count} timecard${count !== 1 ? "s" : ""} updated.`,
+        });
+        router.refresh();
+      } else {
+        setLabourState({
+          status:  "error",
+          message: json.message ?? "Labour sync failed.",
+          detail:  json.errors?.join("; ") ?? null,
+        });
+      }
+    } catch (err) {
+      clearTimeout(timeout);
+      const isAbort = err instanceof DOMException && err.name === "AbortError";
+      setLabourState({
+        status:  "error",
+        message: isAbort
+          ? "Labour sync timed out. It may still be running — refresh in a moment."
           : err instanceof Error ? err.message : "Unexpected error.",
       });
     }
@@ -370,18 +415,23 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
 
             <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
               <div>
-                <dt className="text-xs text-stone-500">Last successful sync</dt>
+                <dt className="text-xs text-stone-500">Last successful sales sync</dt>
                 <dd className="mt-0.5 font-medium text-stone-800">
                   {formatDate(connection.last_successful_sync_at)}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-stone-500">Last sync attempt</dt>
+                <dt className="text-xs text-stone-500">Last sales sync attempt</dt>
                 <dd className="mt-0.5 font-medium text-stone-800">
                   {formatDate(connection.last_sync_at)}
                 </dd>
               </div>
-
+              <div>
+                <dt className="text-xs text-stone-500">Last labour sync</dt>
+                <dd className="mt-0.5 font-medium text-stone-800">
+                  {formatDate(labourLastSyncAt ?? null)}
+                </dd>
+              </div>
             </dl>
           </div>
 
@@ -421,6 +471,24 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
             </div>
           )}
 
+          {/* Labour sync feedback */}
+          {labourState.status === "error" && (
+            <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 space-y-1">
+              <div>{labourState.message}</div>
+              {labourState.detail && (
+                <details className="text-[10px] text-red-500">
+                  <summary className="cursor-pointer">Detail</summary>
+                  <pre className="mt-1 whitespace-pre-wrap break-all">{labourState.detail}</pre>
+                </details>
+              )}
+            </div>
+          )}
+          {labourState.status === "success" && (
+            <div className="mt-2 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+              {labourState.message}
+            </div>
+          )}
+
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="button"
@@ -438,7 +506,16 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth }
               className="flex items-center gap-1.5 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-100 disabled:opacity-50 transition-colors"
             >
               <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", syncState.status === "testing" ? "bg-emerald-400 animate-pulse" : "bg-emerald-500")} />
-              {syncState.status === "testing" ? "Syncing…" : "Sync now"}
+              {syncState.status === "testing" ? "Syncing sales…" : "Sync sales"}
+            </button>
+            <button
+              type="button"
+              onClick={handleLabourSyncNow}
+              disabled={labourState.status === "testing"}
+              className="flex items-center gap-1.5 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 hover:bg-sky-100 disabled:opacity-50 transition-colors"
+            >
+              <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", labourState.status === "testing" ? "bg-sky-400 animate-pulse" : "bg-sky-500")} />
+              {labourState.status === "testing" ? "Syncing labour…" : "Sync labour"}
             </button>
           </div>
         </>

@@ -15,37 +15,30 @@ export const dynamic   = "force-dynamic";
 export const revalidate = 0;
 
 export default async function IntegrationsPage() {
-  const microsResult = await getMicrosStatus().catch(() => null);
-  const connection   = microsResult?.connection ?? null;
-  const cfgStatus         = getMicrosConfigStatus();
-  const microsHealth      = deriveMicrosIntegrationStatus(
+  const supabase = createServerClient();
+
+  const [microsResult, labourRes, userRes] = await Promise.all([
+    getMicrosStatus().catch(() => null),
+    supabase
+      .from("labour_sync_state")
+      .select("last_sync_at, last_bus_dt, error_message")
+      .order("last_sync_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+  ]);
+
+  const connection      = microsResult?.connection ?? null;
+  const cfgStatus       = getMicrosConfigStatus();
+  const microsHealth    = deriveMicrosIntegrationStatus(
     microsResult, cfgStatus.configured, cfgStatus.enabled,
   );
+  const labourLastSyncAt = labourRes.data?.last_sync_at ?? null;
 
-  // ── Admin check (server-side) — debug panel shown to admin users only ──
-  const supabase = createServerClient();
-  const { data: { user } } = await supabase.auth.getUser().catch(() => ({ data: { user: null } }));
+  const user    = userRes.data.user;
   const role    = (user?.user_metadata?.role as string | undefined) ??
                   (user?.app_metadata?.role  as string | undefined) ?? "";
   const isAdmin = role === "admin";
-
-  // ── [MICROS_STATUS_DEBUG] server-side only ───────────────────────────────
-  console.log("[MICROS_STATUS_DEBUG] integrations page render", {
-    envEnabled:            cfgStatus.enabled,
-    envConfigured:         cfgStatus.configured,
-    envMissing:            cfgStatus.missing,
-    dbConnectionStatus:    connection?.status ?? "no_row",
-    dbLastSyncError:       connection?.last_sync_error
-                             ? `[present — ${connection.last_sync_error.length} chars]`
-                             : "null",
-    containsClientSecret:  connection?.last_sync_error?.includes("MICROS_CLIENT_SECRET") ?? false,
-    derivedHealth:         microsHealth.health,
-    derivedLabel:          microsHealth.label,
-    derivedUserMessage:    microsHealth.userMessage,
-    isLiveDataAvailable:   microsHealth.isLiveDataAvailable,
-    isAdmin,
-  });
-  // ── end debug ────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-8">
@@ -56,7 +49,11 @@ export default async function IntegrationsPage() {
         </p>
       </div>
 
-      <MicrosSettingsCard connection={connection as never} microsHealth={microsHealth} />
+      <MicrosSettingsCard
+        connection={connection as never}
+        microsHealth={microsHealth}
+        labourLastSyncAt={labourLastSyncAt}
+      />
 
       {/* Admin-only: MICROS config diagnostics panel */}
       {isAdmin && (
