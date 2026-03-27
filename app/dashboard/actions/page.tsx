@@ -216,6 +216,13 @@ export default async function ActionsPage() {
   ).length;
   const groups = groupByHorizon(actions);
 
+  // Co-pilot actions logged today (any status, including completed)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const copilotToday = actions
+    .filter((a) => a.source_type === "copilot" && new Date(a.created_at) >= todayStart)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
   return (
     <div className="space-y-4">
 
@@ -231,6 +238,42 @@ export default async function ActionsPage() {
       {loadError && (
         <div className="rounded-lg border border-red-800/30 bg-red-950/40 px-4 py-3 text-sm text-red-400">
           Could not load actions: {loadError}
+        </div>
+      )}
+
+      {/* Co-Pilot logged actions — shows completed + active from today */}
+      {!loadError && copilotToday.length > 0 && (
+        <div className="rounded-xl border border-stone-700/50 bg-stone-900/40 p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs uppercase tracking-widest text-stone-500 font-medium">
+              Logged from Co-Pilot Today
+            </span>
+            <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400 font-mono">
+              {copilotToday.length}
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {copilotToday.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-center justify-between gap-3 rounded-lg border border-stone-800/40 bg-stone-900/60 px-3 py-2"
+              >
+                <span className={`text-sm leading-snug ${a.status === "completed" ? "line-through text-stone-500" : "text-stone-200"}`}>
+                  {a.title}
+                </span>
+                <span className={`shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
+                  a.status === "completed"   ? "bg-emerald-900/40 text-emerald-400" :
+                  a.status === "in_progress" ? "bg-amber-900/30 text-amber-400" :
+                  a.status === "escalated"   ? "bg-red-900/30 text-red-400" :
+                                               "bg-stone-800 text-stone-400"
+                }`}>
+                  {a.status === "in_progress" ? "In Progress" :
+                   a.status === "completed"   ? "Done" :
+                   a.status === "escalated"   ? "Escalated" : "Pending"}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

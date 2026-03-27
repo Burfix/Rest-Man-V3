@@ -59,6 +59,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
   const [status, setStatus] = useState(d.status);
   const [actionId, setActionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [logged, setLogged] = useState(false);
   const sev = SEV_STYLE[d.severity];
 
   async function handleAction(targetStatus: "in_progress" | "completed" | "escalated") {
@@ -86,6 +87,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
           const json = await res.json();
           setActionId(json.action.id);
           setStatus(targetStatus === "in_progress" ? "in_progress" : targetStatus);
+          setLogged(true);
         }
       } else {
         // Subsequent interaction — PATCH existing action
@@ -96,6 +98,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
         });
         if (res.ok) {
           setStatus(targetStatus);
+          setLogged(true);
         }
       }
     } catch {
@@ -202,6 +205,19 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
       <p className="text-[11px] text-stone-500 italic">
         If ignored: {d.consequenceIfIgnored}
       </p>
+
+      {/* Logged confirmation */}
+      {logged && (
+        <div className="flex items-center justify-between rounded-md bg-emerald-950/40 border border-emerald-800/30 px-3 py-1.5">
+          <span className="text-[11px] text-emerald-400">✓ Logged to action queue</span>
+          <a
+            href="/dashboard/actions"
+            className="text-[11px] text-emerald-400 underline underline-offset-2 hover:text-emerald-300"
+          >
+            View Actions →
+          </a>
+        </div>
+      )}
     </div>
   );
 }

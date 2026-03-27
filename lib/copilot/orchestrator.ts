@@ -18,7 +18,7 @@ import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { todayISO } from "@/lib/utils";
 import { getSiteConfig } from "@/lib/config/site";
-import { persistDecisions, supersedeOldDecisions } from "./decision-store";
+import { persistDecisions, supersedeOldDecisions, applyActionedStatuses, hashDecision } from "./decision-store";
 
 import { getServiceWindow } from "./service-window";
 import { getServiceState } from "./service-state";
@@ -281,14 +281,18 @@ export async function runCopilot(): Promise<CopilotOutput> {
     reviewSentimentPct: 75, // TODO: wire real review data
   });
 
-  // ── 13. Persist decisions (async, non-blocking) ───────────────────────
+  // ── 13. Persist decisions + restore actioned statuses ────────────────
   const siteId = cfg.site_id;
-  persistDecisions(decisions, siteId).then((idMap) => {
-    if (idMap.size > 0) {
-      const currentHashes = Array.from(idMap.values());
-      supersedeOldDecisions(siteId, currentHashes).catch(() => {});
-    }
-  }).catch(() => {});
+
+  // Apply prior actioned statuses so actionsCompleted is accurate and the
+  // UI shows correct button states without resetting to "pending" on reload.
+  const decisionsWithStatus = await applyActionedStatuses(decisions, siteId);
+
+  // Persist in background — don't block the response
+  const currentHashes = decisions.map(hashDecision);
+  persistDecisions(decisions, siteId)
+    .then(() => supersedeOldDecisions(siteId, currentHashes))
+    .catch(() => {});
 
   // ── Return full output ───────────────────────────────────────────────
   return {
@@ -297,7 +301,7 @@ export async function runCopilot(): Promise<CopilotOutput> {
     serviceImpact,
     serviceScore,
     insights,
-    decisions,
+    decisions: decisionsWithStatus,
     trustState,
     operatingScore,
     generatedAt: now.toISOString(),
