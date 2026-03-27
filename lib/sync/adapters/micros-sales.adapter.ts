@@ -12,7 +12,6 @@ import { MicrosApiClient } from "@/lib/micros/client";
 import { getMicrosEnvConfig, isMicrosEnabled } from "@/lib/micros/config";
 import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
 import { aggregateGuestChecksToDailySales } from "@/services/micros/normalize";
-import { computeHash } from "../hash";
 import { logger } from "@/lib/logger";
 import type {
   SourceAdapter,
@@ -39,35 +38,38 @@ interface MicrosSalesRawRecord extends RawRecord {
 
 export const microsSalesAdapter: SourceAdapter<MicrosSalesRawRecord> = {
   /**
-   * Phase 1: Validate MICROS is enabled + connection exists for this site.
+   * Phase 1: Validate MICROS is enabled + a connected connection exists.
    */
   async validate(config: SyncConfig): Promise<void> {
     if (!isMicrosEnabled()) {
       throw new Error("MICROS integration is disabled (MICROS_ENABLED != true)");
     }
 
+    const cfg = getMicrosEnvConfig();
+    if (!cfg.locRef) {
+      throw new Error("MICROS_LOCATION_REF is not configured");
+    }
+
     const supabase = createServerClient();
     const { data: conn } = await supabase
       .from("micros_connections")
       .select("id, loc_ref, status")
-      .eq("id", config.siteId)
+      .eq("loc_ref", cfg.locRef)
+      .eq("status", "connected")
       .maybeSingle();
 
-    // Fallback: look up connection by site
     if (!conn) {
-      const { data: site } = await supabase
-        .from("sites")
-        .select("id")
-        .eq("id", config.siteId)
-        .maybeSingle();
-
-      if (!site) {
-        throw new Error(`Site ${config.siteId} not found`);
-      }
+      throw new Error(
+        `No active MICROS connection found for loc_ref ${cfg.locRef}. ` +
+        `Check the micros_connections table and ensure status='connected'.`,
+      );
     }
 
-    // Verify env config is available
-    getMicrosEnvConfig();
+    logger.info("[adapter:micros-sales] Validate OK", {
+      siteId: config.siteId,
+      connectionId: conn.id,
+      locRef: conn.loc_ref,
+    });
   },
 
   /**
@@ -78,12 +80,12 @@ export const microsSalesAdapter: SourceAdapter<MicrosSalesRawRecord> = {
     const cfg = getMicrosEnvConfig();
     const supabase = createServerClient();
 
-    // Resolve connection for this site
+    // Resolve connection by loc_ref (deterministic — safe for multi-site future)
     const { data: connection } = await supabase
       .from("micros_connections")
       .select("id, loc_ref, access_token, token_expires_at")
-      .order("created_at", { ascending: false })
-      .limit(1)
+      .eq("loc_ref", cfg.locRef)
+      .eq("status", "connected")
       .maybeSingle();
 
     if (!connection) {

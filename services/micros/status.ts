@@ -19,7 +19,7 @@ const SAFE_CONNECTION_COLUMNS =
 export async function getMicrosStatus(): Promise<MicrosStatusSummary> {
   const supabase = createServerClient();
 
-  const [connRes, runRes] = await Promise.all([
+  const [connRes, v1RunRes, v2RunRes] = await Promise.all([
     supabase
       .from("micros_connections")
       .select(SAFE_CONNECTION_COLUMNS)
@@ -27,16 +27,48 @@ export async function getMicrosStatus(): Promise<MicrosStatusSummary> {
       .limit(1)
       .maybeSingle(),
 
+    // V1 sync run history
     supabase
       .from("micros_sync_runs")
       .select("id, connection_id, sync_type, started_at, completed_at, status, records_fetched, records_inserted, error_message")
       .order("started_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
+
+    // V2 sync engine run history (sales only)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (supabase.from("sync_runs") as any)
+      .select("id, status, started_at, completed_at, records_fetched, records_written, error_message")
+      .eq("sync_type", "sales")
+      .eq("source", "micros")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle() as Promise<{ data: { id: string; status: string; started_at: string; completed_at: string | null; records_fetched: number; records_written: number; error_message: string | null } | null }>,
   ]);
 
   const connection = (connRes.data as MicrosConnection | null) ?? null;
-  const lastRun    = (runRes.data as MicrosSyncRun | null) ?? null;
+  const v1Run      = (v1RunRes.data as MicrosSyncRun | null) ?? null;
+  const v2Run      = v2RunRes.data ?? null;
+
+  // Promote V2 run to MicrosSyncRun shape if it's more recent than V1
+  let lastRun: MicrosSyncRun | null = v1Run;
+  if (v2Run) {
+    const v2StartedAt = v2Run.started_at ? new Date(v2Run.started_at).getTime() : 0;
+    const v1StartedAt = v1Run?.started_at ? new Date(v1Run.started_at).getTime() : 0;
+    if (v2StartedAt >= v1StartedAt) {
+      lastRun = {
+        id:               v2Run.id,
+        connection_id:    connection?.id ?? "",
+        sync_type:        "full",
+        started_at:       v2Run.started_at,
+        completed_at:     v2Run.completed_at,
+        status:           v2Run.status as MicrosSyncRun["status"],
+        records_fetched:  v2Run.records_fetched ?? 0,
+        records_inserted: v2Run.records_written ?? 0,
+        error_message:    v2Run.error_message ?? null,
+      };
+    }
+  }
 
   // Sanitize any stale legacy error text before it propagates to UI
   if (connection?.last_sync_error) {

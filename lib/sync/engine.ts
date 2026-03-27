@@ -314,7 +314,7 @@ async function createRunRecord(
 ): Promise<void> {
   const supabase = createServerClient();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase.from("sync_runs") as any).insert({
+  const { error } = await (supabase.from("sync_runs") as any).insert({
     id: runId,
     site_id: config.siteId,
     sync_type: config.syncType,
@@ -325,6 +325,15 @@ async function createRunRecord(
     started_at: new Date().toISOString(),
     metadata: { businessDate, ...config.metadata },
   });
+  if (error) {
+    logger.error("[sync:engine] Failed to create run record — sync will proceed but won't be visible in sync_runs", {
+      runId,
+      siteId: config.siteId,
+      syncType: config.syncType,
+      error: error.message,
+      errorCode: error.code,
+    });
+  }
 }
 
 async function finalizeRun(
