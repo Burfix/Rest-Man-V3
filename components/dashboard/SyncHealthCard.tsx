@@ -8,6 +8,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 interface TypeStatus {
@@ -48,6 +49,7 @@ function formatAgo(minutes: number | null): string {
 }
 
 export default function SyncHealthCard() {
+  const router = useRouter();
   const [data, setData] = useState<SyncStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
@@ -81,8 +83,9 @@ export default function SyncHealthCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ syncType }),
       });
-      // Refresh status after sync
+      // Refresh status pill and re-render the page with fresh data
       await fetchStatus();
+      router.refresh();
     } catch {
       // Will show in next status refresh
     } finally {
