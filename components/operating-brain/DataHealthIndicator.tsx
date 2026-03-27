@@ -31,10 +31,8 @@ const TONE_DOT: Record<string, string> = {
 
 async function syncAll(): Promise<{ ok: number; failed: number }> {
   const endpoints = [
-    { url: "/api/micros/sync", method: "POST" },
+    { url: "/api/micros/sync",        method: "POST" },
     { url: "/api/micros/labour-sync", method: "POST", body: JSON.stringify({ mode: "delta" }) },
-    { url: "/api/forecast/briefing", method: "GET" },
-    { url: "/api/ops/operating-score", method: "GET" },
   ];
 
   const results = await Promise.allSettled(
@@ -69,7 +67,8 @@ export default function DataHealthIndicator({ health }: Props) {
     try {
       const result = await syncAll();
       setSyncResult(result);
-      // Refresh the page to pick up fresh data
+      // Brief pause so the user can read the result before the panel re-renders
+      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
       router.refresh();
     } finally {
       setSyncing(false);

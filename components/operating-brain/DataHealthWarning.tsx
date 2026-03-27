@@ -62,10 +62,8 @@ const SOURCE_REMEDIATION: Record<string, string> = {
 
 async function syncAll(): Promise<{ ok: number; failed: number }> {
   const endpoints = [
-    { url: "/api/micros/sync",           method: "POST" },
-    { url: "/api/micros/labour-sync",    method: "POST", body: JSON.stringify({ mode: "delta" }) },
-    { url: "/api/micros/inventory-sync", method: "POST" },
-    { url: "/api/reviews/sync",          method: "POST" },
+    { url: "/api/micros/sync",        method: "POST" },
+    { url: "/api/micros/labour-sync", method: "POST", body: JSON.stringify({ mode: "delta" }) },
   ];
 
   const results = await Promise.allSettled(
@@ -102,6 +100,8 @@ export default function DataHealthWarning({ health }: Props) {
     try {
       const result = await syncAll();
       setSyncResult(result);
+      // Brief pause so the user can read the result before the panel re-renders
+      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
       router.refresh();
     } finally {
       setSyncing(false);
@@ -117,6 +117,11 @@ export default function DataHealthWarning({ health }: Props) {
           <span className="text-xs font-semibold text-emerald-400">{meta.label}</span>
           <span className="text-[10px] text-stone-500 ml-auto">{health.summary}</span>
         </div>
+        {syncResult && (
+          <div className="mt-1.5 text-[11px] text-emerald-500">
+            ✓ Sync complete — {syncResult.ok} source{syncResult.ok !== 1 ? "s" : ""} updated
+          </div>
+        )}
       </div>
     );
   }
