@@ -264,12 +264,12 @@ export default async function ActionsPage() {
                 <span className={`shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
                   a.status === "completed"   ? "bg-emerald-900/40 text-emerald-400" :
                   a.status === "in_progress" ? "bg-amber-900/30 text-amber-400" :
-                  a.status === "escalated"   ? "bg-red-900/30 text-red-400" :
+                  (a.status as string) === "escalated" ? "bg-red-900/30 text-red-400" :
                                                "bg-stone-800 text-stone-400"
                 }`}>
                   {a.status === "in_progress" ? "In Progress" :
                    a.status === "completed"   ? "Done" :
-                   a.status === "escalated"   ? "Escalated" : "Pending"}
+                   (a.status as string) === "escalated" ? "Escalated" : "Pending"}
                 </span>
               </div>
             ))}
