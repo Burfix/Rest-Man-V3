@@ -31,6 +31,16 @@ export default async function LabourPage() {
       if (!summary) {
         summary = await buildDailySummary(locRef);
       }
+      // If today has no data (no timecards yet), fall back to yesterday
+      if (!summary || (summary.totalLabourHours === 0 && summary.activeStaffCount === 0)) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yDate = yesterday.toISOString().split("T")[0];
+        const fallback = await getStoredDailySummary(locRef, yDate);
+        if (fallback && fallback.totalLabourHours > 0) {
+          summary = fallback;
+        }
+      }
     } catch (err) {
       loadError = err instanceof Error ? err.message : "Failed to load labour data";
     }
