@@ -6,7 +6,7 @@
   "regions": ["cpt1"],
   "crons": [
     {
-      "path": "/api/sync/cron",
+      "path": "/api/micros/sync",
       "schedule": "0 4 * * *"
     },
     {
@@ -16,6 +16,10 @@
     {
       "path": "/api/reports/weekly",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/sync/cron",
+      "schedule": "20 4 * * *"
     }
   ]
 }
