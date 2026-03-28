@@ -241,8 +241,14 @@ export async function getCurrentSalesSnapshot(
   if (microsStatus?.latestDailySales) {
     const daily = microsStatus.latestDailySales;
     const mins = microsStatus.minutesSinceSync;
-    if (daily.business_date === businessDate) {
+    if (daily.business_date === businessDate && daily.net_sales > 0) {
       return buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
+    }
+    // If today has zero sales (restaurant not open yet), show yesterday's data
+    if (daily.business_date !== businessDate && daily.net_sales > 0) {
+      const snap = buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
+      snap.notes = [`Showing ${daily.business_date} (today not yet available)`];
+      return snap;
     }
   }
 

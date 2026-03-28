@@ -173,7 +173,14 @@ export default async function OperationsDashboard() {
   // Resolve MICROS locRef from DB connection (not env var)
   const msConn = microsStatus as MicrosStatusSummary | null;
   const locRef = msConn?.connection?.loc_ref ?? process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual";
-  const labourSummary = await getStoredDailySummary(locRef).catch(() => null);
+  let labourSummary = await getStoredDailySummary(locRef).catch(() => null);
+  // Fall back to yesterday if today has no labour data yet
+  if (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0)) {
+    const yest = new Date(); yest.setDate(yest.getDate() - 1);
+    const yDate = yest.toISOString().split("T")[0];
+    const fallback = await getStoredDailySummary(locRef, yDate).catch(() => null);
+    if (fallback && fallback.totalLabourHours > 0) labourSummary = fallback;
+  }
 
   // ─── Unified sales snapshot (single source of truth for revenue) ─────────
   const today_iso = todayISO();
