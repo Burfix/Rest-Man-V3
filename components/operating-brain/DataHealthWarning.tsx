@@ -48,6 +48,7 @@ const TONE_STYLES: Record<string, { dot: string; text: string }> = {
   positive: { dot: "bg-emerald-400", text: "text-emerald-400" },
   warning: { dot: "bg-amber-400", text: "text-amber-400" },
   critical: { dot: "bg-red-400", text: "text-red-400" },
+  neutral: { dot: "bg-stone-600", text: "text-stone-500" },
 };
 
 const SOURCE_REMEDIATION: Record<string, string> = {

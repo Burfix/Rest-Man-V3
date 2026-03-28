@@ -81,8 +81,18 @@ export class MicrosSyncService {
         .eq("id", connection.id)
         .maybeSingle();
 
-      // refresh_token column may not exist yet (pre-migration) — access via untyped cast
-      const refreshToken = (tokenRow as Record<string, unknown> | null)?.refresh_token as string | undefined;
+      // refresh_token column may exist in DB but not in generated types — use a separate query
+      let refreshToken: string | undefined;
+      try {
+        const { data: rtRow } = await supabase
+          .from("micros_connections")
+          .select()
+          .eq("id", connection.id)
+          .maybeSingle();
+        refreshToken = (rtRow as Record<string, unknown> | null)?.refresh_token as string | undefined;
+      } catch {
+        // Column might not exist pre-migration — ignore
+      }
 
       if (tokenRow?.access_token && tokenRow?.token_expires_at) {
         const expiresAt = new Date(tokenRow.token_expires_at).getTime();

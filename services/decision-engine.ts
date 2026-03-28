@@ -685,7 +685,8 @@ export function evaluateOperations(
         tone: ageMin <= 30 ? "positive" : ageMin <= 120 ? "warning" : "critical",
       });
     } else {
-      details.push({ source, label: "No data", tone: "critical" });
+      // No data available — treat as inactive/unconfigured, not critical
+      details.push({ source, label: "Not connected", tone: "neutral" });
     }
   };
   addFreshness("Sales", input.freshness.salesAgeMinutes);

@@ -352,6 +352,8 @@ export default async function OperationsDashboard() {
             forecastCovers={forecast?.forecast_covers}
             insights={engineOutput.servicePulseInsights}
             isLive={salesSnapshot.isLive}
+            source={salesSnapshot.source}
+            sourceNote={salesSnapshot.notes?.[0]}
           />
         </div>
 

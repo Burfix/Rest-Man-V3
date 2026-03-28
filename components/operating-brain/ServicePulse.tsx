@@ -24,6 +24,10 @@ type Props = {
   forecastCovers?: number | null;
   insights: string[];
   isLive: boolean;
+  /** Data source: "micros" | "manual" | "forecast" */
+  source?: string;
+  /** Contextual note, e.g. "Showing 2026-03-27 (today's trading not yet started)" */
+  sourceNote?: string;
 };
 
 export default function ServicePulse({
@@ -37,9 +41,25 @@ export default function ServicePulse({
   forecastCovers,
   insights,
   isLive,
+  source,
+  sourceNote,
 }: Props) {
   const isAhead = variancePercent >= 0;
   const pacePercent = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
+
+  // Determine accurate label based on source + freshness
+  const isYesterday = sourceNote?.includes("today's trading not yet started") || sourceNote?.includes("today not yet available");
+  const revenueLabel = source === "forecast"
+    ? "Forecast Revenue"
+    : source === "manual"
+      ? "Uploaded Revenue"
+      : isLive
+        ? "Live Revenue"
+        : isYesterday
+          ? "Yesterday's Revenue"
+          : "MICROS Revenue";
+  const showForecastBadge = source === "forecast";
+  const showYesterdayBadge = !isLive && source === "micros" && isYesterday;
 
   return (
     <div className="space-y-2">
@@ -51,7 +71,7 @@ export default function ServicePulse({
         <div className="flex items-end justify-between mb-2">
           <div>
             <span className="text-[10px] uppercase tracking-wider text-stone-500">
-              {isLive ? "Live" : "Forecast"} Revenue
+              {revenueLabel}
             </span>
             <div className="flex items-baseline gap-2 mt-0.5">
               <span className="text-xl font-bold text-stone-100 font-mono">
@@ -90,9 +110,14 @@ export default function ServicePulse({
           {forecastCovers != null && (
             <span>{forecastCovers} forecast covers</span>
           )}
-          {!isLive && (
+          {showForecastBadge && (
             <span className="rounded bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-500 font-medium">
               Forecast mode
+            </span>
+          )}
+          {showYesterdayBadge && (
+            <span className="rounded bg-amber-900/40 px-1.5 py-0.5 text-[10px] text-amber-500 font-medium">
+              Yesterday&apos;s close
             </span>
           )}
         </div>
