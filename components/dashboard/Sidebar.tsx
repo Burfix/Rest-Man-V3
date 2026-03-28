@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { isNavItemAllowed } from "@/lib/rbac/nav-access";
+import type { UserRole } from "@/lib/ontology/entities";
 
 // ── Nav data ──────────────────────────────────────────────────────────────────
 
@@ -74,13 +76,23 @@ const NAV: NavGroup[] = [
 function NavList({
   pathname,
   onNavClick,
+  role,
 }: {
   pathname: string;
   onNavClick?: () => void;
+  role?: UserRole;
 }) {
+  // Filter nav groups based on role
+  const filteredNav = role
+    ? NAV.map((group) => ({
+        ...group,
+        items: group.items.filter((item) => isNavItemAllowed(role, item.href)),
+      })).filter((group) => group.items.length > 0)
+    : NAV;
+
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5">
-      {NAV.map((group, gi) => (
+      {filteredNav.map((group, gi) => (
         <div key={gi}>
           {group.group && (
             <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
@@ -132,9 +144,10 @@ function NavList({
 
 interface Props {
   footer?: React.ReactNode;
+  role?: UserRole;
 }
 
-export default function Sidebar({ footer }: Props) {
+export default function Sidebar({ footer, role }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -161,7 +174,7 @@ export default function Sidebar({ footer }: Props) {
           </div>
         </div>
 
-        <NavList pathname={pathname} />
+        <NavList pathname={pathname} role={role} />
         {footer}
       </aside>
 
@@ -215,7 +228,7 @@ export default function Sidebar({ footer }: Props) {
               </button>
             </div>
 
-            <NavList pathname={pathname} onNavClick={() => setOpen(false)} />
+            <NavList pathname={pathname} onNavClick={() => setOpen(false)} role={role} />
             {footer}
           </div>
         </div>
