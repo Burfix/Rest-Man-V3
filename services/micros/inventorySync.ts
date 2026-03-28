@@ -212,10 +212,17 @@ export async function syncMicrosInventory(
   const hasBatchTable = !batchErr;
 
   try {
-    // 2. Validate MICROS is enabled
+    // 2. Validate MICROS is enabled + IM module is provisioned
     if (!isMicrosEnabled()) {
       const msg = "MICROS integration is disabled (MICROS_ENABLED != true)";
       logger.warn("Inventory sync skipped: MICROS disabled", logMeta);
+      await finalizeBatch(supabase, batchId, "skipped", 0, 0, 0, 0, msg);
+      return { ok: false, source: "micros-im", siteId, fetched: 0, inserted: 0, updated: 0, failed: 0, syncedAt, error: msg };
+    }
+
+    if (process.env.MICROS_IM_ENABLED !== "true") {
+      const msg = "MICROS IM module not enabled (set MICROS_IM_ENABLED=true when provisioned)";
+      logger.info("Inventory sync skipped: IM not enabled", logMeta);
       await finalizeBatch(supabase, batchId, "skipped", 0, 0, 0, 0, msg);
       return { ok: false, source: "micros-im", siteId, fetched: 0, inserted: 0, updated: 0, failed: 0, syncedAt, error: msg };
     }
@@ -239,14 +246,12 @@ export async function syncMicrosInventory(
     // 4. Call Oracle IM API (uses standard RNA PKCE credentials)
     const imResult = await fetchAllStockOnHand({ requestId, siteId });
 
-    // Persist refreshed token back to DB
+    // Persist refreshed token back to DB (token only — do NOT touch status/last_sync_at)
     const tokenInfo = getCachedMicrosToken();
     if (tokenInfo && connection?.id) {
       const tokenUpdate: Record<string, unknown> = {
         access_token: tokenInfo.idToken,
         token_expires_at: new Date(tokenInfo.expiresAt).toISOString(),
-        status: "connected",
-        last_sync_at: new Date().toISOString(),
       };
       if (tokenInfo.refreshToken) tokenUpdate.refresh_token = tokenInfo.refreshToken;
       await (supabase as any)
@@ -293,14 +298,8 @@ export async function syncMicrosInventory(
     const status = failed > 0 ? "partial" : "success";
     await finalizeBatch(supabase, batchId, status, fetched, inserted, updated, failed);
 
-    // 6. Update micros_connections last_sync_at
-    if (connection?.id) {
-      const now = new Date().toISOString();
-      await (supabase as any)
-        .from("micros_connections")
-        .update({ last_sync_at: now, last_successful_sync_at: now })
-        .eq("id", connection.id);
-    }
+    // 6. Inventory sync does NOT update micros_connections last_sync_at
+    // Those timestamps belong to sales/labour syncs only
 
     const totalMs = Date.now() - startMs;
     logger.info("Inventory sync completed", {

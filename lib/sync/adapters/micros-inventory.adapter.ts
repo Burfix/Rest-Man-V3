@@ -87,6 +87,10 @@ export const microsInventoryAdapter: SourceAdapter<InventoryRawRecord> = {
    * Phase 5: Fetch stock-on-hand from Oracle IM API.
    */
   async fetch(config: SyncConfig, _checkpoint?: SyncCheckpoint): Promise<InventoryRawRecord[]> {
+    if (process.env.MICROS_IM_ENABLED !== "true") {
+      throw new Error("MICROS IM module not enabled (set MICROS_IM_ENABLED=true when provisioned)");
+    }
+
     const cfg = getMicrosEnvConfig();
     const supabase = createServerClient();
 
@@ -127,14 +131,12 @@ export const microsInventoryAdapter: SourceAdapter<InventoryRawRecord> = {
       durationMs: result.durationMs,
     });
 
-    // Persist token to DB after successful fetch
+    // Persist token to DB after successful fetch (token only — do NOT touch status/last_sync_at)
     const tokenInfo = getCachedMicrosToken();
     if (tokenInfo) {
       const tokenUpdate: Record<string, unknown> = {
         access_token: tokenInfo.idToken,
         token_expires_at: new Date(tokenInfo.expiresAt).toISOString(),
-        status: "connected",
-        last_sync_at: new Date().toISOString(),
       };
       if (tokenInfo.refreshToken) tokenUpdate.refresh_token = tokenInfo.refreshToken;
       await supabase

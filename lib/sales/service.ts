@@ -237,15 +237,19 @@ export async function getCurrentSalesSnapshot(
   bookedCoversToday: number | null,
   siteId?: string,
 ): Promise<NormalizedSalesSnapshot> {
+  const logTag = "[SalesSnapshot]";
+
   // 1. Try MICROS live data — use it for today regardless of sync age
   if (microsStatus?.latestDailySales) {
     const daily = microsStatus.latestDailySales;
     const mins = microsStatus.minutesSinceSync;
     if (daily.business_date === businessDate && daily.net_sales > 0) {
+      console.info(`${logTag} source=micros date=${businessDate} net=${daily.net_sales} mins=${mins}`);
       return buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
     }
     // If latest row is from a different date and has sales, use it
     if (daily.business_date !== businessDate && daily.net_sales > 0) {
+      console.info(`${logTag} source=micros date=${daily.business_date} net=${daily.net_sales} (different date fallback)`);
       const snap = buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
       snap.notes = [`Showing ${daily.business_date} (today not yet available)`];
       return snap;
@@ -254,25 +258,30 @@ export async function getCurrentSalesSnapshot(
     if (daily.business_date === businessDate && daily.net_sales === 0 && microsStatus.connection?.id) {
       const yesterdayRow = await fetchYesterdayMicrosRow(microsStatus.connection.id);
       if (yesterdayRow && yesterdayRow.net_sales > 0) {
+        console.info(`${logTag} source=micros-yesterday date=${yesterdayRow.business_date} net=${yesterdayRow.net_sales} (today=0 fallback)`);
         const snap = buildFromMicros(yesterdayRow, mins, forecast, bookingsToday, bookedCoversToday);
         snap.notes = [`Showing ${yesterdayRow.business_date} (today's trading not yet started)`];
         return snap;
       }
+      console.warn(`${logTag} today=${businessDate} net=0, yesterday has no data either`);
     }
   }
 
   // 2. Try manual upload for today
   const manual = await getManualSalesForDate(businessDate, siteId);
   if (manual) {
+    console.info(`${logTag} source=manual date=${businessDate}`);
     return buildFromManual(manual, forecast, bookingsToday, bookedCoversToday);
   }
 
   // 3. Forecast fallback
   if (forecast) {
+    console.info(`${logTag} source=forecast date=${businessDate} (no MICROS or manual data)`);
     return buildFromForecast(forecast, bookingsToday, bookedCoversToday);
   }
 
   // 4. Absolute fallback — no data at all
+  console.warn(`${logTag} source=NONE date=${businessDate} — no MICROS, manual, or forecast data`);
   return {
     source: "forecast",
     sourceLabel: "NO DATA",

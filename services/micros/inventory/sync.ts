@@ -62,6 +62,10 @@ export async function syncInventoryFromMicros(
     return { success: false, message: "MICROS integration is disabled." };
   }
 
+  if (process.env.MICROS_IM_ENABLED !== "true") {
+    return { success: false, message: "MICROS IM module not enabled (set MICROS_IM_ENABLED=true when provisioned)." };
+  }
+
   const supabase = createServerClient();
   const syncRunId = crypto.randomUUID();
 
@@ -97,13 +101,12 @@ export async function syncInventoryFromMicros(
       siteId: connection.id,
     });
 
-    // Persist refreshed token
+    // Persist refreshed token (token only — do NOT touch status/last_sync_at)
     const tokenInfo = getCachedMicrosToken();
     if (tokenInfo) {
       const tokenUpdate: Record<string, unknown> = {
         access_token: tokenInfo.idToken,
         token_expires_at: new Date(tokenInfo.expiresAt).toISOString(),
-        status: "connected",
       };
       if (tokenInfo.refreshToken) tokenUpdate.refresh_token = tokenInfo.refreshToken;
       await supabase
