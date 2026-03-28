@@ -29,36 +29,63 @@ const TONE_DOT: Record<string, string> = {
   critical: "bg-red-400",
 };
 
-async function syncAll(): Promise<{ ok: number; failed: number }> {
+interface SyncAllResult {
+  ok: number;
+  failed: number;
+  errors: string[];
+}
+
+async function syncAll(): Promise<SyncAllResult> {
   const endpoints = [
-    { url: "/api/micros/sync",           method: "POST" },
-    { url: "/api/micros/labour-sync",    method: "POST", body: JSON.stringify({ mode: "delta" }) },
-    // Inventory sync shelved — do not include until IM module is provisioned
+    { label: "Sales",  url: "/api/micros/sync",        method: "POST" },
+    { label: "Labour", url: "/api/micros/labour-sync",  method: "POST", body: JSON.stringify({ mode: "delta" }) },
   ];
 
   const results = await Promise.allSettled(
     endpoints.map(({ url, method, body }) =>
       fetch(url, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
-        body,
+        headers: { "Content-Type": "application/json" },
+        body: body ?? "{}",
       }),
     ),
   );
 
   let ok = 0;
   let failed = 0;
-  for (const r of results) {
-    if (r.status === "fulfilled" && r.value.ok) ok++;
-    else failed++;
+  const errors: string[] = [];
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const label = endpoints[i].label;
+    if (r.status === "rejected") {
+      failed++;
+      errors.push(`${label}: ${r.reason}`);
+    } else if (!r.value.ok) {
+      failed++;
+      const text = await r.value.text().catch(() => "");
+      errors.push(`${label}: HTTP ${r.value.status} — ${text.slice(0, 120)}`);
+    } else {
+      try {
+        const json = await r.value.json();
+        if (json.ok === false) {
+          failed++;
+          errors.push(`${label}: ${json.message || "Sync returned failure"}`);
+        } else {
+          ok++;
+        }
+      } catch {
+        ok++;
+      }
+    }
   }
-  return { ok, failed };
+  return { ok, failed, errors };
 }
 
 export default function DataHealthIndicator({ health }: Props) {
   const [open, setOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ ok: number; failed: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null);
   const router = useRouter();
   const cfg = STATUS_STYLES[health.status];
 
@@ -68,9 +95,10 @@ export default function DataHealthIndicator({ health }: Props) {
     try {
       const result = await syncAll();
       setSyncResult(result);
-      // Brief pause so the user can read the result before the panel re-renders
-      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
-      router.refresh();
+      if (result.ok > 0) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+        router.refresh();
+      }
     } finally {
       setSyncing(false);
     }

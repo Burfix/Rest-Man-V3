@@ -61,35 +61,63 @@ const SOURCE_REMEDIATION: Record<string, string> = {
   Forecast: "Forecast pulls from Google Calendar + historical sales.",
 };
 
-async function syncAll(): Promise<{ ok: number; failed: number }> {
+interface SyncAllResult {
+  ok: number;
+  failed: number;
+  errors: string[];
+}
+
+async function syncAll(): Promise<SyncAllResult> {
   const endpoints = [
-    { url: "/api/micros/sync",           method: "POST" },
-    { url: "/api/micros/labour-sync",    method: "POST", body: JSON.stringify({ mode: "delta" }) },
-    // Inventory sync shelved — do not include until IM module is provisioned
+    { label: "Sales",  url: "/api/micros/sync",        method: "POST" },
+    { label: "Labour", url: "/api/micros/labour-sync",  method: "POST", body: JSON.stringify({ mode: "delta" }) },
   ];
 
   const results = await Promise.allSettled(
     endpoints.map(({ url, method, body }) =>
       fetch(url, {
         method,
-        headers: body ? { "Content-Type": "application/json" } : undefined,
-        body,
+        headers: { "Content-Type": "application/json" },
+        body: body ?? "{}",
       }),
     ),
   );
 
   let ok = 0;
   let failed = 0;
-  for (const r of results) {
-    if (r.status === "fulfilled" && r.value.ok) ok++;
-    else failed++;
+  const errors: string[] = [];
+
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i];
+    const label = endpoints[i].label;
+    if (r.status === "rejected") {
+      failed++;
+      errors.push(`${label}: ${r.reason}`);
+    } else if (!r.value.ok) {
+      failed++;
+      const text = await r.value.text().catch(() => "");
+      errors.push(`${label}: HTTP ${r.value.status} — ${text.slice(0, 120)}`);
+    } else {
+      // HTTP 200 — check the JSON body for { ok: false }
+      try {
+        const json = await r.value.json();
+        if (json.ok === false) {
+          failed++;
+          errors.push(`${label}: ${json.message || "Sync returned failure"}`);
+        } else {
+          ok++;
+        }
+      } catch {
+        ok++; // non-JSON 200 is still ok
+      }
+    }
   }
-  return { ok, failed };
+  return { ok, failed, errors };
 }
 
 export default function DataHealthWarning({ health }: Props) {
   const [syncing, setSyncing] = useState(false);
-  const [syncResult, setSyncResult] = useState<{ ok: number; failed: number } | null>(null);
+  const [syncResult, setSyncResult] = useState<SyncAllResult | null>(null);
   const router = useRouter();
   const meta = STATUS_META[health.status];
 
@@ -102,9 +130,12 @@ export default function DataHealthWarning({ health }: Props) {
     try {
       const result = await syncAll();
       setSyncResult(result);
-      // Brief pause so the user can read the result before the panel re-renders
-      await new Promise<void>((resolve) => setTimeout(resolve, 2000));
-      router.refresh();
+      if (result.ok > 0) {
+        // Wait so user sees the result, then refresh page data
+        await new Promise<void>((resolve) => setTimeout(resolve, 3000));
+        router.refresh();
+      }
+      // If all failed, keep the error visible (no refresh)
     } finally {
       setSyncing(false);
     }
@@ -120,8 +151,18 @@ export default function DataHealthWarning({ health }: Props) {
           <span className="text-[10px] text-stone-500 ml-auto">{health.summary}</span>
         </div>
         {syncResult && (
-          <div className="mt-1.5 text-[11px] text-emerald-500">
-            ✓ Sync complete — {syncResult.ok} source{syncResult.ok !== 1 ? "s" : ""} updated
+          <div className={cn(
+            "mt-1.5 text-[11px]",
+            syncResult.failed > 0 ? "text-red-400" : "text-emerald-500",
+          )}>
+            {syncResult.failed > 0
+              ? `⚠ Sync: ${syncResult.ok} ok, ${syncResult.failed} failed`
+              : `✓ Sync complete — ${syncResult.ok} source${syncResult.ok !== 1 ? "s" : ""} updated`}
+            {syncResult.errors.length > 0 && (
+              <div className="mt-1 text-[10px] text-red-400/80 font-mono space-y-0.5">
+                {syncResult.errors.map((e, i) => <div key={i}>{e}</div>)}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -196,8 +237,18 @@ export default function DataHealthWarning({ health }: Props) {
 
       {/* Sync result */}
       {syncResult && (
-        <div className="text-[11px] text-stone-500 pt-1 border-t border-stone-800/30">
-          Synced: {syncResult.ok} ok, {syncResult.failed} failed
+        <div className={cn(
+          "text-[11px] pt-2 border-t border-stone-800/30",
+          syncResult.failed > 0 ? "text-red-400" : "text-emerald-500",
+        )}>
+          {syncResult.failed > 0
+            ? `⚠ ${syncResult.ok} ok, ${syncResult.failed} failed`
+            : `✓ ${syncResult.ok} source${syncResult.ok !== 1 ? "s" : ""} synced`}
+          {syncResult.errors.length > 0 && (
+            <div className="mt-1 text-[10px] text-red-400/80 font-mono space-y-0.5 break-all">
+              {syncResult.errors.map((e, i) => <div key={i}>{e}</div>)}
+            </div>
+          )}
         </div>
       )}
     </div>
