@@ -128,6 +128,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: roleErr.message }, { status: 500 });
     }
 
+    // Grant site access if a site was specified
+    if (d.site_id) {
+      await supabase.from("user_site_access").insert({
+        user_id: userId,
+        site_id: d.site_id,
+        granted_by: ctx.userId,
+      } as any).then(() => {}); // ignore duplicate
+    }
+
     // Audit log
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
