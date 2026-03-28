@@ -127,8 +127,14 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY srole_profiles ON profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY users_read_own_profile ON profiles FOR SELECT TO authenticated USING (id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='srole_profiles') THEN
+    CREATE POLICY srole_profiles ON profiles FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='profiles' AND policyname='users_read_own_profile') THEN
+    CREATE POLICY users_read_own_profile ON profiles FOR SELECT TO authenticated USING (id = auth.uid());
+  END IF;
+END $$;
 
 INSERT INTO profiles (id, email, full_name, status)
 VALUES (
@@ -165,8 +171,14 @@ CREATE INDEX IF NOT EXISTS idx_usa_user ON user_site_access (user_id);
 CREATE INDEX IF NOT EXISTS idx_usa_site ON user_site_access (site_id);
 
 ALTER TABLE user_site_access ENABLE ROW LEVEL SECURITY;
-CREATE POLICY srole_usa ON user_site_access FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY users_read_own_usa ON user_site_access FOR SELECT TO authenticated USING (user_id = auth.uid());
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_site_access' AND policyname='srole_usa') THEN
+    CREATE POLICY srole_usa ON user_site_access FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='user_site_access' AND policyname='users_read_own_usa') THEN
+    CREATE POLICY users_read_own_usa ON user_site_access FOR SELECT TO authenticated USING (user_id = auth.uid());
+  END IF;
+END $$;
 
 INSERT INTO user_site_access (user_id, site_id) VALUES
   ('5fa15569-8415-4118-9d83-1fd7d8408963', '00000000-0000-0000-0000-000000000001'),
@@ -189,7 +201,11 @@ CREATE INDEX IF NOT EXISTS idx_aal_target  ON access_audit_log (target_user_id);
 CREATE INDEX IF NOT EXISTS idx_aal_created ON access_audit_log (created_at DESC);
 
 ALTER TABLE access_audit_log ENABLE ROW LEVEL SECURITY;
-CREATE POLICY srole_aal ON access_audit_log FOR ALL TO service_role USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='access_audit_log' AND policyname='srole_aal') THEN
+    CREATE POLICY srole_aal ON access_audit_log FOR ALL TO service_role USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 -- ── user_accessible_sites RPC ─────────────────────────────────────────────────
 
