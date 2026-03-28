@@ -527,7 +527,7 @@ function TeamPanel({
       await apiFetch("/api/admin/impersonate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ targetUserId: userId }),
+        body: JSON.stringify({ target_user_id: userId }),
       });
       router.push("/dashboard");
       router.refresh();
