@@ -147,7 +147,7 @@ export default function DataHealthWarning({ health }: Props) {
           disabled={syncing}
           className={cn(
             "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
-            "bg-sky-600/80 text-white hover:bg-sky-500/90",
+            "bg-orange-600/80 text-white hover:bg-orange-500/90",
             syncing && "opacity-50 cursor-not-allowed",
           )}
         >
