@@ -2,6 +2,7 @@ import Sidebar from "@/components/dashboard/Sidebar";
 import UserProfile from "@/components/dashboard/UserProfile";
 import ThemeToggle from "@/components/dashboard/ThemeToggle";
 import AutoRefresh from "@/components/dashboard/AutoRefresh";
+import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 
 export const metadata = {
   title: "Dashboard — Ops Engine",
@@ -14,6 +15,7 @@ export default function DashboardLayout({
 }) {
   return (
     <div className="flex h-screen bg-stone-50 dark:bg-[#0f0f0e]">
+      <ImpersonationBanner />
       <Sidebar footer={
         <div>
           <ThemeToggle />

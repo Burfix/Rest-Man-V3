@@ -21,6 +21,11 @@ export interface UserContext {
   siteId: string;       // primary site (for GM/supervisor/contractor)
   siteIds: string[];     // all accessible sites (for area_manager/executive/super_admin)
   orgId: string | null;
+  // Impersonation
+  isImpersonating?: boolean;
+  realUserId?: string;
+  realEmail?: string;
+  realRole?: UserRole;
 }
 
 export class AuthError extends Error {
@@ -115,13 +120,79 @@ export async function getUserContext(): Promise<UserContext> {
     throw new AuthError("No site assigned — contact your administrator", 403);
   }
 
-  return {
+  const baseCtx: UserContext = {
     userId: user.id,
     email: user.email ?? "",
     role,
     siteId,
     siteIds: siteIds.length > 0 ? siteIds : [siteId],
     orgId,
+  };
+
+  // 5. Impersonation — super_admin only
+  if (role === "super_admin") {
+    const impersonateId = (cookieStore as any).get("fs-impersonate")?.value;
+    if (impersonateId && typeof impersonateId === "string" && impersonateId !== user.id) {
+      return resolveImpersonation(db, impersonateId, baseCtx);
+    }
+  }
+
+  return baseCtx;
+}
+
+/**
+ * Resolve the impersonated user's context while preserving real user identity.
+ */
+async function resolveImpersonation(
+  db: any,
+  targetUserId: string,
+  realCtx: UserContext,
+): Promise<UserContext> {
+  const ROLE_RANK: Record<string, number> = {
+    super_admin: 100, executive: 80, head_office: 75, auditor: 70,
+    area_manager: 60, gm: 40, supervisor: 20, contractor: 10, viewer: 5,
+  };
+
+  const { data: targetRoles } = await db
+    .from("user_roles")
+    .select("role, site_id, organisation_id, region_id")
+    .eq("user_id", targetUserId)
+    .eq("is_active", true)
+    .is("revoked_at", null)
+    .order("granted_at", { ascending: false });
+
+  if (!targetRoles || targetRoles.length === 0) return realCtx; // fallback
+
+  const sorted = [...targetRoles].sort(
+    (a, b) => (ROLE_RANK[b.role] ?? 0) - (ROLE_RANK[a.role] ?? 0),
+  );
+  const tp = sorted[0];
+
+  const { data: targetSites } = await db.rpc("user_accessible_sites", {
+    p_user_id: targetUserId,
+  });
+  const tSiteIds = ((targetSites ?? []) as { site_id: string }[]).map((r) => r.site_id);
+
+  // Fetch target profile for email
+  const { data: profile } = await db
+    .from("profiles")
+    .select("email")
+    .eq("id", targetUserId)
+    .maybeSingle();
+
+  const targetSiteId = (tp.site_id as string) ?? tSiteIds[0] ?? realCtx.siteId;
+
+  return {
+    userId: targetUserId,
+    email: (profile as any)?.email ?? "unknown",
+    role: tp.role as UserRole,
+    siteId: targetSiteId,
+    siteIds: tSiteIds.length > 0 ? tSiteIds : [targetSiteId],
+    orgId: (tp.organisation_id as string) ?? null,
+    isImpersonating: true,
+    realUserId: realCtx.userId,
+    realEmail: realCtx.email,
+    realRole: realCtx.role,
   };
 }
 
