@@ -691,8 +691,14 @@ export function evaluateOperations(
   };
   addFreshness("Sales", input.freshness.salesAgeMinutes);
   addFreshness("Labour", input.freshness.labourAgeMinutes);
-  addFreshness("Inventory", input.freshness.inventoryAgeMinutes);
-  addFreshness("Reviews", undefined, input.freshness.reviewsAgeDays);
+  // Only include Inventory / Reviews when actively connected;
+  // undefined means not configured — omit rather than show "critical"
+  if (input.freshness.inventoryAgeMinutes != null) {
+    addFreshness("Inventory", input.freshness.inventoryAgeMinutes);
+  }
+  if (input.freshness.reviewsAgeDays != null) {
+    addFreshness("Reviews", undefined, input.freshness.reviewsAgeDays);
+  }
 
   const staleCount = details.filter((d) => d.tone === "critical").length;
   const warnCount = details.filter((d) => d.tone === "warning").length;

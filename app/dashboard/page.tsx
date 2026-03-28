@@ -224,7 +224,10 @@ export default async function OperationsDashboard() {
   const labourAgeMinutes = labourSummary?.lastSyncAt
     ? Math.round((now - new Date(labourSummary.lastSyncAt).getTime()) / 60_000)
     : undefined;
-  const inventoryAgeMinutes = inventoryIntel?.lastSynced
+  // Only report inventory freshness when automated sync is active;
+  // otherwise stale manual-count timestamps permanently trigger "critical"
+  const imEnabled = process.env.MICROS_IM_ENABLED === "true";
+  const inventoryAgeMinutes = imEnabled && inventoryIntel?.lastSynced
     ? Math.round((now - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
     : undefined;
 
