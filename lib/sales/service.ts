@@ -244,11 +244,20 @@ export async function getCurrentSalesSnapshot(
     if (daily.business_date === businessDate && daily.net_sales > 0) {
       return buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
     }
-    // If today has zero sales (restaurant not open yet), show yesterday's data
+    // If latest row is from a different date and has sales, use it
     if (daily.business_date !== businessDate && daily.net_sales > 0) {
       const snap = buildFromMicros(daily, mins, forecast, bookingsToday, bookedCoversToday);
       snap.notes = [`Showing ${daily.business_date} (today not yet available)`];
       return snap;
+    }
+    // Today's row exists but has 0 sales (restaurant not open yet) — fetch yesterday from DB
+    if (daily.business_date === businessDate && daily.net_sales === 0 && microsStatus.connection?.id) {
+      const yesterdayRow = await fetchYesterdayMicrosRow(microsStatus.connection.id);
+      if (yesterdayRow && yesterdayRow.net_sales > 0) {
+        const snap = buildFromMicros(yesterdayRow, mins, forecast, bookingsToday, bookedCoversToday);
+        snap.notes = [`Showing ${yesterdayRow.business_date} (today's trading not yet started)`];
+        return snap;
+      }
     }
   }
 
@@ -293,6 +302,22 @@ export async function getCurrentSalesSnapshot(
     bookedCoversToday,
     notes: ["No sales data available — upload daily sales or connect MICROS"],
   };
+}
+
+// ── Yesterday MICROS fallback ────────────────────────────────────────────────
+
+async function fetchYesterdayMicrosRow(connectionId: string): Promise<MicrosSalesDaily | null> {
+  const sb = createServerClient();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yDate = yesterday.toISOString().split("T")[0];
+  const { data } = await sb
+    .from("micros_sales_daily")
+    .select("*")
+    .eq("connection_id", connectionId)
+    .eq("business_date", yDate)
+    .maybeSingle();
+  return (data as MicrosSalesDaily | null) ?? null;
 }
 
 // ── Manual upload query ─────────────────────────────────────────────────────

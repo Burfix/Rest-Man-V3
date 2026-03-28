@@ -64,8 +64,7 @@ async function syncAll(): Promise<{ ok: number; failed: number }> {
   const endpoints = [
     { url: "/api/micros/sync",           method: "POST" },
     { url: "/api/micros/labour-sync",    method: "POST", body: JSON.stringify({ mode: "delta" }) },
-    { url: "/api/micros/inventory-sync", method: "POST", body: JSON.stringify({}) },
-    { url: "/api/inventory/food-cost-sync", method: "POST" },
+    // Inventory sync shelved — do not include until IM module is provisioned
   ];
 
   const results = await Promise.allSettled(

@@ -13,7 +13,7 @@
  * instead of /bi/v1.  Auth tokens are interchangeable.
  */
 
-import { getMicrosIdToken, clearMicrosTokenCache } from "@/lib/micros/auth";
+import { getMicrosIdToken } from "@/lib/micros/auth";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { logger } from "@/lib/logger";
 import type { OracleStockOnHand } from "./inventory/types";
@@ -130,7 +130,10 @@ export async function fetchStockOnHand(
 
       if (!res.ok) {
         // Clear token on 401 so next attempt re-authenticates via PKCE
-        if (res.status === 401) clearMicrosTokenCache();
+        // Do NOT clear shared token cache — IM 401 must not invalidate BI API tokens
+        if (res.status === 401) {
+          logger.warn("[IMClient] 401 from IM API — token may not be valid for IM module");
+        }
 
         // ── Diagnostic logging for auth/access failures ──────────────
         if (res.status === 401 || res.status === 403 || res.status === 404) {
