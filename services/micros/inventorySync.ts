@@ -18,11 +18,11 @@ import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import * as Sentry from "@sentry/nextjs";
 import {
-  resolveIMConfig,
-  validateIMConfig,
-  fetchStockOnHand,
+  fetchAllStockOnHand,
 } from "./imClient";
 import type { OracleStockOnHand } from "./inventory/types";
+import { isMicrosEnabled } from "@/lib/micros/config";
+import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
 import { todayISO } from "@/lib/utils";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -212,31 +212,49 @@ export async function syncMicrosInventory(
   const hasBatchTable = !batchErr;
 
   try {
-    // 2. Load site-specific MICROS connection config
-    const { data: connection } = await (supabase as any)
-      .from("micros_connections")
-      .select("id, app_server_url, org_identifier, loc_ref")
-      .limit(1)
-      .maybeSingle();
-
-    const imConfig = resolveIMConfig(connection);
-    const missing = validateIMConfig(imConfig);
-
-    if (missing.length > 0) {
-      const msg = `MICROS IM not configured: missing ${missing.join(", ")}`;
-      logger.warn("Inventory sync IM config incomplete", { ...logMeta, missing });
-      await finalizeBatch(supabase, batchId, "error", 0, 0, 0, 0, msg);
+    // 2. Validate MICROS is enabled
+    if (!isMicrosEnabled()) {
+      const msg = "MICROS integration is disabled (MICROS_ENABLED != true)";
+      logger.warn("Inventory sync skipped: MICROS disabled", logMeta);
+      await finalizeBatch(supabase, batchId, "skipped", 0, 0, 0, 0, msg);
       return { ok: false, source: "micros-im", siteId, fetched: 0, inserted: 0, updated: 0, failed: 0, syncedAt, error: msg };
     }
 
-    logger.info("MICROS IM config resolved", { ...logMeta, serverUrl: imConfig.serverUrl });
+    // 3. Seed PKCE token cache from DB (cold-start optimisation)
+    const { data: connection } = await (supabase as any)
+      .from("micros_connections")
+      .select("id, loc_ref, access_token, token_expires_at, refresh_token")
+      .limit(1)
+      .maybeSingle();
 
-    // 3. Call Oracle IM API
-    const imResult = await fetchStockOnHand(
-      imConfig,
-      { locationCode: params.locationCode ?? connection?.loc_ref },
-      { requestId, siteId },
-    );
+    if (connection?.access_token && connection?.token_expires_at) {
+      const expiresAt = new Date(connection.token_expires_at).getTime();
+      if (expiresAt > Date.now()) {
+        seedMicrosTokenCache(connection.access_token, expiresAt, connection.refresh_token);
+      }
+    }
+
+    logger.info("MICROS IM config resolved, using PKCE Bearer auth", logMeta);
+
+    // 4. Call Oracle IM API (uses standard RNA PKCE credentials)
+    const imResult = await fetchAllStockOnHand({ requestId, siteId });
+
+    // Persist refreshed token back to DB
+    const tokenInfo = getCachedMicrosToken();
+    if (tokenInfo && connection?.id) {
+      const tokenUpdate: Record<string, unknown> = {
+        access_token: tokenInfo.idToken,
+        token_expires_at: new Date(tokenInfo.expiresAt).toISOString(),
+        status: "connected",
+        last_sync_at: new Date().toISOString(),
+      };
+      if (tokenInfo.refreshToken) tokenUpdate.refresh_token = tokenInfo.refreshToken;
+      await (supabase as any)
+        .from("micros_connections")
+        .update(tokenUpdate)
+        .eq("id", connection.id)
+        .then(null, () => {}); // best-effort
+    }
 
     if (!imResult.ok) {
       logger.error("MICROS IM API failed", { ...logMeta, error: imResult.errorMessage, durationMs: imResult.durationMs });

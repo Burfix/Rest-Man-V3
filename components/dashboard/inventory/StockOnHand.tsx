@@ -35,6 +35,8 @@ export default function StockOnHand() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [lowStockOnly, setLowStockOnly] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
 
 
@@ -56,6 +58,26 @@ export default function StockOnHand() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const syncFromMicros = useCallback(async () => {
+    try {
+      setSyncing(true);
+      setSyncMessage(null);
+      const res = await fetch("/api/micros/inventory-sync", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({}) });
+      const data = await res.json();
+      if (data.ok) {
+        setSyncMessage(`Synced ${data.fetched ?? 0} items (${data.inserted ?? 0} new, ${data.updated ?? 0} updated)`);
+        await fetchData();
+      } else {
+        setSyncMessage(data.error ?? data.details ?? "Sync failed");
+      }
+    } catch (err) {
+      setSyncMessage("Sync request failed");
+      console.error("MICROS sync error:", err);
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetchData]);
 
 
 
@@ -216,8 +238,40 @@ export default function StockOnHand() {
             </svg>
             Refresh
           </button>
+
+          <button
+            onClick={syncFromMicros}
+            disabled={syncing}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
+              syncing
+                ? "border-orange-800/40 text-orange-700 cursor-wait"
+                : "border-orange-600/40 text-orange-400 hover:bg-orange-900/30 hover:text-orange-300",
+            )}
+          >
+            <svg
+              className={cn("h-3.5 w-3.5", syncing && "animate-spin")}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+            {syncing ? "Syncing…" : "Sync MICROS"}
+          </button>
         </div>
       </div>
+
+      {/* ── Sync message banner ────────────────────────────────────────── */}
+      {syncMessage && (
+        <div className={cn(
+          "flex items-center gap-2 rounded-lg px-3 py-2 text-xs",
+          syncMessage.startsWith("Synced")
+            ? "bg-emerald-900/20 border border-emerald-800/30 text-emerald-400"
+            : "bg-red-900/20 border border-red-800/30 text-red-400",
+        )}>
+          <span>{syncMessage}</span>
+          <button onClick={() => setSyncMessage(null)} className="ml-auto text-stone-500 hover:text-stone-300">&times;</button>
+        </div>
+      )}
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 overflow-hidden">

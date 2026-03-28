@@ -28,7 +28,7 @@ async function main() {
 
   if (result.success) {
     console.log(`✅ Labour sync succeeded!`);
-    console.log(`   Timecards synced: ${result.timecardCount ?? 'N/A'}`);
+    console.log(`   Timecards synced: ${result.timecardsUpserted ?? 'N/A'}`);
     console.log(`   Message: ${result.message}`);
   } else {
     console.error(`❌ Labour sync failed!`);
