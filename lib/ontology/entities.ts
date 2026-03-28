@@ -58,11 +58,13 @@ export type ComplianceStatus =
 export type UserRole =
   | "super_admin"
   | "executive"
+  | "head_office"
   | "area_manager"
   | "gm"
   | "supervisor"
   | "contractor"
-  | "auditor";
+  | "auditor"
+  | "viewer";
 
 // ── Core Entities ──────────────────────────────────────────────────────────────
 

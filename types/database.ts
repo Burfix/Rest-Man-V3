@@ -765,6 +765,15 @@ export interface Database {
           timezone: string;
           is_active: boolean;
           metadata_json: Record<string, unknown>;
+          organisation_id: string | null;
+          region_id: string | null;
+          store_code: string | null;
+          gm_user_id: string | null;
+          target_labour_pct: number | null;
+          target_margin_pct: number | null;
+          target_avg_spend: number | null;
+          seating_capacity: number | null;
+          settings: Record<string, unknown>;
           created_at: string;
           updated_at: string;
         };
@@ -778,6 +787,15 @@ export interface Database {
           timezone?: string;
           is_active?: boolean;
           metadata_json?: Record<string, unknown>;
+          organisation_id?: string | null;
+          region_id?: string | null;
+          store_code?: string | null;
+          gm_user_id?: string | null;
+          target_labour_pct?: number | null;
+          target_margin_pct?: number | null;
+          target_avg_spend?: number | null;
+          seating_capacity?: number | null;
+          settings?: Record<string, unknown>;
           created_at?: string;
           updated_at?: string;
         };
@@ -791,6 +809,15 @@ export interface Database {
           timezone?: string;
           is_active?: boolean;
           metadata_json?: Record<string, unknown>;
+          organisation_id?: string | null;
+          region_id?: string | null;
+          store_code?: string | null;
+          gm_user_id?: string | null;
+          target_labour_pct?: number | null;
+          target_margin_pct?: number | null;
+          target_avg_spend?: number | null;
+          seating_capacity?: number | null;
+          settings?: Record<string, unknown>;
           updated_at?: string;
         };
         Relationships: [];
@@ -2156,6 +2183,182 @@ export interface Database {
           run_id?: string | null;
           first_seen_at?: string;
           last_seen_at?: string;
+        };
+        Relationships: [];
+      };
+
+      // ── Admin Dashboard tables ────────────────────────────────────────────
+
+      organisations: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          country: string;
+          timezone: string;
+          currency: string;
+          settings: Record<string, unknown>;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          slug: string;
+          country?: string;
+          timezone?: string;
+          currency?: string;
+          settings?: Record<string, unknown>;
+          is_active?: boolean;
+        };
+        Update: {
+          name?: string;
+          slug?: string;
+          country?: string;
+          timezone?: string;
+          currency?: string;
+          settings?: Record<string, unknown>;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+
+      regions: {
+        Row: {
+          id: string;
+          organisation_id: string;
+          name: string;
+          code: string;
+          area_manager_id: string | null;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organisation_id: string;
+          name: string;
+          code: string;
+          area_manager_id?: string | null;
+          is_active?: boolean;
+        };
+        Update: {
+          organisation_id?: string;
+          name?: string;
+          code?: string;
+          area_manager_id?: string | null;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+
+      profiles: {
+        Row: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          avatar_url: string | null;
+          status: string;
+          last_seen_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id: string;
+          email: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          status?: string;
+        };
+        Update: {
+          email?: string;
+          full_name?: string | null;
+          avatar_url?: string | null;
+          status?: string;
+          last_seen_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      user_roles: {
+        Row: {
+          id: string;
+          user_id: string;
+          organisation_id: string | null;
+          site_id: string | null;
+          region_id: string | null;
+          role: string;
+          is_active: boolean;
+          granted_by: string | null;
+          granted_at: string;
+          revoked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          organisation_id?: string | null;
+          site_id?: string | null;
+          region_id?: string | null;
+          role: string;
+          is_active?: boolean;
+          granted_by?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          organisation_id?: string | null;
+          site_id?: string | null;
+          region_id?: string | null;
+          role?: string;
+          is_active?: boolean;
+          granted_by?: string | null;
+          revoked_at?: string | null;
+        };
+        Relationships: [];
+      };
+
+      user_site_access: {
+        Row: {
+          id: string;
+          user_id: string;
+          site_id: string;
+          granted_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          site_id: string;
+          granted_by?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          site_id?: string;
+          granted_by?: string | null;
+        };
+        Relationships: [];
+      };
+
+      access_audit_log: {
+        Row: {
+          id: string;
+          actor_user_id: string | null;
+          target_user_id: string | null;
+          action: string;
+          metadata: Record<string, unknown>;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_user_id?: string | null;
+          target_user_id?: string | null;
+          action: string;
+          metadata?: Record<string, unknown>;
+        };
+        Update: {
+          actor_user_id?: string | null;
+          target_user_id?: string | null;
+          action?: string;
+          metadata?: Record<string, unknown>;
         };
         Relationships: [];
       };

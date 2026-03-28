@@ -70,6 +70,29 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.RESPOND_TO_REVIEWS,
   ],
 
+  head_office: [
+    PERMISSIONS.VIEW_ALL_STORES,
+    PERMISSIONS.VIEW_FINANCIALS,
+    PERMISSIONS.VIEW_AUDIT_LOG,
+    PERMISSIONS.VIEW_COMPLIANCE,
+    PERMISSIONS.VIEW_CONTRACTOR_TICKETS,
+    PERMISSIONS.CREATE_ACTION,
+    PERMISSIONS.ASSIGN_ACTION,
+    PERMISSIONS.COMPLETE_ACTION,
+    PERMISSIONS.ESCALATE_ACTION,
+    PERMISSIONS.REOPEN_ACTION,
+    PERMISSIONS.CREATE_MAINTENANCE,
+    PERMISSIONS.UPDATE_MAINTENANCE,
+    PERMISSIONS.CLOSE_MAINTENANCE,
+    PERMISSIONS.UPLOAD_COMPLIANCE,
+    PERMISSIONS.EDIT_COMPLIANCE_ITEM,
+    PERMISSIONS.MANAGE_STORE_SETTINGS,
+    PERMISSIONS.MANAGE_INTEGRATIONS,
+    PERMISSIONS.RUN_INTEGRATION_SYNC,
+    PERMISSIONS.SYNC_INVENTORY,
+    PERMISSIONS.RESPOND_TO_REVIEWS,
+  ],
+
   auditor: [
     PERMISSIONS.VIEW_ALL_STORES,
     PERMISSIONS.VIEW_FINANCIALS,
@@ -132,6 +155,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.VIEW_CONTRACTOR_TICKETS,
     PERMISSIONS.UPDATE_MAINTENANCE,
   ],
+
+  viewer: [
+    PERMISSIONS.VIEW_OWN_STORE,
+    PERMISSIONS.VIEW_COMPLIANCE,
+  ],
 };
 
 // ── Helper: check permission ───────────────────────────────────────────────────
@@ -153,11 +181,13 @@ export function hasAllPermissions(role: UserRole, permissions: Permission[]): bo
 const ROLE_RANK: Record<UserRole, number> = {
   super_admin:  100,
   executive:     80,
+  head_office:   75,
   auditor:       70,
   area_manager:  60,
   gm:            40,
   supervisor:    20,
   contractor:    10,
+  viewer:         5,
 };
 
 export function roleRank(role: UserRole): number {

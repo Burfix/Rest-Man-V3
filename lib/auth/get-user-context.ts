@@ -84,11 +84,13 @@ export async function getUserContext(): Promise<UserContext> {
   const ROLE_RANK: Record<string, number> = {
     super_admin: 100,
     executive: 80,
+    head_office: 75,
     auditor: 70,
     area_manager: 60,
     gm: 40,
     supervisor: 20,
     contractor: 10,
+    viewer: 5,
   };
 
   const sorted = [...roles].sort(

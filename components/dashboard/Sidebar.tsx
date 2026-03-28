@@ -62,6 +62,7 @@ const NAV: NavGroup[] = [
   {
     group: "System",
     items: [
+      { href: "/dashboard/admin",                label: "Admin",        icon: "🛡️" },
       { href: "/dashboard/settings",              label: "Settings",     icon: "⚙️" },
       { href: "/dashboard/settings/integrations", label: "Integrations", icon: "🔌" },
     ],

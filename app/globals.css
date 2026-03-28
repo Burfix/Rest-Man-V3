@@ -72,3 +72,8 @@ body {
   background: #57534e;
 }
 
+/* ── Admin input field ─────────────────────────────────────────────────────── */
+.input-field {
+  @apply w-full rounded-lg border border-stone-700 bg-stone-800/60 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-500 focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600;
+}
+
