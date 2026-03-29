@@ -502,8 +502,23 @@ function TeamPanel({
   const [showInvite, setShowInvite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
+  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [changingRole, setChangingRole] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", full_name: "", role: "gm", site_id: "" });
   const router = useRouter();
+
+  const handleChangeRole = async (userId: string, newRole: string) => {
+    setChangingRole(userId);
+    try {
+      await apiFetch(`/api/admin/users/${userId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      });
+      setEditingRole(null);
+      onRefresh();
+    } catch { /* toast */ } finally { setChangingRole(null); }
+  };
 
   if (!users) return <LoadingSkeleton />;
 
@@ -575,6 +590,7 @@ function TeamPanel({
       <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
         {users.map((u) => {
           const primaryRole = u.roles.find((r) => r.is_active);
+          const isEditing = editingRole === u.id;
           return (
             <div key={u.id} className="flex items-center justify-between px-4 py-3 hover:bg-stone-800/40 transition-colors">
               <div className="space-y-1">
@@ -584,7 +600,25 @@ function TeamPanel({
                   {u.full_name && <span className="text-[11px] text-stone-500">{u.email}</span>}
                 </div>
                 <div className="flex items-center gap-2">
-                  {primaryRole && <RoleBadge role={primaryRole.role} />}
+                  {primaryRole && !isEditing && (
+                    <button onClick={() => setEditingRole(u.id)} className="cursor-pointer" title="Click to change role">
+                      <RoleBadge role={primaryRole.role} />
+                    </button>
+                  )}
+                  {isEditing && (
+                    <div className="flex items-center gap-1.5">
+                      <select
+                        defaultValue={primaryRole?.role ?? "viewer"}
+                        onChange={(e) => handleChangeRole(u.id, e.target.value)}
+                        disabled={changingRole === u.id}
+                        className="rounded-md border border-stone-700 bg-stone-800 px-2 py-0.5 text-xs text-stone-200 focus:border-blue-500 focus:outline-none disabled:opacity-40"
+                      >
+                        {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      <button onClick={() => setEditingRole(null)} className="text-[10px] text-stone-500 hover:text-stone-300">Cancel</button>
+                      {changingRole === u.id && <span className="text-[10px] text-stone-500">Saving…</span>}
+                    </div>
+                  )}
                   {u.site_ids.length > 0 && (
                     <span className="text-[10px] text-stone-500">
                       {u.site_ids.map((sid) => storeMap.get(sid) ?? sid.slice(0, 8)).join(", ")}
@@ -593,7 +627,6 @@ function TeamPanel({
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {/* Impersonate button – don't show for yourself */}
                 {primaryRole?.role !== "super_admin" && (
                   <button
                     onClick={() => handleImpersonate(u.id)}
@@ -601,7 +634,7 @@ function TeamPanel({
                     className="rounded px-2 py-1 text-[10px] font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors disabled:opacity-40"
                     title="View dashboard as this user"
                   >
-                    {impersonating === u.id ? "…" : "🎭 Impersonate"}
+                    {impersonating === u.id ? "…" : "Impersonate"}
                   </button>
                 )}
                 <div className="text-right">

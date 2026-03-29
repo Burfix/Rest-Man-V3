@@ -5,6 +5,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
+import { isSuperAdmin } from "@/lib/admin/helpers";
 import { patchUserRoleSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
 
@@ -22,18 +23,33 @@ export async function PATCH(
     if (!v.success) return v.response;
     const d = v.data;
 
+    // For super_admin, resolve the target user's org so we can deactivate the right rows
+    let targetOrgId = ctx.orgId;
+    if (isSuperAdmin(ctx)) {
+      const { data: existingRole } = await supabase
+        .from("user_roles")
+        .select("organisation_id")
+        .eq("user_id", params.id)
+        .eq("is_active", true)
+        .limit(1)
+        .single();
+      if (existingRole?.organisation_id) targetOrgId = existingRole.organisation_id;
+    }
+
     // Deactivate old roles
-    await supabase
+    const deactivateQ = supabase
       .from("user_roles")
       .update({ is_active: false, revoked_at: new Date().toISOString() } as any)
       .eq("user_id", params.id)
-      .eq("organisation_id", ctx.orgId!)
       .eq("is_active", true);
+    if (targetOrgId) deactivateQ.eq("organisation_id", targetOrgId);
+
+    await deactivateQ;
 
     // Create new role
     const { error } = await supabase.from("user_roles").insert({
       user_id: params.id,
-      organisation_id: ctx.orgId,
+      organisation_id: targetOrgId,
       role: d.role,
       site_id: d.site_id ?? null,
       region_id: d.region_id ?? null,
