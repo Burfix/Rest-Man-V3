@@ -17,6 +17,7 @@ export const ROLE_ALLOWED_ROUTES: Partial<Record<UserRole, string[]>> = {
   gm: [
     "/dashboard",                   // Command Centre (exact)
     "/dashboard/forecast",          // GM Co-Pilot
+    "/dashboard/daily-ops",         // Daily Operations Tracker
     "/dashboard/maintenance",       // Maintenance
     "/dashboard/compliance",        // Compliance
     "/dashboard/bookings",          // Bookings
@@ -26,6 +27,7 @@ export const ROLE_ALLOWED_ROUTES: Partial<Record<UserRole, string[]>> = {
   ],
   supervisor: [
     "/dashboard",
+    "/dashboard/daily-ops",
     "/dashboard/maintenance",
     "/dashboard/compliance",
     "/dashboard/bookings",
