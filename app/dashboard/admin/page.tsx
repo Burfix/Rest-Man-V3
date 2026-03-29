@@ -504,6 +504,7 @@ function TeamPanel({
   const [impersonating, setImpersonating] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [changingRole, setChangingRole] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", full_name: "", role: "gm", site_id: "" });
   const router = useRouter();
 
@@ -518,6 +519,15 @@ function TeamPanel({
       setEditingRole(null);
       onRefresh();
     } catch { /* toast */ } finally { setChangingRole(null); }
+  };
+
+  const handleDelete = async (userId: string, name: string) => {
+    if (!confirm(`Delete ${name}? This will remove their account, roles, and site access.`)) return;
+    setDeleting(userId);
+    try {
+      await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" });
+      onRefresh();
+    } catch { /* toast */ } finally { setDeleting(null); }
   };
 
   if (!users) return <LoadingSkeleton />;
@@ -635,6 +645,16 @@ function TeamPanel({
                     title="View dashboard as this user"
                   >
                     {impersonating === u.id ? "…" : "Impersonate"}
+                  </button>
+                )}
+                {primaryRole?.role !== "super_admin" && (
+                  <button
+                    onClick={() => handleDelete(u.id, u.full_name ?? u.email)}
+                    disabled={deleting === u.id}
+                    className="rounded px-2 py-1 text-[10px] font-semibold bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors disabled:opacity-40"
+                    title="Delete user"
+                  >
+                    {deleting === u.id ? "…" : "Delete"}
                   </button>
                 )}
                 <div className="text-right">
