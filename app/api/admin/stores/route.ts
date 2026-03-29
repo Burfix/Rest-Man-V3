@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
+import { isSuperAdmin } from "@/lib/admin/helpers";
 import { createStoreSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
 
@@ -17,13 +18,17 @@ export async function GET() {
   const { ctx, supabase } = guard;
 
   try {
-    if (!ctx.orgId) return NextResponse.json({ error: "No organisation" }, { status: 400 });
+    const unrestricted = isSuperAdmin(ctx);
 
-    const { data, error } = await supabase
+    if (!unrestricted && !ctx.orgId) return NextResponse.json({ error: "No organisation" }, { status: 400 });
+
+    const q = supabase
       .from("sites")
       .select("*")
-      .eq("organisation_id", ctx.orgId)
       .order("name");
+    if (!unrestricted && ctx.orgId) q.eq("organisation_id", ctx.orgId);
+
+    const { data, error } = await q;
 
     if (error) {
       logger.error("Failed to fetch stores", { err: error });
