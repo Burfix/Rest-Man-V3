@@ -98,19 +98,27 @@ export async function POST(req: NextRequest) {
     if (existing) {
       userId = (existing as any).id;
     } else {
-      // Create profile as invited (no auth signup — admin-created)
-      const newId = crypto.randomUUID();
-      const { error: profileErr } = await supabase.from("profiles").insert({
-        id: newId,
+      // Use Supabase Auth Admin to create the user and send an invite email
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ops-engine.vercel.app";
+      const { data: authUser, error: authErr } = await supabase.auth.admin.inviteUserByEmail(d.email, {
+        data: { full_name: d.full_name },
+        redirectTo: `${siteUrl}/reset-password`,
+      });
+
+      if (authErr || !authUser?.user) {
+        logger.error("Failed to invite auth user", { err: authErr });
+        return NextResponse.json({ error: authErr?.message ?? "Failed to send invite" }, { status: 500 });
+      }
+
+      userId = authUser.user.id;
+
+      // Upsert profile row to match the auth user
+      await supabase.from("profiles").upsert({
+        id: userId,
         email: d.email,
         full_name: d.full_name,
         status: "invited",
-      } as any);
-      if (profileErr) {
-        logger.error("Failed to create profile", { err: profileErr });
-        return NextResponse.json({ error: profileErr.message }, { status: 500 });
-      }
-      userId = newId;
+      } as any, { onConflict: "id" });
     }
 
     // Create role assignment
