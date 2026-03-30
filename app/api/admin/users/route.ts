@@ -99,24 +99,32 @@ export async function POST(req: NextRequest) {
     if (existing) {
       userId = (existing as any).id;
     } else {
-      // Use generateLink instead of inviteUserByEmail to avoid hanging on email send
-      const siteUrl = "https://ops-engine.vercel.app";
-      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-        type: "invite",
+      // Create user directly (no email sent) to avoid SMTP hangs
+      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
         email: d.email,
-        options: {
-          data: { full_name: d.full_name },
-          redirectTo: `${siteUrl}/reset-password`,
-        },
+        email_confirm: true,
+        user_metadata: { full_name: d.full_name },
       });
 
-      if (linkErr || !linkData?.user) {
-        logger.error("Failed to generate invite link", { err: linkErr });
-        return NextResponse.json({ error: linkErr?.message ?? "Failed to generate invite" }, { status: 500 });
+      if (createErr || !newUser?.user) {
+        logger.error("Failed to create user", { err: createErr });
+        return NextResponse.json({ error: createErr?.message ?? "Failed to create user" }, { status: 500 });
       }
 
-      userId = linkData.user.id;
-      const inviteLink = linkData.properties?.action_link;
+      userId = newUser.user.id;
+
+      // Generate a password-reset link the admin can share
+      const siteUrl = "https://ops-engine.vercel.app";
+      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+        type: "recovery",
+        email: d.email,
+        options: { redirectTo: `${siteUrl}/reset-password` },
+      });
+
+      const inviteLink = linkErr ? undefined : linkData?.properties?.action_link;
+      if (linkErr) {
+        logger.warn("Could not generate recovery link, user still created", { err: linkErr });
+      }
 
       // Upsert profile row to match the auth user
       await supabase.from("profiles").upsert({

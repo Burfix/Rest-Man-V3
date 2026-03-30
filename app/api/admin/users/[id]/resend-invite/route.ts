@@ -41,64 +41,36 @@ export async function POST(
       );
     }
 
-    // 2. Generate a new invite link (doesn't send email, just creates the link)
+    // 2. Generate a recovery (password-reset) link — avoids SMTP hang from invite type
     const siteUrl = "https://ops-engine.vercel.app";
     const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-      type: "invite",
+      type: "recovery",
       email: profileData.email,
-      options: {
-        data: { full_name: profileData.full_name },
-        redirectTo: `${siteUrl}/reset-password`,
-      },
+      options: { redirectTo: `${siteUrl}/reset-password` },
     });
 
-    if (linkErr || !linkData?.user) {
-      logger.error("Failed to generate invite link", { err: linkErr, email: profileData.email });
-      return NextResponse.json({ error: linkErr?.message ?? "Failed to generate invite" }, { status: 500 });
+    if (linkErr) {
+      logger.error("Failed to generate recovery link", { err: linkErr, email: profileData.email });
+      return NextResponse.json({ error: linkErr?.message ?? "Failed to generate link" }, { status: 500 });
     }
 
-    // 3. Update profile if user ID changed
-    const newUserId = linkData.user.id;
-    if (newUserId !== targetId) {
-      // Migrate to new user ID
-      await supabase.from("profiles").delete().eq("id", targetId);
-      await supabase.from("profiles").upsert({
-        id: newUserId,
-        email: profileData.email,
-        full_name: profileData.full_name,
-        status: "invited",
-      } as any, { onConflict: "id" });
-
-      await supabase
-        .from("user_roles")
-        .update({ user_id: newUserId } as any)
-        .eq("user_id", targetId);
-
-      await supabase
-        .from("user_site_access")
-        .update({ user_id: newUserId } as any)
-        .eq("user_id", targetId);
-    }
-
-    // 4. Audit log
+    // 3. Audit log
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
-      target_user_id: newUserId,
+      target_user_id: targetId,
       action: "user.invite_resent",
       metadata: { email: profileData.email },
     } as any);
 
-    logger.info("Generated new invite link", { email: profileData.email, newUserId });
+    logger.info("Generated new invite link", { email: profileData.email, targetId });
 
-    // Return the invite link - the admin can share it manually
-    // The link contains the token needed to complete signup
-    const inviteLink = linkData.properties?.action_link;
+    const inviteLink = linkData?.properties?.action_link;
 
     return NextResponse.json({
       success: true,
       email: profileData.email,
-      userId: newUserId,
-      inviteLink, // Admin can copy and send manually if email doesn't work
+      userId: targetId,
+      inviteLink,
     });
   } catch (err) {
     logger.error("Resend invite failed", { err, targetId });
