@@ -8,6 +8,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { inviteUserSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
+import { sendInviteEmail } from "@/services/notifications/inviteEmail";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -126,6 +127,17 @@ export async function POST(req: NextRequest) {
         logger.warn("Could not generate recovery link, user still created", { err: linkErr });
       }
 
+      // Auto-send invite email via Resend (non-blocking — doesn't hang)
+      let emailSent = false;
+      if (inviteLink) {
+        emailSent = await sendInviteEmail({
+          to: d.email,
+          name: d.full_name,
+          role: d.role,
+          inviteLink,
+        });
+      }
+
       // Upsert profile row to match the auth user
       await supabase.from("profiles").upsert({
         id: userId,
@@ -172,7 +184,8 @@ export async function POST(req: NextRequest) {
         userId,
         email: d.email,
         role: d.role,
-        inviteLink, // Return the link so admin can share it
+        inviteLink,
+        emailSent,
       }, { status: 201 });
     }
 

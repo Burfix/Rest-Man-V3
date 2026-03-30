@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { logger } from "@/lib/logger";
+import { sendInviteEmail } from "@/services/notifications/inviteEmail";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -66,11 +67,22 @@ export async function POST(
 
     const inviteLink = linkData?.properties?.action_link;
 
+    // Auto-send invite email via Resend
+    let emailSent = false;
+    if (inviteLink) {
+      emailSent = await sendInviteEmail({
+        to: profileData.email,
+        name: profileData.full_name ?? undefined,
+        inviteLink,
+      });
+    }
+
     return NextResponse.json({
       success: true,
       email: profileData.email,
       userId: targetId,
       inviteLink,
+      emailSent,
     });
   } catch (err) {
     logger.error("Resend invite failed", { err, targetId });

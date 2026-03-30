@@ -554,11 +554,13 @@ function TeamPanel({
     if (!confirm(`Generate new invite link for ${email}?`)) return;
     setResending(userId);
     try {
-      const result = await apiFetch<{ success: boolean; email: string; inviteLink?: string }>(`/api/admin/users/${userId}/resend-invite`, { method: "POST" });
+      const result = await apiFetch<{ success: boolean; email: string; inviteLink?: string; emailSent?: boolean }>(`/api/admin/users/${userId}/resend-invite`, { method: "POST" });
 
-      if (result.inviteLink) {
+      if (result.emailSent) {
+        alert(`Invite email resent to ${result.email}!`);
+      } else if (result.inviteLink) {
         const copied = await navigator.clipboard.writeText(result.inviteLink).then(() => true).catch(() => false);
-        alert(`New invite link generated${copied ? " (copied to clipboard)" : ""}:\n\n${result.inviteLink}`);
+        alert(`Email could not be sent.\n\nInvite link${copied ? " (copied to clipboard)" : ""}:\n${result.inviteLink}`);
       } else {
         alert(`Invite generated for ${email}`);
       }
@@ -575,7 +577,7 @@ function TeamPanel({
   const handleInvite = async () => {
     setSaving(true);
     try {
-      const result = await apiFetch<{ userId: string; email: string; role: string; inviteLink?: string }>("/api/admin/users", {
+      const result = await apiFetch<{ userId: string; email: string; role: string; inviteLink?: string; emailSent?: boolean }>("/api/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: form.email, full_name: form.full_name, role: form.role, site_id: form.site_id || null }),
@@ -584,10 +586,11 @@ function TeamPanel({
       setForm({ email: "", full_name: "", role: "gm", site_id: "" });
       onRefresh();
 
-      // Show invite link if returned
-      if (result.inviteLink) {
+      if (result.emailSent) {
+        alert(`Invite email sent to ${result.email}!`);
+      } else if (result.inviteLink) {
         const copied = await navigator.clipboard.writeText(result.inviteLink).then(() => true).catch(() => false);
-        alert(`User invited!\n\nInvite link${copied ? " (copied to clipboard)" : ""}:\n${result.inviteLink}`);
+        alert(`User created but email could not be sent.\n\nInvite link${copied ? " (copied to clipboard)" : ""}:\n${result.inviteLink}`);
       }
     } catch (e: any) {
       alert(`Failed to invite: ${e.message}`);
