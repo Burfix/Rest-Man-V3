@@ -47,7 +47,18 @@ export default function ResetPasswordPage() {
       }
     });
 
-    // Timeout fallback — if no event fires within 5s, show error
+    // The singleton client may have already processed the hash before the listener
+    // was set up. Check if we already have a session from a recovery token.
+    const hashType = params.get("type");
+    if (hashType === "recovery" || hashType === "invite") {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setStage((s) => (s === "loading" ? "ready" : s));
+        }
+      });
+    }
+
+    // Timeout fallback — if no event fires within 8s, show error
     const timeout = setTimeout(() => {
       setStage((s) => {
         if (s === "loading") {
@@ -56,7 +67,7 @@ export default function ResetPasswordPage() {
         }
         return s;
       });
-    }, 5000);
+    }, 8000);
 
     return () => {
       sub.subscription.unsubscribe();
