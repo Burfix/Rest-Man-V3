@@ -163,7 +163,7 @@ export const createMaintenanceIssueSchema = z.object({
   equipment_id: uuidString.optional().nullable(),
   category: z.string().max(100).optional().nullable(),
   issue_description: z.string().max(2000).optional().nullable(),
-  impact_level: z.enum(["none", "low", "medium", "high", "service_blocking"]).optional().nullable(),
+  impact_level: z.enum(["none", "minor", "service_disruption", "revenue_loss", "compliance_risk", "food_safety_risk"]).optional().nullable(),
   reported_by: z.string().max(200).optional().nullable(),
   repair_status: z.string().max(50).optional().nullable(),
   date_reported: dateString.optional().nullable(),
