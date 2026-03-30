@@ -77,3 +77,21 @@ body {
   @apply w-full rounded-lg border border-stone-700 bg-stone-800/60 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-500 focus:border-stone-600 focus:outline-none focus:ring-1 focus:ring-stone-600;
 }
 
+/* ── Print styles for store detail overlay ─────────────────────────────────── */
+@media print {
+  body { background: white !important; color: black !important; }
+  body > *:not(#__next) { display: none !important; }
+  nav, aside, header, [data-sidebar] { display: none !important; }
+  #store-detail-print {
+    position: static !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    background: white !important;
+    color: black !important;
+    border-radius: 0 !important;
+  }
+  @page { size: A4 landscape; margin: 8mm; }
+}
+

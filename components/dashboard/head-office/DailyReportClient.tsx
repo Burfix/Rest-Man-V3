@@ -19,6 +19,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import StoreDetailOverlay from "./StoreDetailOverlay";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +216,7 @@ export default function DailyReportClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>("executive");
+  const [selectedStore, setSelectedStore] = useState<StoreData | null>(null);
 
   const fetchReport = useCallback(async () => {
     setLoading(true);
@@ -319,14 +321,23 @@ export default function DailyReportClient() {
 
       {/* Tab Content */}
       <div className="min-h-[400px]">
-        {activeTab === "executive" && <ExecutiveTab report={report} />}
-        {activeTab === "comparison" && <StoreComparisonTab stores={report.stores} />}
+        {activeTab === "executive" && <ExecutiveTab report={report} onSelectStore={setSelectedStore} />}
+        {activeTab === "comparison" && <StoreComparisonTab stores={report.stores} onSelectStore={setSelectedStore} />}
         {activeTab === "duties" && <DailyDutiesTab stores={report.stores} />}
         {activeTab === "labour" && <LabourTurnoverTab stores={report.stores} g={g} />}
         {activeTab === "maintenance" && <MaintenanceComplianceTab stores={report.stores} />}
         {activeTab === "guest" && <GuestExperienceTab stores={report.stores} />}
         {activeTab === "risks" && <RisksEscalationsTab stores={report.stores} />}
       </div>
+
+      {/* Store Detail Overlay */}
+      {selectedStore && (
+        <StoreDetailOverlay
+          store={selectedStore}
+          reportDate={report.date}
+          onClose={() => setSelectedStore(null)}
+        />
+      )}
     </div>
   );
 }
@@ -352,7 +363,7 @@ function ExecutiveCards({ g }: { g: GroupSummary }) {
 
 // ── Tab 1: Executive Summary ─────────────────────────────────────────────────
 
-function ExecutiveTab({ report }: { report: DailyReport }) {
+function ExecutiveTab({ report, onSelectStore }: { report: DailyReport; onSelectStore: (store: StoreData) => void }) {
   const g = report.groupSummary;
   const sortedStores = [...report.stores].sort((a, b) => {
     const order = { red: 0, yellow: 1, green: 2 };
@@ -365,7 +376,7 @@ function ExecutiveTab({ report }: { report: DailyReport }) {
       <Section title="Store Status">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
           {sortedStores.map((store) => (
-            <StoreStatusCard key={store.siteId} store={store} />
+            <StoreStatusCard key={store.siteId} store={store} onClick={() => onSelectStore(store)} />
           ))}
         </div>
       </Section>
@@ -382,13 +393,19 @@ function ExecutiveTab({ report }: { report: DailyReport }) {
   );
 }
 
-function StoreStatusCard({ store }: { store: StoreData }) {
+function StoreStatusCard({ store, onClick }: { store: StoreData; onClick?: () => void }) {
   const risk = riskBadge(store.riskLevel);
   const s = store.summary;
   const f = store.financials;
 
   return (
-    <div className={cn("rounded-lg border overflow-hidden", store.riskLevel === "red" ? "border-red-700" : store.riskLevel === "yellow" ? "border-amber-800" : "border-stone-800")}>
+    <div
+      className={cn("rounded-lg border overflow-hidden cursor-pointer hover:ring-1 hover:ring-stone-600 transition-shadow", store.riskLevel === "red" ? "border-red-700" : store.riskLevel === "yellow" ? "border-amber-800" : "border-stone-800")}
+      onClick={onClick}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onClick?.(); }}
+    >
       {/* Header */}
       <div className={cn("flex items-center justify-between px-3 py-2", store.riskLevel === "red" ? "bg-red-950/40" : store.riskLevel === "yellow" ? "bg-amber-950/20" : "bg-emerald-950/20")}>
         <div>
@@ -458,7 +475,7 @@ function MiniFlag({ label, color }: { label: string; color: "red" | "amber" | "b
 
 // ── Tab 2: Store Comparison ──────────────────────────────────────────────────
 
-function StoreComparisonTab({ stores }: { stores: StoreData[] }) {
+function StoreComparisonTab({ stores, onSelectStore }: { stores: StoreData[]; onSelectStore: (store: StoreData) => void }) {
   const [sortBy, setSortBy] = useState<"completion" | "revenue" | "labour" | "risk">("completion");
 
   const sorted = useMemo(() => {
@@ -508,7 +525,9 @@ function StoreComparisonTab({ stores }: { stores: StoreData[] }) {
               const f = store.financials;
               return (
                 <tr key={store.siteId} className={cn("border-b border-stone-800/30", store.riskLevel === "red" ? "bg-red-950/10" : "")}>
-                  <td className="px-3 py-2.5 font-medium text-stone-200">{store.store}</td>
+                  <td className="px-3 py-2.5 font-medium text-stone-200">
+                    <button onClick={() => onSelectStore(store)} className="hover:text-amber-400 hover:underline transition-colors text-left">{store.store}</button>
+                  </td>
                   <td className="px-3 py-2.5 text-center"><span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", risk.bg)}>{risk.label}</span></td>
                   <td className={cn("px-3 py-2.5 text-right font-bold", pctColor(store.summary.completion_pct))}>{store.summary.completion_pct}%</td>
                   <td className="px-3 py-2.5 text-right text-stone-400">{store.summary.completed}/{store.summary.total}</td>
