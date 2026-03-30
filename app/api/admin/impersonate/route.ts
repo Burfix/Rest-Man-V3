@@ -40,12 +40,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Set impersonation cookie
-    const cookieStore = cookies();
-    (cookieStore as any).set(COOKIE, target_user_id, {
+    // Set impersonation cookie on the response
+    const res = NextResponse.json({
+      impersonating: true,
+      target: {
+        id: (profile as any).id,
+        email: (profile as any).email,
+        full_name: (profile as any).full_name,
+      },
+    });
+    res.cookies.set(COOKIE, target_user_id, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict" as const,
+      sameSite: "strict",
       maxAge: MAX_AGE,
       path: "/",
     });
@@ -63,14 +70,7 @@ export async function POST(req: NextRequest) {
       target: (profile as any).email,
     });
 
-    return NextResponse.json({
-      impersonating: true,
-      target: {
-        id: (profile as any).id,
-        email: (profile as any).email,
-        full_name: (profile as any).full_name,
-      },
-    });
+    return res;
   } catch (err) {
     logger.error("Impersonate POST failed", { err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -84,10 +84,13 @@ export async function DELETE() {
     const cookieStore = cookies();
     const targetId = (cookieStore as any).get(COOKIE)?.value;
 
-    (cookieStore as any).set(COOKIE, "", {
+    // Build response and clear cookie directly on it (cookies().set may not
+    // merge into NextResponse.json reliably in Next.js 14 Route Handlers)
+    const res = NextResponse.json({ impersonating: false });
+    res.cookies.set(COOKIE, "", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "strict" as const,
+      sameSite: "strict",
       maxAge: 0,
       path: "/",
     });
@@ -110,7 +113,7 @@ export async function DELETE() {
       }
     }
 
-    return NextResponse.json({ impersonating: false });
+    return res;
   } catch (err) {
     logger.error("Impersonate DELETE failed", { err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
