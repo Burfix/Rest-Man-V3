@@ -49,9 +49,11 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     const storeName = (site as any)?.name ?? undefined;
 
-    // Fire-and-forget notifications
-    sendMaintenanceEmail(log as any, storeName).catch(() => {});
-    sendMaintenanceWhatsApp(log as any, storeName).catch(() => {});
+    // Await notifications so they complete before the serverless function freezes
+    await Promise.allSettled([
+      sendMaintenanceEmail(log as any, storeName),
+      sendMaintenanceWhatsApp(log as any, storeName),
+    ]);
 
     return NextResponse.json({ log }, { status: 201 });
   } catch (err) {
