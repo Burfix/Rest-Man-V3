@@ -502,24 +502,43 @@ function TeamPanel({
   const [showInvite, setShowInvite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [impersonating, setImpersonating] = useState<string | null>(null);
-  const [editingRole, setEditingRole] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<{ role: string; site_ids: string[] }>({ role: "viewer", site_ids: [] });
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", full_name: "", role: "gm", site_id: "" });
   const router = useRouter();
 
-  const handleChangeRole = async (userId: string, newRole: string) => {
+  const startEditing = (user: UserEntry) => {
+    const primaryRole = user.roles.find((r) => r.is_active);
+    setEditingUser(user.id);
+    setEditForm({
+      role: primaryRole?.role ?? "viewer",
+      site_ids: user.site_ids,
+    });
+  };
+
+  const handleSaveRole = async (userId: string) => {
     setChangingRole(userId);
     try {
       await apiFetch(`/api/admin/users/${userId}/role`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: newRole }),
+        body: JSON.stringify({ role: editForm.role, site_ids: editForm.site_ids }),
       });
-      setEditingRole(null);
+      setEditingUser(null);
       onRefresh();
     } catch { /* toast */ } finally { setChangingRole(null); }
+  };
+
+  const toggleSiteAccess = (siteId: string) => {
+    setEditForm((prev) => ({
+      ...prev,
+      site_ids: prev.site_ids.includes(siteId)
+        ? prev.site_ids.filter((id) => id !== siteId)
+        : [...prev.site_ids, siteId],
+    }));
   };
 
   const handleDelete = async (userId: string, name: string) => {
@@ -615,82 +634,128 @@ function TeamPanel({
       <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
         {users.map((u) => {
           const primaryRole = u.roles.find((r) => r.is_active);
-          const isEditing = editingRole === u.id;
+          const isEditing = editingUser === u.id;
           return (
-            <div key={u.id} className="flex items-center justify-between px-4 py-3 hover:bg-stone-800/40 transition-colors">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className={cn("h-2 w-2 rounded-full", u.status === "active" ? "bg-emerald-400" : u.status === "invited" ? "bg-amber-400" : "bg-red-400")} />
-                  <span className="text-sm font-medium text-stone-200">{u.full_name ?? u.email}</span>
-                  {u.full_name && <span className="text-[11px] text-stone-500">{u.email}</span>}
+            <div key={u.id} className={cn("px-4 py-3 hover:bg-stone-800/40 transition-colors", isEditing && "bg-stone-800/30")}>
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={cn("h-2 w-2 rounded-full", u.status === "active" ? "bg-emerald-400" : u.status === "invited" ? "bg-amber-400" : "bg-red-400")} />
+                    <span className="text-sm font-medium text-stone-200">{u.full_name ?? u.email}</span>
+                    {u.full_name && <span className="text-[11px] text-stone-500">{u.email}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {primaryRole && !isEditing && (
+                      <button onClick={() => startEditing(u)} className="cursor-pointer" title="Click to edit role & stores">
+                        <RoleBadge role={primaryRole.role} />
+                      </button>
+                    )}
+                    {!isEditing && u.site_ids.length > 0 && (
+                      <span className="text-[10px] text-stone-500">
+                        {u.site_ids.map((sid) => storeMap.get(sid) ?? sid.slice(0, 8)).join(", ")}
+                      </span>
+                    )}
+                    {!isEditing && u.site_ids.length === 0 && primaryRole && (
+                      <span className="text-[10px] text-stone-600 italic">All stores</span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {primaryRole && !isEditing && (
-                    <button onClick={() => setEditingRole(u.id)} className="cursor-pointer" title="Click to change role">
-                      <RoleBadge role={primaryRole.role} />
+                  {u.status === "invited" && (
+                    <button
+                      onClick={() => handleResendInvite(u.id, u.email)}
+                      disabled={resending === u.id}
+                      className="rounded px-2 py-1 text-[10px] font-semibold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40"
+                      title="Resend invite email"
+                    >
+                      {resending === u.id ? "…" : "Resend Invite"}
                     </button>
                   )}
-                  {isEditing && (
-                    <div className="flex items-center gap-1.5">
-                      <select
-                        defaultValue={primaryRole?.role ?? "viewer"}
-                        onChange={(e) => handleChangeRole(u.id, e.target.value)}
-                        disabled={changingRole === u.id}
-                        className="rounded-md border border-stone-700 bg-stone-800 px-2 py-0.5 text-xs text-stone-200 focus:border-blue-500 focus:outline-none disabled:opacity-40"
-                      >
-                        {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                      </select>
-                      <button onClick={() => setEditingRole(null)} className="text-[10px] text-stone-500 hover:text-stone-300">Cancel</button>
-                      {changingRole === u.id && <span className="text-[10px] text-stone-500">Saving…</span>}
-                    </div>
+                  {primaryRole?.role !== "super_admin" && (
+                    <button
+                      onClick={() => handleImpersonate(u.id)}
+                      disabled={impersonating === u.id}
+                      className="rounded px-2 py-1 text-[10px] font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors disabled:opacity-40"
+                      title="View dashboard as this user"
+                    >
+                      {impersonating === u.id ? "…" : "Impersonate"}
+                    </button>
                   )}
-                  {u.site_ids.length > 0 && (
-                    <span className="text-[10px] text-stone-500">
-                      {u.site_ids.map((sid) => storeMap.get(sid) ?? sid.slice(0, 8)).join(", ")}
+                  {primaryRole?.role !== "super_admin" && (
+                    <button
+                      onClick={() => handleDelete(u.id, u.full_name ?? u.email)}
+                      disabled={deleting === u.id}
+                      className="rounded px-2 py-1 text-[10px] font-semibold bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors disabled:opacity-40"
+                      title="Delete user"
+                    >
+                      {deleting === u.id ? "…" : "Delete"}
+                    </button>
+                  )}
+                  <div className="text-right">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium capitalize", u.status === "active" ? "bg-emerald-500/20 text-emerald-300" : u.status === "invited" ? "bg-amber-500/20 text-amber-300" : "bg-red-500/20 text-red-300")}>
+                      {u.status}
                     </span>
-                  )}
+                    {u.last_seen_at && (
+                      <p className="mt-0.5 text-[10px] text-stone-600">Seen {timeAgo(u.last_seen_at)}</p>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {u.status === "invited" && (
-                  <button
-                    onClick={() => handleResendInvite(u.id, u.email)}
-                    disabled={resending === u.id}
-                    className="rounded px-2 py-1 text-[10px] font-semibold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40"
-                    title="Resend invite email"
-                  >
-                    {resending === u.id ? "…" : "Resend Invite"}
-                  </button>
-                )}
-                {primaryRole?.role !== "super_admin" && (
-                  <button
-                    onClick={() => handleImpersonate(u.id)}
-                    disabled={impersonating === u.id}
-                    className="rounded px-2 py-1 text-[10px] font-semibold bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-colors disabled:opacity-40"
-                    title="View dashboard as this user"
-                  >
-                    {impersonating === u.id ? "…" : "Impersonate"}
-                  </button>
-                )}
-                {primaryRole?.role !== "super_admin" && (
-                  <button
-                    onClick={() => handleDelete(u.id, u.full_name ?? u.email)}
-                    disabled={deleting === u.id}
-                    className="rounded px-2 py-1 text-[10px] font-semibold bg-red-500/20 text-red-300 hover:bg-red-500/30 transition-colors disabled:opacity-40"
-                    title="Delete user"
-                  >
-                    {deleting === u.id ? "…" : "Delete"}
-                  </button>
-                )}
-                <div className="text-right">
-                  <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium capitalize", u.status === "active" ? "bg-emerald-500/20 text-emerald-300" : u.status === "invited" ? "bg-amber-500/20 text-amber-300" : "bg-red-500/20 text-red-300")}>
-                    {u.status}
-                  </span>
-                  {u.last_seen_at && (
-                    <p className="mt-0.5 text-[10px] text-stone-600">Seen {timeAgo(u.last_seen_at)}</p>
-                  )}
+
+              {/* Inline edit form for role + stores */}
+              {isEditing && (
+                <div className="mt-3 pt-3 border-t border-stone-700/50 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Role:</label>
+                    <select
+                      value={editForm.role}
+                      onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                      className="rounded-md border border-stone-700 bg-stone-800 px-2 py-1 text-xs text-stone-200 focus:border-blue-500 focus:outline-none"
+                    >
+                      {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">Assigned Stores:</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(stores ?? []).map((store) => (
+                        <button
+                          key={store.id}
+                          onClick={() => toggleSiteAccess(store.id)}
+                          className={cn(
+                            "rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+                            editForm.site_ids.includes(store.id)
+                              ? "bg-blue-600/30 border-blue-500/50 text-blue-300"
+                              : "bg-stone-800 border-stone-700 text-stone-400 hover:border-stone-600"
+                          )}
+                        >
+                          {store.name}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-stone-600">
+                      {editForm.site_ids.length === 0
+                        ? "No stores selected — user will have access to all stores based on their role"
+                        : `${editForm.site_ids.length} store${editForm.site_ids.length !== 1 ? "s" : ""} selected`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleSaveRole(u.id)}
+                      disabled={changingRole === u.id}
+                      className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
+                    >
+                      {changingRole === u.id ? "Saving…" : "Save Changes"}
+                    </button>
+                    <button
+                      onClick={() => setEditingUser(null)}
+                      className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-400 hover:bg-stone-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           );
         })}

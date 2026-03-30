@@ -1,5 +1,5 @@
 /**
- * PATCH /api/admin/users/[id]/role — update user role
+ * PATCH /api/admin/users/[id]/role — update user role and site access
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -61,14 +61,33 @@ export async function PATCH(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Update site access if site_ids provided
+    if (d.site_ids !== undefined) {
+      // Remove existing site access
+      await supabase
+        .from("user_site_access")
+        .delete()
+        .eq("user_id", params.id);
+
+      // Add new site access
+      if (d.site_ids.length > 0) {
+        const accessRows = d.site_ids.map((siteId: string) => ({
+          user_id: params.id,
+          site_id: siteId,
+          granted_by: ctx.userId,
+        }));
+        await supabase.from("user_site_access").insert(accessRows as any);
+      }
+    }
+
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
       target_user_id: params.id,
       action: "role.changed",
-      metadata: { new_role: d.role, site_id: d.site_id, region_id: d.region_id },
+      metadata: { new_role: d.role, site_id: d.site_id, site_ids: d.site_ids, region_id: d.region_id },
     } as any);
 
-    return NextResponse.json({ success: true, role: d.role });
+    return NextResponse.json({ success: true, role: d.role, site_ids: d.site_ids });
   } catch (err) {
     logger.error("Admin role PATCH failed", { err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

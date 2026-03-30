@@ -321,6 +321,7 @@ export const patchUserRoleSchema = z.object({
     "gm", "supervisor", "contractor", "auditor", "viewer",
   ]),
   site_id: z.string().uuid().optional().nullable(),
+  site_ids: z.array(z.string().uuid()).optional(),
   region_id: z.string().uuid().optional().nullable(),
 });
 
