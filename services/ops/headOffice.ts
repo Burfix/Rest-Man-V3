@@ -118,21 +118,25 @@ function deriveRisk(score: number | null): RiskLevel {
 
 // ── Queries ────────────────────────────────────────────────────────────────────
 
-export async function getAllActiveSites(): Promise<Pick<SiteRow, "id" | "name" | "city" | "timezone" | "is_active">[]> {
+export async function getAllActiveSites(siteIds?: string[]): Promise<Pick<SiteRow, "id" | "name" | "city" | "timezone" | "is_active">[]> {
   const supabase = createServerClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("sites")
     .select("id, name, city, timezone, is_active")
     .eq("is_active", true)
     .order("name");
+  if (siteIds && siteIds.length > 0) {
+    query = query.in("id", siteIds);
+  }
+  const { data, error } = await query;
   if (error) throw new Error(`[HeadOffice] sites: ${error.message}`);
   return (data ?? []) as Pick<SiteRow, "id" | "name" | "city" | "timezone" | "is_active">[];
 }
 
-export async function getStoreSummaries(): Promise<StoreSummary[]> {
+export async function getStoreSummaries(filterSiteIds?: string[]): Promise<StoreSummary[]> {
   const supabase = createServerClient();
 
-  const sites = await getAllActiveSites();
+  const sites = await getAllActiveSites(filterSiteIds);
   if (sites.length === 0) return [];
 
   const siteIds = sites.map((s) => s.id);
@@ -301,10 +305,10 @@ export function buildLeaderboard(summaries: StoreSummary[]): StoreLeaderboardEnt
 
 // ── Trend queries ──────────────────────────────────────────────────────────────
 
-export async function getGroupTrends(days = 7): Promise<GroupTrends> {
+export async function getGroupTrends(days = 7, filterSiteIds?: string[]): Promise<GroupTrends> {
   const supabase = createServerClient();
 
-  const sites = await getAllActiveSites();
+  const sites = await getAllActiveSites(filterSiteIds);
   if (sites.length === 0) return { revenue: [], labour: [], risk_score: [] };
 
   const siteIds = sites.map((s) => s.id);
@@ -345,10 +349,10 @@ export async function getGroupTrends(days = 7): Promise<GroupTrends> {
 
 // ── Live action stats ──────────────────────────────────────────────────────────
 
-export async function getGroupActionStats(): Promise<StoreActionStats[]> {
+export async function getGroupActionStats(filterSiteIds?: string[]): Promise<StoreActionStats[]> {
   const supabase = createServerClient();
 
-  const sites   = await getAllActiveSites();
+  const sites   = await getAllActiveSites(filterSiteIds);
   const siteIds = sites.map((s) => s.id);
 
   const { data: actions } = await supabase
@@ -395,18 +399,22 @@ export async function getGroupActionStats(): Promise<StoreActionStats[]> {
  * Get the latest food cost snapshot across all stores.
  * Returns avg food cost % and count of stores above target.
  */
-export async function getGroupFoodCostMetrics(): Promise<{
+export async function getGroupFoodCostMetrics(siteIds?: string[]): Promise<{
   avg_food_cost_pct: number | null;
   food_cost_risk_count: number;
 }> {
   try {
     const supabase = createServerClient();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data } = await supabase
+    let query = supabase
       .from("food_cost_snapshots" as any)
       .select("store_id, estimated_food_cost_pct, target_food_cost_pct, date")
       .order("date", { ascending: false })
       .limit(50);
+    if (siteIds && siteIds.length > 0) {
+      query = query.in("store_id", siteIds);
+    }
+    const { data } = await query;
 
     if (!data || data.length === 0) return { avg_food_cost_pct: null, food_cost_risk_count: 0 };
 

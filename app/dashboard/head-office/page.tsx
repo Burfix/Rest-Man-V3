@@ -24,6 +24,9 @@ import {
   getGroupFoodCostMetrics,
 } from "@/services/ops/headOffice";
 
+import { getUserContext } from "@/lib/auth/get-user-context";
+import { redirect } from "next/navigation";
+
 import GlobalAlertBar        from "@/components/dashboard/head-office/GlobalAlertBar";
 import GroupScoreHeader      from "@/components/dashboard/head-office/GroupScoreHeader";
 import StoreRiskGrid         from "@/components/dashboard/head-office/StoreRiskGrid";
@@ -44,11 +47,20 @@ function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function HeadOfficePage() {
+  let ctx;
+  try {
+    ctx = await getUserContext();
+  } catch {
+    redirect("/login");
+  }
+
+  const ids = ctx.siteIds;
+
   const [summariesResult, trendsResult, actionStatsResult, foodCostResult] = await Promise.allSettled([
-    getStoreSummaries(),
-    getGroupTrends(7),
-    getGroupActionStats(),
-    getGroupFoodCostMetrics(),
+    getStoreSummaries(ids),
+    getGroupTrends(7, ids),
+    getGroupActionStats(ids),
+    getGroupFoodCostMetrics(ids),
   ]);
 
   const summaries   = settled(summariesResult,   []);

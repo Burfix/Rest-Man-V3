@@ -176,17 +176,6 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
     } catch { /* ignore */ } finally { setSaving(null); }
   };
 
-  const handleAssign = async (taskId: string, userId: string) => {
-    try {
-      await apiFetch(`/api/daily-ops/${taskId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: tasks.find((t) => t.id === taskId)?.status ?? "not_started", assigned_to: userId }),
-      });
-      await refresh();
-    } catch { /* ignore */ }
-  };
-
   const handleUpload = async (taskId: string, file: File) => {
     const fd = new FormData();
     fd.append("file", file);
@@ -197,6 +186,8 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
   };
 
   // ── Computed ────────────────────────────────────────────────────────────────
+
+  const teamMap = useMemo(() => new Map(team.map((m) => [m.id, m.name])), [team]);
 
   const summary = useMemo(() => {
     const completed = tasks.filter((t) => t.status === "completed").length;
@@ -334,15 +325,12 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         )}
                       </div>
                     </div>
-                    {/* Assignment */}
-                    <select
-                      value={task.assigned_to ?? ""}
-                      onChange={(e) => handleAssign(task.id, e.target.value)}
-                      className="rounded-md border border-stone-700 bg-stone-800 px-2 py-1 text-[10px] text-stone-300 min-w-[100px]"
-                    >
-                      <option value="">Unassigned</option>
-                      {team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
+                    {/* Executed by */}
+                    {task.assigned_to && (
+                      <span className="rounded-md border border-stone-700 bg-stone-800 px-2 py-1 text-[10px] text-stone-400">
+                        {teamMap.get(task.assigned_to) ?? "Unknown"}
+                      </span>
+                    )}
                   </div>
 
                   {/* Timestamps row */}

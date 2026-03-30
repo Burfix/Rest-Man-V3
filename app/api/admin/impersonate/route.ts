@@ -78,10 +78,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE() {
-  const guard = await apiGuard(null, "DELETE /api/admin/impersonate");
-  if (guard.error) return guard.error;
-  const { ctx, supabase } = guard;
-
+  // Use a lightweight auth check — apiGuard may fail when impersonating a
+  // user with no role/site, and we still need to allow ending impersonation.
   try {
     const cookieStore = cookies();
     const targetId = (cookieStore as any).get(COOKIE)?.value;
@@ -94,13 +92,22 @@ export async function DELETE() {
       path: "/",
     });
 
+    // Best-effort audit log
     if (targetId) {
-      await supabase.from("access_audit_log").insert({
-        actor_user_id: ctx.isImpersonating ? ctx.realUserId : ctx.userId,
-        target_user_id: targetId,
-        action: "impersonation.ended",
-        metadata: {},
-      } as any);
+      try {
+        const guard = await apiGuard(null, "DELETE /api/admin/impersonate");
+        if (!guard.error) {
+          const { ctx, supabase } = guard;
+          await supabase.from("access_audit_log").insert({
+            actor_user_id: ctx.isImpersonating ? ctx.realUserId : ctx.userId,
+            target_user_id: targetId,
+            action: "impersonation.ended",
+            metadata: {},
+          } as any);
+        }
+      } catch {
+        // Audit log is best-effort — don't block the cookie clear
+      }
     }
 
     return NextResponse.json({ impersonating: false });

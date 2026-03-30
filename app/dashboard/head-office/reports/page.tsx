@@ -1,18 +1,18 @@
 /**
- * Head Office — Weekly Performance Reports
+ * Head Office — Daily Operations Report
  *
- * Generates and displays the weekly performance report for the group.
- * Supports email delivery and JSON export.
+ * Generates and displays the daily ops report for the group.
+ * AI narrative + per-store task breakdown.
  */
 
-import WeeklyReportClient from "@/components/dashboard/head-office/WeeklyReportClient";
+import DailyReportClient from "@/components/dashboard/head-office/DailyReportClient";
 
 export const dynamic = "force-dynamic";
 
-export default function WeeklyReportsPage() {
+export default function DailyReportsPage() {
   return (
     <div className="space-y-4">
-      <WeeklyReportClient />
+      <DailyReportClient />
     </div>
   );
 }

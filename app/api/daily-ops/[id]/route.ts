@@ -18,7 +18,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { status, comments_start, comments_end, blocker_reason, escalated_to, assigned_to } = body;
+    const { status, comments_start, comments_end, blocker_reason, escalated_to } = body;
 
     if (!status) {
       return NextResponse.json({ error: "status is required" }, { status: 400 });
@@ -85,10 +85,8 @@ export async function PATCH(
       updates.escalated_to = escalated_to;
     }
 
-    // Assignment
-    if (assigned_to !== undefined) {
-      updates.assigned_to = assigned_to || null;
-    }
+    // Auto-assign to the signed-in user performing the action
+    updates.assigned_to = ctx.userId;
 
     const { data: updated, error: updateErr } = await supabase
       .from("daily_ops_tasks")
