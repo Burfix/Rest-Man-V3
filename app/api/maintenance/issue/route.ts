@@ -3,6 +3,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { createMaintenanceIssueSchema, patchMaintenanceIssueSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
+import { sendMaintenanceEmail, sendMaintenanceWhatsApp } from "@/services/notifications/maintenanceNotifications";
 
 function todayJHB(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
@@ -39,6 +40,19 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
     logger.info("Maintenance issue created", { route: "POST /api/maintenance/issue", siteId: ctx.siteId });
+
+    // Resolve store name for notifications
+    const { data: site } = await supabase
+      .from("sites")
+      .select("name")
+      .eq("id", ctx.siteId)
+      .maybeSingle();
+    const storeName = (site as any)?.name ?? undefined;
+
+    // Fire-and-forget notifications
+    sendMaintenanceEmail(log as any, storeName).catch(() => {});
+    sendMaintenanceWhatsApp(log as any, storeName).catch(() => {});
+
     return NextResponse.json({ log }, { status: 201 });
   } catch (err) {
     logger.error("Failed to create maintenance issue", { route: "POST /api/maintenance/issue", err });
