@@ -112,6 +112,36 @@ export async function POST() {
       if (!latestSnapshot[snap.site_id]) latestSnapshot[snap.site_id] = snap;
     }
 
+    // ── 6b. Live financial fallback — query transactional tables for sites missing today's snapshot ──
+    const fallbackSiteIds = siteIds.filter(
+      (id) => !latestSnapshot[id] || latestSnapshot[id].snapshot_date !== today
+    );
+
+    const liveRevenue: Record<string, number> = {};
+    const liveLabour: Record<string, number> = {};
+
+    if (fallbackSiteIds.length > 0) {
+      const [revRows, labRows] = await Promise.all([
+        supabase
+          .from("revenue_records")
+          .select("site_id, net_vat_excl")
+          .in("site_id", fallbackSiteIds)
+          .eq("service_date", today),
+        supabase
+          .from("labour_records")
+          .select("site_id, labour_cost")
+          .in("site_id", fallbackSiteIds)
+          .eq("service_date", today),
+      ]);
+
+      for (const r of (revRows.data ?? []) as any[]) {
+        liveRevenue[r.site_id] = (liveRevenue[r.site_id] ?? 0) + (Number(r.net_vat_excl) || 0);
+      }
+      for (const l of (labRows.data ?? []) as any[]) {
+        liveLabour[l.site_id] = (liveLabour[l.site_id] ?? 0) + (Number(l.labour_cost) || 0);
+      }
+    }
+
     // ── 7. Reviews (today + recent unanswered negatives) ──────────────────────
     const sevenDaysAgo = new Date(todayDate);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -250,16 +280,44 @@ export async function POST() {
           blocker_reasons: blockerReasons,
         },
 
-        // Financial
-        financials: {
-          sales_net_vat: snap?.sales_net_vat != null ? Number(snap.sales_net_vat) : null,
-          revenue_target: snap?.revenue_target != null ? Number(snap.revenue_target) : null,
-          revenue_gap_pct: snap?.revenue_gap_pct != null ? Number(snap.revenue_gap_pct) : null,
-          labour_pct: snap?.labour_pct != null ? Number(snap.labour_pct) : null,
-          target_labour_pct: site.target_labour_pct ?? 30,
-          operating_score: snap?.operating_score ?? null,
-          score_grade: snap?.score_grade ?? null,
-        },
+        // Financial — prefer today's snapshot; fall back to live transactional data
+        financials: (() => {
+          const snapIsToday = snap?.snapshot_date === today;
+          const liveRev = liveRevenue[site.id] > 0 ? liveRevenue[site.id] : null;
+          const liveLab = liveLabour[site.id] > 0 ? liveLabour[site.id] : null;
+
+          const sales_net_vat = snapIsToday && snap.sales_net_vat != null
+            ? Number(snap.sales_net_vat)
+            : liveRev;
+
+          const revenue_target = snap?.revenue_target != null ? Number(snap.revenue_target) : null;
+
+          const revenue_gap_pct = (() => {
+            if (snapIsToday && snap.revenue_gap_pct != null) return Number(snap.revenue_gap_pct);
+            if (sales_net_vat != null && revenue_target != null && revenue_target > 0) {
+              return Math.round(((sales_net_vat - revenue_target) / revenue_target) * 1000) / 10;
+            }
+            return null;
+          })();
+
+          const labour_pct = (() => {
+            if (snapIsToday && snap.labour_pct != null) return Number(snap.labour_pct);
+            if (liveLab != null && liveRev != null && liveRev > 0) {
+              return Math.round((liveLab / liveRev) * 1000) / 10;
+            }
+            return null;
+          })();
+
+          return {
+            sales_net_vat,
+            revenue_target,
+            revenue_gap_pct,
+            labour_pct,
+            target_labour_pct: site.target_labour_pct ?? 30,
+            operating_score: snap?.operating_score ?? null,
+            score_grade: snap?.score_grade ?? null,
+          };
+        })(),
 
         // Maintenance
         maintenance: {
