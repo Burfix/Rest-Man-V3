@@ -23,6 +23,23 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const supabase = createClient();
 
+    // Check for error in the URL hash (e.g. #error=access_denied&error_description=...)
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const hashError = params.get("error");
+    const hashErrorDesc = params.get("error_description");
+
+    if (hashError) {
+      const msg = hashErrorDesc?.replace(/\+/g, " ") || hashError;
+      setErrorMsg(
+        msg.toLowerCase().includes("expired") || msg.toLowerCase().includes("denied")
+          ? "This invite link has expired or has already been used. Please ask your admin to resend the invite."
+          : msg
+      );
+      setStage("error");
+      return;
+    }
+
     // Listen for the recovery event that Supabase fires after parsing the hash
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
       if (event === "PASSWORD_RECOVERY") {
@@ -30,8 +47,20 @@ export default function ResetPasswordPage() {
       }
     });
 
+    // Timeout fallback — if no event fires within 5s, show error
+    const timeout = setTimeout(() => {
+      setStage((s) => {
+        if (s === "loading") {
+          setErrorMsg("Could not verify the reset link. It may have expired or already been used.");
+          return "error";
+        }
+        return s;
+      });
+    }, 5000);
+
     return () => {
       sub.subscription.unsubscribe();
+      clearTimeout(timeout);
     };
   }, []);
 
@@ -81,6 +110,20 @@ export default function ResetPasswordPage() {
             <p className="text-center text-sm text-stone-500">
               Verifying reset link…
             </p>
+          )}
+
+          {stage === "error" && !password && (
+            <div className="text-center">
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                {errorMsg}
+              </p>
+              <a
+                href="/login"
+                className="mt-5 inline-block rounded-lg bg-stone-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-stone-700"
+              >
+                Go to login
+              </a>
+            </div>
           )}
 
           {stage === "success" && (
