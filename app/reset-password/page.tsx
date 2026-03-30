@@ -4,13 +4,13 @@
  * Reset Password page.
  *
  * Supabase sends a recovery link whose hash contains the access_token.
- * The browser Supabase client detects this on mount and fires the
- * PASSWORD_RECOVERY auth event, establishing a temporary session.
- * Once the session is ready we allow the user to set a new password.
+ * We manually extract the tokens from the hash and call setSession
+ * to guarantee the session is established before updating the password.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 type Stage = "loading" | "ready" | "submitting" | "success" | "error";
 
@@ -19,13 +19,16 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+  const sbRef = useRef<SupabaseClient | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
+    sbRef.current = supabase;
 
-    // Check for error in the URL hash (e.g. #error=access_denied&error_description=...)
     const hash = window.location.hash.substring(1);
     const params = new URLSearchParams(hash);
+
+    // Check for error in the URL hash
     const hashError = params.get("error");
     const hashErrorDesc = params.get("error_description");
 
@@ -40,39 +43,44 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    // Listen for the recovery event that Supabase fires after parsing the hash
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
-        setStage("ready");
-      }
-    });
+    // Manually extract tokens and establish the session
+    const accessToken = params.get("access_token");
+    const refreshToken = params.get("refresh_token");
 
-    // The singleton client may have already processed the hash before the listener
-    // was set up. Check if we already have a session from a recovery token.
-    const hashType = params.get("type");
-    if (hashType === "recovery" || hashType === "invite") {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setStage((s) => (s === "loading" ? "ready" : s));
+    if (accessToken && refreshToken) {
+      supabase.auth
+        .setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(({ error }) => {
+          if (error) {
+            setErrorMsg("This link has expired or has already been used. Please ask your admin to resend the invite.");
+            setStage("error");
+          } else {
+            setStage("ready");
+          }
+        });
+    } else {
+      // No tokens in hash — listen for the recovery event as fallback
+      const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+        if (event === "PASSWORD_RECOVERY") {
+          setStage("ready");
         }
       });
+
+      const timeout = setTimeout(() => {
+        setStage((s) => {
+          if (s === "loading") {
+            setErrorMsg("Could not verify the reset link. It may have expired or already been used.");
+            return "error";
+          }
+          return s;
+        });
+      }, 8000);
+
+      return () => {
+        sub.subscription.unsubscribe();
+        clearTimeout(timeout);
+      };
     }
-
-    // Timeout fallback — if no event fires within 8s, show error
-    const timeout = setTimeout(() => {
-      setStage((s) => {
-        if (s === "loading") {
-          setErrorMsg("Could not verify the reset link. It may have expired or already been used.");
-          return "error";
-        }
-        return s;
-      });
-    }, 8000);
-
-    return () => {
-      sub.subscription.unsubscribe();
-      clearTimeout(timeout);
-    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -89,7 +97,7 @@ export default function ResetPasswordPage() {
     }
 
     setStage("submitting");
-    const supabase = createClient();
+    const supabase = sbRef.current ?? createClient();
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
