@@ -505,6 +505,7 @@ function TeamPanel({
   const [editingRole, setEditingRole] = useState<string | null>(null);
   const [changingRole, setChangingRole] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [resending, setResending] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", full_name: "", role: "gm", site_id: "" });
   const router = useRouter();
 
@@ -528,6 +529,20 @@ function TeamPanel({
       await apiFetch(`/api/admin/users/${userId}`, { method: "DELETE" });
       onRefresh();
     } catch { /* toast */ } finally { setDeleting(null); }
+  };
+
+  const handleResendInvite = async (userId: string, email: string) => {
+    if (!confirm(`Resend invite email to ${email}?`)) return;
+    setResending(userId);
+    try {
+      await apiFetch(`/api/admin/users/${userId}/resend-invite`, { method: "POST" });
+      alert(`Invite resent to ${email}`);
+      onRefresh();
+    } catch (e: any) {
+      alert(`Failed to resend invite: ${e.message}`);
+    } finally {
+      setResending(null);
+    }
   };
 
   if (!users) return <LoadingSkeleton />;
@@ -637,6 +652,16 @@ function TeamPanel({
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {u.status === "invited" && (
+                  <button
+                    onClick={() => handleResendInvite(u.id, u.email)}
+                    disabled={resending === u.id}
+                    className="rounded px-2 py-1 text-[10px] font-semibold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40"
+                    title="Resend invite email"
+                  >
+                    {resending === u.id ? "…" : "Resend Invite"}
+                  </button>
+                )}
                 {primaryRole?.role !== "super_admin" && (
                   <button
                     onClick={() => handleImpersonate(u.id)}
