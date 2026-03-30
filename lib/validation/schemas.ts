@@ -159,7 +159,7 @@ export const patchEquipmentSchema = z.object({
 export const createMaintenanceIssueSchema = z.object({
   unit_name: z.string().min(1).max(300),
   issue_title: z.string().min(1).max(500),
-  priority: z.enum(["low", "medium", "high", "critical"]),
+  priority: z.enum(["low", "medium", "high", "urgent", "critical"]),
   equipment_id: uuidString.optional().nullable(),
   category: z.string().max(100).optional().nullable(),
   issue_description: z.string().max(2000).optional().nullable(),
