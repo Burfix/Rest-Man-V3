@@ -10,6 +10,7 @@ import { inviteUserSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function GET() {
   const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "GET /api/admin/users");
@@ -98,20 +99,24 @@ export async function POST(req: NextRequest) {
     if (existing) {
       userId = (existing as any).id;
     } else {
-      // Use Supabase Auth Admin to create the user and send an invite email
-      // Hardcode production URL to ensure invite links always work
+      // Use generateLink instead of inviteUserByEmail to avoid hanging on email send
       const siteUrl = "https://ops-engine.vercel.app";
-      const { data: authUser, error: authErr } = await supabase.auth.admin.inviteUserByEmail(d.email, {
-        data: { full_name: d.full_name },
-        redirectTo: `${siteUrl}/reset-password`,
+      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
+        type: "invite",
+        email: d.email,
+        options: {
+          data: { full_name: d.full_name },
+          redirectTo: `${siteUrl}/reset-password`,
+        },
       });
 
-      if (authErr || !authUser?.user) {
-        logger.error("Failed to invite auth user", { err: authErr });
-        return NextResponse.json({ error: authErr?.message ?? "Failed to send invite" }, { status: 500 });
+      if (linkErr || !linkData?.user) {
+        logger.error("Failed to generate invite link", { err: linkErr });
+        return NextResponse.json({ error: linkErr?.message ?? "Failed to generate invite" }, { status: 500 });
       }
 
-      userId = authUser.user.id;
+      userId = linkData.user.id;
+      const inviteLink = linkData.properties?.action_link;
 
       // Upsert profile row to match the auth user
       await supabase.from("profiles").upsert({
@@ -120,9 +125,50 @@ export async function POST(req: NextRequest) {
         full_name: d.full_name,
         status: "invited",
       } as any, { onConflict: "id" });
+
+      // Create role assignment
+      const { error: roleErr } = await supabase.from("user_roles").insert({
+        user_id: userId,
+        organisation_id: ctx.orgId,
+        role: d.role,
+        site_id: d.site_id ?? null,
+        region_id: d.region_id ?? null,
+        granted_by: ctx.userId,
+      } as any);
+
+      if (roleErr) {
+        logger.error("Failed to assign role", { err: roleErr });
+        return NextResponse.json({ error: roleErr.message }, { status: 500 });
+      }
+
+      // Grant site access if a site was specified
+      if (d.site_id) {
+        await supabase.from("user_site_access").insert({
+          user_id: userId,
+          site_id: d.site_id,
+          granted_by: ctx.userId,
+        } as any).then(() => {}); // ignore duplicate
+      }
+
+      // Audit log
+      await supabase.from("access_audit_log").insert({
+        actor_user_id: ctx.userId,
+        target_user_id: userId,
+        action: "user.invited",
+        metadata: { email: d.email, role: d.role, site_id: d.site_id },
+      } as any);
+
+      logger.info("User invited", { email: d.email, userId });
+
+      return NextResponse.json({
+        userId,
+        email: d.email,
+        role: d.role,
+        inviteLink, // Return the link so admin can share it
+      }, { status: 201 });
     }
 
-    // Create role assignment
+    // User already exists - just add the role
     const { error: roleErr } = await supabase.from("user_roles").insert({
       user_id: userId,
       organisation_id: ctx.orgId,
@@ -150,7 +196,7 @@ export async function POST(req: NextRequest) {
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
       target_user_id: userId,
-      action: "user.invited",
+      action: "user.role_added",
       metadata: { email: d.email, role: d.role, site_id: d.site_id },
     } as any);
 
