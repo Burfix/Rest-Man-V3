@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
     await Promise.all([
       supabase.from("daily_ops_tasks").select("*").in("site_id", siteIds).eq("task_date", today).order("sort_order"),
       supabase.from("maintenance_logs")
-        .select("id, site_id, issue_title, priority, repair_status, impact_level, date_reported")
+        .select("id, site_id, issue_title, issue_description, priority, repair_status, impact_level, date_reported, reported_by")
         .in("site_id", siteIds).in("repair_status", ["open", "in_progress", "awaiting_parts"])
         .order("date_reported", { ascending: false }).limit(100),
       supabase.from("compliance_items")
@@ -207,7 +207,14 @@ export async function GET(req: NextRequest) {
       },
       maintenance: {
         open_count: maint.length,
-        issues: maint.slice(0, 10).map((m) => ({ title: m.issue_title, priority: m.priority })),
+        issues: maint.slice(0, 10).map((m) => ({
+          title: m.issue_title,
+          priority: m.priority,
+          status: m.repair_status,
+          reported: m.date_reported,
+          description: m.issue_description || null,
+          assigned_to: m.reported_by || null,
+        })),
       },
       compliance: {
         expired: compliance.filter((c) => c._status === "expired").length,
@@ -403,14 +410,34 @@ function buildStoreBlock(s: any, date: string): string {
         </tr>`;
   }).join("");
 
-  // Maintenance items
+  // Maintenance items (expanded)
   const maintItems = s.maintenance.issues.length === 0
     ? `<p style="font-size:12px;color:#4b5563;margin:0;">No open issues.</p>`
-    : s.maintenance.issues.map((m: any) => `
-        <div style="display:block;padding:6px 0;border-bottom:1px solid #1f1f1f;font-size:12px;">
-          ${priorityDot(m.priority)}<span style="color:#e5e5e5;">${esc(m.title)}</span>
-          <span style="float:right;font-size:10px;color:#6b7280;text-transform:uppercase;">${esc(m.priority)}</span>
-        </div>`).join("");
+    : s.maintenance.issues.map((m: any) => {
+        const priStyle = (m.priority === "urgent" || m.priority === "critical")
+          ? "background:#3b0a0a;color:#f87171;border:1px solid #7f1d1d;"
+          : m.priority === "high"
+          ? "background:#431407;color:#fbbf24;border:1px solid #78350f;"
+          : "background:#1c1c1c;color:#9ca3af;border:1px solid #374151;";
+        const statusColor = m.status === "open" ? "#fbbf24" : m.status === "in_progress" ? "#60a5fa" : "#9ca3af";
+        return `
+        <div style="border:1px solid #2a2a2a;border-radius:6px;padding:10px 12px;margin-bottom:6px;">
+          <div style="display:table;width:100%;margin-bottom:4px;">
+            <div style="display:table-cell;vertical-align:top;">
+              <span style="font-size:12px;font-weight:600;color:#e5e5e5;">${esc(m.title)}</span>
+            </div>
+            <div style="display:table-cell;text-align:right;vertical-align:top;white-space:nowrap;">
+              <span style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;padding:2px 6px;border-radius:3px;${priStyle}">${esc(m.priority)}</span>
+              <span style="font-size:10px;color:#6b7280;margin-left:8px;">${esc(m.reported ?? "")}</span>
+            </div>
+          </div>
+          <div style="font-size:11px;color:#6b7280;">
+            ${m.assigned_to ? `<span>Reported by: <span style="color:#9ca3af;">${esc(m.assigned_to)}</span></span>&nbsp;·&nbsp;` : ""}
+            <span style="color:${statusColor};font-weight:600;">${esc((m.status ?? "").replace(/_/g, " "))}</span>
+          </div>
+          ${m.description ? `<div style="font-size:11px;color:#6b7280;margin-top:4px;">${esc(m.description.slice(0, 120))}${m.description.length > 120 ? "…" : ""}</div>` : ""}
+        </div>`;
+      }).join("");
 
   // Compliance
   const complianceContent = s.compliance.expired === 0
@@ -479,26 +506,16 @@ function buildStoreBlock(s: any, date: string): string {
             </table>
           </div>
 
-          <!-- Maintenance + Compliance -->
-          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
-            <tr>
-              <td width="50%" style="vertical-align:top;padding-right:10px;">
-                <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
-                  Maintenance (${s.maintenance.open_count} Open)
-                </div>
-                ${maintItems}
-              </td>
-              <td width="50%" style="vertical-align:top;padding-left:10px;">
-                <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
-                  Compliance
-                </div>
-                ${complianceContent}
-              </td>
-            </tr>
-          </table>
+          <!-- Maintenance (full width, expanded) -->
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
+              Maintenance (${s.maintenance.open_count} Open)
+            </div>
+            ${maintItems}
+          </div>
 
           <!-- Reviews + Actions -->
-          <table width="100%" cellpadding="0" cellspacing="0">
+          <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
             <tr>
               <td width="50%" style="vertical-align:top;padding-right:10px;">
                 <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
@@ -548,6 +565,14 @@ function buildStoreBlock(s: any, date: string): string {
               </td>
             </tr>
           </table>
+
+          <!-- Compliance (full width, bottom) -->
+          <div>
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
+              Compliance
+            </div>
+            ${complianceContent}
+          </div>
 
         </div>
       </td>

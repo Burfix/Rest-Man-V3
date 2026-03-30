@@ -30,6 +30,8 @@ export interface MaintenanceIssue {
   status: string;
   impact: string | null;
   reported: string;
+  description: string | null;
+  assigned_to: string | null;
 }
 
 export interface ComplianceOverdueItem {
@@ -232,51 +234,47 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
             </div>
           </div>
 
-          {/* ── Two-column: Maintenance + Compliance ─────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
-            {/* Maintenance */}
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
-                Maintenance ({store.maintenance.open_count} open)
-              </h3>
-              {store.maintenance.issues.length === 0 ? (
-                <p className="text-xs text-stone-600">No open issues.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {store.maintenance.issues.map((issue, i) => (
-                    <div key={i} className="flex items-center justify-between text-[11px] print:text-[9px] rounded-lg border border-stone-800 print:border-stone-300 px-3 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("h-2 w-2 rounded-full shrink-0", issue.priority === "urgent" || issue.priority === "critical" ? "bg-red-500" : issue.priority === "high" ? "bg-amber-400" : "bg-stone-500")} />
-                        <span className="text-stone-300 print:text-stone-700">{issue.title}</span>
-                      </div>
-                      <span className={cn("text-[9px] font-bold uppercase", issue.priority === "urgent" || issue.priority === "critical" ? "text-red-400 print:text-red-700" : "text-stone-500")}>{issue.priority}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Compliance */}
-            <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
-                Compliance ({store.compliance.expired} overdue)
-              </h3>
-              {store.compliance.overdue_items.length === 0 ? (
-                <p className="text-xs text-stone-600">No overdue items.</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {store.compliance.overdue_items.map((item, i) => (
-                    <div key={i} className={cn("flex items-center justify-between text-[11px] print:text-[9px] rounded-lg border px-3 py-1.5", item.critical ? "border-red-800/50 bg-red-950/10 print:border-red-300 print:bg-red-50" : "border-stone-800 print:border-stone-300")}>
-                      <span className="text-stone-300 print:text-stone-700">{item.name}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-stone-500 text-[9px]">{item.category}</span>
-                        <span className="text-red-400 print:text-red-700 text-[9px]">Due: {item.due}</span>
+          {/* ── Maintenance ─────────────────────────────────────────────────── */}
+          <div>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+              Maintenance ({store.maintenance.open_count} open)
+            </h3>
+            {store.maintenance.issues.length === 0 ? (
+              <p className="text-xs text-stone-600">No open issues.</p>
+            ) : (
+              <div className="space-y-2">
+                {store.maintenance.issues.map((issue, i) => (
+                  <div key={i} className="rounded-lg border border-stone-800 print:border-stone-300 px-3 py-2.5 text-[11px] print:text-[9px]">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <span className="font-semibold text-stone-200 print:text-stone-800 flex-1">{issue.title}</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border",
+                          issue.priority === "urgent" || issue.priority === "critical"
+                            ? "bg-red-950/60 text-red-300 border-red-800/40 print:bg-red-100 print:text-red-800"
+                            : issue.priority === "high"
+                            ? "bg-amber-950/60 text-amber-300 border-amber-800/40 print:bg-amber-100 print:text-amber-800"
+                            : "bg-stone-800 text-stone-400 border-stone-700 print:bg-stone-200 print:text-stone-700"
+                        )}>{issue.priority}</span>
+                        <span className="text-stone-500 print:text-stone-500 text-[9px]">{issue.reported}</span>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    <div className="flex items-center gap-3 text-[10px] text-stone-500 print:text-stone-600">
+                      {issue.assigned_to && (
+                        <span>Reported by: <span className="text-stone-400 print:text-stone-700">{issue.assigned_to}</span></span>
+                      )}
+                      <span className={cn("font-semibold",
+                        issue.status === "open" ? "text-amber-400 print:text-amber-700" :
+                        issue.status === "in_progress" || issue.status === "awaiting_parts" ? "text-blue-400 print:text-blue-700" :
+                        "text-stone-500"
+                      )}>{issue.status.replace(/_/g, " ")}</span>
+                    </div>
+                    {issue.description && (
+                      <p className="mt-1 text-[10px] text-stone-500 print:text-stone-600 line-clamp-2 print:line-clamp-none">{issue.description}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Two-column: Reviews + Actions ────────────────────────────── */}
@@ -322,6 +320,28 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* ── Compliance ───────────────────────────────────────────────────── */}
+          <div>
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+              Compliance ({store.compliance.expired} overdue)
+            </h3>
+            {store.compliance.overdue_items.length === 0 ? (
+              <p className="text-xs text-stone-600">No overdue items.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 print:grid-cols-2">
+                {store.compliance.overdue_items.map((item, i) => (
+                  <div key={i} className={cn("flex items-center justify-between text-[11px] print:text-[9px] rounded-lg border px-3 py-1.5", item.critical ? "border-red-800/50 bg-red-950/10 print:border-red-300 print:bg-red-50" : "border-stone-800 print:border-stone-300")}>
+                    <span className="text-stone-300 print:text-stone-700">{item.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-stone-500 text-[9px]">{item.category}</span>
+                      <span className="text-red-400 print:text-red-700 text-[9px]">Due: {item.due}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

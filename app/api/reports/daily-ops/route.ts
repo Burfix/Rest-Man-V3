@@ -66,7 +66,7 @@ export async function POST() {
     // ── 4. Maintenance issues (open) ──────────────────────────────────────────
     const { data: maintData } = await supabase
       .from("maintenance_logs")
-      .select("id, site_id, issue_title, issue_description, priority, repair_status, impact_level, date_reported, follow_up_required")
+      .select("id, site_id, issue_title, issue_description, priority, repair_status, impact_level, date_reported, follow_up_required, reported_by")
       .in("site_id", siteIds)
       .in("repair_status", ["open", "in_progress", "awaiting_parts"])
       .order("date_reported", { ascending: false })
@@ -329,6 +329,8 @@ export async function POST() {
             status: m.repair_status,
             impact: m.impact_level,
             reported: m.date_reported,
+            description: m.issue_description || null,
+            assigned_to: m.reported_by || null,
           })),
         },
 

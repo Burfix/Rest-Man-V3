@@ -72,6 +72,8 @@ interface MaintenanceIssue {
   status: string;
   impact: string | null;
   reported: string;
+  description: string | null;
+  assigned_to: string | null;
 }
 
 interface ComplianceOverdueItem {
