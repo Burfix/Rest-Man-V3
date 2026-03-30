@@ -47,7 +47,8 @@ export async function POST(
     }
 
     // 3. Re-invite the user
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ops-engine.vercel.app";
+    // Hardcode production URL to ensure invite links always work
+    const siteUrl = "https://ops-engine.vercel.app";
     const { data: authUser, error: authErr } = await supabase.auth.admin.inviteUserByEmail(
       profileData.email,
       {

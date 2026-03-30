@@ -99,7 +99,8 @@ export async function POST(req: NextRequest) {
       userId = (existing as any).id;
     } else {
       // Use Supabase Auth Admin to create the user and send an invite email
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://ops-engine.vercel.app";
+      // Hardcode production URL to ensure invite links always work
+      const siteUrl = "https://ops-engine.vercel.app";
       const { data: authUser, error: authErr } = await supabase.auth.admin.inviteUserByEmail(d.email, {
         data: { full_name: d.full_name },
         redirectTo: `${siteUrl}/reset-password`,
