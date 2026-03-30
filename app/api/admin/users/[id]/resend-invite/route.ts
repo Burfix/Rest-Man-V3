@@ -42,7 +42,7 @@ export async function POST(
     }
 
     // 2. Generate a recovery (password-reset) link — avoids SMTP hang from invite type
-    const siteUrl = "https://ops-engine.vercel.app";
+    const siteUrl = "https://si-cantina-concierge.vercel.app";
     const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
       type: "recovery",
       email: profileData.email,

@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
       userId = newUser.user.id;
 
       // Generate a password-reset link the admin can share
-      const siteUrl = "https://ops-engine.vercel.app";
+      const siteUrl = "https://si-cantina-concierge.vercel.app";
       const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
         type: "recovery",
         email: d.email,
