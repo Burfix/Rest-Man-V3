@@ -135,6 +135,23 @@ export async function GET(req: NextRequest) {
     for (const p of (profiles ?? []) as any[]) nameMap[p.id] = p.full_name || p.email;
   }
 
+  // GM performance scores for yesterday
+  const yesterday = new Date(todayDate);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toLocaleDateString("en-CA");
+  const { data: gmScoreRows } = await supabase
+    .from("manager_performance_scores")
+    .select("user_id,site_id,score,completion_rate,on_time_rate,tasks_assigned,tasks_completed,tasks_blocked,tasks_escalated")
+    .in("site_id", siteIds)
+    .eq("period_date", yesterdayStr);
+  const gmScoreList = (gmScoreRows ?? []) as any[];
+  const gmNameMap: Record<string, string> = {};
+  if (gmScoreList.length > 0) {
+    const gmUserIds = Array.from(new Set(gmScoreList.map((g: any) => g.user_id as string)));
+    const { data: gmProfiles } = await supabase.from("profiles").select("id, full_name, email").in("id", gmUserIds);
+    for (const p of (gmProfiles ?? []) as any[]) gmNameMap[p.id] = p.full_name || p.email;
+  }
+
   const OVERDUE_MS = 24 * 3_600_000;
   const nowMs = Date.now();
 
@@ -238,6 +255,19 @@ export async function GET(req: NextRequest) {
         note: a.completion_note ?? null,
         completed_at: a.completed_at,
       })),
+      gmScores: gmScoreList
+        .filter((g: any) => g.site_id === site.id)
+        .map((g: any) => ({
+          name:           gmNameMap[g.user_id] ?? "Unknown",
+          score:          g.score,
+          completionRate: g.completion_rate,
+          onTimeRate:     g.on_time_rate,
+          tasksAssigned:  g.tasks_assigned,
+          tasksCompleted: g.tasks_completed,
+          tasksBlocked:   g.tasks_blocked,
+          tasksEscalated: g.tasks_escalated,
+        }))
+        .sort((a: any, b: any) => b.score - a.score),
     };
   });
 
@@ -604,6 +634,49 @@ function buildStoreBlock(s: any, date: string): string {
             </div>
             ${complianceContent}
           </div>
+
+          ${s.gmScores?.length > 0 ? `
+          <!-- GM Performance -->
+          <div style="margin-top:20px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#6b7280;text-transform:uppercase;margin-bottom:8px;">
+              GM Performance — Yesterday
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              <thead>
+                <tr style="background:#252525;border-bottom:1px solid #2a2a2a;">
+                  <th style="padding:6px 8px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;">Manager</th>
+                  <th style="padding:6px 8px;text-align:center;font-size:10px;color:#6b7280;font-weight:600;">Score</th>
+                  <th style="padding:6px 8px;text-align:center;font-size:10px;color:#6b7280;font-weight:600;">Tier</th>
+                  <th style="padding:6px 8px;text-align:right;font-size:10px;color:#6b7280;font-weight:600;">Completion</th>
+                  <th style="padding:6px 8px;text-align:right;font-size:10px;color:#6b7280;font-weight:600;">On-Time</th>
+                  <th style="padding:6px 8px;text-align:right;font-size:10px;color:#6b7280;font-weight:600;">Done</th>
+                  <th style="padding:6px 8px;text-align:right;font-size:10px;color:#6b7280;font-weight:600;">Blocks</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${s.gmScores.map((g: any) => {
+                  const tier = g.score >= 90 ? "Elite" : g.score >= 75 ? "Strong" : g.score >= 60 ? "Average" : "At Risk";
+                  const tierStyle = tier === "Elite" ? "background:#052e16;color:#22c55e;"
+                    : tier === "Strong"  ? "background:#0c1a3a;color:#60a5fa;"
+                    : tier === "Average" ? "background:#2d1a00;color:#fbbf24;"
+                    : "background:#3b0a0a;color:#f87171;";
+                  const sc = g.score >= 90 ? "#22c55e" : g.score >= 75 ? "#60a5fa" : g.score >= 60 ? "#fbbf24" : "#f87171";
+                  return `
+                <tr style="border-bottom:1px solid #1f1f1f;">
+                  <td style="padding:6px 8px;color:#e5e5e5;font-size:11px;">${esc(g.name)}</td>
+                  <td style="padding:6px 8px;text-align:center;font-size:14px;font-weight:700;color:${sc};">${g.score}</td>
+                  <td style="padding:6px 8px;text-align:center;">
+                    <span style="font-size:9px;font-weight:700;letter-spacing:.5px;padding:2px 6px;border-radius:3px;${tierStyle}">${tier}</span>
+                  </td>
+                  <td style="padding:6px 8px;text-align:right;font-size:11px;color:#9ca3af;">${g.completionRate != null ? g.completionRate + "%" : "—"}</td>
+                  <td style="padding:6px 8px;text-align:right;font-size:11px;color:#9ca3af;">${g.onTimeRate != null ? g.onTimeRate + "%" : "—"}</td>
+                  <td style="padding:6px 8px;text-align:right;font-size:11px;color:#9ca3af;">${g.tasksCompleted ?? "—"}/${g.tasksAssigned ?? "—"}</td>
+                  <td style="padding:6px 8px;text-align:right;font-size:11px;color:${g.tasksBlocked > 0 ? "#f87171" : "#6b7280"};">${g.tasksBlocked ?? 0}</td>
+                </tr>`;
+                }).join("")}
+              </tbody>
+            </table>
+          </div>` : ""}
 
         </div>
       </td>

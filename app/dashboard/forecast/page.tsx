@@ -15,6 +15,12 @@
  */
 
 import { runCopilot } from "@/lib/copilot/orchestrator";
+import { getUserContext } from "@/lib/auth/get-user-context";
+import { buildOperationsContext } from "@/services/intelligence/context-builder";
+import { detectSignals } from "@/services/intelligence/signal-detector";
+import { todayISO } from "@/lib/utils";
+import CrossModuleSignalFeed from "@/components/intelligence/CrossModuleSignalFeed";
+import ForecastCard from "@/components/copilot/ForecastCard";
 
 import CopilotHero       from "@/components/copilot/CopilotHero";
 import TopDecisions      from "@/components/copilot/TopDecisions";
@@ -36,7 +42,19 @@ export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function GMCoPilotPage() {
+  // Get siteId early so intelligence context can run in parallel with copilot
+  const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
+  let siteId = DEFAULT_SITE_ID;
+  try {
+    const userCtx = await getUserContext();
+    siteId = userCtx.siteId;
+  } catch {}
+
+  const intellContextPromise = buildOperationsContext(siteId, todayISO());
   const copilot = await runCopilot();
+
+  const intellContext = await intellContextPromise.catch(() => null);
+  const crossModuleSignals = intellContext ? detectSignals(intellContext) : [];
 
   // Build a simple shift review from the current data
   const actionsTotal = copilot.decisions.length;
@@ -54,6 +72,7 @@ export default async function GMCoPilotPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
+            <CrossModuleSignalFeed signals={crossModuleSignals} variant="copilot" />
             <TopDecisions decisions={copilot.decisions} />
             <AllDecisions decisions={copilot.decisions} />
             <InsightsPanel insights={copilot.insights} />
@@ -66,6 +85,9 @@ export default async function GMCoPilotPage() {
               serviceState={copilot.serviceState}
               serviceImpact={copilot.serviceImpact}
             />
+            {intellContext && (
+              <ForecastCard forecast={intellContext.forecast} />
+            )}
             <DataHealth trust={copilot.trustState} />
           </div>
         </div>

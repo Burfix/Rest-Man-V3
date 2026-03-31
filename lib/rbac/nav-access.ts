@@ -18,6 +18,7 @@ export const ROLE_ALLOWED_ROUTES: Partial<Record<UserRole, string[]>> = {
     "/dashboard",                   // Command Centre (exact)
     "/dashboard/forecast",          // GM Co-Pilot
     "/dashboard/daily-ops",         // Daily Operations Tracker
+    "/dashboard/accountability",    // Accountability (own data only)
     "/dashboard/maintenance",       // Maintenance
     "/dashboard/compliance",        // Compliance
     "/dashboard/bookings",          // Bookings

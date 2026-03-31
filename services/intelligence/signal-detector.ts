@@ -1,0 +1,244 @@
+/**
+ * Cross-Module Signal Detector
+ *
+ * Pure function — no async, no side effects.
+ * Takes an OperationsContext (from context-builder.ts) and returns
+ * all active compound signals sorted by severity.
+ *
+ * Each signal spans at least two modules, producing a recommendation
+ * that no single module could generate alone.
+ */
+
+import type { OperationsContext } from "./context-builder";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type SignalSeverity = "CRITICAL" | "HIGH" | "MEDIUM" | "INFO";
+
+export type SignalModule =
+  | "REVENUE"
+  | "LABOUR"
+  | "OPS"
+  | "MAINTENANCE"
+  | "COMPLIANCE";
+
+export type CrossModuleSignal = {
+  id: string;
+  modules: SignalModule[];
+  severity: SignalSeverity;
+  title: string;
+  recommendation: string;
+  moneyAtRisk?: number;    // calculated R amount
+  timeWindow?: string;     // human-readable window
+  confidence: number;      // 0–100 confidence score
+  triggeredConditions: string[];  // which conditions fired — for debug/transparency
+};
+
+// ── Severity sort weight ──────────────────────────────────────────────────────
+
+const SEV_WEIGHT: Record<SignalSeverity, number> = {
+  CRITICAL: 4,
+  HIGH:     3,
+  MEDIUM:   2,
+  INFO:     1,
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmt(n: number): string {
+  return `R${Math.round(n).toLocaleString("en-ZA")}`;
+}
+
+function pct(n: number): string {
+  const sign = n >= 0 ? "+" : "";
+  return `${sign}${n.toFixed(1)}%`;
+}
+
+// ── Signal definitions ────────────────────────────────────────────────────────
+
+export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
+  const signals: CrossModuleSignal[] = [];
+
+  const {
+    revenue:     rev,
+    labour:      lab,
+    dailyOps:    ops,
+    maintenance: maint,
+    compliance:  comp,
+    meta,
+  } = ctx;
+
+  const revGapAbs = rev.target > 0 ? Math.abs(rev.actual - rev.target) : 0;
+
+  // ── SIGNAL 1 — Revenue Recovery Window ─────────────────────────────────────
+  if (rev.variance < -20 && lab.variance > 5 && ops.completionRate < 60) {
+    const conditions: string[] = [
+      `Revenue ${pct(rev.variance)} vs target`,
+      `Labour ${pct(lab.variance)} over`,
+      `Ops ${ops.completionRate}% complete`,
+    ];
+    signals.push({
+      id: "S1_REVENUE_RECOVERY_WINDOW",
+      modules: ["REVENUE", "LABOUR", "OPS"],
+      severity: "CRITICAL",
+      title: "Revenue Recovery Window — Multi-System Drag",
+      recommendation: `Revenue ${fmt(revGapAbs)} behind. Labour ${pct(lab.variance)} over. Ops ${ops.completionRate}% complete. Cut 1 FOH staff, push walk-in promo, escalate incomplete duties to GM.`,
+      moneyAtRisk: revGapAbs,
+      timeWindow: meta.timeOfDay === "service" ? "Until session end" : "Next service",
+      confidence: 92,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── SIGNAL 2 — Service Collapse Risk ───────────────────────────────────────
+  if (maint.serviceBlocking && ops.blocked > 1 && rev.variance < -10) {
+    const conditions: string[] = [
+      "Service-blocking maintenance active",
+      `${ops.blocked} ops tasks blocked`,
+      `Revenue ${pct(rev.variance)} behind`,
+    ];
+    signals.push({
+      id: "S2_SERVICE_COLLAPSE_RISK",
+      modules: ["MAINTENANCE", "OPS", "REVENUE"],
+      severity: "CRITICAL",
+      title: "Service Collapse Risk",
+      recommendation: `Service-blocking maintenance + ${ops.blocked} ops blocked. Revenue already ${pct(rev.variance)} behind. Resolve maintenance first or revenue loss compounds.`,
+      moneyAtRisk: revGapAbs + revGapAbs * 0.15, // compound estimate
+      timeWindow: "Immediate",
+      confidence: 95,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── SIGNAL 3 — Labour Efficiency Alert ─────────────────────────────────────
+  if (lab.variance > 8 && rev.variance < 0 && ops.completionRate > 80) {
+    const conditions: string[] = [
+      `Labour ${pct(lab.variance)} over target`,
+      `Revenue ${pct(rev.variance)} behind`,
+      `Ops ${ops.completionRate}% complete`,
+    ];
+    signals.push({
+      id: "S3_LABOUR_EFFICIENCY_ALERT",
+      modules: ["LABOUR", "REVENUE"],
+      severity: "HIGH",
+      title: "Labour Efficiency Alert — Safe Reduction Window",
+      recommendation: `Labour ${pct(lab.variance)} over target while revenue is behind. Ops covered at ${ops.completionRate}%. Safe to reduce floor staff by 1 — duties are covered.`,
+      timeWindow: meta.timeOfDay === "service" ? "This session" : "Next shift",
+      confidence: 85,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── SIGNAL 4 — Compliance + Maintenance Compound Risk ──────────────────────
+  if (comp.overdueCount > 0 && maint.urgentCount >= 2) {
+    const conditions: string[] = [
+      `${comp.overdueCount} compliance item${comp.overdueCount > 1 ? "s" : ""} overdue`,
+      `${maint.urgentCount} urgent maintenance tickets`,
+    ];
+    signals.push({
+      id: "S4_COMPLIANCE_MAINTENANCE_COMPOUND",
+      modules: ["COMPLIANCE", "MAINTENANCE"],
+      severity: "HIGH",
+      title: "Compliance + Maintenance Compound Risk",
+      recommendation: `${comp.overdueCount} compliance items overdue alongside ${maint.urgentCount} urgent maintenance. Combined risk for audit failure. Schedule resolution this week.`,
+      timeWindow: "This week",
+      confidence: 88,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── SIGNAL 5 — Full System Green ───────────────────────────────────────────
+  if (
+    rev.variance > -5 &&
+    lab.variance < 5 &&
+    ops.completionRate > 85 &&
+    !maint.serviceBlocking &&
+    comp.overdueCount === 0
+  ) {
+    signals.push({
+      id: "S5_FULL_SYSTEM_GREEN",
+      modules: ["REVENUE", "LABOUR", "OPS"],
+      severity: "INFO",
+      title: "All Systems Nominal",
+      recommendation: "All systems nominal. Monitor booking pace and floor energy.",
+      confidence: 80,
+      triggeredConditions: [
+        `Revenue ${pct(rev.variance)} vs target`,
+        `Labour ${pct(lab.variance)} vs target`,
+        `Ops ${ops.completionRate}% complete`,
+        "No service-blocking maintenance",
+        "No overdue compliance",
+      ],
+    });
+  }
+
+  // ── SIGNAL 6 — Pre-Service Labour Surge ────────────────────────────────────
+  if (meta.timeOfDay === "pre-service" && lab.variance > 10) {
+    const conditions: string[] = [
+      "Pre-service window active",
+      `Labour already ${pct(lab.variance)} over target`,
+    ];
+    signals.push({
+      id: "S6_PRE_SERVICE_LABOUR_SURGE",
+      modules: ["LABOUR", "OPS"],
+      severity: "MEDIUM",
+      title: "Pre-Service Labour Surge",
+      recommendation: `Labour already ${pct(lab.variance)} over target before service starts. Review clock-ons and stagger arrivals. Revenue hasn't arrived yet to justify current labour spend.`,
+      timeWindow: "Before service",
+      confidence: 80,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── SIGNAL 7 — Ops + Maintenance Overload During Service ───────────────────
+  if (meta.timeOfDay === "service" && ops.overdue > 2 && maint.urgentCount >= 1) {
+    const conditions: string[] = [
+      `${ops.overdue} ops tasks overdue`,
+      `${maint.urgentCount} urgent maintenance during service`,
+    ];
+    signals.push({
+      id: "S7_OPS_MAINTENANCE_OVERLOAD",
+      modules: ["OPS", "MAINTENANCE"],
+      severity: "HIGH",
+      title: "Ops + Maintenance Overload During Service",
+      recommendation: `${ops.overdue} ops tasks overdue and ${maint.urgentCount} urgent maintenance active during service. Team is stretched. Escalate maintenance to contractor, triage ops by GM priority.`,
+      timeWindow: "This service",
+      confidence: 87,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── SIGNAL 8 — Unexplained Revenue Gap ─────────────────────────────────────
+  if (
+    rev.variance < -15 &&
+    !maint.serviceBlocking &&
+    ops.completionRate > 80 &&
+    comp.overdueCount === 0
+  ) {
+    const sdlyVariance = ctx.forecast.vsSameDayLastYear;
+    const sdlyNote = sdlyVariance != null
+      ? ` Pattern confirms year-on-year gap at ${sdlyVariance > 0 ? "+" : ""}${sdlyVariance.toFixed(1)}%.`
+      : "";
+    const conditions: string[] = [
+      `Revenue ${pct(rev.variance)} behind`,
+      "No service-blocking maintenance",
+      `Ops ${ops.completionRate}% complete`,
+      "Compliance clean",
+    ];
+    if (sdlyVariance != null) conditions.push(`SDLY trajectory: ${sdlyVariance.toFixed(1)}%`);
+    signals.push({
+      id: "S8_UNEXPLAINED_REVENUE_GAP",
+      modules: ["REVENUE", "LABOUR", "OPS"],
+      severity: "HIGH",
+      title: "Unexplained Revenue Gap",
+      recommendation: `Revenue ${pct(rev.variance)} behind but ops, maintenance, and compliance are clean.${sdlyNote} Review floor conversion, upsell performance, and walk-in capture.`,
+      moneyAtRisk: revGapAbs,
+      timeWindow: meta.timeOfDay === "service" ? "This session" : "Today",
+      confidence: sdlyVariance != null ? 85 : 78,
+      triggeredConditions: conditions,
+    });
+  }
+
+  // ── Sort by severity ────────────────────────────────────────────────────────
+  return signals.sort((a, b) => SEV_WEIGHT[b.severity] - SEV_WEIGHT[a.severity]);
+}

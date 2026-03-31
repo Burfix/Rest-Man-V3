@@ -1,11 +1,13 @@
 /**
  * PATCH /api/daily-ops/[id] — transition task status
+ * Writes an accountability log entry on every status change.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { logger } from "@/lib/logger";
+import { computeSla } from "@/services/accountability/score-calculator";
 
 export async function PATCH(
   req: NextRequest,
@@ -18,7 +20,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { status, comments_start, comments_end, blocker_reason, escalated_to } = body;
+    const { status, comments_start, comments_end, blocker_reason, escalated_to, actor_name } = body;
 
     if (!status) {
       return NextResponse.json({ error: "status is required" }, { status: 400 });
@@ -41,48 +43,73 @@ export async function PATCH(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
+    const now    = new Date().toISOString();
     const updates: Record<string, unknown> = {
       status,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     };
 
-    // Start flow
+    // ── Start flow ────────────────────────────────────────────────────────────
     if (status === "started" || status === "in_progress") {
       if (!comments_start && !(task as any).comments_start) {
         return NextResponse.json({ error: "Start comment is required" }, { status: 400 });
       }
       if (!(task as any).started_at) {
-        updates.started_at = new Date().toISOString();
+        updates.started_at  = now;
+        updates.started_by  = ctx.userId;
       }
       if (comments_start) updates.comments_start = comments_start;
     }
 
-    // Complete flow
+    // ── Complete flow ─────────────────────────────────────────────────────────
+    let slaMet: boolean | null = null;
+    let minutesFromSla: number | null = null;
+    let timeToCompleteMinutes: number | null = null;
+
     if (status === "completed") {
       if (!comments_end) {
         return NextResponse.json({ error: "Completion comment is required" }, { status: 400 });
       }
-      updates.completed_at = new Date().toISOString();
-      updates.comments_end = comments_end;
+      updates.completed_at   = now;
+      updates.completed_by   = ctx.userId;
+      updates.comments_end   = comments_end;
 
-      // Calculate duration
       const startedAt = (task as any).started_at;
       if (startedAt) {
-        const dur = Math.round((Date.now() - new Date(startedAt).getTime()) / 60000);
-        updates.duration_minutes = dur;
+        timeToCompleteMinutes = Math.round((Date.now() - new Date(startedAt).getTime()) / 60_000);
+        updates.duration_minutes         = timeToCompleteMinutes;
+        updates.time_to_complete_minutes = timeToCompleteMinutes;
+      }
+
+      // SLA computation
+      const t = task as any;
+      if (t.due_time && t.task_date) {
+        const slaResult     = computeSla(t.task_date, t.due_time, now);
+        slaMet              = slaResult.sla_met;
+        minutesFromSla      = slaResult.minutes_from_sla;
       }
     }
 
-    // Block / Delay / Escalate flow
+    // ── Block / Delay / Escalate flow ─────────────────────────────────────────
     if (status === "blocked" || status === "delayed" || status === "escalated") {
       if (!blocker_reason) {
         return NextResponse.json({ error: "Blocker reason is required" }, { status: 400 });
       }
-      if (!escalated_to) {
-        return NextResponse.json({ error: "Escalation contact is required" }, { status: 400 });
-      }
       updates.blocker_reason = blocker_reason;
-      updates.escalated_to = escalated_to;
+      if (escalated_to) updates.escalated_to = escalated_to;
+
+      if (status === "blocked") {
+        updates.blocked_by     = ctx.userId;
+        updates.blocked_at     = now;
+        updates.blocked_reason = blocker_reason;
+      }
+      if (status === "delayed") {
+        if (!(task as any).delayed_at) updates.delayed_at = now;
+      }
+      if (status === "escalated") {
+        updates.escalated_by = ctx.userId;
+        updates.escalated_at = now;
+      }
     }
 
     // Auto-assign to the signed-in user performing the action
@@ -98,6 +125,34 @@ export async function PATCH(
     if (updateErr) {
       logger.error("Failed to update daily ops task", { err: updateErr });
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    // ── Write accountability log entry ────────────────────────────────────────
+    const logAction =
+      status === "started"     ? "started"    :
+      status === "in_progress" ? "started"    :
+      status === "completed"   ? "completed"  :
+      status === "blocked"     ? "blocked"    :
+      status === "delayed"     ? "delayed"    :
+      status === "escalated"   ? "escalated"  :
+      status === "missed"      ? "completed"  :   // treat missed as a completed event
+      null;
+
+    if (logAction) {
+      const logEntry: Record<string, unknown> = {
+        task_id:         params.id,
+        site_id:         ctx.siteId,
+        action:          logAction,
+        actor_id:        ctx.userId,
+        actor_name:      actor_name ?? null,
+        timestamp:       now,
+        notes:           blocker_reason ?? comments_end ?? comments_start ?? null,
+        sla_met:         logAction === "completed" ? slaMet : null,
+        minutes_from_sla: logAction === "completed" ? minutesFromSla : null,
+      };
+
+      // Fire-and-forget — don't block the response on log write
+      supabase.from("task_accountability_log").insert(logEntry).then(() => {});
     }
 
     return NextResponse.json({ task: updated });

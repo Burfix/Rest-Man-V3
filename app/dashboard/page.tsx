@@ -30,6 +30,10 @@ import { evaluateOperations } from "@/services/decision-engine";
 import { getServicePeriod } from "@/lib/commandCenter";
 import { getSiteConfig } from "@/lib/config/site";
 import { getUserContext } from "@/lib/auth/get-user-context";
+import { buildOperationsContext } from "@/services/intelligence/context-builder";
+import { detectSignals } from "@/services/intelligence/signal-detector";
+import CrossModuleSignalFeed from "@/components/intelligence/CrossModuleSignalFeed";
+import AccountabilityAlert from "@/components/accountability/AccountabilityAlert";
 
 import ControlBar              from "@/components/operating-brain/ControlBar";
 import OperatingScoreHero     from "@/components/operating-brain/OperatingScoreHero";
@@ -132,6 +136,9 @@ export default async function OperationsDashboard() {
   } catch {
     // Not authenticated (shouldn't happen behind middleware) — fall back to defaults
   }
+
+  // Start cross-module intelligence in parallel (runs alongside main data fetches)
+  const intellContextPromise = buildOperationsContext(siteId, todayISO());
 
   const [
     todayResult,
@@ -316,6 +323,10 @@ export default async function OperationsDashboard() {
     ? new Date(labourSummary.lastSyncAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
     : undefined;
 
+  // Await cross-module intelligence (was started in parallel above)
+  const intellContext = await intellContextPromise.catch(() => null);
+  const crossModuleSignals = intellContext ? detectSignals(intellContext) : [];
+
   return (
     <div className="space-y-4">
 
@@ -347,6 +358,8 @@ export default async function OperationsDashboard() {
         {/* Primary Column (dominant) */}
         <div className="lg:col-span-8 space-y-4">
           <DataHealthWarning health={engineOutput.dataHealth} />
+          <CrossModuleSignalFeed signals={crossModuleSignals} variant="command-center" />
+          <AccountabilityAlert />
           <CommandFeed decisions={engineOutput.commandFeed} />
           <ServicePulse
             actual={salesSnapshot.netSales}
