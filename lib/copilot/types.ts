@@ -96,7 +96,6 @@ export interface GMBrief {
   coversActual: number;
   coversForecast: number;
   avgSpend: number;
-  stockRisks: number;
   criticalIssues: number;
   serviceRiskSummary: string[];
   topThreeActions: GMDecision[];
@@ -127,7 +126,6 @@ export type GMDecisionCategory =
   | "revenue"
   | "labour"
   | "bookings"
-  | "inventory"
   | "compliance"
   | "maintenance"
   | "data";
@@ -199,7 +197,6 @@ export interface CopilotOperatingScore {
     service: number;    // max 25
     revenue: number;    // max 25
     labour: number;     // max 20
-    inventory: number;  // max 10
     maintenance: number; // max 10
     compliance: number; // max 10
   };

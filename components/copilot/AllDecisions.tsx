@@ -1,7 +1,6 @@
 /**
  * AllDecisions — Scrollable list of all decisions beyond the top 3.
- *
- * Compact format with severity indicators and action buttons.
+ * Command Center design language — flat list, → execute link, no rounded-xl.
  */
 
 "use client";
@@ -16,20 +15,19 @@ type Props = {
 
 const SEV_DOT: Record<GMDecisionSeverity, string> = {
   critical: "bg-red-400",
-  high: "bg-amber-400",
-  medium: "bg-stone-400",
-  low: "bg-stone-600",
+  high:     "bg-amber-400",
+  medium:   "bg-stone-500",
+  low:      "bg-stone-700",
 };
 
 const CAT_LABEL: Record<string, string> = {
-  service: "Service",
-  revenue: "Revenue",
-  labour: "Labour",
-  bookings: "Bookings",
-  inventory: "Inventory",
-  compliance: "Compliance",
+  service:     "Service",
+  revenue:     "Revenue",
+  labour:      "Labour",
+  bookings:    "Bookings",
+  compliance:  "Compliance",
   maintenance: "Maintenance",
-  data: "Data",
+  data:        "Data",
 };
 
 export default function AllDecisions({ decisions }: Props) {
@@ -42,10 +40,10 @@ export default function AllDecisions({ decisions }: Props) {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         All Decisions ({decisions.length})
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 divide-y divide-stone-800/30">
+      <div className="border border-[#1a1a1a] bg-[#0f0f0f] divide-y divide-[#1a1a1a]">
         {shown.map((d) => (
           <CompactDecision key={d.id} decision={d} />
         ))}
@@ -53,9 +51,9 @@ export default function AllDecisions({ decisions }: Props) {
       {remaining.length > 5 && (
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-xs text-stone-500 hover:text-stone-300 px-1 transition-colors"
+          className="text-[10px] font-mono text-stone-600 hover:text-stone-400 px-1 transition-colors"
         >
-          {expanded ? "Show less" : `Show ${remaining.length - 5} more`}
+          {expanded ? "↑ show less" : `↓ ${remaining.length - 5} more`}
         </button>
       )}
     </div>
@@ -72,7 +70,6 @@ function CompactDecision({ decision: d }: { decision: GMDecision }) {
     setLoading(true);
     try {
       if (!actionId) {
-        // First interaction — create as completed
         const res = await fetch("/api/actions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -93,7 +90,6 @@ function CompactDecision({ decision: d }: { decision: GMDecision }) {
           setStatus("completed");
         }
       } else {
-        // Subsequent — PATCH to completed
         const res = await fetch(`/api/actions/${actionId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -109,36 +105,36 @@ function CompactDecision({ decision: d }: { decision: GMDecision }) {
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
+    <div className="flex items-center gap-3 px-4 py-2.5">
       {/* Rank */}
-      <span className="text-[10px] font-mono text-stone-600 w-4 flex-shrink-0 text-right">
+      <span className="text-[10px] font-mono text-stone-700 w-4 flex-shrink-0 text-right">
         {d.priorityRank}
       </span>
 
       {/* Severity dot */}
-      <div className={cn("h-2 w-2 rounded-full flex-shrink-0", SEV_DOT[d.severity])} />
+      <div className={cn("h-1.5 w-1.5 flex-shrink-0", SEV_DOT[d.severity])} />
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-stone-200 truncate">{d.title}</p>
-        <p className="text-[11px] text-stone-500 truncate">{d.directInstruction}</p>
+        <p className="text-[11px] text-stone-300 truncate">{d.title}</p>
+        <p className="text-[10px] text-stone-600 truncate">{d.directInstruction}</p>
       </div>
 
       {/* Category */}
-      <span className="text-[10px] text-stone-500 flex-shrink-0">
+      <span className="text-[9px] uppercase tracking-wider text-stone-600 flex-shrink-0">
         {CAT_LABEL[d.category] ?? d.category}
       </span>
 
       {/* Action */}
       {status === "completed" ? (
-        <span className="text-[10px] text-emerald-400 flex-shrink-0">✓</span>
+        <span className="text-[10px] font-mono text-emerald-500 flex-shrink-0">✓</span>
       ) : (
         <button
           onClick={handleComplete}
           disabled={loading}
-          className="text-[10px] text-stone-500 hover:text-emerald-400 flex-shrink-0 transition-colors disabled:opacity-50"
+          className="text-[10px] font-mono text-stone-600 hover:text-emerald-400 flex-shrink-0 transition-colors disabled:opacity-40"
         >
-          Done
+          {loading ? "…" : "→ execute"}
         </button>
       )}
     </div>

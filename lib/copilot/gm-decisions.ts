@@ -6,7 +6,7 @@
  * The heart of the co-pilot. Generates ranked, executable decisions
  * with direct instructions, consequences, and ownership.
  *
- * Priority: service → revenue → labour → bookings → inventory → compliance → maintenance → data
+ * Priority: service → revenue → labour → bookings → compliance → maintenance → data
  */
 
 import type {
@@ -36,9 +36,6 @@ export interface DecisionInput {
   bookingsToday: number;
   bookedCovers: number;
   walkInCovers: number;
-  criticalStockCount: number;
-  lowStockCount: number;
-  noPOCount: number;
   maintenanceUrgent: number;
   maintenanceServiceBlocking: boolean;
   complianceExpired: number;
@@ -69,10 +66,9 @@ const CAT_PRIORITY: Record<GMDecisionCategory, number> = {
   revenue: 2,
   labour: 3,
   bookings: 4,
-  inventory: 5,
-  compliance: 6,
-  maintenance: 7,
-  data: 8,
+  compliance: 5,
+  maintenance: 6,
+  data: 7,
 };
 
 const SEV_WEIGHT: Record<GMDecisionSeverity, number> = {
@@ -278,55 +274,7 @@ export function generateGMDecisions(input: DecisionInput): GMDecision[] {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // INVENTORY DECISIONS (priority 5)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // I1: Critical stock
-  if (input.criticalStockCount > 0) {
-    decisions.push({
-      id: nextId(),
-      priorityRank: 0,
-      category: "inventory",
-      title: `${input.criticalStockCount} item${input.criticalStockCount > 1 ? "s" : ""} at critical stock`,
-      directInstruction: "Emergency order or 86 affected dishes now",
-      whyItMatters: "Running out will force menu 86s and guest disappointment",
-      expectedImpactText: "Protect menu availability and service quality",
-      expectedImpactValue: null,
-      dueAt: "now",
-      owner: "Kitchen Manager",
-      severity: "critical",
-      status: "pending",
-      consequenceIfIgnored: "Stockout during service → menu disruption, complaints, lost revenue",
-      actionType: "place_order",
-      serviceWindowRelevance: input.serviceWindow,
-      confidenceType: "measured",
-    });
-  }
-
-  // I2: Low stock with no PO
-  if (input.noPOCount > 0 && input.criticalStockCount === 0) {
-    decisions.push({
-      id: nextId(),
-      priorityRank: 0,
-      category: "inventory",
-      title: `Place orders before 16:00 — ${input.noPOCount} item${input.noPOCount > 1 ? "s" : ""} without PO`,
-      directInstruction: "Contact supplier and place order for low-stock items",
-      whyItMatters: "No purchase order means no delivery — risk stockout tomorrow",
-      expectedImpactText: "Protect tomorrow's menu and service",
-      expectedImpactValue: null,
-      dueAt: "16:00",
-      owner: "Kitchen Manager",
-      severity: "medium",
-      status: "pending",
-      consequenceIfIgnored: "Stockout risk escalates to critical by tomorrow",
-      actionType: "place_order",
-      serviceWindowRelevance: null,
-      confidenceType: "measured",
-    });
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // COMPLIANCE DECISIONS (priority 6)
+  // COMPLIANCE DECISIONS (priority 5)
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (input.complianceExpired > 0) {
@@ -372,7 +320,7 @@ export function generateGMDecisions(input: DecisionInput): GMDecision[] {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // MAINTENANCE DECISIONS (priority 7)
+  // MAINTENANCE DECISIONS (priority 6)
   // ═══════════════════════════════════════════════════════════════════════════
 
   if (input.maintenanceServiceBlocking) {
@@ -416,7 +364,7 @@ export function generateGMDecisions(input: DecisionInput): GMDecision[] {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // DATA DECISIONS (priority 8)
+  // DATA DECISIONS (priority 7)
   // ═══════════════════════════════════════════════════════════════════════════
 
   const staleFlags: string[] = [];

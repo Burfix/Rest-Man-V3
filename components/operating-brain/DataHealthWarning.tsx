@@ -48,7 +48,6 @@ const SOURCE_REMEDIATION: Record<string, string> = {
   Sales: "Sales data syncs from MICROS via the BI API. Check MICROS connection.",
   Labour: "Labour syncs from MICROS time cards. Ensure crew are clocking in.",
   "Daily Ops": "Daily ops come from the daily upload form. Complete today's form.",
-  Inventory: "Inventory requires Oracle IM module. Manual counts available.",
   Compliance: "Compliance updates during inspections. Schedule next inspection.",
   Maintenance: "Maintenance updates when tasks are logged. Check maintenance queue.",
   Forecast: "Forecast pulls from Google Calendar + historical sales.",

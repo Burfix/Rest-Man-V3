@@ -23,9 +23,6 @@ export interface InsightInput {
   bookingsToday: number;
   bookedCovers: number;
   walkInCovers: number;
-  criticalStockCount: number;
-  lowStockCount: number;
-  noPOCount: number;
   maintenanceOpen: number;
   maintenanceUrgent: number;
   maintenanceRepeatIssues: number;
@@ -96,31 +93,7 @@ export function generateGMInsights(input: InsightInput): GMInsight[] {
     });
   }
 
-  // ── 4. Low stock without PO ─────────────────────────────────────────────
-  if (input.noPOCount > 0) {
-    insights.push({
-      detectedPattern: `${input.noPOCount} low-stock item${input.noPOCount > 1 ? "s" : ""} with no purchase order`,
-      likelyCause: "Reorder not triggered or supplier not contacted",
-      recommendedAction: `Place orders before 16:00 to protect tomorrow`,
-      expectedImpact: "Prevent stockout and menu disruption",
-      confidenceType: "measured",
-      category: "inventory",
-    });
-  }
-
-  // ── 5. Critical stock ───────────────────────────────────────────────────
-  if (input.criticalStockCount > 0) {
-    insights.push({
-      detectedPattern: `${input.criticalStockCount} item${input.criticalStockCount > 1 ? "s" : ""} at critical stock level`,
-      likelyCause: "Consumption exceeded forecast or delivery missed",
-      recommendedAction: "Emergency order or 86 affected dishes before guest complaints",
-      expectedImpact: "Protect service quality and prevent revenue loss from unavailable items",
-      confidenceType: "measured",
-      category: "inventory",
-    });
-  }
-
-  // ── 6. Repeat maintenance failures ──────────────────────────────────────
+  // ── 4. Repeat maintenance failures ──────────────────────────────────────
   if (input.maintenanceRepeatIssues > 0) {
     insights.push({
       detectedPattern: `${input.maintenanceRepeatIssues} recurring maintenance issue${input.maintenanceRepeatIssues > 1 ? "s" : ""}`,

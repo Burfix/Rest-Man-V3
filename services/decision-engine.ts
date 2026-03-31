@@ -76,7 +76,6 @@ export type OperatingDecision = {
   category:
     | "revenue"
     | "labour"
-    | "inventory"
     | "maintenance"
     | "compliance"
     | "service"
@@ -272,51 +271,6 @@ export function evaluateOperations(
       },
       due: "Before next service",
       confidence: "high",
-    });
-  }
-
-  // ── Rule 3: Critical inventory stockouts ───────────────────────────────
-  if (input.inventory.criticalCount > 0) {
-    const items = input.inventory.atRiskItems?.filter(
-      (i) => i.severity === "critical",
-    );
-    const names = items?.map((i) => i.name).join(", ") ?? "items";
-    const menuHits = items
-      ?.flatMap((i) => i.affectedMenuItems ?? [])
-      .slice(0, 3);
-    decisions.push({
-      id: nextId(),
-      severity: "critical",
-      category: "inventory",
-      title: `${input.inventory.criticalCount} critical stockout${input.inventory.criticalCount > 1 ? "s" : ""} — ${names}`,
-      explanation: menuHits?.length
-        ? `Menu items impacted: ${menuHits.join(", ")}. Stock depleted.`
-        : "Critical stock depleted. Menu items may be unavailable.",
-      action: "Emergency order or 86 affected dishes now",
-      impact: {
-        type: "revenue_protected",
-        label: "Prevent menu gaps and lost sales",
-      },
-      due: "Immediate",
-      confidence: "high",
-    });
-  }
-
-  // ── Rule 4: Low stock + no open PO ────────────────────────────────────
-  if (input.inventory.lowCount > 0 && input.inventory.noOpenPOCount > 0) {
-    decisions.push({
-      id: nextId(),
-      severity: "high",
-      category: "inventory",
-      title: `${input.inventory.noOpenPOCount} low-stock item${input.inventory.noOpenPOCount > 1 ? "s" : ""} without purchase orders`,
-      explanation: `${input.inventory.lowCount} items running low and ${input.inventory.noOpenPOCount} have no open PO. Risk of stockout within 24–48h.`,
-      action: "Place orders for unprotected items today",
-      impact: {
-        type: "revenue_protected",
-        label: "Prevent tomorrow's stockout",
-      },
-      due: "Today",
-      confidence,
     });
   }
 

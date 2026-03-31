@@ -12,7 +12,6 @@ import type { DataTrustState, TrustState, StaleSource } from "./types";
 export interface TrustInput {
   salesAgeMinutes: number | null;
   labourAgeMinutes: number | null;
-  inventoryAgeMinutes: number | null;
   reviewsAgeDays: number | null;
   bookingsLive: boolean;
 }
@@ -37,12 +36,6 @@ export function getDecisionTrustState(input: TrustInput): DataTrustState {
       ageMinutes: input.labourAgeMinutes,
       thresholdMinutes: 480,
       impact: "Labour cost decisions may not reflect current staffing",
-    },
-    {
-      name: "Inventory",
-      ageMinutes: input.inventoryAgeMinutes,
-      thresholdMinutes: 1440,         // 24 hours
-      impact: "Stock risk assessment may miss recent consumption",
     },
     {
       name: "Reviews",

@@ -1,7 +1,6 @@
 /**
- * OperatingScoreCard — Service-weighted operating score with breakdown ring.
- *
- * Shows total score, grade, ring visualization, and 6-component breakdown.
+ * OperatingScoreCard — Horizontal threat bar + breakdown bars.
+ * Matches Command Center design language — no ring, no rounded corners > 4px.
  */
 
 "use client";
@@ -21,91 +20,90 @@ const GRADE_COLOR: Record<ScoreGrade, string> = {
   F: "text-red-400",
 };
 
-const RING_COLOR: Record<ScoreGrade, string> = {
-  A: "stroke-emerald-500",
-  B: "stroke-emerald-500",
-  C: "stroke-amber-500",
-  D: "stroke-orange-500",
-  F: "stroke-red-500",
+const GRADE_BORDER: Record<ScoreGrade, string> = {
+  A: "border-l-emerald-500",
+  B: "border-l-emerald-500",
+  C: "border-l-amber-500",
+  D: "border-l-orange-500",
+  F: "border-l-red-500",
+};
+
+const BAR_COLOR: Record<ScoreGrade, string> = {
+  A: "bg-emerald-500/60",
+  B: "bg-emerald-500/60",
+  C: "bg-amber-500/60",
+  D: "bg-orange-500/60",
+  F: "bg-red-500/60",
 };
 
 const COMPONENTS: { key: keyof CopilotOperatingScore["breakdown"]; label: string; max: number }[] = [
   { key: "service",     label: "Service",     max: 25 },
   { key: "revenue",     label: "Revenue",     max: 25 },
   { key: "labour",      label: "Labour",      max: 20 },
-  { key: "inventory",   label: "Inventory",   max: 10 },
   { key: "maintenance", label: "Maintenance", max: 10 },
   { key: "compliance",  label: "Compliance",  max: 10 },
 ];
 
-function barColor(pct: number): string {
-  if (pct >= 70) return "bg-emerald-500";
-  if (pct >= 40) return "bg-amber-500";
-  return "bg-red-500";
+function segmentColor(pct: number): string {
+  if (pct >= 70) return "bg-emerald-500/60";
+  if (pct >= 40) return "bg-amber-500/60";
+  return "bg-red-500/60";
 }
 
 export default function OperatingScoreCard({ score }: Props) {
   const pct = Math.min(100, Math.round(score.totalScore));
-  const radius = 50;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (pct / 100) * circumference;
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Operating Score
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4 space-y-4">
-        {/* Score ring */}
-        <div className="flex items-center gap-4">
-          <div className="relative h-24 w-24 flex-shrink-0">
-            <svg className="h-full w-full -rotate-90" viewBox="0 0 120 120">
-              <circle cx="60" cy="60" r={radius} fill="none" stroke="currentColor" strokeWidth="6" className="text-stone-800/60" />
-              <circle
-                cx="60" cy="60" r={radius} fill="none" strokeWidth="6" strokeLinecap="round"
-                className={cn(RING_COLOR[score.grade], "transition-all duration-700")}
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className={cn("text-2xl font-bold", GRADE_COLOR[score.grade])}>
-                {score.totalScore}
-              </span>
-              <span className="text-[10px] text-stone-500 uppercase tracking-wider">
-                Grade {score.grade}
+
+      {/* Threat bar */}
+      <div className={cn(
+        "border border-[#1a1a1a] border-l-[3px] bg-[#0f0f0f] px-4 py-3",
+        GRADE_BORDER[score.grade],
+      )}>
+        <div className="flex items-center gap-3 font-mono text-[11px] mb-2">
+          <span className={cn("font-bold text-sm", GRADE_COLOR[score.grade])}>
+            {score.totalScore}
+            <span className="text-stone-600 text-[11px] font-normal">/90</span>
+          </span>
+          <span className="text-stone-600">·</span>
+          <span className={cn("font-bold tracking-wider uppercase text-[10px]", GRADE_COLOR[score.grade])}>
+            Grade {score.grade}
+          </span>
+        </div>
+        {/* Fill bar */}
+        <div className="h-1 bg-[#1a1a1a] w-full">
+          <div
+            className={cn("h-full transition-all duration-700", BAR_COLOR[score.grade])}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <p className="text-[10px] text-stone-600 mt-1.5 leading-snug">{score.scoreSummary}</p>
+      </div>
+
+      {/* Breakdown bars */}
+      <div className="border border-[#1a1a1a] bg-[#0f0f0f] divide-y divide-[#1a1a1a]">
+        {COMPONENTS.map(({ key, label, max }) => {
+          const val = score.breakdown[key];
+          const barPct = max > 0 ? (val / max) * 100 : 0;
+          return (
+            <div key={key} className="flex items-center gap-3 px-4 py-2">
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 w-20 flex-shrink-0">{label}</span>
+              <div className="flex-1 h-0.5 bg-[#1a1a1a]">
+                <div
+                  className={cn("h-full transition-all duration-500", segmentColor(barPct))}
+                  style={{ width: `${barPct}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-stone-500 w-8 text-right font-mono">
+                {val}/{max}
               </span>
             </div>
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-xs text-stone-400 leading-relaxed">
-              {score.scoreSummary}
-            </p>
-          </div>
-        </div>
-
-        {/* Breakdown bars */}
-        <div className="space-y-2 border-t border-stone-800/30 pt-3">
-          {COMPONENTS.map(({ key, label, max }) => {
-            const val = score.breakdown[key];
-            const barPct = max > 0 ? (val / max) * 100 : 0;
-            return (
-              <div key={key} className="flex items-center gap-2">
-                <span className="text-[10px] text-stone-500 w-20 flex-shrink-0">{label}</span>
-                <div className="flex-1 h-1.5 bg-stone-800/60 rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full transition-all duration-500", barColor(barPct))}
-                    style={{ width: `${barPct}%` }}
-                  />
-                </div>
-                <span className="text-[10px] text-stone-500 w-8 text-right font-mono">
-                  {val}/{max}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+          );
+        })}
       </div>
     </div>
   );

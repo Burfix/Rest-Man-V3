@@ -57,11 +57,6 @@ export default function MobileBusinessSnapshot({ brief, score }: Props) {
       tone: brief.coversActual < brief.coversForecast * 0.5 ? "critical" : brief.coversActual < brief.coversForecast * 0.7 ? "warning" : "positive",
     },
     {
-      label: "Inventory",
-      value: score.breakdown.inventory >= 7 ? "Healthy" : score.breakdown.inventory >= 3 ? "Low stock" : "Critical",
-      tone: score.breakdown.inventory >= 7 ? "positive" : score.breakdown.inventory >= 3 ? "warning" : "critical",
-    },
-    {
       label: "Maintenance",
       value: score.breakdown.maintenance >= 7 ? "Clear" : score.breakdown.maintenance >= 3 ? "Open issues" : "Blocking",
       tone: score.breakdown.maintenance >= 7 ? "positive" : score.breakdown.maintenance >= 3 ? "warning" : "critical",

@@ -38,7 +38,6 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/daily-ops",   label: "Daily Ops",          icon: "📋" },
       { href: "/dashboard/compliance",  label: "Compliance",       icon: "🛡️" },
       { href: "/dashboard/maintenance", label: "Maintenance",      icon: "🔧" },
-      { href: "/dashboard/inventory",   label: "Inventory & Stock", icon: "📦" },
     ],
   },
   {

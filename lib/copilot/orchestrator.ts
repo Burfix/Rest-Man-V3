@@ -14,7 +14,6 @@ import { generateRevenueForecast } from "@/services/revenue/forecast";
 import { getComplianceSummary } from "@/services/ops/complianceSummary";
 import { getMicrosStatus } from "@/services/micros/status";
 import { getCurrentSalesSnapshot } from "@/lib/sales/service";
-import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { todayISO } from "@/lib/utils";
 import { getSiteConfig } from "@/lib/config/site";
@@ -82,14 +81,13 @@ export async function runCopilot(): Promise<CopilotOutput> {
   const [
     todayResult, maintenanceResult,
     forecastResult, complianceResult, microsResult,
-    inventoryResult, labourResult,
+    labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(),
     generateRevenueForecast(today_iso),
     getComplianceSummary(),
     getMicrosStatus(),
-    getInventoryIntelligence(cfg.site_id),
     getStoredDailySummary(
       process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"
     ),
@@ -100,7 +98,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
   const forecast = settled(forecastResult, null as RevenueForecast | null);
   const complianceSummary = settled(complianceResult, EMPTY_COMPLIANCE);
   const microsStatus = settled(microsResult, null) as MicrosStatusSummary | null;
-  const inventoryIntel = settled(inventoryResult, null);
   const labourSummary = settled(labourResult, null);
 
   // ── 2. Unified sales snapshot ─────────────────────────────────────────
@@ -114,9 +111,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
   const salesAgeMinutes = salesSnapshot.freshnessMinutes ?? null;
   const labourAgeMinutes = labourSummary?.lastSyncAt
     ? Math.round((nowMs - new Date(labourSummary.lastSyncAt).getTime()) / 60_000)
-    : null;
-  const inventoryAgeMinutes = inventoryIntel?.lastSynced
-    ? Math.round((nowMs - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
     : null;
 
   const labourPct = labourSummary?.labourPercentOfSales
@@ -136,10 +130,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
   const revenueVariancePct = targetSales > 0
     ? ((netSales - targetSales) / targetSales) * 100
     : 0;
-
-  const criticalStockCount = inventoryIntel?.criticalItems.length ?? 0;
-  const lowStockCount = inventoryIntel?.lowItems.length ?? 0;
-  const noPOCount = inventoryIntel?.noPOItems.length ?? 0;
 
   // ── 4. Service window ────────────────────────────────────────────────
   const windowInfo = getServiceWindow(now);
@@ -189,9 +179,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     bookingsToday: today.total,
     bookedCovers,
     walkInCovers,
-    criticalStockCount,
-    lowStockCount,
-    noPOCount,
     maintenanceUrgent: maintenance.urgentIssues.length,
     maintenanceServiceBlocking: maintenance.serviceDisruptions > 0,
     complianceExpired: complianceSummary.expired,
@@ -211,7 +198,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     coversActual: covers,
     coversForecast: forecastCovers,
     avgSpend,
-    stockRisks: criticalStockCount + lowStockCount,
     maintenanceUrgent: maintenance.urgentIssues.length,
     complianceExpired: complianceSummary.expired,
     decisions,
@@ -232,9 +218,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     bookingsToday: today.total,
     bookedCovers,
     walkInCovers,
-    criticalStockCount,
-    lowStockCount,
-    noPOCount,
     maintenanceOpen: maintenance.openRepairs,
     maintenanceUrgent: maintenance.urgentIssues.length,
     maintenanceRepeatIssues: 0,
@@ -252,7 +235,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
   const trustState = getDecisionTrustState({
     salesAgeMinutes,
     labourAgeMinutes,
-    inventoryAgeMinutes,
     reviewsAgeDays: null,
     bookingsLive: today.total > 0,
   });
@@ -264,8 +246,6 @@ export async function runCopilot(): Promise<CopilotOutput> {
     revenueTarget: targetSales,
     labourPercent: labourPct,
     targetLabourPercent: TARGET_LABOUR_PCT,
-    criticalStockCount,
-    lowStockCount,
     maintenanceUrgent: maintenance.urgentIssues.length,
     maintenanceServiceBlocking: maintenance.serviceDisruptions > 0,
     complianceExpired: complianceSummary.expired,

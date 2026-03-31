@@ -32,7 +32,7 @@ const TONE_FILL: Record<BusinessStatusTone, number> = {
 };
 
 type StatusKey = keyof EvaluateOperationsOutput["businessStatus"];
-const KEYS: StatusKey[] = ["revenue", "labour", "inventory", "maintenance", "compliance"];
+const KEYS: StatusKey[] = ["revenue", "labour", "maintenance", "compliance"];
 
 export default function BusinessStatusRail({ status }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);

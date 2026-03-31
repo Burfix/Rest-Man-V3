@@ -22,7 +22,6 @@ export interface BriefInput {
   coversActual: number;
   coversForecast: number;
   avgSpend: number;
-  stockRisks: number;
   maintenanceUrgent: number;
   complianceExpired: number;
   decisions: GMDecision[];
@@ -37,7 +36,7 @@ export function generateGMBrief(input: BriefInput): GMBrief {
     serviceWindow, serviceState, serviceImpact,
     revenueActual, revenueTarget, labourPercent,
     coversActual, coversForecast, avgSpend,
-    stockRisks, maintenanceUrgent, complianceExpired,
+    maintenanceUrgent, complianceExpired,
     decisions,
   } = input;
 
@@ -95,9 +94,6 @@ export function generateGMBrief(input: BriefInput): GMBrief {
   if (serviceState.serviceRiskLevel === "critical" || serviceState.serviceRiskLevel === "high") {
     pieces.push("service signals are weak");
   }
-  if (stockRisks > 0) {
-    pieces.push(`${stockRisks} stock risk${stockRisks > 1 ? "s" : ""}`);
-  }
   if (maintenanceUrgent > 0) {
     pieces.push(`${maintenanceUrgent} urgent maintenance issue${maintenanceUrgent > 1 ? "s" : ""}`);
   }
@@ -153,7 +149,6 @@ export function generateGMBrief(input: BriefInput): GMBrief {
     coversActual,
     coversForecast,
     avgSpend,
-    stockRisks,
     criticalIssues: criticalIssues + maintenanceUrgent + complianceExpired,
     serviceRiskSummary,
     topThreeActions: decisions.slice(0, 3),

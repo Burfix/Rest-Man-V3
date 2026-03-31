@@ -1,8 +1,6 @@
 /**
  * ServicePulseCard — Service state dashboard card.
- *
- * Shows: floor energy, upsell strength, conversion, booking conversion,
- * avg spend, service risk level, and service impact on revenue.
+ * Command Center design language — flat list, left-border signals, no rounded-xl.
  */
 
 "use client";
@@ -15,22 +13,22 @@ type Props = {
   serviceImpact: ServiceRevenueImpact;
 };
 
-const LEVEL_COLOR = {
+const LEVEL_COLOR: Record<string, string> = {
   high:     "text-emerald-400",
   strong:   "text-emerald-400",
   moderate: "text-amber-400",
   low:      "text-red-400",
   weak:     "text-red-400",
   critical: "text-red-400",
-  none:     "text-stone-500",
+  none:     "text-stone-600",
 };
 
-const RISK_COLOR = {
-  none:     "bg-emerald-400",
-  low:      "bg-emerald-400",
-  moderate: "bg-amber-400",
-  high:     "bg-red-400",
-  critical: "bg-red-400",
+const RISK_BORDER: Record<string, string> = {
+  none:     "border-l-emerald-600",
+  low:      "border-l-emerald-600",
+  moderate: "border-l-amber-500",
+  high:     "border-l-red-500",
+  critical: "border-l-red-500",
 };
 
 function rands(v: number): string {
@@ -42,92 +40,91 @@ export default function ServicePulseCard({ serviceState, serviceImpact }: Props)
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Service Pulse
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4 space-y-4">
-        {/* Service summary */}
-        <p className="text-sm text-stone-300">
+
+      {/* Summary bar */}
+      <div className={cn(
+        "border border-[#1a1a1a] border-l-[3px] bg-[#0f0f0f] px-4 py-3",
+        RISK_BORDER[serviceState.serviceRiskLevel],
+      )}>
+        <p className="text-[11px] text-stone-400 leading-snug">
           {serviceState.serviceSummary}
         </p>
-
-        {/* Signal grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          <SignalCard
-            label="Floor Energy"
-            value={`${s.floorEnergyScore}`}
-            suffix="/100"
-            level={serviceState.energyLevel}
-          />
-          <SignalCard
-            label="Upsell Strength"
-            value={serviceState.upsellStrength}
-            level={serviceState.upsellStrength === "strong" || serviceState.upsellStrength === "moderate" ? serviceState.upsellStrength : "low"}
-          />
-          <SignalCard
-            label="Conversion"
-            value={serviceState.conversionRate}
-            level={serviceState.conversionRate === "high" || serviceState.conversionRate === "moderate" ? serviceState.conversionRate : "low"}
-          />
-          <SignalCard
-            label="Avg Spend"
-            value={rands(s.avgSpend)}
-            level={s.upsellRate >= 0.95 ? "high" : s.upsellRate >= 0.80 ? "moderate" : "low"}
-          />
-          <SignalCard
-            label="Booking Arrival"
-            value={`${Math.round(s.bookingConversionRate * 100)}%`}
-            level={s.bookingConversionRate >= 0.85 ? "high" : s.bookingConversionRate >= 0.65 ? "moderate" : "low"}
-          />
-          <SignalCard
-            label="Walk-in Rate"
-            value={`${Math.round(s.walkInConversionRate * 100)}%`}
-            level={s.walkInConversionRate >= 0.4 ? "high" : s.walkInConversionRate >= 0.25 ? "moderate" : "low"}
-          />
-        </div>
-
-        {/* Service risk indicator */}
-        <div className="flex items-center gap-2 border-t border-stone-800/30 pt-3">
-          <div className={cn("h-2 w-2 rounded-full", RISK_COLOR[serviceState.serviceRiskLevel])} />
-          <span className="text-xs text-stone-400">
-            Service Risk: <span className="font-medium text-stone-300 capitalize">{serviceState.serviceRiskLevel}</span>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-[9px] uppercase tracking-wider text-stone-600">Risk</span>
+          <span className={cn(
+            "text-[10px] font-mono font-semibold uppercase",
+            LEVEL_COLOR[serviceState.serviceRiskLevel],
+          )}>
+            {serviceState.serviceRiskLevel}
           </span>
         </div>
-
-        {/* Revenue impact from service */}
-        {serviceImpact.estimatedRevenueLoss > 0 && (
-          <div className="bg-red-950/20 border border-red-800/20 rounded-lg p-3 text-xs">
-            <p className="text-red-400 font-medium">
-              Service drag: {rands(serviceImpact.estimatedRevenueLoss)} estimated revenue loss
-            </p>
-            <p className="text-stone-500 mt-1">{serviceImpact.revenueImpactExplanation}</p>
-          </div>
-        )}
       </div>
+
+      {/* Signal grid */}
+      <div className="border border-[#1a1a1a] bg-[#0f0f0f] divide-y divide-[#1a1a1a]">
+        <SignalRow
+          label="Floor Energy"
+          value={`${s.floorEnergyScore}/100`}
+          level={serviceState.energyLevel}
+        />
+        <SignalRow
+          label="Upsell Strength"
+          value={serviceState.upsellStrength}
+          level={serviceState.upsellStrength}
+        />
+        <SignalRow
+          label="Conversion"
+          value={serviceState.conversionRate}
+          level={serviceState.conversionRate}
+        />
+        <SignalRow
+          label="Avg Spend"
+          value={rands(s.avgSpend)}
+          level={s.upsellRate >= 0.95 ? "high" : s.upsellRate >= 0.80 ? "moderate" : "low"}
+        />
+        <SignalRow
+          label="Booking Arrival"
+          value={`${Math.round(s.bookingConversionRate * 100)}%`}
+          level={s.bookingConversionRate >= 0.85 ? "high" : s.bookingConversionRate >= 0.65 ? "moderate" : "low"}
+        />
+        <SignalRow
+          label="Walk-in Rate"
+          value={`${Math.round(s.walkInConversionRate * 100)}%`}
+          level={s.walkInConversionRate >= 0.4 ? "high" : s.walkInConversionRate >= 0.25 ? "moderate" : "low"}
+        />
+      </div>
+
+      {/* Revenue drag */}
+      {serviceImpact.estimatedRevenueLoss > 0 && (
+        <div className="border border-[#1a1a1a] border-l-[3px] border-l-red-500 bg-[#0f0f0f] px-4 py-2">
+          <p className="text-[10px] font-mono text-red-400">
+            Service drag: {rands(serviceImpact.estimatedRevenueLoss)} estimated revenue loss
+          </p>
+          <p className="text-[10px] text-stone-600 mt-0.5">{serviceImpact.revenueImpactExplanation}</p>
+        </div>
+      )}
     </div>
   );
 }
 
-function SignalCard({
+function SignalRow({
   label,
   value,
-  suffix,
   level,
 }: {
   label: string;
   value: string;
-  suffix?: string;
   level: string;
 }) {
-  const color = LEVEL_COLOR[level as keyof typeof LEVEL_COLOR] ?? "text-stone-400";
+  const color = LEVEL_COLOR[level] ?? "text-stone-500";
 
   return (
-    <div className="rounded-lg bg-stone-900/60 border border-stone-800/20 px-3 py-2">
-      <span className="text-[10px] uppercase tracking-wider text-stone-500 block">{label}</span>
-      <span className={cn("text-sm font-bold font-mono capitalize", color)}>
-        {value}
-        {suffix && <span className="text-stone-500 text-xs font-normal">{suffix}</span>}
-      </span>
+    <div className="flex items-center justify-between px-4 py-2">
+      <span className="text-[9px] uppercase tracking-wider text-stone-600 font-semibold">{label}</span>
+      <span className={cn("text-[11px] font-mono font-semibold capitalize", color)}>{value}</span>
     </div>
   );
 }

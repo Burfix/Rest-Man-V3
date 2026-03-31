@@ -1,8 +1,10 @@
 /**
- * CopilotHero — Top hero section of the GM Co-Pilot page.
+ * CopilotHero — Horizontal threat bar matching Command Center design language.
  *
- * Shows: service window badge, urgency state, headline, revenue gap,
- * labour %, covers, avg spend, service risk signals, consequence if ignored.
+ * One-line format: [GRADE] [Score] [Issues Active] [Top Risk] [Window]
+ * Metrics row: Revenue Gap / Labour / Covers / Avg Spend
+ * Service risks: inline pills without emoji
+ * Consequence: opacity-40 until hovered
  */
 
 "use client";
@@ -14,22 +16,29 @@ type Props = {
   brief: GMBrief;
 };
 
-const URGENCY_STYLE: Record<UrgencyState, { bg: string; border: string; dot: string; label: string }> = {
-  critical:  { bg: "bg-red-950/30",    border: "border-red-800/50",    dot: "bg-red-400 animate-pulse",    label: "CRITICAL" },
-  urgent:    { bg: "bg-amber-950/20",  border: "border-amber-800/40",  dot: "bg-amber-400 animate-pulse",  label: "URGENT" },
-  attention: { bg: "bg-yellow-950/20", border: "border-yellow-800/30", dot: "bg-yellow-400",                label: "ATTENTION" },
-  on_track:  { bg: "bg-emerald-950/20",border: "border-emerald-800/30",dot: "bg-emerald-400",              label: "ON TRACK" },
+const URGENCY_BORDER: Record<UrgencyState, string> = {
+  critical:  "border-l-red-500",
+  urgent:    "border-l-amber-500",
+  attention: "border-l-yellow-500",
+  on_track:  "border-l-emerald-600",
+};
+
+const URGENCY_LABEL_COLOR: Record<UrgencyState, string> = {
+  critical:  "text-red-400",
+  urgent:    "text-amber-400",
+  attention: "text-yellow-400",
+  on_track:  "text-emerald-400",
 };
 
 const WINDOW_LABEL: Record<ServiceWindow, string> = {
-  pre_open: "Pre-Open",
-  breakfast: "Breakfast",
-  lunch_build: "Lunch Build",
-  lunch_peak: "Lunch Peak",
-  dinner_build: "Dinner Build",
-  dinner_peak: "Dinner Peak",
-  afternoon_lull: "Afternoon",
-  close: "Close",
+  pre_open:      "PRE-OPEN",
+  breakfast:     "BREAKFAST",
+  lunch_build:   "LUNCH BUILD",
+  lunch_peak:    "LUNCH PEAK",
+  dinner_build:  "DINNER BUILD",
+  dinner_peak:   "DINNER PEAK",
+  afternoon_lull:"AFTERNOON",
+  close:         "CLOSE",
 };
 
 function rands(v: number): string {
@@ -37,54 +46,53 @@ function rands(v: number): string {
 }
 
 export default function CopilotHero({ brief }: Props) {
-  const u = URGENCY_STYLE[brief.urgencyState];
+  const issueCount = brief.topThreeActions.length;
+  const topRisk = brief.topThreeActions[0]?.title ?? null;
 
   return (
-    <div className={cn("rounded-xl border p-5 space-y-4", u.bg, u.border)}>
-      {/* Top row: window + urgency badge */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] uppercase tracking-widest text-stone-400 font-medium">
-            {WINDOW_LABEL[brief.serviceWindow]}
+    <div className="space-y-2">
+      {/* Threat bar */}
+      <div className={cn(
+        "group border border-[#1a1a1a] border-l-[3px] bg-[#0f0f0f] px-4 py-3",
+        URGENCY_BORDER[brief.urgencyState],
+      )}>
+        <div className="flex items-center gap-4 font-mono text-[11px] flex-wrap">
+          <span className={cn("font-bold tracking-wider uppercase", URGENCY_LABEL_COLOR[brief.urgencyState])}>
+            {brief.urgencyState.replace("_", " ")}
           </span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <div className={cn("h-2 w-2 rounded-full", u.dot)} />
-          <span className="text-[10px] uppercase tracking-widest font-bold text-stone-300">
-            {u.label}
+          <span className="text-stone-500">·</span>
+          <span className="text-stone-300">{brief.criticalIssues} issues active</span>
+          {topRisk && (
+            <>
+              <span className="text-stone-600">·</span>
+              <span className="text-stone-500">Top risk: <span className="text-stone-300">{topRisk}</span></span>
+            </>
+          )}
+          <span className="ml-auto text-stone-600 text-[10px] tracking-widest">
+            {WINDOW_LABEL[brief.serviceWindow]}
           </span>
         </div>
       </div>
 
-      {/* Headline */}
-      <h1 className="text-xl md:text-2xl font-bold text-stone-100 leading-tight">
-        {brief.headline}
-      </h1>
-
-      {/* Summary */}
-      <p className="text-sm text-stone-400 leading-relaxed">
-        {brief.summary}
-      </p>
-
-      {/* Key metrics row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <MetricPill
-          label="Revenue Gap"
+      {/* Metrics row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-px border border-[#1a1a1a]">
+        <MetricCell
+          label="REVENUE GAP"
           value={brief.revenueGap > 0 ? rands(brief.revenueGap) : "On Target"}
           tone={brief.revenueGap > brief.todayTarget * 0.15 ? "critical" : brief.revenueGap > 0 ? "warning" : "positive"}
         />
-        <MetricPill
-          label="Labour"
+        <MetricCell
+          label="LABOUR"
           value={`${brief.labourPercent.toFixed(1)}%`}
           tone={brief.labourPercent > 37 ? "critical" : brief.labourPercent > 32 ? "warning" : "positive"}
         />
-        <MetricPill
-          label="Covers"
+        <MetricCell
+          label="COVERS"
           value={`${brief.coversActual} / ${brief.coversForecast}`}
           tone={brief.coversActual < brief.coversForecast * 0.5 ? "critical" : brief.coversActual < brief.coversForecast * 0.7 ? "warning" : "positive"}
         />
-        <MetricPill
-          label="Avg Spend"
+        <MetricCell
+          label="AVG SPEND"
           value={rands(brief.avgSpend)}
           tone={brief.avgSpend < 200 ? "warning" : "positive"}
         />
@@ -92,10 +100,10 @@ export default function CopilotHero({ brief }: Props) {
 
       {/* Service risk signals */}
       {brief.serviceRiskSummary.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-1.5 px-1">
           {brief.serviceRiskSummary.map((risk, i) => (
-            <span key={i} className="inline-flex items-center gap-1 text-[11px] text-red-400 bg-red-950/30 border border-red-800/30 rounded-full px-2.5 py-0.5">
-              <span className="h-1 w-1 rounded-full bg-red-400" />
+            <span key={i} className="inline-flex items-center gap-1 text-[10px] font-mono text-red-400/70 border border-red-900/30 px-2 py-0.5">
+              <span className="h-1 w-1 bg-red-500 block" />
               {risk}
             </span>
           ))}
@@ -104,15 +112,16 @@ export default function CopilotHero({ brief }: Props) {
 
       {/* Consequence if ignored */}
       {brief.urgencyState !== "on_track" && (
-        <div className="text-xs text-stone-500 italic border-t border-stone-800/40 pt-3">
-          If ignored: {brief.consequenceIfIgnored}
+        <div className="group/consequence px-4 py-2 border border-[#1a1a1a] opacity-40 hover:opacity-100 transition-opacity duration-200">
+          <span className="text-[10px] uppercase tracking-wider text-red-400/80 font-mono">If ignored → </span>
+          <span className="text-[11px] text-red-300/80">{brief.consequenceIfIgnored}</span>
         </div>
       )}
     </div>
   );
 }
 
-function MetricPill({
+function MetricCell({
   label,
   value,
   tone,
@@ -123,13 +132,13 @@ function MetricPill({
 }) {
   const colors = {
     positive: "text-emerald-400",
-    warning: "text-amber-400",
+    warning:  "text-amber-400",
     critical: "text-red-400",
   };
 
   return (
-    <div className="rounded-lg bg-stone-900/50 border border-stone-800/30 px-3 py-2">
-      <span className="text-[10px] uppercase tracking-wider text-stone-500 block">{label}</span>
+    <div className="bg-[#0f0f0f] px-3 py-2.5">
+      <span className="text-[9px] uppercase tracking-[0.15em] text-stone-600 font-semibold block">{label}</span>
       <span className={cn("text-sm font-bold font-mono", colors[tone])}>{value}</span>
     </div>
   );

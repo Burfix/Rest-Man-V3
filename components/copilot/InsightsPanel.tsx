@@ -1,7 +1,6 @@
 /**
  * InsightsPanel — Pattern + cause insights from the GM engine.
- *
- * Shows detected patterns, likely causes, and recommended actions.
+ * Command Center design language — left-border severity, no emoji, IF IGNORED opacity.
  */
 
 "use client";
@@ -13,21 +12,30 @@ type Props = {
   insights: GMInsight[];
 };
 
-const CAT_ICON: Record<GMDecisionCategory, string> = {
-  service: "🎯",
-  revenue: "💰",
-  labour: "👥",
-  bookings: "📋",
-  inventory: "📦",
-  compliance: "📜",
-  maintenance: "🔧",
-  data: "📡",
+const CAT_LABEL: Record<GMDecisionCategory, string> = {
+  service:     "Service",
+  revenue:     "Revenue",
+  labour:      "Labour",
+  bookings:    "Bookings",
+  compliance:  "Compliance",
+  maintenance: "Maintenance",
+  data:        "Data",
 };
 
-const CONF_STYLE: Record<ConfidenceType, { bg: string; text: string }> = {
-  measured:  { bg: "bg-emerald-950/20", text: "text-emerald-400" },
-  inferred:  { bg: "bg-amber-950/20",  text: "text-amber-400" },
-  estimated: { bg: "bg-stone-800/50",  text: "text-stone-400" },
+const CONF_COLOR: Record<ConfidenceType, string> = {
+  measured:  "text-emerald-400",
+  inferred:  "text-amber-400",
+  estimated: "text-stone-500",
+};
+
+const CAT_BORDER: Record<GMDecisionCategory, string> = {
+  service:     "border-l-amber-500",
+  revenue:     "border-l-emerald-500",
+  labour:      "border-l-orange-500",
+  bookings:    "border-l-stone-500",
+  compliance:  "border-l-red-500",
+  maintenance: "border-l-orange-500",
+  data:        "border-l-stone-600",
 };
 
 export default function InsightsPanel({ insights }: Props) {
@@ -35,43 +43,52 @@ export default function InsightsPanel({ insights }: Props) {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Insights
       </h2>
-      <div className="space-y-2">
-        {insights.map((insight, i) => {
-          const conf = CONF_STYLE[insight.confidenceType];
-          return (
-            <div key={i} className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4 space-y-2">
-              <div className="flex items-start gap-2">
-                <span className="text-sm flex-shrink-0">{CAT_ICON[insight.category]}</span>
-                <div className="min-w-0">
-                  <p className="text-sm text-stone-200 font-medium leading-tight">
-                    {insight.detectedPattern}
-                  </p>
-                  <p className="text-xs text-stone-400 mt-1">
-                    <span className="text-stone-500">Cause: </span>
-                    {insight.likelyCause}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs border-t border-stone-800/30 pt-2">
-                <div className="text-stone-400">
-                  <span className="text-stone-500">Do: </span>
-                  {insight.recommendedAction}
-                </div>
-                <span className={cn("text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded", conf.bg, conf.text)}>
-                  {insight.confidenceType}
-                </span>
-              </div>
-
-              <p className="text-[11px] text-emerald-400/80">
-                Impact: {insight.expectedImpact}
-              </p>
+      <div className="border border-[#1a1a1a] bg-[#0f0f0f] divide-y divide-[#1a1a1a]">
+        {insights.map((insight, i) => (
+          <div
+            key={i}
+            className={cn(
+              "border-l-[3px] px-4 py-3 space-y-1.5",
+              CAT_BORDER[insight.category] ?? "border-l-stone-600",
+            )}
+          >
+            {/* Header row */}
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 font-semibold">
+                {CAT_LABEL[insight.category] ?? insight.category}
+              </span>
+              <span className="text-stone-700">·</span>
+              <span className={cn("text-[9px] uppercase tracking-wider font-semibold", CONF_COLOR[insight.confidenceType])}>
+                {insight.confidenceType}
+              </span>
             </div>
-          );
-        })}
+
+            {/* Pattern */}
+            <p className="text-[11px] text-stone-200 leading-snug font-medium">
+              {insight.detectedPattern}
+            </p>
+
+            {/* Cause */}
+            <p className="text-[10px] text-stone-500 leading-snug">
+              <span className="text-stone-600 uppercase tracking-wider text-[9px]">Cause </span>
+              {insight.likelyCause}
+            </p>
+
+            {/* Action + Impact */}
+            <div className="flex items-center justify-between pt-0.5 border-t border-[#1a1a1a]">
+              <p className="text-[10px] text-stone-400 leading-snug">
+                <span className="text-stone-600 uppercase tracking-wider text-[9px]">Do </span>
+                {insight.recommendedAction}
+              </p>
+              <span className="text-[10px] text-emerald-400/80 font-mono ml-3 flex-shrink-0">
+                {insight.expectedImpact}
+              </span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

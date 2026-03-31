@@ -7,9 +7,9 @@
  *   Service:    25 pts
  *   Revenue:    25 pts
  *   Labour:     20 pts
- *   Inventory:  10 pts
  *   Maintenance: 10 pts
  *   Compliance: 10 pts
+ *                ── max 90 pts
  */
 
 import type { CopilotOperatingScore, ScoreGrade } from "./types";
@@ -21,8 +21,6 @@ export interface ScoreInput {
   revenueTarget: number;
   labourPercent: number;
   targetLabourPercent: number;
-  criticalStockCount: number;
-  lowStockCount: number;
   maintenanceUrgent: number;
   maintenanceServiceBlocking: boolean;
   complianceExpired: number;
@@ -41,7 +39,6 @@ export function getCopilotOperatingScore(input: ScoreInput): CopilotOperatingSco
   const {
     serviceState, revenueActual, revenueTarget,
     labourPercent, targetLabourPercent,
-    criticalStockCount, lowStockCount,
     maintenanceUrgent, maintenanceServiceBlocking,
     complianceExpired, complianceDueSoon,
   } = input;
@@ -86,12 +83,6 @@ export function getCopilotOperatingScore(input: ScoreInput): CopilotOperatingSco
   else if (labourPercent <= targetLabourPercent + 15) labourScore = 5;
   else labourScore = 0;
 
-  // ── Inventory (max 10) ─────────────────────────────────────────────────
-  let inventoryScore = 10;
-  if (criticalStockCount > 0) inventoryScore = 0;
-  else if (lowStockCount > 3) inventoryScore = 3;
-  else if (lowStockCount > 0) inventoryScore = 7;
-
   // ── Maintenance (max 10) ───────────────────────────────────────────────
   let maintenanceScore = 10;
   if (maintenanceServiceBlocking) maintenanceScore = 0;
@@ -102,7 +93,7 @@ export function getCopilotOperatingScore(input: ScoreInput): CopilotOperatingSco
   if (complianceExpired > 0) complianceScore = 0;
   else if (complianceDueSoon > 0) complianceScore = 6;
 
-  const totalScore = serviceScore + revenueScore + labourScore + inventoryScore + maintenanceScore + complianceScore;
+  const totalScore = serviceScore + revenueScore + labourScore + maintenanceScore + complianceScore;
 
   // ── Summary ────────────────────────────────────────────────────────────
 
@@ -110,7 +101,6 @@ export function getCopilotOperatingScore(input: ScoreInput): CopilotOperatingSco
   if (serviceScore < 12) weakest.push("service weakness");
   if (revenueScore < 12) weakest.push("revenue underperformance");
   if (labourScore < 10) weakest.push("labour overspend");
-  if (inventoryScore < 5) weakest.push("inventory risk");
   if (maintenanceScore < 5) weakest.push("maintenance issues");
   if (complianceScore < 5) weakest.push("compliance gaps");
 
@@ -130,7 +120,6 @@ export function getCopilotOperatingScore(input: ScoreInput): CopilotOperatingSco
       service: serviceScore,
       revenue: revenueScore,
       labour: labourScore,
-      inventory: inventoryScore,
       maintenance: maintenanceScore,
       compliance: complianceScore,
     },

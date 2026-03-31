@@ -1,7 +1,6 @@
 /**
- * BusinessStatus — Revenue/labour/bookings/inventory/maintenance/compliance rail.
- *
- * Compact status overview of all domain areas with at-a-glance indicators.
+ * BusinessStatus — Revenue / labour / covers / maintenance / compliance rail.
+ * Command Center design language — flat list, left-border severity, no rounded > sm.
  */
 
 "use client";
@@ -27,10 +26,16 @@ function rands(v: number): string {
   return `R${Math.abs(v).toLocaleString("en-ZA", { maximumFractionDigits: 0 })}`;
 }
 
-const TONE_COLORS: Record<Tone, { dot: string; text: string }> = {
-  positive: { dot: "bg-emerald-400", text: "text-emerald-400" },
-  warning:  { dot: "bg-amber-400",  text: "text-amber-400" },
-  critical: { dot: "bg-red-400",    text: "text-red-400" },
+const TONE_COLOR: Record<Tone, string> = {
+  positive: "text-emerald-400",
+  warning:  "text-amber-400",
+  critical: "text-red-400",
+};
+
+const TONE_BORDER: Record<Tone, string> = {
+  positive: "border-l-emerald-600",
+  warning:  "border-l-amber-500",
+  critical: "border-l-red-500",
 };
 
 export default function BusinessStatus({ brief, score }: Props) {
@@ -56,14 +61,6 @@ export default function BusinessStatus({ brief, score }: Props) {
         : brief.coversActual < brief.coversForecast * 0.7 ? "warning" : "positive",
     },
     {
-      label: "Inventory",
-      value: score.breakdown.inventory >= 7 ? "Healthy"
-        : score.breakdown.inventory >= 3 ? "Low stock"
-        : "Critical",
-      tone: score.breakdown.inventory >= 7 ? "positive"
-        : score.breakdown.inventory >= 3 ? "warning" : "critical",
-    },
-    {
       label: "Maintenance",
       value: score.breakdown.maintenance >= 7 ? "Clear"
         : score.breakdown.maintenance >= 3 ? "Issues open"
@@ -83,28 +80,26 @@ export default function BusinessStatus({ brief, score }: Props) {
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Business Status
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {items.map((item) => {
-            const t = TONE_COLORS[item.tone];
-            return (
-              <div key={item.label} className="flex items-center gap-2">
-                <div className={cn("h-2 w-2 rounded-full flex-shrink-0", t.dot)} />
-                <div className="min-w-0">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 block">
-                    {item.label}
-                  </span>
-                  <span className={cn("text-xs font-medium", t.text)}>
-                    {item.value}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      <div className="border border-[#1a1a1a] bg-[#0f0f0f] divide-y divide-[#1a1a1a]">
+        {items.map((item) => (
+          <div
+            key={item.label}
+            className={cn(
+              "flex items-center justify-between px-4 py-2 border-l-[3px]",
+              TONE_BORDER[item.tone],
+            )}
+          >
+            <span className="text-[9px] uppercase tracking-wider text-stone-600 font-semibold">
+              {item.label}
+            </span>
+            <span className={cn("text-[11px] font-mono font-semibold", TONE_COLOR[item.tone])}>
+              {item.value}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

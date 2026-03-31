@@ -49,7 +49,6 @@ const SEV_STYLES: Record<
 const CAT_LABEL: Record<OperatingDecision["category"], string> = {
   revenue: "Revenue",
   labour: "Labour",
-  inventory: "Inventory",
   maintenance: "Maintenance",
   compliance: "Compliance",
   service: "Service",
@@ -59,7 +58,6 @@ const CAT_LABEL: Record<OperatingDecision["category"], string> = {
 const CAT_TO_ACTION_CAT: Record<string, string> = {
   revenue: "revenue",
   labour: "labour",
-  inventory: "stock",
   maintenance: "maintenance",
   compliance: "compliance",
   service: "service",
