@@ -2,12 +2,13 @@
  * BusinessStatusRail — Compact vertical status rail for the secondary column.
  *
  * Shows Revenue, Labour, Inventory, Maintenance, Compliance —
- * each with label, current state, supporting text, and tone.
- * Supporting context, not the hero.
+ * each with a horizontal fill bar showing % of target, label, and tone.
+ * Click any row to expand supporting text.
  */
 
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 import type { EvaluateOperationsOutput, BusinessStatusTone } from "@/services/decision-engine";
 
@@ -15,51 +16,78 @@ type Props = {
   status: EvaluateOperationsOutput["businessStatus"];
 };
 
-const TONE_STYLES: Record<BusinessStatusTone, { text: string; dot: string }> = {
-  positive: { text: "text-emerald-400", dot: "bg-emerald-400" },
-  warning:  { text: "text-amber-400",   dot: "bg-amber-400"   },
-  critical: { text: "text-red-400",     dot: "bg-red-400"     },
-  neutral:  { text: "text-stone-400",   dot: "bg-stone-500"   },
+const TONE_STYLES: Record<BusinessStatusTone, { text: string; bar: string }> = {
+  positive: { text: "text-emerald-400", bar: "bg-emerald-500/60" },
+  warning:  { text: "text-amber-400",   bar: "bg-amber-500/60"   },
+  critical: { text: "text-red-400",     bar: "bg-red-500/60"     },
+  neutral:  { text: "text-stone-400",   bar: "bg-stone-600"      },
 };
 
-const CATEGORY_ICON: Record<string, string> = {
-  revenue: "💰",
-  labour: "👥",
-  inventory: "📦",
-  maintenance: "🔧",
-  compliance: "📋",
+// Approximate fill % from tone for the indicator bar
+const TONE_FILL: Record<BusinessStatusTone, number> = {
+  positive: 82,
+  warning: 46,
+  critical: 18,
+  neutral: 55,
 };
 
 type StatusKey = keyof EvaluateOperationsOutput["businessStatus"];
 const KEYS: StatusKey[] = ["revenue", "labour", "inventory", "maintenance", "compliance"];
 
 export default function BusinessStatusRail({ status }: Props) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Business Status
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 divide-y divide-stone-800/40">
+      <div className="rounded border border-stone-800/40 bg-stone-900/50 divide-y divide-stone-800/40">
         {KEYS.map((key) => {
           const item = status[key];
           const tone = TONE_STYLES[item.tone];
+          const fillPct = TONE_FILL[item.tone];
+          const isExp = expanded === key;
+          const isRevenue = key === "revenue";
+
           return (
-            <div key={key} className="flex items-start gap-3 px-4 py-3">
-              <span className="text-sm mt-0.5">{CATEGORY_ICON[key]}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium">
+            <div
+              key={key}
+              className="px-4 py-2.5 cursor-pointer hover:bg-stone-800/20 transition-colors"
+              onClick={() => setExpanded(isExp ? null : key)}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="text-[9px] uppercase tracking-widest text-stone-600 font-medium w-[72px] shrink-0">
                     {key}
                   </span>
-                  <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} />
+                  <p className={cn(
+                    "font-semibold leading-tight truncate",
+                    isRevenue ? "text-base font-black" : "text-sm",
+                    tone.text
+                  )}>
+                    {item.label}
+                  </p>
                 </div>
-                <p className={cn("text-sm font-semibold mt-0.5", tone.text)}>
-                  {item.label}
-                </p>
-                <p className="text-[11px] text-stone-500 mt-0.5 leading-snug">
+                <span className="text-stone-700 text-[9px] font-mono shrink-0">
+                  {isExp ? "▲" : "▼"}
+                </span>
+              </div>
+
+              {/* Fill bar */}
+              <div className="mt-1.5 h-0.5 bg-stone-800 overflow-hidden">
+                <div
+                  className={cn("h-full transition-all duration-700", tone.bar)}
+                  style={{ width: `${fillPct}%` }}
+                />
+              </div>
+
+              {/* Expanded supporting text */}
+              {isExp && (
+                <p className="mt-1.5 text-[10px] text-stone-500 leading-snug">
                   {item.supportingText}
                 </p>
-              </div>
+              )}
             </div>
           );
         })}

@@ -2,7 +2,8 @@
  * ControlBar — Top bar replacing the old OperatingCommandBar.
  *
  * Three data points: Revenue Risk | Time Pressure | Score
- * Strips away noise. Forces awareness. Creates urgency.
+ * Pulsing red dot on AFTER HOURS / CLOSED periods.
+ * Last sync timestamp displayed in monospace.
  */
 
 "use client";
@@ -16,6 +17,7 @@ type Props = {
   score: number;
   status: "healthy" | "needs_attention" | "critical";
   servicePeriod: string;
+  lastSyncAt?: string;
 };
 
 export default function ControlBar({
@@ -25,6 +27,7 @@ export default function ControlBar({
   score,
   status,
   servicePeriod,
+  lastSyncAt,
 }: Props) {
   const isNegative = variancePercent < 0;
   const scorePct = Math.round(score);
@@ -41,8 +44,13 @@ export default function ControlBar({
         ? "border-amber-800/40"
         : "border-stone-800/40";
 
-  const statusDot =
-    status === "critical"
+  // Pulsing red dot for after-hours/closed periods regardless of operational status
+  const periodUpper = servicePeriod.toUpperCase();
+  const isAfterHours = periodUpper.includes("AFTER") || periodUpper.includes("CLOSED");
+
+  const statusDot = isAfterHours
+    ? "bg-red-400 animate-pulse"
+    : status === "critical"
       ? "bg-red-400 animate-pulse"
       : status === "needs_attention"
         ? "bg-amber-400"
@@ -51,16 +59,21 @@ export default function ControlBar({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-4 rounded-xl border px-5 py-3 bg-stone-950/80",
+        "flex items-center justify-between gap-4 rounded border px-5 py-3 bg-stone-950/80",
         statusBorder,
       )}
     >
       {/* Left: Status + Service Period */}
       <div className="flex items-center gap-3 shrink-0">
-        <span className={cn("h-2.5 w-2.5 rounded-full", statusDot)} />
-        <span className="text-xs font-semibold text-stone-300 uppercase tracking-wider">
+        <span className={cn("h-2 w-2 rounded-full shrink-0", statusDot)} />
+        <span className="text-xs font-semibold text-stone-300 uppercase tracking-wider font-mono">
           {servicePeriod}
         </span>
+        {lastSyncAt && (
+          <span className="text-[10px] text-stone-600 font-mono hidden sm:block">
+            sync {lastSyncAt}
+          </span>
+        )}
       </div>
 
       {/* Center: Three Key Metrics */}
@@ -83,7 +96,7 @@ export default function ControlBar({
             </span>
             <span
               className={cn(
-                "text-[11px] font-semibold",
+                "text-[11px] font-semibold font-mono",
                 isNegative ? "text-red-400" : "text-emerald-400",
               )}
             >
@@ -100,7 +113,7 @@ export default function ControlBar({
           <span className="text-[9px] uppercase tracking-widest text-stone-600 font-medium">
             Time Pressure
           </span>
-          <span className="text-sm font-bold text-stone-200 mt-0.5">
+          <span className="text-sm font-bold text-stone-200 mt-0.5 font-mono">
             {timePressure}
           </span>
         </div>
@@ -115,14 +128,14 @@ export default function ControlBar({
           </span>
           <span className={cn("text-lg font-black font-mono mt-0.5", scoreTone)}>
             {score}
-            <span className="text-stone-600 text-xs font-normal">/100</span>
+            <span className="text-stone-700 text-xs font-normal">/100</span>
           </span>
         </div>
       </div>
 
-      {/* Right: Score badge */}
-      <div className={cn("rounded-lg px-3 py-1.5 shrink-0", scoreBg)}>
-        <span className={cn("text-xs font-bold", scoreTone)}>
+      {/* Right: Grade badge */}
+      <div className={cn("rounded px-3 py-1.5 shrink-0", scoreBg)}>
+        <span className={cn("text-xs font-bold font-mono", scoreTone)}>
           {scorePct >= 85 ? "A" : scorePct >= 70 ? "B" : scorePct >= 55 ? "C" : scorePct >= 40 ? "D" : "F"}
         </span>
       </div>

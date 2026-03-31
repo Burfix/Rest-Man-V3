@@ -1,9 +1,8 @@
 /**
  * CommandFeed — The heart of the Operating Brain.
  *
- * Each decision card includes Execute, Assign, Complete buttons
- * that create/update actions via the /api/actions endpoints.
- * Shows consequence if ignored. Feels like a control panel, not a report.
+ * War-room aesthetic: no buttons, terminal-style action links,
+ * borders by severity, IF IGNORED dim until hover.
  */
 
 "use client";
@@ -76,7 +75,7 @@ function ConfidencePips({ level }: { level?: "low" | "medium" | "high" }) {
         <span
           key={n}
           className={cn(
-            "h-1 w-3 rounded-full",
+            "h-1 w-3 rounded-none",
             n <= fill ? "bg-emerald-500/60" : "bg-stone-700",
           )}
         />
@@ -95,7 +94,7 @@ function ImpactPill({ impact }: { impact: NonNullable<OperatingDecision["impact"
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium border",
+        "inline-flex items-center gap-1 rounded-sm px-2 py-0.5 text-[10px] font-medium border",
         styles[impact.type] ?? "bg-stone-800 text-stone-400",
       )}
     >
@@ -108,7 +107,7 @@ function ConsequenceLine({ decision }: { decision: OperatingDecision }) {
   if (!decision.impact?.value && !decision.impact?.label) return null;
   const riskValue = decision.impact?.value;
   return (
-    <div className="mt-2 px-2.5 py-1.5 rounded bg-red-950/30 border border-red-900/30">
+    <div className="mt-2 px-2.5 py-1.5 rounded-sm bg-red-950/30 border border-red-900/30 opacity-40 group-hover:opacity-100 transition-opacity duration-200">
       <span className="text-[10px] uppercase tracking-wider text-red-400/80 font-medium">
         If ignored →{" "}
       </span>
@@ -123,7 +122,6 @@ function ConsequenceLine({ decision }: { decision: OperatingDecision }) {
 }
 
 export default function CommandFeed({ decisions }: Props) {
-  // Track action state per decision by decision id
   const [actionStates, setActionStates] = useState<Record<string, ActionState>>({});
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
@@ -134,7 +132,6 @@ export default function CommandFeed({ decisions }: Props) {
     }));
   }, []);
 
-  // Execute: Create an action from a decision
   const handleExecute = useCallback(
     async (d: OperatingDecision) => {
       setLoadingId(d.id);
@@ -166,7 +163,6 @@ export default function CommandFeed({ decisions }: Props) {
     [updateState],
   );
 
-  // Start: Move action to in_progress
   const handleStart = useCallback(
     async (d: OperatingDecision) => {
       const actionId = actionStates[d.id]?.id;
@@ -186,7 +182,6 @@ export default function CommandFeed({ decisions }: Props) {
     [actionStates, updateState],
   );
 
-  // Complete: Mark action as completed
   const handleComplete = useCallback(
     async (d: OperatingDecision) => {
       const actionId = actionStates[d.id]?.id;
@@ -208,18 +203,18 @@ export default function CommandFeed({ decisions }: Props) {
 
   if (decisions.length === 0) {
     return (
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-8 text-center">
-        <p className="text-sm text-stone-500">No active decisions — operations are clear</p>
+      <div className="rounded border border-stone-800/40 bg-stone-900/50 px-5 py-8 text-center">
+        <p className="text-sm text-stone-500 font-mono">— operations clear —</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-2">
-      <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
+      <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Command Feed
       </h2>
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {decisions.map((d) => {
           const sev = SEV_STYLES[d.severity];
           const state = actionStates[d.id] ?? { status: "idle" };
@@ -230,9 +225,9 @@ export default function CommandFeed({ decisions }: Props) {
             <div
               key={d.id}
               className={cn(
-                "rounded-lg border border-stone-800/40 bg-stone-900/50 border-l-[3px] px-4 py-3.5 transition-opacity",
+                "group rounded-sm border border-stone-800/40 bg-stone-900/50 border-l-[3px] px-4 py-3 transition-opacity",
                 sev.border,
-                isDone && "opacity-50",
+                isDone && "opacity-40",
               )}
             >
               {/* Header row */}
@@ -240,25 +235,25 @@ export default function CommandFeed({ decisions }: Props) {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span
                     className={cn(
-                      "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border",
+                      "rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border",
                       sev.badge,
                     )}
                   >
                     {d.severity}
                   </span>
-                  <span className="text-[10px] text-stone-500 uppercase tracking-wider">
+                  <span className="text-[10px] text-stone-600 uppercase tracking-wider">
                     {CAT_LABEL[d.category]}
                   </span>
                   {isDone && (
-                    <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                    <span className="rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
                       Done
                     </span>
                   )}
                 </div>
-                <div className="flex items-center">
+                <div className="flex items-center shrink-0">
                   {d.due && (
-                    <span className="text-[10px] text-stone-500 font-mono">
-                      Due: {d.due}
+                    <span className="text-[10px] text-stone-600 font-mono">
+                      {d.due}
                     </span>
                   )}
                   <ConfidencePips level={d.confidence} />
@@ -266,98 +261,74 @@ export default function CommandFeed({ decisions }: Props) {
               </div>
 
               {/* Title */}
-              <h3 className="mt-2 text-sm font-semibold text-stone-100 leading-snug">
+              <h3 className="mt-1.5 text-sm font-semibold text-stone-100 leading-snug">
                 {d.title}
               </h3>
 
               {/* Explanation */}
-              <p className="mt-1 text-xs text-stone-400 leading-relaxed">
+              <p className="mt-1 text-[11px] text-stone-500 leading-snug">
                 {d.explanation}
               </p>
 
-              {/* Action */}
-              <div className="mt-2.5 flex items-start gap-2">
-                <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium shrink-0 mt-0.5">
-                  Action
+              {/* Action — bold + larger */}
+              <div className="mt-2 flex items-start gap-2">
+                <span className="text-[9px] uppercase tracking-widest text-stone-600 font-semibold shrink-0 mt-0.5">
+                  ACTION
                 </span>
-                <span className="text-xs text-stone-300 font-medium">
+                <span className="text-sm text-stone-100 font-bold leading-snug">
                   {d.action}
                 </span>
               </div>
 
               {/* Impact pill */}
               {d.impact && (
-                <div className="mt-2 flex items-center gap-2">
+                <div className="mt-1.5 flex items-center gap-2">
                   <ImpactPill impact={d.impact} />
                 </div>
               )}
 
-              {/* Consequence line */}
+              {/* Consequence line — dim until hovered */}
               <ConsequenceLine decision={d} />
 
-              {/* Execution buttons */}
+              {/* Terminal action links */}
               {!isDone && (
-                <div className="mt-3 flex items-center gap-2 border-t border-stone-800/40 pt-3">
+                <div className="mt-2 flex items-center gap-4 font-mono text-[11px]">
                   {state.status === "idle" && (
                     <button
                       disabled={busy}
                       onClick={() => handleExecute(d)}
-                      className={cn(
-                        "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                        "bg-sky-600/80 text-white hover:bg-sky-500/90",
-                        busy && "opacity-50 cursor-not-allowed",
-                      )}
+                      className="text-stone-600 hover:text-amber-400 transition-colors disabled:opacity-30"
                     >
-                      {busy ? "Creating…" : "Execute"}
+                      {busy ? "→ creating..." : "→ execute"}
                     </button>
                   )}
-
                   {state.status === "pending" && (
                     <>
                       <button
                         disabled={busy}
                         onClick={() => handleStart(d)}
-                        className={cn(
-                          "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                          "bg-amber-600/80 text-white hover:bg-amber-500/90",
-                          busy && "opacity-50 cursor-not-allowed",
-                        )}
+                        className="text-stone-600 hover:text-blue-400 transition-colors disabled:opacity-30"
                       >
-                        {busy ? "Starting…" : "Start"}
+                        {busy ? "→ starting..." : "→ start"}
                       </button>
                       <button
                         disabled={busy}
                         onClick={() => handleComplete(d)}
-                        className={cn(
-                          "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                          "bg-emerald-600/80 text-white hover:bg-emerald-500/90",
-                          busy && "opacity-50 cursor-not-allowed",
-                        )}
+                        className="text-stone-600 hover:text-emerald-400 transition-colors disabled:opacity-30"
                       >
-                        Complete
+                        → complete
                       </button>
                     </>
                   )}
-
                   {state.status === "in_progress" && (
                     <button
                       disabled={busy}
                       onClick={() => handleComplete(d)}
-                      className={cn(
-                        "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
-                        "bg-emerald-600/80 text-white hover:bg-emerald-500/90",
-                        busy && "opacity-50 cursor-not-allowed",
-                      )}
+                      className="text-stone-600 hover:text-emerald-400 transition-colors disabled:opacity-30"
                     >
-                      {busy ? "Completing…" : "Complete"}
+                      {busy ? "→ completing..." : "→ complete"}
                     </button>
                   )}
-
-                  <span className="text-[10px] text-stone-600 ml-auto">
-                    {state.status === "idle" && "→ Create action from this decision"}
-                    {state.status === "pending" && "Action created — ready to begin"}
-                    {state.status === "in_progress" && "In progress — mark when done"}
-                  </span>
                 </div>
               )}
             </div>

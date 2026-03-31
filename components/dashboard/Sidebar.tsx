@@ -96,7 +96,7 @@ function NavList({
       {filteredNav.map((group, gi) => (
         <div key={gi}>
           {group.group && (
-            <p className="mb-1 px-2 text-[9px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+            <p className="mb-1 px-2 text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400 dark:text-stone-700">
               {group.group}
             </p>
           )}
@@ -114,12 +114,12 @@ function NavList({
                   href={item.soon ? "#" : item.href}
                   onClick={item.soon ? undefined : onNavClick}
                   className={cn(
-                    "flex items-center justify-between rounded-lg px-2.5 py-2 text-sm transition-colors group",
+                    "flex items-center justify-between px-2.5 py-2 text-sm transition-colors group",
                     item.soon
                       ? "cursor-default opacity-40"
                       : isActive
-                      ? "bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100"
-                      : "text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800/60 hover:text-stone-800 dark:hover:text-stone-200"
+                      ? "border-l-2 border-amber-500 pl-2 text-amber-700 dark:text-amber-400 bg-amber-50/30 dark:bg-transparent rounded-r"
+                      : "rounded-lg text-stone-500 dark:text-stone-400 hover:bg-stone-50 dark:hover:bg-stone-800/60 hover:text-stone-800 dark:hover:text-stone-200"
                   )}
                 >
                   <div className="flex items-center gap-2.5">

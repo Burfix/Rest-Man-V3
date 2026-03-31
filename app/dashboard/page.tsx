@@ -312,6 +312,10 @@ export default async function OperationsDashboard() {
     ? engineOutput.commandFeed[0].title
     : undefined;
 
+  const lastSyncLabel = labourSummary?.lastSyncAt
+    ? new Date(labourSummary.lastSyncAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
+    : undefined;
+
   return (
     <div className="space-y-4">
 
@@ -323,17 +327,16 @@ export default async function OperationsDashboard() {
         score={scoreTotal}
         status={barStatus}
         servicePeriod={servicePeriod}
+        lastSyncAt={lastSyncLabel}
       />
 
-      {/* ── 2. Operating Score Hero — Dominant Visual Center ── */}
-      <div className="flex justify-center py-2">
-        <OperatingScoreHero
-          score={scoreTotal}
-          status={barStatus}
-          issueCount={engineOutput.operatingCommandBar.issueCount}
-          topRisk={topRisk}
-        />
-      </div>
+      {/* ── 2. Threat Bar — Full-width score + grade + issues ── */}
+      <OperatingScoreHero
+        score={scoreTotal}
+        status={barStatus}
+        issueCount={engineOutput.operatingCommandBar.issueCount}
+        topRisk={topRisk}
+      />
 
       {/* ── 3. Since Last Check ── */}
       <SinceLastCheck items={engineOutput.sinceLastCheck} />
@@ -343,6 +346,7 @@ export default async function OperationsDashboard() {
 
         {/* Primary Column (dominant) */}
         <div className="lg:col-span-8 space-y-4">
+          <DataHealthWarning health={engineOutput.dataHealth} />
           <CommandFeed decisions={engineOutput.commandFeed} />
           <ServicePulse
             actual={salesSnapshot.netSales}
@@ -364,7 +368,6 @@ export default async function OperationsDashboard() {
         <div className="lg:col-span-4 space-y-4">
           <BusinessStatusRail status={engineOutput.businessStatus} />
           <FeedbackLoop />
-          <DataHealthWarning health={engineOutput.dataHealth} />
         </div>
       </div>
 

@@ -1,8 +1,8 @@
 /**
- * OperatingScoreHero — Dominant visual element at center of dashboard.
+ * OperatingScoreHero — Full-width THREAT BAR replacing the SVG ring.
  *
- * Large animated score ring with grade, status label, and
- * 3-word consequence summary. This IS the dashboard anchor.
+ * [GRADE F] | [28/100] [████░░░░] | [5 ISSUES ACTIVE] | [TOP RISK: ...]
+ * All on one line, monospace, no circle.
  */
 
 "use client";
@@ -25,18 +25,19 @@ function getGrade(pct: number): { letter: string; color: string } {
   return { letter: "F", color: "text-red-400" };
 }
 
-function getRingColor(pct: number): string {
-  if (pct >= 70) return "stroke-emerald-500";
-  if (pct >= 55) return "stroke-amber-500";
-  if (pct >= 40) return "stroke-orange-500";
-  return "stroke-red-500";
+function getBarColor(pct: number): string {
+  if (pct >= 70) return "bg-emerald-500";
+  if (pct >= 55) return "bg-amber-500";
+  if (pct >= 40) return "bg-orange-500";
+  return "bg-red-500";
 }
 
-const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
-  healthy:         { text: "Operations On Track",       cls: "text-emerald-400" },
-  needs_attention: { text: "Attention Required",        cls: "text-amber-400" },
-  critical:        { text: "Immediate Action Needed",   cls: "text-red-400" },
-};
+function getBorderColor(pct: number): string {
+  if (pct >= 70) return "border-emerald-800/40";
+  if (pct >= 55) return "border-amber-800/40";
+  if (pct >= 40) return "border-orange-800/40";
+  return "border-red-800/40";
+}
 
 export default function OperatingScoreHero({
   score,
@@ -47,72 +48,64 @@ export default function OperatingScoreHero({
 }: Props) {
   const pct = maxScore > 0 ? Math.round((score / maxScore) * 100) : 0;
   const grade = getGrade(pct);
-  const ringColor = getRingColor(pct);
-  const statusCfg = STATUS_LABEL[status] ?? STATUS_LABEL.healthy;
-
-  // SVG ring math
-  const radius = 58;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (pct / 100) * circumference;
+  const barColor = getBarColor(pct);
+  const borderColor = getBorderColor(pct);
 
   return (
-    <div className="flex flex-col items-center py-5">
-      {/* Score Ring */}
-      <div className="relative h-40 w-40">
-        <svg className="h-full w-full -rotate-90" viewBox="0 0 128 128">
-          {/* Background ring */}
-          <circle
-            cx="64" cy="64" r={radius}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="6"
-            className="text-stone-800/60"
-          />
-          {/* Score ring */}
-          <circle
-            cx="64" cy="64" r={radius}
-            fill="none"
-            strokeWidth="6"
-            strokeLinecap="round"
-            className={cn(ringColor, "transition-all duration-1000")}
-            strokeDasharray={circumference}
-            strokeDashoffset={strokeDashoffset}
-          />
-        </svg>
-        {/* Center content */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className={cn("text-4xl font-black font-mono", grade.color)}>
-            {score}
-          </span>
-          <span className="text-[10px] text-stone-500 uppercase tracking-wider mt-0.5">
-            / {maxScore}
+    <div className={cn("w-full rounded border bg-stone-950/80 overflow-hidden", borderColor)}>
+      <div className="flex items-stretch divide-x divide-stone-800/60">
+
+        {/* Grade */}
+        <div className="flex items-center px-4 py-2.5 shrink-0">
+          <span className={cn("font-mono font-black text-sm uppercase tracking-widest", grade.color)}>
+            GRADE {grade.letter}
           </span>
         </div>
-      </div>
 
-      {/* Grade + Status */}
-      <div className="mt-3 flex items-center gap-2">
-        <span className={cn("text-lg font-bold", grade.color)}>
-          Grade {grade.letter}
-        </span>
-        <span className="text-stone-700">·</span>
-        <span className={cn("text-sm font-semibold", statusCfg.cls)}>
-          {statusCfg.text}
-        </span>
-      </div>
+        {/* Score + fill bar */}
+        <div className="flex items-center gap-3 px-4 py-2.5 shrink-0">
+          <span className="font-mono">
+            <span className={cn("font-black text-xl", grade.color)}>{score}</span>
+            <span className="text-stone-700 text-xs">/100</span>
+          </span>
+          <div className="w-24 h-1 bg-stone-800 rounded-sm overflow-hidden">
+            <div
+              className={cn("h-full transition-all duration-1000", barColor)}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+        </div>
 
-      {/* Issue count + top risk */}
-      <div className="mt-2 flex items-center gap-3 text-xs text-stone-500">
+        {/* Issues active */}
         {issueCount > 0 && (
-          <span className="rounded-full bg-red-500/10 text-red-400 px-2.5 py-0.5 font-medium">
-            {issueCount} issue{issueCount !== 1 ? "s" : ""} active
-          </span>
+          <div className="flex items-center px-4 py-2.5 shrink-0">
+            <span className="font-mono text-[11px] text-red-400 font-semibold uppercase tracking-wider">
+              {issueCount} ISSUE{issueCount !== 1 ? "S" : ""} ACTIVE
+            </span>
+          </div>
         )}
+
+        {/* Top risk — fills remaining space */}
         {topRisk && (
-          <span className="text-stone-400">
-            Top risk: <span className="text-stone-300 font-medium">{topRisk}</span>
-          </span>
+          <div className="flex items-center px-4 py-2.5 flex-1 min-w-0">
+            <span className="font-mono text-[11px] text-stone-600 uppercase tracking-wider truncate">
+              TOP RISK:{" "}
+              <span className="text-stone-400">{topRisk.toUpperCase()}</span>
+            </span>
+          </div>
         )}
+
+        {/* Status label — right edge */}
+        <div className="flex items-center px-4 py-2.5 shrink-0 ml-auto">
+          <span className={cn(
+            "font-mono text-[10px] uppercase tracking-widest",
+            status === "healthy" ? "text-emerald-500/60" :
+            status === "needs_attention" ? "text-amber-500/60" :
+            "text-red-500/60"
+          )}>
+            {status === "healthy" ? "NOMINAL" : status === "needs_attention" ? "ATTENTION" : "CRITICAL"}
+          </span>
+        </div>
       </div>
     </div>
   );

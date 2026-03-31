@@ -19,12 +19,12 @@
 
 /* ── Dark mode tokens (applied when <html class="dark">) ────────────────────── */
 .dark {
-  --background:        #0f0f0e;   /* near-black warm */
+  --background:        #060606;   /* near-black — war room */
   --foreground:        #e7e5e4;   /* stone-200 */
-  --surface:           #1c1917;   /* stone-900 */
-  --surface-muted:     #292524;   /* stone-800 */
-  --border:            #3a3330;   /* stone-700 */
-  --border-subtle:     #292524;   /* stone-800 */
+  --surface:           #0f0e0d;   /* just above pure black */
+  --surface-muted:     #1a1917;   /* stone-900 */
+  --border:            #2c2a28;   /* stone-800 tight */
+  --border-subtle:     #1a1917;   /* stone-900 */
   --text-primary:      #fafaf9;   /* stone-50 */
   --text-secondary:    #a8a29e;   /* stone-400 */
   --text-muted:        #78716c;   /* stone-500 */
@@ -39,6 +39,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   transition: background-color 0.4s ease, color 0.4s ease;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── Smooth transitions for common surfaces ────────────────────────────────── */

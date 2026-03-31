@@ -1,12 +1,8 @@
 /**
  * DataHealthWarning — Structured data health warning.
  *
- * Replaces abstract "low confidence" signals with specific:
- * - What data sources are stale
- * - Impact on brain decisions
- * - What to do about it
- *
- * Includes a Sync All button and per-source freshness breakdown.
+ * Terminal-style [SYNC ALL] button. Amber warning colors.
+ * Compact, war-room aesthetic.
  */
 
 "use client";
@@ -24,22 +20,19 @@ const STATUS_META = {
   good: {
     bg: "border-emerald-800/30 bg-emerald-950/20",
     dot: "bg-emerald-400",
-    label: "All Systems Current",
-    icon: "✓",
+    label: "ALL SYSTEMS CURRENT",
     desc: "All data sources are fresh. Decisions are fully informed.",
   },
   warning: {
-    bg: "border-amber-800/30 bg-amber-950/20",
+    bg: "border-amber-800/30 bg-amber-950/10",
     dot: "bg-amber-400 animate-pulse",
-    label: "Partial Data Gaps",
-    icon: "⚠",
+    label: "PARTIAL DATA GAPS",
     desc: "Some data sources are delayed. Affected decisions are marked with lower confidence.",
   },
   stale: {
-    bg: "border-red-800/30 bg-red-950/20",
+    bg: "border-red-800/30 bg-red-950/10",
     dot: "bg-red-400 animate-pulse",
-    label: "Critical Data Gaps",
-    icon: "✕",
+    label: "CRITICAL DATA GAPS",
     desc: "Key data sources are stale. Operating score and decisions may not reflect reality.",
   },
 };
@@ -98,7 +91,6 @@ async function syncAll(): Promise<SyncAllResult> {
       const text = await r.value.text().catch(() => "");
       errors.push(`${label}: HTTP ${r.value.status} — ${text.slice(0, 120)}`);
     } else {
-      // HTTP 200 — check the JSON body for { ok: false }
       try {
         const json = await r.value.json();
         if (json.ok === false) {
@@ -108,7 +100,7 @@ async function syncAll(): Promise<SyncAllResult> {
           ok++;
         }
       } catch {
-        ok++; // non-JSON 200 is still ok
+        ok++;
       }
     }
   }
@@ -121,7 +113,6 @@ export default function DataHealthWarning({ health }: Props) {
   const router = useRouter();
   const meta = STATUS_META[health.status];
 
-  // Count issues
   const staleCount = health.details.filter((d) => d.tone === "critical" || d.tone === "warning").length;
 
   const handleSync = async () => {
@@ -131,38 +122,32 @@ export default function DataHealthWarning({ health }: Props) {
       const result = await syncAll();
       setSyncResult(result);
       if (result.ok > 0) {
-        // Wait so user sees the result, then refresh page data
         await new Promise<void>((resolve) => setTimeout(resolve, 3000));
         router.refresh();
       }
-      // If all failed, keep the error visible (no refresh)
     } finally {
       setSyncing(false);
     }
   };
 
-  // If everything is good, show minimal indicator
   if (health.status === "good") {
     return (
-      <div className={cn("rounded-xl border px-4 py-3", meta.bg)}>
+      <div className={cn("rounded border px-4 py-2.5", meta.bg)}>
         <div className="flex items-center gap-2">
-          <span className={cn("h-2 w-2 rounded-full", meta.dot)} />
-          <span className="text-xs font-semibold text-emerald-400">{meta.label}</span>
-          <span className="text-[10px] text-stone-500 ml-auto">{health.summary}</span>
+          <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", meta.dot)} />
+          <span className="font-mono text-[10px] font-semibold text-emerald-500 uppercase tracking-wider">
+            {meta.label}
+          </span>
+          <span className="text-[10px] text-stone-600 font-mono ml-auto">{health.summary}</span>
         </div>
         {syncResult && (
           <div className={cn(
-            "mt-1.5 text-[11px]",
+            "mt-1 text-[10px] font-mono",
             syncResult.failed > 0 ? "text-red-400" : "text-emerald-500",
           )}>
             {syncResult.failed > 0
-              ? `⚠ Sync: ${syncResult.ok} ok, ${syncResult.failed} failed`
-              : `✓ Sync complete — ${syncResult.ok} source${syncResult.ok !== 1 ? "s" : ""} updated`}
-            {syncResult.errors.length > 0 && (
-              <div className="mt-1 text-[10px] text-red-400/80 font-mono space-y-0.5">
-                {syncResult.errors.map((e, i) => <div key={i}>{e}</div>)}
-              </div>
-            )}
+              ? `[FAIL] ${syncResult.ok} ok, ${syncResult.failed} failed`
+              : `[OK] ${syncResult.ok} source${syncResult.ok !== 1 ? "s" : ""} updated`}
           </div>
         )}
       </div>
@@ -170,39 +155,39 @@ export default function DataHealthWarning({ health }: Props) {
   }
 
   return (
-    <div className={cn("rounded-xl border px-4 py-4 space-y-3", meta.bg)}>
+    <div className={cn("rounded border px-4 py-3 space-y-2.5", meta.bg)}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={cn("h-2.5 w-2.5 rounded-full", meta.dot)} />
+          <span className={cn("h-2 w-2 rounded-full shrink-0", meta.dot)} />
           <span className={cn(
-            "text-sm font-bold",
+            "font-mono text-[11px] font-bold uppercase tracking-wider",
             health.status === "stale" ? "text-red-400" : "text-amber-400",
           )}>
             {meta.label}
           </span>
-          <span className="text-[10px] text-stone-500 font-mono">
-            {staleCount} source{staleCount !== 1 ? "s" : ""} affected
+          <span className="text-[10px] text-stone-600 font-mono">
+            {staleCount} source{staleCount !== 1 ? "s" : ""}
           </span>
         </div>
         <button
           onClick={handleSync}
           disabled={syncing}
           className={cn(
-            "rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors",
-            "bg-orange-600/80 text-white hover:bg-orange-500/90",
-            syncing && "opacity-50 cursor-not-allowed",
+            "font-mono text-[11px] px-2 py-1 border transition-colors",
+            "border-amber-700/40 text-amber-500 hover:border-amber-400 hover:text-amber-300",
+            syncing && "opacity-40 cursor-not-allowed",
           )}
         >
-          {syncing ? "Syncing…" : "Sync All"}
+          {syncing ? "[ SYNCING... ]" : "[ SYNC ALL ]"}
         </button>
       </div>
 
       {/* Impact statement */}
-      <p className="text-xs text-stone-400 leading-relaxed">{meta.desc}</p>
+      <p className="text-[10px] text-stone-500 leading-snug">{meta.desc}</p>
 
       {/* Per-source breakdown */}
-      <div className="space-y-1.5">
+      <div className="space-y-1">
         {health.details.map((d) => {
           const tone = TONE_STYLES[d.tone] ?? { dot: "bg-stone-600", text: "text-stone-400" };
           const remedy = SOURCE_REMEDIATION[d.source];
@@ -212,21 +197,21 @@ export default function DataHealthWarning({ health }: Props) {
             <div
               key={d.source}
               className={cn(
-                "rounded-lg px-3 py-2 border",
+                "px-2.5 py-1.5 border",
                 isIssue ? "border-stone-800/50 bg-stone-900/50" : "border-transparent",
               )}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={cn("h-1.5 w-1.5 rounded-full", tone.dot)} />
-                  <span className="text-xs text-stone-300 font-medium">{d.source}</span>
+                  <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", tone.dot)} />
+                  <span className="text-[11px] text-stone-400 font-medium">{d.source}</span>
                 </div>
-                <span className={cn("text-[11px] font-mono", tone.text)}>
+                <span className={cn("text-[10px] font-mono", tone.text)}>
                   {d.label}
                 </span>
               </div>
               {isIssue && remedy && (
-                <p className="mt-1 ml-3.5 text-[10px] text-stone-500 leading-snug">
+                <p className="mt-0.5 ml-3.5 text-[9px] text-stone-600 leading-snug">
                   → {remedy}
                 </p>
               )}
@@ -238,14 +223,14 @@ export default function DataHealthWarning({ health }: Props) {
       {/* Sync result */}
       {syncResult && (
         <div className={cn(
-          "text-[11px] pt-2 border-t border-stone-800/30",
+          "text-[10px] font-mono pt-2 border-t border-stone-800/30",
           syncResult.failed > 0 ? "text-red-400" : "text-emerald-500",
         )}>
           {syncResult.failed > 0
-            ? `⚠ ${syncResult.ok} ok, ${syncResult.failed} failed`
-            : `✓ ${syncResult.ok} source${syncResult.ok !== 1 ? "s" : ""} synced`}
+            ? `[FAIL] ${syncResult.ok} ok, ${syncResult.failed} failed`
+            : `[OK] ${syncResult.ok} source${syncResult.ok !== 1 ? "s" : ""} synced`}
           {syncResult.errors.length > 0 && (
-            <div className="mt-1 text-[10px] text-red-400/80 font-mono space-y-0.5 break-all">
+            <div className="mt-1 text-[9px] text-red-400/80 space-y-0.5 break-all">
               {syncResult.errors.map((e, i) => <div key={i}>{e}</div>)}
             </div>
           )}
