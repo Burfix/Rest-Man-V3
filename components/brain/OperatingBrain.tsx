@@ -1,0 +1,288 @@
+/**
+ * OperatingBrain — Command Center top section.
+ *
+ * Server Component. Receives pre-computed BrainOutput from the page.
+ * Renders 3-column layout:
+ *   LEFT  (50%) — Primary Threat
+ *   MIDDLE(30%) — Action Queue
+ *   RIGHT (20%) — System Pulse
+ *
+ * Voice line appears in a full-width bar above the columns.
+ */
+
+import { cn } from "@/lib/utils";
+import type { BrainOutput } from "@/services/brain/operating-brain";
+import ActionTakenButton from "./ActionTakenButton";
+
+type Props = {
+  brain: BrainOutput;
+};
+
+// ── Colour maps ───────────────────────────────────────────────────────────────
+
+const SEV_BORDER: Record<string, string> = {
+  critical: "border-l-red-500",
+  high:     "border-l-amber-500",
+  medium:   "border-l-yellow-500",
+  low:      "border-l-stone-700",
+};
+
+const SEV_BADGE: Record<string, string> = {
+  critical: "text-red-400 border-red-900/50 bg-red-950/20",
+  high:     "text-amber-400 border-amber-900/50 bg-amber-950/20",
+  medium:   "text-yellow-400 border-yellow-900/50 bg-yellow-950/20",
+  low:      "text-stone-500 border-stone-700 bg-stone-900/20",
+};
+
+const SEV_MONEY: Record<string, string> = {
+  critical: "text-red-400",
+  high:     "text-amber-400",
+  medium:   "text-yellow-400",
+  low:      "text-stone-400",
+};
+
+const GRADE_COLOR: Record<string, string> = {
+  A:   "text-emerald-400",
+  B:   "text-emerald-500",
+  C:   "text-amber-400",
+  D:   "text-amber-500",
+  F:   "text-red-400",
+  "?": "text-stone-600",
+};
+
+const TREND_ARROW: Record<string, string> = {
+  improving: "↑",
+  stable:    "→",
+  declining: "↓",
+};
+
+const TREND_COLOR: Record<string, string> = {
+  improving: "text-emerald-400",
+  stable:    "text-stone-500",
+  declining: "text-red-400",
+};
+
+const TIER_COLOR: Record<string, string> = {
+  Elite:    "text-emerald-400",
+  Strong:   "text-emerald-500",
+  Average:  "text-amber-400",
+  "At Risk":"text-red-400",
+  Unknown:  "text-stone-600",
+};
+
+function fmt(n: number): string {
+  return `R${Math.round(n).toLocaleString("en-ZA")}`;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function OperatingBrain({ brain }: Props) {
+  const { primaryThreat, actionQueue, systemHealth, forecastSummary, gmSituation, voiceLine } = brain;
+  const sev = primaryThreat.severity;
+
+  return (
+    <div className="border border-[#1a1a1a] bg-[#060606]">
+
+      {/* ── Voice line — full width bar ── */}
+      {voiceLine && (
+        <div className="border-b border-[#1a1a1a] px-4 py-2 bg-[#0a0a0a]">
+          <p className="text-[11px] text-stone-400 font-mono leading-relaxed">{voiceLine}</p>
+        </div>
+      )}
+
+      {/* ── 3-column grid ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[5fr_3fr_2fr] divide-y lg:divide-y-0 lg:divide-x divide-[#1a1a1a]">
+
+        {/* ════════════ LEFT — Primary Threat ════════════ */}
+        <div className={cn("border-l-[6px] p-4 space-y-3 bg-[#0f0f0f]", SEV_BORDER[sev])}>
+
+          {/* Section label */}
+          <span className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-medium block">
+            BIGGEST RISK RIGHT NOW
+          </span>
+
+          {/* Severity + Module badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={cn(
+              "text-[10px] font-black uppercase tracking-wider border px-1.5 py-0.5",
+              SEV_BADGE[sev],
+            )}>
+              {sev}
+            </span>
+            {primaryThreat.modulesInvolved.map((mod) => (
+              <span
+                key={mod}
+                className="text-[9px] font-mono uppercase tracking-wider text-stone-600 border border-[#2a2a2a] px-1.5 py-0.5"
+              >
+                {mod}
+              </span>
+            ))}
+          </div>
+
+          {/* Title + description */}
+          <div>
+            <p className="text-sm font-bold text-stone-100 leading-snug">{primaryThreat.title}</p>
+            {primaryThreat.description && (
+              <p className="text-[11px] text-stone-500 mt-0.5 leading-relaxed">{primaryThreat.description}</p>
+            )}
+          </div>
+
+          {/* Key facts grid */}
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
+            <div>
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 block">OWNER</span>
+              <span className="text-stone-300">{primaryThreat.owner.name}</span>
+            </div>
+            {primaryThreat.moneyAtRisk > 0 && (
+              <div>
+                <span className="text-[9px] uppercase tracking-wider text-stone-600 block">MONEY AT RISK</span>
+                <span className={cn("font-bold", SEV_MONEY[sev])}>{fmt(primaryThreat.moneyAtRisk)}</span>
+              </div>
+            )}
+            <div>
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 block">TIME WINDOW</span>
+              <span className="text-stone-300">{primaryThreat.timeWindowLabel}</span>
+            </div>
+            <div>
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 block">CONFIDENCE</span>
+              <span className="text-stone-500 uppercase">{primaryThreat.confidence}</span>
+            </div>
+          </div>
+
+          {/* Do this first */}
+          <div className="border-t border-[#1a1a1a] pt-3">
+            <span className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold block mb-1">
+              DO THIS FIRST
+            </span>
+            <p className="text-[11px] text-stone-300 leading-relaxed">{primaryThreat.recommendedAction}</p>
+          </div>
+
+          {/* If you do nothing */}
+          {sev !== "low" && (
+            <div className="border-t border-[#1a1a1a] pt-3">
+              <span className="text-[9px] uppercase tracking-wider text-red-500/70 font-semibold block mb-1">
+                IF YOU DO NOTHING
+              </span>
+              <p className="text-[11px] text-red-300/70 leading-relaxed opacity-60 hover:opacity-100 transition-opacity duration-200">
+                {primaryThreat.ifIgnored}
+              </p>
+            </div>
+          )}
+
+          {/* Action button */}
+          {sev !== "low" && (
+            <ActionTakenButton signalId={primaryThreat.title} siteId={brain.siteId} />
+          )}
+        </div>
+
+        {/* ════════════ MIDDLE — Action Queue ════════════ */}
+        <div className="p-4 bg-[#0c0c0c]">
+          <span className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-medium block mb-3">
+            DO NEXT
+          </span>
+          {actionQueue.length === 0 ? (
+            <p className="text-[11px] text-stone-600 font-mono">No pending actions.</p>
+          ) : (
+            <div className="space-y-3">
+              {actionQueue.map((action) => (
+                <div key={action.priority} className="flex gap-2.5">
+                  <span className="text-[10px] font-black font-mono text-stone-600 w-4 shrink-0 mt-[1px]">
+                    {action.priority}.
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold text-stone-300 leading-snug">
+                      {action.title}
+                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-[10px] font-mono text-stone-600">{action.owner}</span>
+                      <span className="text-stone-700">·</span>
+                      <span className="text-[10px] font-mono text-stone-600">~{action.estimatedMinutes} min</span>
+                      {action.deadline && (
+                        <>
+                          <span className="text-stone-700">·</span>
+                          <span className="text-[10px] font-mono text-stone-700">{action.deadline}</span>
+                        </>
+                      )}
+                    </div>
+                    {action.moneyAtRisk != null && action.moneyAtRisk > 0 && (
+                      <span className="text-[10px] font-mono text-amber-500/60 mt-0.5 block">
+                        {fmt(action.moneyAtRisk)} at risk
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ════════════ RIGHT — System Pulse ════════════ */}
+        <div className="p-4 bg-[#0a0a0a] space-y-4">
+          <span className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-medium block">
+            SYSTEM PULSE
+          </span>
+
+          {/* Score + Grade + Trend */}
+          <div className="font-mono">
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-black text-stone-100">{systemHealth.score}</span>
+              <span className={cn("text-xl font-black", GRADE_COLOR[systemHealth.grade] ?? "text-stone-500")}>
+                {systemHealth.grade}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className={cn("text-base font-bold leading-none", TREND_COLOR[systemHealth.trend])}>
+                {TREND_ARROW[systemHealth.trend]}
+              </span>
+              <span className="text-[10px] text-stone-600 uppercase tracking-wider">
+                {systemHealth.criticalCount > 0
+                  ? `${systemHealth.criticalCount} critical`
+                  : systemHealth.highCount > 0
+                  ? `${systemHealth.highCount} high`
+                  : "nominal"}
+              </span>
+            </div>
+          </div>
+
+          {/* Forecast */}
+          <div className="border-t border-[#1a1a1a] pt-3 font-mono space-y-0.5">
+            <span className="text-[9px] uppercase tracking-wider text-stone-600 block">PROJECTED CLOSE</span>
+            <span className="text-base font-bold text-stone-200">
+              {forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"}
+            </span>
+            {forecastSummary.projectedClose > 0 && (
+              <span className={cn(
+                "text-[11px] font-bold block",
+                (forecastSummary.vsTarget ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
+              )}>
+                {(forecastSummary.vsTarget ?? 0) >= 0 ? "+" : ""}
+                {(forecastSummary.vsTarget ?? 0).toFixed(1)}% target
+              </span>
+            )}
+          </div>
+
+          {/* GM Situation */}
+          <div className="border-t border-[#1a1a1a] pt-3 font-mono">
+            <span className="text-[9px] uppercase tracking-wider text-stone-600 block mb-1">GM</span>
+            <span className="text-[11px] text-stone-300 block">{gmSituation.name}</span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {gmSituation.tier !== "Unknown" && (
+                <span className={cn("text-[10px] font-bold", TIER_COLOR[gmSituation.tier] ?? "text-stone-500")}>
+                  {gmSituation.tier}
+                </span>
+              )}
+              {gmSituation.score > 0 && (
+                <span className="text-[10px] text-stone-600">{gmSituation.score}/100</span>
+              )}
+            </div>
+            {gmSituation.alertNeeded && (
+              <span className="text-[9px] text-red-400/70 block mt-0.5 leading-snug">
+                {gmSituation.alertReason}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
