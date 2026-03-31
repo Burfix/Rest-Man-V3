@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   sevenAgo.setDate(sevenAgo.getDate() - 7);
   const sevenAgoStr = sevenAgo.toLocaleDateString("en-CA");
 
-  const [tasksRes, maintRes, complianceRes, snapshotRes, reviewRes, actionsRes] =
+  const [tasksRes, maintRes, complianceRes, snapshotRes, reviewRes, actionsRes, completedActionsRes] =
     await Promise.all([
       supabase.from("daily_ops_tasks").select("*").in("site_id", siteIds).eq("task_date", today).order("sort_order"),
       supabase.from("maintenance_logs")
@@ -85,13 +85,21 @@ export async function GET(req: NextRequest) {
       supabase.from("actions")
         .select("id, site_id, status, created_at")
         .in("site_id", siteIds).is("archived_at", null).neq("status", "completed"),
+      supabase.from("actions")
+        .select("id, site_id, title, completion_note, completed_at, owner")
+        .in("site_id", siteIds)
+        .eq("status", "completed")
+        .eq("source_type", "copilot")
+        .gte("completed_at", `${today}T00:00:00`)
+        .order("completed_at", { ascending: false }),
     ]);
 
-  const taskList     = (tasksRes.data     ?? []) as any[];
-  const maintList    = (maintRes.data     ?? []) as any[];
-  const compList     = (complianceRes.data ?? []) as any[];
-  const reviewList   = (reviewRes.data    ?? []) as any[];
-  const actionsList  = (actionsRes.data   ?? []) as any[];
+  const taskList            = (tasksRes.data            ?? []) as any[];
+  const maintList           = (maintRes.data            ?? []) as any[];
+  const compList            = (complianceRes.data       ?? []) as any[];
+  const reviewList          = (reviewRes.data           ?? []) as any[];
+  const actionsList         = (actionsRes.data          ?? []) as any[];
+  const completedActionsList = (completedActionsRes.data ?? []) as any[];
 
   // Latest snapshot per site
   const latestSnap: Record<string, any> = {};
@@ -137,6 +145,7 @@ export async function GET(req: NextRequest) {
     const compliance = compList.filter((c) => c.site_id === site.id);
     const reviews    = reviewList.filter((r) => r.site_id === site.id);
     const actions    = actionsList.filter((a) => a.site_id === site.id);
+    const completedDecisions = completedActionsList.filter((a) => a.site_id === site.id);
     const snap       = latestSnap[site.id] ?? null;
 
     const total       = tasks.length;
@@ -223,6 +232,12 @@ export async function GET(req: NextRequest) {
       },
       reviews: { total_7d: reviews.length, avg_rating: avgRating, negative_count: negativeCount },
       actions: { open_count: actions.length, overdue_count: overdueActions.length },
+      completedDecisions: completedDecisions.map((a: any) => ({
+        title: a.title,
+        owner: a.owner ?? null,
+        note: a.completion_note ?? null,
+        completed_at: a.completed_at,
+      })),
     };
   });
 
@@ -565,6 +580,22 @@ function buildStoreBlock(s: any, date: string): string {
               </td>
             </tr>
           </table>
+
+          ${s.completedDecisions?.length > 0 ? `
+          <!-- Completed Decisions Today -->
+          <div style="margin-bottom:20px;">
+            <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#22c55e;text-transform:uppercase;margin-bottom:8px;">
+              Decisions Completed Today (${s.completedDecisions.length})
+            </div>
+            ${s.completedDecisions.map((cd: any) => `
+            <div style="border:1px solid #1a3a2a;border-radius:6px;padding:10px 12px;margin-bottom:6px;background:#0d1f17;">
+              <div style="font-size:12px;font-weight:600;color:#e5e5e5;margin-bottom:4px;">${esc(cd.title)}</div>
+              ${cd.note ? `<div style="font-size:11px;color:#4ade80;margin-bottom:3px;">"${esc(cd.note)}"</div>` : ""}
+              <div style="font-size:10px;color:#4b5563;">
+                ${cd.owner ? `${esc(cd.owner)} · ` : ""}${cd.completed_at ? new Date(cd.completed_at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" }) : ""}
+              </div>
+            </div>`).join("")}
+          </div>` : ""}
 
           <!-- Compliance (full width, bottom) -->
           <div>

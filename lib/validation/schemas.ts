@@ -54,6 +54,7 @@ export const createActionSchema = z.object({
   why_it_matters: z.string().max(1000).optional().nullable(),
   impact_weight: severity.optional().nullable(),
   decision_id: uuidString.optional().nullable(),
+  completion_note: z.string().max(2000).optional().nullable(),
 });
 
 export const patchActionSchema = z.object({

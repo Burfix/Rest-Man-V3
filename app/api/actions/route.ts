@@ -100,6 +100,10 @@ export async function POST(req: NextRequest) {
 
     if (resolvedStatus === "in_progress") insert.started_at = now;
     else if (resolvedStatus === "escalated") insert.escalated_at = now;
+    else if (resolvedStatus === "completed") {
+      insert.completed_at = now;
+      if (d.completion_note) insert.completion_note = d.completion_note;
+    }
 
     const { data, error } = await supabase
       .from("actions")

@@ -165,6 +165,18 @@ export async function POST() {
       .is("archived_at", null)
       .neq("status", "completed");
 
+    // ── 8b. Completed copilot decisions today ─────────────────────────────────
+    const { data: completedActionsData } = await supabase
+      .from("actions")
+      .select("id, site_id, title, completion_note, completed_at, owner")
+      .in("site_id", siteIds)
+      .eq("status", "completed")
+      .eq("source_type", "copilot")
+      .gte("completed_at", `${today}T00:00:00`)
+      .order("completed_at", { ascending: false });
+
+    const completedActionsList = (completedActionsData ?? []) as any[];
+
     const actionsList = (actionsData ?? []) as any[];
     const OVERDUE_MS = 24 * 3_600_000;
     const nowMs = Date.now();
@@ -177,6 +189,7 @@ export async function POST() {
       const storeCompliance = complianceList.filter((c) => c.site_id === site.id);
       const storeReviews = reviewList.filter((r) => r.site_id === site.id);
       const storeActions = actionsList.filter((a) => a.site_id === site.id);
+      const storeCompletedActions = completedActionsList.filter((a) => a.site_id === site.id);
       const snap = latestSnapshot[site.id] ?? null;
 
       // Task summary
@@ -365,6 +378,12 @@ export async function POST() {
         actions: {
           open_count: storeActions.length,
           overdue_count: overdueActions.length,
+          completed_today: storeCompletedActions.map((a) => ({
+            title: a.title,
+            owner: a.owner ?? null,
+            note: a.completion_note ?? null,
+            completed_at: a.completed_at,
+          })),
         },
 
         // Risk

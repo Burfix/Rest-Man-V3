@@ -59,14 +59,58 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
   const [status, setStatus] = useState(d.status);
   const [actionId, setActionId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [awaitingComment, setAwaitingComment] = useState(false);
+  const [comment, setComment] = useState("");
   const sev = SEV_STYLE[d.severity];
 
-  async function handleAction(targetStatus: "in_progress" | "completed" | "escalated") {
+  async function submitComplete(notes: string) {
     if (loading) return;
     setLoading(true);
     try {
       if (!actionId) {
-        // First interaction — create the action
+        const res = await fetch("/api/actions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: d.title,
+            direct_instruction: d.directInstruction,
+            category: d.category,
+            severity: d.severity,
+            status: "completed",
+            owner: d.owner,
+            source_type: "copilot",
+            expected_impact_text: d.expectedImpactText,
+            expected_impact_value: d.expectedImpactValue,
+            completion_note: notes || null,
+          }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setActionId(json.action.id);
+          setStatus("completed");
+        }
+      } else {
+        const res = await fetch(`/api/actions/${actionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "completed", notes: notes || null }),
+        });
+        if (res.ok) setStatus("completed");
+      }
+    } catch {
+      // Silent fallback
+    } finally {
+      setLoading(false);
+      setAwaitingComment(false);
+      setComment("");
+    }
+  }
+
+  async function handleAction(targetStatus: "in_progress" | "escalated") {
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (!actionId) {
         const res = await fetch("/api/actions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -85,18 +129,15 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
         if (res.ok) {
           const json = await res.json();
           setActionId(json.action.id);
-          setStatus(targetStatus === "in_progress" ? "in_progress" : targetStatus);
+          setStatus(targetStatus);
         }
       } else {
-        // Subsequent interaction — PATCH existing action
         const res = await fetch(`/api/actions/${actionId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ status: targetStatus }),
         });
-        if (res.ok) {
-          setStatus(targetStatus);
-        }
+        if (res.ok) setStatus(targetStatus);
       }
     } catch {
       // Silent fallback
@@ -170,7 +211,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
           )}
           {(status === "pending" || status === "in_progress") && (
             <button
-              onClick={() => handleAction("completed")}
+              onClick={() => setAwaitingComment(true)}
               disabled={loading}
               className="text-xs font-medium bg-emerald-800/50 hover:bg-emerald-700/50 text-emerald-300 px-3 py-1 rounded transition-colors disabled:opacity-50"
             >
@@ -192,11 +233,41 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
           {status === "escalated" && (
             <span className="text-xs text-red-400 font-medium">↑ Escalated</span>
           )}
-          {status === "in_progress" && (
+          {status === "in_progress" && !awaitingComment && (
             <span className="text-xs text-amber-400 font-medium">In Progress</span>
           )}
         </div>
       </div>
+
+      {/* Inline completion comment prompt */}
+      {awaitingComment && (
+        <div className="border border-emerald-800/40 rounded-lg bg-emerald-950/20 p-3 space-y-2">
+          <p className="text-xs text-emerald-400 font-medium">What did you do? (included in HQ daily report)</p>
+          <textarea
+            autoFocus
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="e.g. Repositioned 2 servers to floor — avg spend improved within 30 min"
+            rows={2}
+            className="w-full text-xs bg-stone-900 border border-stone-700 rounded px-2 py-1.5 text-stone-200 placeholder-stone-600 resize-none focus:outline-none focus:border-emerald-700"
+          />
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setAwaitingComment(false); setComment(""); }}
+              className="text-xs text-stone-500 hover:text-stone-300 px-2 py-1"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => submitComplete(comment)}
+              disabled={loading}
+              className="text-xs font-medium bg-emerald-700/60 hover:bg-emerald-600/60 text-emerald-200 px-3 py-1 rounded transition-colors disabled:opacity-50"
+            >
+              {loading ? "Saving…" : "Submit"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Consequence if ignored */}
       <p className="text-[11px] text-stone-500 italic">

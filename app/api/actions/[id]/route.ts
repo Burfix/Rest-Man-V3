@@ -60,6 +60,7 @@ export async function PATCH(
         update.completed_at = now;
         update.revenue_after = rev.sales;
         update.revenue_date_after = rev.date;
+        if (notes != null) update.completion_note = notes;
         break;
       }
       case "escalated":
