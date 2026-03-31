@@ -325,6 +325,17 @@ export default async function OperationsDashboard() {
   // Await brain (was started in parallel above)
   const brain = await brainPromise.catch(() => null);
 
+  // Align brain system health score with the canonical operating score so both
+  // the OperatingBrain panel and the existing score hero show the same number.
+  if (brain && scoreTotal > 0) {
+    brain.systemHealth.score = scoreTotal;
+    brain.systemHealth.grade =
+      scoreTotal >= 90 ? "A" :
+      scoreTotal >= 80 ? "B" :
+      scoreTotal >= 70 ? "C" :
+      scoreTotal >= 60 ? "D" : "F";
+  }
+
   return (
     <div className="space-y-4">
 

@@ -90,20 +90,29 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
     });
   }
 
-  // ── SIGNAL 2 — Service Collapse Risk ───────────────────────────────────────
-  if (maint.serviceBlocking && ops.blocked > 1 && rev.variance < -10) {
+  // ── SIGNAL 2 — Service Blocking Maintenance ────────────────────────────────
+  // Fires whenever any open item has impact_level = service_disruption.
+  // Does NOT require ops.blocked > 1 — the maintenance event alone is the trigger.
+  if (maint.serviceBlocking) {
+    const revenueCompound = rev.variance < -10;
     const conditions: string[] = [
       "Service-blocking maintenance active",
-      `${ops.blocked} ops tasks blocked`,
-      `Revenue ${pct(rev.variance)} behind`,
+      ...(revenueCompound ? [`Revenue ${pct(rev.variance)} behind`] : []),
+      ...(ops.blocked > 0 ? [`${ops.blocked} ops task${ops.blocked > 1 ? "s" : ""} blocked`] : []),
     ];
     signals.push({
       id: "S2_SERVICE_COLLAPSE_RISK",
-      modules: ["MAINTENANCE", "OPS", "REVENUE"],
-      severity: "CRITICAL",
-      title: "Service Collapse Risk",
-      recommendation: `Service-blocking maintenance + ${ops.blocked} ops blocked. Revenue already ${pct(rev.variance)} behind. Resolve maintenance first or revenue loss compounds.`,
-      moneyAtRisk: revGapAbs + revGapAbs * 0.15, // compound estimate
+      modules: revenueCompound
+        ? ["MAINTENANCE", "OPS", "REVENUE"]
+        : ["MAINTENANCE", "OPS"],
+      severity: revenueCompound ? "CRITICAL" : "HIGH",
+      title: revenueCompound
+        ? "Service Collapse Risk — Maintenance + Revenue"
+        : "Service-Blocking Maintenance Active",
+      recommendation: revenueCompound
+        ? `Service-blocking maintenance active. Revenue already ${pct(rev.variance)} behind. Resolve maintenance immediately — every service minute lost widens the gap.`
+        : `Service-blocking maintenance active. Resolve immediately to prevent guest impact and revenue loss.`,
+      moneyAtRisk: revenueCompound ? revGapAbs + revGapAbs * 0.15 : revGapAbs,
       timeWindow: "Immediate",
       confidence: 95,
       triggeredConditions: conditions,
