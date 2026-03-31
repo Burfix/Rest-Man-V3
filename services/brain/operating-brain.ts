@@ -26,7 +26,6 @@ import {
 import {
   getPerformanceTier,
 } from "@/services/accountability/score-calculator";
-import type { ForecastResult } from "@/services/forecasting/forecast-engine";
 import { generateVoice } from "./voice-generator";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -94,20 +93,6 @@ export type BrainOutput = {
   };
 
   voiceLine: string;
-
-  /** Raw ForecastResult — for passing to ForecastCard or other consumers */
-  forecast: ForecastResult;
-};
-
-// ── Fallback ──────────────────────────────────────────────────────────────────
-
-const FALLBACK_FORECAST: ForecastResult = {
-  projectedClose: 0,
-  vsTarget: 0,
-  vsSameDayLastYear: null,
-  vsSameWeekdayAvg: 0,
-  confidence: "low",
-  warning: null,
 };
 
 export const BRAIN_FALLBACK: BrainOutput = {
@@ -150,7 +135,6 @@ export const BRAIN_FALLBACK: BrainOutput = {
     alertReason: null,
   },
   voiceLine: "Operational data is loading. Check back shortly.",
-  forecast: FALLBACK_FORECAST,
 };
 
 // ── Severity helpers ───────────────────────────────────────────────────────────
@@ -608,11 +592,13 @@ export async function runOperatingBrain(
   const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), ctx, saHour);
 
   const forecastSummary: BrainOutput["forecastSummary"] = {
-    projectedClose:      ctx.forecast.projectedClose,
-    vsTarget:            ctx.forecast.vsTarget ?? 0,
-    vsSameDayLastYear:   ctx.forecast.vsSameDayLastYear,
-    recoverable:         (ctx.forecast.vsTarget ?? 0) > -30,
-    recoveryAction:      ctx.forecast.warning,
+    projectedClose:    saHour > 0 ? Math.round(ctx.revenue.actual / saHour * 22) : 0,
+    vsTarget:          ctx.revenue.variance,
+    vsSameDayLastYear: null,
+    recoverable:       ctx.revenue.variance > -30,
+    recoveryAction:    ctx.revenue.variance < -10
+      ? "Push floor conversion and walk-in capture to close the gap."
+      : null,
   };
 
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)
@@ -628,7 +614,6 @@ export async function runOperatingBrain(
     forecastSummary,
     gmSituation,
     voiceLine: "",
-    forecast:  ctx.forecast,
   };
 
   brain.voiceLine = generateVoice(brain, ctx);

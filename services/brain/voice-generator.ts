@@ -32,14 +32,8 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
         ? `${pct(forecastSummary.vsTarget)} vs target`
         : "tracking on target";
 
-    const sdlyNote =
-      forecastSummary.vsSameDayLastYear != null &&
-      Math.abs(forecastSummary.vsSameDayLastYear) > 3
-        ? ` ${forecastSummary.vsSameDayLastYear > 0 ? "above" : "below"} last year's pattern`
-        : "";
-
     return (
-      `All systems nominal. ${revNote.charAt(0).toUpperCase() + revNote.slice(1)}${sdlyNote}.` +
+      `All systems nominal. ${revNote.charAt(0).toUpperCase() + revNote.slice(1)}.` +
       ` Monitor floor energy and walk-in conversion.`
     );
   }

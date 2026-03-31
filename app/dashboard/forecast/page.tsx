@@ -18,7 +18,6 @@ import { runCopilot } from "@/lib/copilot/orchestrator";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { todayISO } from "@/lib/utils";
-import ForecastCard from "@/components/copilot/ForecastCard";
 import BrainCopilotHero from "@/components/brain/BrainCopilotHero";
 import BrainTopDecisions from "@/components/brain/BrainTopDecisions";
 
@@ -81,9 +80,6 @@ export default async function GMCoPilotPage() {
               serviceState={copilot.serviceState}
               serviceImpact={copilot.serviceImpact}
             />
-            {brain && (
-              <ForecastCard forecast={brain.forecast} />
-            )}
             <DataHealth trust={copilot.trustState} />
           </div>
         </div>

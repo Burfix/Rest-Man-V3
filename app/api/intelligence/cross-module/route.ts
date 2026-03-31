@@ -31,7 +31,6 @@ export async function GET() {
     const response = NextResponse.json({
       signals,
       context,
-      todayForecast: context.forecast,
       siteId,
       generatedAt: new Date().toISOString(),
       signalCount: signals.length,

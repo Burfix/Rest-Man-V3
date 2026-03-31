@@ -10,8 +10,6 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import { forecastToday } from "@/services/forecasting/forecast-engine";
-import type { ForecastResult } from "@/services/forecasting/forecast-engine";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,8 +51,6 @@ export type MetaContext = {
   sessionPressure: "low" | "medium" | "high" | "critical";
 };
 
-export type { ForecastResult };
-
 export type OperationsContext = {
   revenue:     RevenueContext;
   labour:      LabourContext;
@@ -62,7 +58,6 @@ export type OperationsContext = {
   maintenance: MaintenanceContext;
   compliance:  ComplianceContext;
   meta:        MetaContext;
-  forecast:    ForecastResult;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -209,11 +204,6 @@ export async function buildOperationsContext(
   const timeOfDay = getTimeOfDay(hour);
   const sessionPressure = computeSessionPressure(timeOfDay, variance, overdue, urgentCount);
 
-  // ── Forecast (pure computation from historical patterns) ───────────────────
-  const serviceEndHour = 22; // 22:00 SAST
-  const hoursRemaining = Math.max(0, serviceEndHour - hour);
-  const forecast = forecastToday(date, actual, hoursRemaining, target > 0 ? target : undefined);
-
   return {
     revenue:     { actual, target, variance, trend },
     labour:      { actualPercent, targetPercent: targetLabourPct, variance: labourVariance, staffOnFloor: 0 },
@@ -221,6 +211,5 @@ export async function buildOperationsContext(
     maintenance: { openCount: maintRows.length, urgentCount, serviceBlocking },
     compliance:  { overdueCount, atRiskCount },
     meta:        { timeOfDay, sessionPressure },
-    forecast,
   };
 }

@@ -224,26 +224,21 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
     ops.completionRate > 80 &&
     comp.overdueCount === 0
   ) {
-    const sdlyVariance = ctx.forecast.vsSameDayLastYear;
-    const sdlyNote = sdlyVariance != null
-      ? ` Pattern confirms year-on-year gap at ${sdlyVariance > 0 ? "+" : ""}${sdlyVariance.toFixed(1)}%.`
-      : "";
     const conditions: string[] = [
       `Revenue ${pct(rev.variance)} behind`,
       "No service-blocking maintenance",
       `Ops ${ops.completionRate}% complete`,
       "Compliance clean",
     ];
-    if (sdlyVariance != null) conditions.push(`SDLY trajectory: ${sdlyVariance.toFixed(1)}%`);
     signals.push({
       id: "S8_UNEXPLAINED_REVENUE_GAP",
       modules: ["REVENUE", "LABOUR", "OPS"],
       severity: "HIGH",
       title: "Unexplained Revenue Gap",
-      recommendation: `Revenue ${pct(rev.variance)} behind but ops, maintenance, and compliance are clean.${sdlyNote} Review floor conversion, upsell performance, and walk-in capture.`,
+      recommendation: `Revenue ${pct(rev.variance)} behind but ops, maintenance, and compliance are clean. Review floor conversion, upsell performance, and walk-in capture.`,
       moneyAtRisk: revGapAbs,
       timeWindow: meta.timeOfDay === "service" ? "This session" : "Today",
-      confidence: sdlyVariance != null ? 85 : 78,
+      confidence: 78,
       triggeredConditions: conditions,
     });
   }
