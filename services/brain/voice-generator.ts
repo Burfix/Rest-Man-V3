@@ -23,6 +23,20 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
   const { primaryThreat, forecastSummary, gmSituation, systemHealth } = brain;
   const sev = primaryThreat.severity;
 
+  // ── Ramadan suppression ───────────────────────────────────────────────────
+  // Contextualise revenue suppression as a known cause — don't alarm the GM.
+  // Only yields to MAINTENANCE primary threats (those need separate attention).
+  if (
+    forecastSummary.isRamadan &&
+    !primaryThreat.modulesInvolved.includes("MAINTENANCE")
+  ) {
+    const revNote =
+      forecastSummary.vsTarget < -5
+        ? ` Revenue ${pct(forecastSummary.vsTarget)} vs target.`
+        : "";
+    return `Ramadan period. Revenue suppression expected.${revNote} Focus on dinner recovery and cost control.`;
+  }
+
   // ── All systems nominal ────────────────────────────────────────────────────
   if (sev === "low" && systemHealth.score >= 75) {
     const revNote =

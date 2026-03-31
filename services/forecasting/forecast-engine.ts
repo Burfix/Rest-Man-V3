@@ -45,7 +45,39 @@ export type ForecastResult = {
    * Callers should surface this to the user.
    */
   anomalyWarning: string | null;
+  /** True when today falls within a known Ramadan window */
+  isRamadan: boolean;
+  /**
+   * Set during Ramadan — suppression warning for callers and voice generator.
+   * Null when not Ramadan.
+   */
+  ramadanWarning: string | null;
 };
+
+// ── Ramadan calendar ──────────────────────────────────────────────────────────
+
+type RamadanWindow = { start: string; end: string };  // ISO "YYYY-MM-DD"
+
+/**
+ * Approximate Ramadan windows for the years relevant to Si Cantina forecasting.
+ * Dates shift ~11 days earlier each year (lunar calendar).
+ * Update as confirmed scholarly/official dates become available.
+ *
+ * Impact on Si Cantina: 25-30% suppressed lunch covers; dinner may partially recover.
+ * March 2026 underperformance (-21.6% YoY) is explained by this window.
+ */
+const RAMADAN_CALENDAR: RamadanWindow[] = [
+  { start: "2026-02-18", end: "2026-03-19" },
+  { start: "2027-02-07", end: "2027-03-08" },
+  { start: "2028-01-27", end: "2028-02-25" },
+];
+
+const RAMADAN_WARNING =
+  "Ramadan period — expect 25-30% suppressed lunch covers. Dinner service may partially recover.";
+
+function isRamadanPeriod(date: string): boolean {
+  return RAMADAN_CALENDAR.some((w) => date >= w.start && date <= w.end);
+}
 
 // ── Site routing ──────────────────────────────────────────────────────────────
 
@@ -212,6 +244,17 @@ export function forecastToday(
   const anomalyWarning = sdlyData?.anomaly ?? null;
   if (anomalyWarning) confidence = "low";
 
+  // ── Ramadan suppression ───────────────────────────────────────────────────
+  // Ramadan is a known, recurring pattern — not a data anomaly.
+  // Apply 0.70 multiplier and upgrade confidence to 'medium' (predictable event).
+
+  const ramadan = isRamadanPeriod(date);
+  if (ramadan && hoursRemaining > 0) {
+    projectedClose = projectedClose * 0.70;
+    // Ramadan is predictable — override 'low' anomaly confidence to 'medium'
+    if (confidence === "low") confidence = "medium";
+  }
+
   return {
     projectedClose:    Math.round(projectedClose),
     sdlyDailyAvg:      sdlyDaily !== null ? Math.round(sdlyDaily) : null,
@@ -220,5 +263,7 @@ export function forecastToday(
     seasonalityIndex:  seasIdx,
     confidence,
     anomalyWarning,
+    isRamadan:         ramadan,
+    ramadanWarning:    ramadan ? RAMADAN_WARNING : null,
   };
 }

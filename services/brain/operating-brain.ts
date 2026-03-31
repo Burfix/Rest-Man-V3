@@ -27,6 +27,7 @@ import {
   getPerformanceTier,
 } from "@/services/accountability/score-calculator";
 import { generateVoice } from "./voice-generator";
+import { forecastToday } from "@/services/forecasting/forecast-engine";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -82,6 +83,7 @@ export type BrainOutput = {
     vsSameDayLastYear: number | null;
     recoverable: boolean;
     recoveryAction: string | null;
+    isRamadan: boolean;
   };
 
   gmSituation: {
@@ -126,6 +128,7 @@ export const BRAIN_FALLBACK: BrainOutput = {
     vsSameDayLastYear: null,
     recoverable: true,
     recoveryAction: null,
+    isRamadan: false,
   },
   gmSituation: {
     name: "Unknown",
@@ -591,14 +594,24 @@ export async function runOperatingBrain(
   const actionQueue    = buildActionQueue(rankedSignals, gmData.name, ctx);
   const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), ctx, saHour);
 
+  const hoursRemaining = Math.max(0, 22 - saHour);
+  const fcst = forecastToday(
+    date,
+    ctx.revenue.actual,
+    hoursRemaining,
+    ctx.revenue.target > 0 ? ctx.revenue.target : undefined,
+    siteId,
+  );
+
   const forecastSummary: BrainOutput["forecastSummary"] = {
-    projectedClose:    saHour > 0 ? Math.round(ctx.revenue.actual / saHour * 22) : 0,
+    projectedClose:    fcst.projectedClose,
     vsTarget:          ctx.revenue.variance,
-    vsSameDayLastYear: null,
+    vsSameDayLastYear: fcst.vsSameDayLastYear,
     recoverable:       ctx.revenue.variance > -30,
     recoveryAction:    ctx.revenue.variance < -10
       ? "Push floor conversion and walk-in capture to close the gap."
       : null,
+    isRamadan:         fcst.isRamadan,
   };
 
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)

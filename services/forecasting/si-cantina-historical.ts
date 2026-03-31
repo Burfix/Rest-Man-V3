@@ -7,9 +7,11 @@
  * 20-month average: ~R734,000/month
  *
  * ANOMALY FLAGS:
- *   Sep 2024: R931K — 44% above Sep 2025 (likely special event / booking spike)
- *   Mar 2026: R453K — 21.6% below Mar 2025 (cause under investigation)
- *   Use confidence: 'low' when forecasting September or March.
+ *   Sep 2024: R931K — 44% above Sep 2025 average. Likely a major Cape Town event.
+ *             Verify before using as a September baseline.
+ *   Mar 2026: R453K — 21.6% below Mar 2025. Explained by Ramadan 2026 (Feb 18–Mar 19).
+ *             Ramadan suppression is a known recurring pattern handled by the engine.
+ *   Use confidence: 'low' for September (event spike); Ramadan months use 'medium'.
  */
 
 export type MonthlyRevenue = {
@@ -28,7 +30,7 @@ export const SI_CANTINA_MONTHLY: MonthlyRevenue[] = [
   { month: "2024-08", total: 514_951,   daysInMonth: 31 },
   {
     month: "2024-09", total: 931_436, daysInMonth: 30,
-    anomaly: "Historical September data contains anomaly — forecast less reliable",
+    anomaly: "September may contain a major event — verify before using as baseline",
   },
   { month: "2024-10", total: 780_557,   daysInMonth: 31 },
   { month: "2024-11", total: 993_380,   daysInMonth: 30 },
@@ -45,7 +47,7 @@ export const SI_CANTINA_MONTHLY: MonthlyRevenue[] = [
   { month: "2025-08", total: 593_497,   daysInMonth: 31 },
   {
     month: "2025-09", total: 647_546, daysInMonth: 30,
-    anomaly: "Historical September data contains anomaly — forecast less reliable",
+    anomaly: "September may contain a major event — verify before using as baseline",
   },
   { month: "2025-10", total: 706_547,   daysInMonth: 31 },
   { month: "2025-11", total: 851_794,   daysInMonth: 30 },
@@ -54,7 +56,7 @@ export const SI_CANTINA_MONTHLY: MonthlyRevenue[] = [
   { month: "2026-02", total: 1_006_424, daysInMonth: 28 },
   {
     month: "2026-03", total: 453_734, daysInMonth: 31,
-    anomaly: "March 2026 underperformed prior year significantly — treat with caution",
+    anomaly: "March 2026 suppressed by Ramadan (Feb 18–Mar 19, 2026) — use Ramadan-adjusted forecast",
   },
 ];
 
@@ -79,7 +81,7 @@ export const SI_CANTINA_SEASONALITY: Record<number, number> = {
   6:  0.79,  // June
   7:  0.85,  // July
   8:  0.77,  // August
-  9:  0.94,  // September (anomaly in 2024 — use with caution)
+  9:  0.94,  // September (potential event spike in 2024 — verify baseline)
   10: 0.95,  // October
   11: 1.17,  // November
   12: 1.12,  // December
