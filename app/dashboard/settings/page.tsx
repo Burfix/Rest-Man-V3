@@ -3,7 +3,9 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import { getUserContext } from "@/lib/auth/get-user-context";
 import { VenueSettings } from "@/types";
+import UpcomingEventsManager from "@/components/settings/UpcomingEventsManager";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,7 +26,12 @@ async function getVenueSettings(): Promise<VenueSettings | null> {
 }
 
 export default async function SettingsPage() {
-  const settings = await getVenueSettings();
+  const [settings, userCtx] = await Promise.all([
+    getVenueSettings(),
+    getUserContext().catch(() => null),
+  ]);
+
+  const siteId = userCtx?.siteId ?? "";
 
   if (!settings) {
     return (
@@ -94,6 +101,9 @@ export default async function SettingsPage() {
           ))}
         </dl>
       </section>
+
+      {/* Upcoming events */}
+      {siteId && <UpcomingEventsManager siteId={siteId} />}
     </div>
   );
 }

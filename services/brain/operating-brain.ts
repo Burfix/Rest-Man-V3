@@ -28,6 +28,7 @@ import {
 } from "@/services/accountability/score-calculator";
 import { generateVoice } from "./voice-generator";
 import { forecastToday } from "@/services/forecasting/forecast-engine";
+import type { SportsEvent } from "@/services/forecasting/events-calendar";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -84,6 +85,8 @@ export type BrainOutput = {
     recoverable: boolean;
     recoveryAction: string | null;
     isRamadan: boolean;
+    activeEvent: string | null;
+    eventUplift: number | null;
   };
 
   gmSituation: {
@@ -129,6 +132,8 @@ export const BRAIN_FALLBACK: BrainOutput = {
     recoverable: true,
     recoveryAction: null,
     isRamadan: false,
+    activeEvent: null,
+    eventUplift: null,
   },
   gmSituation: {
     name: "Unknown",
@@ -529,6 +534,41 @@ async function fetchGmSituation(
   };
 }
 
+// ── Site events loader ─────────────────────────────────────────────────────────
+
+/**
+ * Load admin-entered events from site_events table for a given date.
+ * Degrades gracefully to empty array on any error.
+ */
+async function fetchSiteEvents(
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
+  date: string,
+): Promise<SportsEvent[]> {
+  try {
+    const { data } = await (supabase as any)
+      .from("site_events")
+      .select("event_name, event_date, category, uplift_multiplier, site_id, notes")
+      .eq("site_id", siteId)
+      .eq("event_date", date)
+      .eq("confirmed", true);
+
+    if (!data) return [];
+
+    return data.map((row: any) => ({
+      date:             row.event_date as string,
+      name:             row.event_name as string,
+      category:         (row.category ?? "custom") as SportsEvent["category"],
+      upliftMultiplier: Number(row.uplift_multiplier ?? 1.0),
+      siteId:           row.site_id as string,
+      confirmed:        true,
+      notes:            row.notes ?? undefined,
+    }));
+  } catch {
+    return [];
+  }
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function runOperatingBrain(
@@ -537,10 +577,11 @@ export async function runOperatingBrain(
 ): Promise<BrainOutput> {
   const supabase = createServerClient();
 
-  // Run context build + GM lookup in parallel
-  const [ctx, gmData] = await Promise.all([
+  // Run context build + GM lookup + site events in parallel
+  const [ctx, gmData, dbEvents] = await Promise.all([
     buildOperationsContext(siteId, date).catch(() => null as OperationsContext | null),
     fetchGmSituation(supabase, siteId),
+    fetchSiteEvents(supabase, siteId, date),
   ]);
 
   if (!ctx) {
@@ -601,6 +642,7 @@ export async function runOperatingBrain(
     hoursRemaining,
     ctx.revenue.target > 0 ? ctx.revenue.target : undefined,
     siteId,
+    dbEvents,
   );
 
   const forecastSummary: BrainOutput["forecastSummary"] = {
@@ -612,6 +654,8 @@ export async function runOperatingBrain(
       ? "Push floor conversion and walk-in capture to close the gap."
       : null,
     isRamadan:         fcst.isRamadan,
+    activeEvent:       fcst.activeEvent,
+    eventUplift:       fcst.eventUplift,
   };
 
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)

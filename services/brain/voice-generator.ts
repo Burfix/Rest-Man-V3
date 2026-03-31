@@ -23,6 +23,24 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
   const { primaryThreat, forecastSummary, gmSituation, systemHealth } = brain;
   const sev = primaryThreat.severity;
 
+  // ── Sports event uplift ───────────────────────────────────────────────────
+  // Proactive: fires whenever an active event is detected. Requires floor
+  // preparation — overrides nominal and revenue paths. Yields only to
+  // critical MAINTENANCE (that takes priority: fix equipment to serve the crowd).
+  if (
+    forecastSummary.activeEvent &&
+    forecastSummary.eventUplift &&
+    forecastSummary.eventUplift > 1.0 &&
+    !(sev === "critical" && primaryThreat.modulesInvolved.includes("MAINTENANCE"))
+  ) {
+    const upliftPct    = Math.round((forecastSummary.eventUplift - 1) * 100);
+    const eventDisplay = forecastSummary.activeEvent.split(" —")[0].trim();
+    return (
+      `${eventDisplay} today. Expect ~${upliftPct}% revenue uplift. ` +
+      `Ensure full staffing and stock levels before kickoff.`
+    );
+  }
+
   // ── Ramadan suppression ───────────────────────────────────────────────────
   // Contextualise revenue suppression as a known cause — don't alarm the GM.
   // Only yields to MAINTENANCE primary threats (those need separate attention).
