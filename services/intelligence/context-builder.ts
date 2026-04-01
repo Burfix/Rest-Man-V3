@@ -157,12 +157,12 @@ export async function buildOperationsContext(
         .eq("id", siteId)
         .single(),
 
-      // Actions (daily ops proxy) — cast through any as Supabase types may lag schema
+      // Daily ops tasks — today's tasks only (matches PriorityActionBoard / dutiesData source)
       (supabase as any)
-        .from("actions")
-        .select("id, status, due_at")
+        .from("daily_ops_tasks")
+        .select("id, status, due_time")
         .eq("site_id", siteId)
-        .is("archived_at", null),
+        .eq("task_date", date),
 
       // Maintenance — open issues
       supabase
@@ -213,14 +213,14 @@ export async function buildOperationsContext(
   const actualPercent   = actual > 0 ? +(labourCost / actual * 100).toFixed(1) : 0;
   const labourVariance  = +(actualPercent - targetLabourPct).toFixed(1);
 
-  // ── Daily ops (actions proxy) ───────────────────────────────────────────────
-  const actionRows    = (actRes.data ?? []) as { id: string; status: string; due_at: string | null }[];
-  const totalTasks    = actionRows.length;
-  const completed     = actionRows.filter((a) => a.status === "completed").length;
-  const blocked       = actionRows.filter((a) => a.status === "blocked").length;
-  const overdue       = actionRows.filter(
-    (a) => a.due_at && new Date(a.due_at).getTime() < now &&
-      !["completed", "cancelled"].includes(a.status)
+  // ── Daily ops (daily_ops_tasks — today only) ───────────────────────────────
+  const taskRows       = (actRes.data ?? []) as { id: string; status: string; due_time: string | null }[];
+  const totalTasks     = taskRows.length;
+  const completed      = taskRows.filter((t) => t.status === "completed").length;
+  const blocked        = taskRows.filter((t) => t.status === "blocked").length;
+  // Overdue: not_started tasks that have a due_time set (approximate — used for session pressure only)
+  const overdue        = taskRows.filter(
+    (t) => t.status === "not_started" && t.due_time !== null
   ).length;
   const completionRate = totalTasks > 0 ? Math.round(completed / totalTasks * 100) : 0;
 
