@@ -323,6 +323,8 @@ function computeSystemHealth(
     ? 0
     : Math.max(0, 15 - ctx.compliance.atRiskCount * 7);
 
+  console.log(`[Brain] computeSystemHealth compliance: overdueCount=${ctx.compliance.overdueCount} atRiskCount=${ctx.compliance.atRiskCount} → compPts=${compPts}`);
+
   const score = Math.round(revPts + labPts + dutyPts + maintPts + compPts);
   let grade =
     score >= 90 ? "A" :

@@ -235,14 +235,22 @@ export async function buildOperationsContext(
 
   // ── Compliance ─────────────────────────────────────────────────────────────
   const compRows      = (compRes.data ?? []) as { id: string; status: string; next_due_date: string | null }[];
+  console.log(`[ContextBuilder] Compliance rows (${compRows.length}):`, compRows.map((c) => `${c.id.slice(0,8)} status=${c.status} due=${c.next_due_date}`));
+  // DB status is not auto-updated on expiry — use date comparison as canonical check.
+  // Expired: past due OR due today (last day = expires at end of day = should be actioned).
   const overdueCount  = compRows.filter(
-    (c) => c.status === "overdue" || c.status === "expired" ||
-      (c.next_due_date && c.next_due_date < date)
+    (c) => c.status === "overdue" || c.status === "expired" || c.status === "blocked" ||
+      (c.next_due_date && c.next_due_date <= date)
   ).length;
   const dueSoonCutoff = new Date(now + 30 * 86_400_000).toISOString().slice(0, 10);
+  // at-risk: due within 30 days but NOT already counted as overdue
+  const isOverdue = (c: { status: string; next_due_date: string | null }) =>
+    c.status === "overdue" || c.status === "expired" || c.status === "blocked" ||
+    (c.next_due_date != null && c.next_due_date <= date);
   const atRiskCount   = compRows.filter(
-    (c) => c.status === "due_soon" ||
-      (c.next_due_date && c.next_due_date >= date && c.next_due_date <= dueSoonCutoff)
+    (c) => !isOverdue(c) &&
+      (c.status === "due_soon" ||
+        (c.next_due_date != null && c.next_due_date > date && c.next_due_date <= dueSoonCutoff))
   ).length;
 
   // ── Meta ───────────────────────────────────────────────────────────────────

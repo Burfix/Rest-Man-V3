@@ -39,7 +39,10 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
       const labNote = ctx.labour.variance > 0
         ? ` Labour ${pct(ctx.labour.variance, true)} over — review roster before tomorrow.`
         : " Labour on budget.";
-      return `Strong close. Today finished at ${closeRevenue}, ${pct(vt, true)} vs target.${labNote}`;
+      const compNote = ctx.compliance.overdueCount > 0
+        ? ` ${ctx.compliance.overdueCount} compliance item${ctx.compliance.overdueCount > 1 ? "s" : ""} expired — renew tomorrow to reach Grade A.`
+        : "";
+      return `Strong close at ${closeRevenue}, ${pct(vt, true)} vs target.${labNote}${compNote}`;
     } else if (vt < -15) {
       // Weak day — flag for tomorrow
       const labNote = ctx.labour.variance > 0
