@@ -244,25 +244,74 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   }
 
   // ── SIGNAL 9 — Revenue Behind Pace (Service, standalone) ───────────────────
-  // Fires when revenue is significantly behind during service without requiring
+  // Fires when revenue is meaningfully behind during service without requiring
   // compound conditions (unlike S1 which also needs labour + ops triggers).
   // Guards against duplicate: suppressed when S1 is already active.
+  // Threshold lowered to -15 to catch moderate gaps that voice generator flags.
   if (
     meta.timeOfDay === "service" &&
-    rev.variance < -20 &&
+    rev.variance < -15 &&
     rev.target > 0 &&
     !signals.some((s) => s.id === "S1_REVENUE_RECOVERY_WINDOW")
   ) {
     signals.push({
       id: "S9_REVENUE_BEHIND_PACE",
       modules: ["REVENUE"],
-      severity: rev.variance < -35 ? "CRITICAL" : "HIGH",
-      title: rev.variance < -35 ? "Revenue Critically Behind Pace" : "Revenue Behind Pace",
+      severity: rev.variance < -25 ? "CRITICAL" : "HIGH",
+      title: rev.variance < -25 ? "Revenue Critically Behind Pace" : "Revenue Behind Pace",
       recommendation: `Revenue ${pct(rev.variance)} behind target during service. Push floor conversion, walk-in capture, and table turn rate.`,
       moneyAtRisk: revGapAbs,
       timeWindow: "This session",
       confidence: 88,
       triggeredConditions: [`Revenue ${pct(rev.variance)} during service`],
+    });
+  }
+
+  // ── SIGNAL 10 — Revenue Behind + Operational Lag ────────────────────────────
+  // Mirrors voice-generator state 11: revenue behind AND ops below 70%.
+  // Catches the scenario where S8 can't fire (ops too low) but there is a
+  // genuine compound risk between revenue and duty completion.
+  // Suppressed when S1 or S9 is already active (they cover revenue signals).
+  if (
+    meta.timeOfDay === "service" &&
+    rev.variance < -10 &&
+    ops.completionRate < 70 &&
+    !signals.some((s) =>
+      s.id === "S1_REVENUE_RECOVERY_WINDOW" || s.id === "S9_REVENUE_BEHIND_PACE"
+    )
+  ) {
+    signals.push({
+      id: "S10_REVENUE_OPS_LAG",
+      modules: ["REVENUE", "OPS"],
+      severity: rev.variance < -20 || ops.completionRate < 40 ? "HIGH" : "MEDIUM",
+      title: "Revenue Behind + Operational Lag",
+      recommendation: `Address ops backlog immediately — ${ops.completionRate}% duties complete while revenue is ${pct(rev.variance)} behind. Compound risk if both persist.`,
+      moneyAtRisk: revGapAbs,
+      timeWindow: "This session",
+      confidence: 82,
+      triggeredConditions: [
+        `Revenue ${pct(rev.variance)} behind target`,
+        `Only ${ops.completionRate}% of duties complete`,
+      ],
+    });
+  }
+
+  // ── SIGNAL 11 — Compliance Overdue (standalone) ────────────────────────────
+  // Fires when compliance items are overdue even without urgent maintenance.
+  // S4 already handles the compound compliance + maintenance case.
+  if (
+    comp.overdueCount >= 2 &&
+    !signals.some((s) => s.id === "S4_COMPLIANCE_MAINTENANCE_COMPOUND")
+  ) {
+    signals.push({
+      id: "S11_COMPLIANCE_OVERDUE",
+      modules: ["COMPLIANCE"],
+      severity: comp.overdueCount >= 4 ? "CRITICAL" : "HIGH",
+      title: comp.overdueCount >= 4 ? "Critical Compliance Exposure" : "Compliance Items Overdue",
+      recommendation: `${comp.overdueCount} compliance items overdue. Audit exposure growing — escalate to GM and schedule resolution today.`,
+      timeWindow: "Today",
+      confidence: 90,
+      triggeredConditions: [`${comp.overdueCount} compliance items overdue`],
     });
   }
 

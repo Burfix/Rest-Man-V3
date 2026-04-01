@@ -427,7 +427,8 @@ function buildConsequences(
     if (
       sig.id === "S1_REVENUE_RECOVERY_WINDOW" ||
       sig.id === "S8_UNEXPLAINED_REVENUE_GAP" ||
-      sig.id === "S9_REVENUE_BEHIND_PACE"
+      sig.id === "S9_REVENUE_BEHIND_PACE"     ||
+      sig.id === "S10_REVENUE_OPS_LAG"
     ) {
       if (hoursLeft > 1) {
         consequences.push({
@@ -508,6 +509,110 @@ function buildConsequences(
   }).slice(0, 5);
 }
 
+// ── Contextual fallback threat (no-signal safety net) ─────────────────────────
+//
+// When no signals fire (edge cases / gap in signal coverage) but the context
+// shows real issues, this synthesises a primaryThreat directly from ctx so the
+// LEFT column never says "All Systems Nominal" while the voice line says
+// "compound risk". Mirrors the same conditions as voice-generator states 11–13.
+
+function buildContextualThreat(
+  ctx: OperationsContext,
+  systemHealth: BrainOutput["systemHealth"],
+  gmOwner: BrainOutput["primaryThreat"]["owner"],
+  hour: number,
+): BrainOutput["primaryThreat"] {
+  const hoursLeft   = Math.max(0, 22 - hour);
+  const timeWindowM = Math.max(30, hoursLeft * 60);
+  const revGap      = ctx.revenue.target > 0 ? Math.max(0, ctx.revenue.target - ctx.revenue.actual) : 0;
+
+  // Revenue behind + ops lag (mirrors voice state 11)
+  if (ctx.meta.timeOfDay === "service" && ctx.revenue.variance < -10 && ctx.dailyOps.completionRate < 70) {
+    const sev: BrainThreatSeverity = ctx.revenue.variance < -20 ? "high" : "medium";
+    return {
+      title:             "Revenue Behind + Operational Lag",
+      description:       `Revenue ${ctx.revenue.variance.toFixed(1)}% vs target with ${ctx.dailyOps.completionRate}% of duties complete.`,
+      severity:          sev,
+      modulesInvolved:   ["REVENUE", "OPS"],
+      owner:             gmOwner,
+      moneyAtRisk:       revGap,
+      timeWindowMinutes: timeWindowM,
+      timeWindowLabel:   timeWindowLabel(timeWindowM, "Until session end"),
+      ifIgnored:         `Revenue gap of ${fmt(revGap)} locks in as session closes — compound ops drag limits recovery.`,
+      recommendedAction: "Address ops backlog immediately and push floor conversion to close the revenue gap.",
+      confidence:        "high",
+    };
+  }
+
+  // Compliance overdue with no urgent maintenance (mirrors voice state 13)
+  if (ctx.compliance.overdueCount > 0 && ctx.revenue.variance > -10) {
+    const sev: BrainThreatSeverity = ctx.compliance.overdueCount >= 4 ? "high" : "medium";
+    return {
+      title:             `${ctx.compliance.overdueCount} Compliance ${ctx.compliance.overdueCount === 1 ? "Item" : "Items"} Overdue`,
+      description:       `Audit exposure growing. ${ctx.maintenance.urgentCount > 0 ? `${ctx.maintenance.urgentCount} maintenance issues also unresolved.` : ""}`,
+      severity:          sev,
+      modulesInvolved:   ["COMPLIANCE"],
+      owner:             gmOwner,
+      moneyAtRisk:       0,
+      timeWindowMinutes: 24 * 60,
+      timeWindowLabel:   "Today",
+      ifIgnored:         "Overdue compliance exposure compounds daily — audit risk increases until resolved.",
+      recommendedAction: "Action overdue items today — assign owner and set deadline for each.",
+      confidence:        "high",
+    };
+  }
+
+  // Revenue behind (moderate, not enough to trip any signal alone)
+  if (ctx.meta.timeOfDay === "service" && ctx.revenue.variance < -10 && ctx.revenue.target > 0) {
+    return {
+      title:             "Revenue Monitoring",
+      description:       `Revenue ${ctx.revenue.variance.toFixed(1)}% vs target during service.`,
+      severity:          "medium",
+      modulesInvolved:   ["REVENUE"],
+      owner:             gmOwner,
+      moneyAtRisk:       revGap,
+      timeWindowMinutes: timeWindowM,
+      timeWindowLabel:   timeWindowLabel(timeWindowM, "Until session end"),
+      ifIgnored:         "Revenue gap widens as service progresses without active floor intervention.",
+      recommendedAction: "Monitor floor conversion and walk-in capture. Push upsell on current tables.",
+      confidence:        "medium",
+    };
+  }
+
+  // Worst score driver (catch-all for below-threshold scores)
+  const topLoss = systemHealth.scoreDrivers.find((d) => d.direction === "down");
+  if (topLoss && systemHealth.score < 70) {
+    return {
+      title:             `${topLoss.module} Below Threshold`,
+      description:       topLoss.reason,
+      severity:          systemHealth.score < 50 ? "medium" : "low",
+      modulesInvolved:   [topLoss.module as string],
+      owner:             gmOwner,
+      moneyAtRisk:       0,
+      timeWindowMinutes: 240,
+      timeWindowLabel:   "Next 4 hours",
+      ifIgnored:         "System health score remains suppressed until resolved.",
+      recommendedAction: `Review ${topLoss.module.toLowerCase()} status and address the top gap.`,
+      confidence:        "medium",
+    };
+  }
+
+  // True all-systems nominal
+  return {
+    title:             "All Systems Nominal",
+    description:       "No active threats detected across any module.",
+    severity:          "low",
+    modulesInvolved:   ["REVENUE", "LABOUR", "OPS"],
+    owner:             gmOwner,
+    moneyAtRisk:       0,
+    timeWindowMinutes: 0,
+    timeWindowLabel:   "No active window",
+    ifIgnored:         "Continue monitoring service quality and walk-in conversion.",
+    recommendedAction: "Monitor booking pace and floor energy. No immediate action required.",
+    confidence:        "high",
+  };
+}
+
 // ── Primary threat builder ─────────────────────────────────────────────────────
 
 function buildIfIgnored(
@@ -541,6 +646,12 @@ function buildIfIgnored(
   }
   if (sig.id === "S9_REVENUE_BEHIND_PACE") {
     return `Revenue gap of ${fmt(revGap)} locks in as session closes — no recovery path after service ends.`;
+  }
+  if (sig.id === "S10_REVENUE_OPS_LAG") {
+    return `Revenue gap of ${fmt(revGap)} grows as ops backlog compounds — recovery window narrows with each hour.`;
+  }
+  if (sig.id === "S11_COMPLIANCE_OVERDUE") {
+    return "Compliance exposure compounds daily — audit risk increases until resolved.";
   }
   return sig.recommendation.split(".")[0] + ".";
 }
@@ -591,6 +702,8 @@ const ESTIMATED_MINUTES: Partial<Record<string, number>> = {
   S7_OPS_MAINTENANCE_OVERLOAD:       20,
   S8_UNEXPLAINED_REVENUE_GAP:        20,
   S9_REVENUE_BEHIND_PACE:            15,
+  S10_REVENUE_OPS_LAG:               20,
+  S11_COMPLIANCE_OVERDUE:            45,
 };
 
 function getOwnerRole(sig: CrossModuleSignal): "Shift Lead" | "GM" | "Head Office" {
@@ -599,7 +712,9 @@ function getOwnerRole(sig: CrossModuleSignal): "Shift Lead" | "GM" | "Head Offic
   if (sig.id === "S3_LABOUR_EFFICIENCY_ALERT")        return "Shift Lead";
   if (sig.id === "S6_PRE_SERVICE_LABOUR_SURGE")       return "Shift Lead";
   if (sig.id === "S7_OPS_MAINTENANCE_OVERLOAD")       return "Shift Lead";
+  if (sig.id === "S10_REVENUE_OPS_LAG")               return "Shift Lead";
   if (sig.id === "S4_COMPLIANCE_MAINTENANCE_COMPOUND") return "GM";
+  if (sig.id === "S11_COMPLIANCE_OVERDUE")             return "GM";
   return "GM";
 }
 
@@ -607,6 +722,7 @@ function getEscalateTo(sig: CrossModuleSignal): "GM" | "Head Office" | "Faciliti
   if (sig.severity === "CRITICAL")                     return "Head Office";
   if (sig.id === "S2_SERVICE_COLLAPSE_RISK")           return "GM";
   if (sig.id === "S4_COMPLIANCE_MAINTENANCE_COMPOUND") return "Head Office";
+  if (sig.id === "S11_COMPLIANCE_OVERDUE")             return "Head Office";
   if (sig.id === "S7_OPS_MAINTENANCE_OVERLOAD")        return "GM";
   return null;
 }
@@ -619,7 +735,7 @@ function buildFinancialImpact(
   const hoursLeft = Math.max(0, 22 - saHour);
   const runRate   = saHour > 0 ? ctx.revenue.actual / saHour : 0;
 
-  if (sig.id === "S1_REVENUE_RECOVERY_WINDOW" || sig.id === "S8_UNEXPLAINED_REVENUE_GAP" || sig.id === "S9_REVENUE_BEHIND_PACE") {
+  if (sig.id === "S1_REVENUE_RECOVERY_WINDOW" || sig.id === "S8_UNEXPLAINED_REVENUE_GAP" || sig.id === "S9_REVENUE_BEHIND_PACE" || sig.id === "S10_REVENUE_OPS_LAG") {
     const gap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
     if (gap > 0) return `${fmt(gap)} revenue gap`;
   }
@@ -882,26 +998,16 @@ export async function runOperatingBrain(
     userId: gmData.userId,
   };
 
-  // Nominal state when no actionable threats
-  const primaryThreat: BrainOutput["primaryThreat"] = topSignal
-    ? buildPrimaryThreat(topSignal, effectiveCtx, saHour, gmOwner)
-    : {
-        title:             "All Systems Nominal",
-        description:       "No active threats detected across any module.",
-        severity:          "low",
-        modulesInvolved:   ["REVENUE", "LABOUR", "OPS"],
-        owner:             gmOwner,
-        moneyAtRisk:       0,
-        timeWindowMinutes: 0,
-        timeWindowLabel:   "No active window",
-        ifIgnored:         "Continue monitoring service quality and walk-in conversion.",
-        recommendedAction: "Monitor booking pace and floor energy. No immediate action required.",
-        confidence:        "high",
-      };
-
+  // Compute systemHealth first — needed by buildContextualThreat for score drivers
   const systemHealth   = computeSystemHealth(effectiveCtx, signals, minutesElapsed);
   const actionQueue    = buildActionQueue(rankedSignals, gmData.name, effectiveCtx, saHour);
   const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), effectiveCtx, minutesElapsed, minutesRemaining);
+
+  // Primary threat: from top signal if available; otherwise synthesise from context
+  // so LEFT column never contradicts the voice line or grade bar.
+  const primaryThreat: BrainOutput["primaryThreat"] = topSignal
+    ? buildPrimaryThreat(topSignal, effectiveCtx, saHour, gmOwner)
+    : buildContextualThreat(effectiveCtx, systemHealth, gmOwner, saHour);
 
   const forecastSummary: BrainOutput["forecastSummary"] = {
     projectedClose:    fcst.projectedClose,
