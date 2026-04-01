@@ -571,6 +571,17 @@ function buildPrimaryThreat(
 
 // ── Action queue builder ───────────────────────────────────────────────────────
 
+/**
+ * Extract the actionable sentence from a recommendation string.
+ * Recommendations typically start with a problem statement, then give
+ * the action. We take the last substantive sentence as the action.
+ */
+function extractActionText(recommendation: string): string {
+  const sentences = recommendation.split(".").map((s) => s.trim()).filter((s) => s.length > 8);
+  if (sentences.length > 1) return sentences[sentences.length - 1] + ".";
+  return recommendation;
+}
+
 const ESTIMATED_MINUTES: Partial<Record<string, number>> = {
   S1_REVENUE_RECOVERY_WINDOW:        15,
   S2_SERVICE_COLLAPSE_RISK:          30,
@@ -638,25 +649,38 @@ function buildRecoveryMeter(
   minutesElapsed: number,
   minutesRemaining: number,
   actionQueue: BrainOutput["actionQueue"],
+  dayBaseline: number | null,
 ): RecoveryMeter | null {
-  // Only during service with a meaningful gap
+  // Only during service with a meaningful gap and time remaining
   if (ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed") return null;
   const revenueGap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
   if (revenueGap < 2_000) return null;
+  if (minutesRemaining <= 60) return null;
 
   const timeLeftMinutes = minutesRemaining;
-  const runRate         = minutesElapsed > 0 ? ctx.revenue.actual / minutesElapsed : 0;
-  const projRemaining   = runRate * minutesRemaining;
+  const SERVICE_DURATION_MINUTES = 720; // 10:00–22:00
 
-  const recoverable    = Math.min(revenueGap, projRemaining * 0.4);
+  // Run rate from actual trading; if no revenue yet, use DOW baseline rate as proxy
+  let runRate = minutesElapsed > 0 ? ctx.revenue.actual / minutesElapsed : 0;
+  if (runRate === 0 && dayBaseline && dayBaseline > 0) {
+    runRate = dayBaseline / SERVICE_DURATION_MINUTES;
+  }
+
+  const potentialRevenue = runRate * minutesRemaining;
+  const recoverable    = Math.min(revenueGap, potentialRevenue * 0.5);
   const isOnTrack      = recoverable >= revenueGap;
-  const limitedWindow  = timeLeftMinutes < 60 && !isOnTrack;
+  const limitedWindow  = timeLeftMinutes < 120 && !isOnTrack;
   const partialOnly    = revenueGap > recoverable * 1.1 && !isOnTrack;
 
-  const topActions: string[] = [];
-  if (actionQueue.length > 0) topActions.push(actionQueue[0].impact);
-  if (actionQueue.length > 1) topActions.push(actionQueue[1].impact);
-  if (topActions.length < 2)  topActions.push("Push walk-in conversion and floor energy.");
+  // Specific recovery actions (ordered by immediacy)
+  const topActions: string[] = [
+    "Push walk-in conversion at entrance.",
+    "Activate upsell on current tables.",
+  ];
+  // Supplement with action queue if it has better context
+  if (actionQueue.length > 0 && !actionQueue[0].impact.toLowerCase().startsWith("revenue")) {
+    topActions[0] = actionQueue[0].impact;
+  }
 
   return { revenueGap, recoverable, timeLeftMinutes, isOnTrack, limitedWindow, partialOnly, topActions };
 }
@@ -671,7 +695,7 @@ function buildActionQueue(
     priority:         idx + 1,
     title:            sig.title,
     why:              sig.triggeredConditions[0] ?? "Multiple conditions triggered",
-    impact:           sig.recommendation.split(".")[0] + ".",
+    impact:           extractActionText(sig.recommendation),
     owner:            gmName,
     estimatedMinutes: ESTIMATED_MINUTES[sig.id] ?? 15,
     moneyAtRisk:      sig.moneyAtRisk ?? null,
@@ -899,7 +923,7 @@ export async function runOperatingBrain(
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)
   const { userId: _uid, ...gmSituation } = gmData;
 
-  const recoveryMeter = buildRecoveryMeter(effectiveCtx, minutesElapsed, minutesRemaining, actionQueue);
+  const recoveryMeter = buildRecoveryMeter(effectiveCtx, minutesElapsed, minutesRemaining, actionQueue, fcst.dayBaseline ?? null);
 
   const brain: BrainOutput = {
     timestamp: new Date().toISOString(),

@@ -92,14 +92,24 @@ export async function buildOperationsContext(
   const supabase = createServerClient();
   const now = Date.now();
 
-  const [revRes, snapRes, labRes, siteRes, actRes, maintRes, compRes] =
+  const [revRes, manualRes, snapRes, labRes, siteRes, actRes, maintRes, compRes] =
     await Promise.all([
-      // Revenue
+      // Revenue records (secondary / fallback)
       supabase
         .from("revenue_records")
         .select("net_vat_excl, net_sales")
         .eq("site_id", siteId)
         .eq("service_date", date),
+
+      // Manual sales upload (primary — same source as Business Status panel)
+      (supabase as any)
+        .from("manual_sales_uploads")
+        .select("net_sales, gross_sales")
+        .eq("site_id", siteId)
+        .eq("business_date", date)
+        .order("uploaded_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
 
       // Target from snapshot
       supabase
@@ -149,7 +159,12 @@ export async function buildOperationsContext(
   // ── Revenue ────────────────────────────────────────────────────────────────
   const revRows    = (revRes.data   ?? []) as { net_vat_excl: number | null; net_sales: number | null }[];
   const snapRows   = (snapRes.data  ?? []) as { revenue_target: number | null }[];
-  const actual     = revRows.reduce((s, r) => s + (r.net_vat_excl ?? r.net_sales ?? 0), 0);
+  const manualRow  = manualRes.data as { net_sales: number | null; gross_sales: number | null } | null;
+
+  // Prefer manual_sales_uploads (same source as Business Status panel) → fall back to revenue_records
+  const actual     = manualRow
+    ? (manualRow.net_sales ?? manualRow.gross_sales ?? 0)
+    : revRows.reduce((s, r) => s + (r.net_vat_excl ?? r.net_sales ?? 0), 0);
   const target     = snapRows[0]?.revenue_target ? Number(snapRows[0].revenue_target) : 0;
   const variance   = target > 0 ? +((actual - target) / target * 100).toFixed(1) : 0;
   const trend: RevenueContext["trend"] =
