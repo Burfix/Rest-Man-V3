@@ -63,8 +63,10 @@ export type OperationsContext = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function getTimeOfDay(hourInJohannesburg: number): MetaContext["timeOfDay"] {
-  if (hourInJohannesburg >= 6  && hourInJohannesburg < 11) return "pre-service";
-  if (hourInJohannesburg >= 11 && hourInJohannesburg < 23) return "service";
+  // Restaurant opens at 10:00 — treat 10:00 onwards as service (not 11:00).
+  // Pre-service = 06:00–09:59 (prep window before doors open).
+  if (hourInJohannesburg >= 6  && hourInJohannesburg < 10) return "pre-service";
+  if (hourInJohannesburg >= 10 && hourInJohannesburg < 23) return "service";
   if (hourInJohannesburg >= 23) return "post-service";
   return "closed";
 }

@@ -525,9 +525,12 @@ function buildContextualThreat(
   const hoursLeft   = Math.max(0, 22 - hour);
   const timeWindowM = Math.max(30, hoursLeft * 60);
   const revGap      = ctx.revenue.target > 0 ? Math.max(0, ctx.revenue.target - ctx.revenue.actual) : 0;
+  const isActive    = ctx.meta.timeOfDay !== "closed" && ctx.meta.timeOfDay !== "post-service";
 
-  // Revenue behind + ops lag (mirrors voice state 11)
-  if (ctx.meta.timeOfDay === "service" && ctx.revenue.variance < -10 && ctx.dailyOps.completionRate < 70) {
+  // Revenue behind + ops lag — mirrors voice state 11 EXACTLY (no timeOfDay gate).
+  // Voice state 11 fires on variance < -10 && ops < 70 regardless of service window.
+  // primaryThreat must match — if voice says "compound risk", LEFT column must agree.
+  if (isActive && ctx.revenue.variance < -10 && ctx.dailyOps.completionRate < 70) {
     const sev: BrainThreatSeverity = ctx.revenue.variance < -20 ? "high" : "medium";
     return {
       title:             "Revenue Behind + Operational Lag",
@@ -562,8 +565,8 @@ function buildContextualThreat(
     };
   }
 
-  // Revenue behind (moderate, not enough to trip any signal alone)
-  if (ctx.meta.timeOfDay === "service" && ctx.revenue.variance < -10 && ctx.revenue.target > 0) {
+  // Revenue behind (moderate) — no timeOfDay gate, matches voice state 14
+  if (isActive && ctx.revenue.variance < -10 && ctx.revenue.target > 0) {
     return {
       title:             "Revenue Monitoring",
       description:       `Revenue ${ctx.revenue.variance.toFixed(1)}% vs target during service.`,
@@ -597,7 +600,7 @@ function buildContextualThreat(
     };
   }
 
-  // True all-systems nominal
+  // True all-systems nominal — only reached when no real issues exist
   return {
     title:             "All Systems Nominal",
     description:       "No active threats detected across any module.",
