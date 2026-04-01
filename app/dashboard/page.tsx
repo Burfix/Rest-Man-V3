@@ -36,8 +36,8 @@ import HeroStrip         from "@/components/brain/HeroStrip";
 import PriorityActionBoard from "@/components/brain/PriorityActionBoard";
 import CommandFeed            from "@/components/operating-brain/CommandFeedV2";
 import ServicePulse           from "@/components/operating-brain/ServicePulse";
-import BusinessStatusRail     from "@/components/operating-brain/BusinessStatusRail";
-import FeedbackLoop           from "@/components/operating-brain/FeedbackLoop";
+import BusinessStatusRail, { type PredictiveSignals } from "@/components/operating-brain/BusinessStatusRail";
+import FeedbackLoop, { type FeedbackLoopProps }  from "@/components/operating-brain/FeedbackLoop";
 import DataHealthWarning      from "@/components/operating-brain/DataHealthWarning";
 import SecondaryInsights      from "@/components/dashboard/SecondaryInsights";
 
@@ -323,6 +323,52 @@ export default async function OperationsDashboard() {
       scoreTotal >= 50 ? "D" : "F";
   }
 
+  // ─── Predictive signals for BusinessStatusRail ───────────────────────────
+  const dutiesDriver   = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "DUTIES");
+  const dutiesCompPct  = dutiesDriver ? Math.round((dutiesDriver.pts / 20) * 100) : 100;
+
+  const dinnerRisk: PredictiveSignals["dinnerRisk"] =
+    (revenueVariance < -10 && dutiesCompPct < 70)  ? "High"   :
+    (maintenance.serviceDisruptions > 0)            ? "High"   :
+    (revenueVariance < -5  || dutiesCompPct < 80)   ? "Medium" : "Low";
+
+  const bookingPace: PredictiveSignals["bookingPace"] =
+    today.total >= 8 ? "Strong" :
+    today.total >= 3 ? "Moderate" : "Slow";
+
+  const staffOnFloor   = labourSummary?.activeStaffCount ?? 0;
+  const forecastCovers = forecast?.forecast_covers ?? 0;
+  const staffingPressure: PredictiveSignals["staffingPressure"] =
+    (staffOnFloor > 0 && forecastCovers > staffOnFloor * 15) ? "High"   :
+    (staffOnFloor > 0 && forecastCovers > staffOnFloor * 8)  ? "Medium" : "Low";
+
+  const predictive: PredictiveSignals = {
+    dinnerRisk,
+    bookingPace,
+    peakWindow: "19:00 – 21:00",
+    staffingPressure,
+  };
+
+  // ─── FeedbackLoop props ──────────────────────────────────────────────────
+  const gradeOrder    = ["D", "C", "B", "A"] as const;
+  const feedScore     = brain?.systemHealth.score ?? scoreTotal;
+  const feedGrade     = brain?.systemHealth.grade ?? "?";
+  const feedNextGrade = gradeOrder.find((g) =>
+    feedScore < ({ D: 50, C: 65, B: 80, A: 90 } as const)[g]
+  ) ?? null;
+  const feedPtsToNext = feedNextGrade
+    ? ({ D: 50, C: 65, B: 80, A: 90 } as const)[feedNextGrade] - feedScore
+    : 0;
+  const feedbackProps: FeedbackLoopProps = {
+    score:          feedScore,
+    grade:          feedGrade,
+    nextGrade:      feedNextGrade,
+    ptsToNextGrade: feedPtsToNext,
+    tradingTrend:   brain?.systemHealth.trend ?? "stable",
+    gmTier:         brain?.gmSituation.tier ?? "Unknown",
+    gmName:         brain?.gmSituation.name ?? "",
+  };
+
   return (
     <div className="space-y-0">
 
@@ -371,8 +417,8 @@ export default async function OperationsDashboard() {
 
           {/* Secondary Column */}
           <div className="lg:col-span-4 space-y-4">
-            <BusinessStatusRail status={engineOutput.businessStatus} />
-            <FeedbackLoop />
+            <BusinessStatusRail status={engineOutput.businessStatus} predictive={predictive} />
+            <FeedbackLoop {...feedbackProps} />
           </div>
         </div>
 

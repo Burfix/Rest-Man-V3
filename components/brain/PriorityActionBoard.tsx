@@ -2,14 +2,14 @@
  * PriorityActionBoard — Layer 2 of the Command Center.
  *
  * 2-column layout:
- *   LEFT (65%) — Numbered action cards + grade progress motivator
- *   RIGHT (35%) — Score breakdown bars + recovery window + forecast + GM
+ *   LEFT (65%) — Numbered action cards
+ *   RIGHT (35%) — Brain recommendation + Score bars + Grade path + Recovery + Forecast + GM
  *
  * Server Component (ActionTakenButton is the only client leaf).
  */
 
 import { cn } from "@/lib/utils";
-import type { BrainOutput, BrainThreatSeverity } from "@/services/brain/operating-brain";
+import type { BrainOutput, BrainThreatSeverity, ScoreDriver } from "@/services/brain/operating-brain";
 import ActionTakenButton from "./ActionTakenButton";
 
 type Props = {
@@ -32,7 +32,7 @@ const GRADE_THRESHOLDS: Record<string, number> = { D: 50, C: 65, B: 80, A: 90 };
 // ── Colour helpers ─────────────────────────────────────────────────────────────
 
 const SEV_BORDER: Record<string, string> = {
-  critical: "border-l-red-500",
+  critical: "border-l-red-600",
   high:     "border-l-amber-500",
   medium:   "border-l-yellow-500",
   low:      "border-l-stone-400 dark:border-l-stone-600",
@@ -86,7 +86,7 @@ function fmtMins(mins: number): string {
   return `${h}h ${m}m`;
 }
 
-/** Compute SAST-relative deadline countdown. Returns { label, isUrgent }. */
+/** Compute SAST-relative deadline countdown. */
 function deadlineCountdown(
   deadline: string | null,
   minutesToClose: number,
@@ -118,38 +118,164 @@ function deriveSeverity(
   return "medium";
 }
 
-/** Build grade progress motivator lines. */
+/**
+ * Generate a specific, operational action title from a score driver.
+ * Always: WHAT + HOW MANY + BY WHEN. No abstract words.
+ */
+function makeOperationalTitle(
+  driver: ScoreDriver,
+  brain: BrainOutput,
+  saHour: number,
+): string {
+  const nextSession = saHour < 17 ? "dinner service" : "close";
+  const nextSessionTime = saHour < 17 ? "17:00" : "22:00";
+
+  switch (driver.module) {
+    case "DUTIES": {
+      const completionPct = Math.round((driver.pts / MODULE_MAX.DUTIES) * 100);
+      const remaining = 100 - completionPct;
+      if (completionPct === 0) return `Daily checklist not started — service risk before ${nextSessionTime}`;
+      if (completionPct < 30)  return `FOH checklist ${completionPct}% complete — critical tasks outstanding before ${nextSessionTime}`;
+      return `${remaining}% of duties incomplete before ${nextSession} (${completionPct}/100 done)`;
+    }
+
+    case "COMPLIANCE": {
+      const match = driver.reason.match(/(\d+) overdue/i);
+      const count = match ? parseInt(match[1], 10) : 1;
+      return `${count} compliance cert${count > 1 ? "s" : ""} expired — legal exposure active`;
+    }
+
+    case "MAINTENANCE": {
+      if (driver.reason.includes("Service block")) {
+        return `Equipment failure blocking ${nextSession} — escalate now`;
+      }
+      const match = driver.reason.match(/(\d+) urgent/i);
+      const count = match ? parseInt(match[1], 10) : 1;
+      return `${count} urgent maintenance issue${count > 1 ? "s" : ""} unresolved — ${nextSession} risk`;
+    }
+
+    case "LABOUR": {
+      const match = driver.reason.match(/([\d.]+)% over/i);
+      const overPct = match ? match[1] : "?";
+      const gap = brain.recoveryMeter?.revenueGap
+        ? ` — ${fmtZAR(Math.round(brain.recoveryMeter.revenueGap * 0.05))} overspend by close`
+        : " — reduce now before shift locks in";
+      return `Labour ${overPct}% over target${gap}`;
+    }
+
+    case "REVENUE": {
+      const match = driver.reason.match(/([\d.]+)% below/i);
+      const varPct = match ? match[1] : "?";
+      if (brain.recoveryMeter && brain.recoveryMeter.revenueGap > 0) {
+        return `${fmtZAR(brain.recoveryMeter.revenueGap)} revenue gap — ${varPct}% below target during ${nextSession}`;
+      }
+      return `Revenue ${varPct}% behind target — active floor effort needed`;
+    }
+
+    default:
+      return driver.reason;
+  }
+}
+
+/**
+ * Generate operational consequence language — guest/financial/legal impact only.
+ * Never mentions points or scoring.
+ */
+function makeOperationalConsequence(
+  driver: ScoreDriver,
+  brain: BrainOutput,
+  saHour: number,
+): string {
+  const closeTime = "22:00";
+  const hoursLeft  = Math.max(0, 22 - saHour);
+
+  switch (driver.module) {
+    case "DUTIES":
+      return `Incomplete duties increase ${saHour < 17 ? "dinner" : "service"} unreadiness risk. FOH handover gaps create guest experience failures and team confusion under pressure.`;
+
+    case "COMPLIANCE":
+      return `Operating with expired certificates. Legal exposure is active. Insurance may be invalidated. Closure risk if inspected — escalate to head office immediately.`;
+
+    case "MAINTENANCE": {
+      if (driver.reason.includes("Service block")) {
+        return `Equipment failure during service means lost covers and guest complaints. Every hour unresolved compounds revenue loss and team pressure.`;
+      }
+      return `Unresolved maintenance during service creates food safety risk and guest-facing failures. Urgent issues escalate into closures if not contained.`;
+    }
+
+    case "LABOUR":
+      return `Excess labour on shift with ${hoursLeft}h remaining. No recovery path after shift ends — adjust roster now or absorb the confirmed overspend on P&L.`;
+
+    case "REVENUE": {
+      if (brain.recoveryMeter && brain.recoveryMeter.revenueGap > 0) {
+        const coversNeeded = brain.forecastSummary.projectedClose > 0
+          ? Math.ceil(brain.recoveryMeter.revenueGap / Math.max(1, brain.forecastSummary.projectedClose / Math.max(1, 60)))
+          : null;
+        const coverStr = coversNeeded ? ` Approximately ${coversNeeded} covers at current average needed.` : "";
+        return `${fmtZAR(brain.recoveryMeter.revenueGap)} needed to close the gap.${coverStr} Walk-in window closes at ${closeTime}. Act before service thins.`;
+      }
+      return `Revenue is behind pace. Walk-in window closes at ${closeTime}. Push floor conversion and upsell on current tables before service thins.`;
+    }
+
+    default:
+      return driver.reason;
+  }
+}
+
+/**
+ * Build the Brain Recommendation line combining top 2 actions into one instruction.
+ */
+function buildBrainRecommendation(brain: BrainOutput): string | null {
+  const top = brain.actionQueue.slice(0, 2);
+  if (top.length === 0) return null;
+
+  const gradeOrder: Array<keyof typeof GRADE_THRESHOLDS> = ["D", "C", "B", "A"];
+  const nextGrade = gradeOrder.find((g) => brain.systemHealth.score < GRADE_THRESHOLDS[g]);
+
+  const action1 = top[0].title.toLowerCase().replace(/^(critical|high|medium|low):\s*/i, "");
+  const action2 = top[1]?.title.toLowerCase().replace(/^(critical|high|medium|low):\s*/i, "");
+
+  if (top.length >= 2 && nextGrade) {
+    return `${action1.charAt(0).toUpperCase() + action1.slice(1)} and ${action2} — moves Grade ${brain.systemHealth.grade} → ${nextGrade}.`;
+  }
+  if (nextGrade) {
+    return `${action1.charAt(0).toUpperCase() + action1.slice(1)} — key step towards Grade ${nextGrade}.`;
+  }
+  return `${action1.charAt(0).toUpperCase() + action1.slice(1)} — highest priority action now.`;
+}
+
+/** Build grade-path steps for the right column. */
 function gradeMotivator(
   score: number,
   allScoreDrivers: BrainOutput["systemHealth"]["allScoreDrivers"],
-): Array<{ text: string; pts: number; nextGrade: string }> {
+): Array<{ label: string; pts: number; nextGrade: string }> {
   const gradeOrder: Array<keyof typeof GRADE_THRESHOLDS> = ["D", "C", "B", "A"];
-  const results: Array<{ text: string; pts: number; nextGrade: string }> = [];
-
   const nextGrade = gradeOrder.find((g) => score < GRADE_THRESHOLDS[g]);
-  if (!nextGrade) return results;
+  if (!nextGrade) return [];
 
-  const ptsNeeded = GRADE_THRESHOLDS[nextGrade] - score;
+  const results: Array<{ label: string; pts: number; nextGrade: string }> = [];
   const downDrivers = allScoreDrivers.filter((d) => d.direction === "down");
 
-  // Show up to 2 steps: current grade target, then one beyond
   downDrivers.slice(0, 2).forEach((driver) => {
     const max = MODULE_MAX[driver.module] ?? 20;
     const potential = max - driver.pts;
     if (potential > 0) {
-      results.push({
-        text:      `${driver.module.charAt(0) + driver.module.slice(1).toLowerCase()} (+${potential} pts)`,
-        pts:       potential,
-        nextGrade: String(nextGrade),
-      });
+      const label = driver.module === "DUTIES"
+        ? `Complete duties (+${potential})`
+        : driver.module === "COMPLIANCE"
+        ? `Renew compliance item (+${potential})`
+        : driver.module === "MAINTENANCE"
+        ? `Clear urgent maintenance (+${potential})`
+        : driver.module === "LABOUR"
+        ? `Trim labour excess (+${potential})`
+        : `Fix ${driver.module.toLowerCase()} (+${potential})`;
+      results.push({ label, pts: potential, nextGrade: String(nextGrade) });
     }
   });
 
-  // If no down drivers supply enough, show generic pointer
   if (results.length === 0) {
-    results.push({ text: `${ptsNeeded} pts needed`, pts: ptsNeeded, nextGrade: String(nextGrade) });
+    results.push({ label: `${GRADE_THRESHOLDS[nextGrade] - score} pts needed`, pts: GRADE_THRESHOLDS[nextGrade] - score, nextGrade: String(nextGrade) });
   }
-
   return results;
 }
 
@@ -180,7 +306,7 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
   const minutesToClose    = Math.max(0, 22 * 60 - totalMins);
   const minutesToMidnight = Math.max(0, 24 * 60 - totalMins);
 
-  // ── Action list — use actionQueue; synthesise fallback when score < 80 ──────
+  // ── Action list ─────────────────────────────────────────────────────────────
   const score = systemHealth.score;
   const hasRealActions = actionQueue.length > 0;
 
@@ -191,9 +317,9 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
         .filter((d) => d.direction === "down")
         .map((d, i) => ({
           priority:         i + 1,
-          title:            `Improve ${d.module.charAt(0) + d.module.slice(1).toLowerCase()}`,
+          title:            makeOperationalTitle(d, brain, saHour),
           why:              d.reason,
-          impact:           `Address ${d.module.toLowerCase()} to recover -${MODULE_MAX[d.module] ?? 20 - d.pts} pts.`,
+          impact:           makeOperationalConsequence(d, brain, saHour),
           owner:            gmSituation.name,
           estimatedMinutes: 30,
           moneyAtRisk:      null  as number | null,
@@ -225,6 +351,9 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
     return { driver, max, pct, barColor, textColor };
   });
 
+  // ── Brain recommendation ───────────────────────────────────────────────────
+  const brainRec = buildBrainRecommendation(brain);
+
   return (
     <div className="border-b border-[#e2e2e0] dark:border-[#1a1a1a] bg-white dark:bg-[#0c0c0c]">
       <div className="grid grid-cols-1 lg:grid-cols-[65fr_35fr] divide-y lg:divide-y-0 lg:divide-x divide-[#e2e2e0] dark:divide-[#1a1a1a]">
@@ -254,6 +383,7 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
           {/* Action cards */}
           {displayActions.map((action, idx) => {
             const sev = deriveSeverity(idx, primaryThreat.severity, action.moneyAtRisk);
+            const isCritical = sev === "critical";
             const countdown = deadlineCountdown(action.deadline, minutesToClose, minutesToMidnight);
             const isTop = idx === 0;
             const ifIgnored = isTop
@@ -264,7 +394,8 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
               <div
                 key={action.priority}
                 className={cn(
-                  "border-l-[6px] border border-[#e2e2e0] dark:border-[#1a1a1a] bg-white dark:bg-[#0c0c0c]",
+                  "border-l-[6px] border border-[#e2e2e0] dark:border-[#1a1a1a]",
+                  isCritical ? "bg-[#fff8f8] dark:bg-[#0f0505]" : "bg-white dark:bg-[#0c0c0c]",
                   SEV_BORDER[sev],
                 )}
               >
@@ -281,13 +412,23 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
                       )}>
                         {sev}
                       </span>
+                      {/* Expiry/overdue badge for critical */}
+                      {isCritical && action.deadline && (
+                        <span className="text-[9px] font-mono font-bold text-red-600 dark:text-red-400 uppercase tracking-wider">
+                          {action.deadline.toLowerCase() === "immediate" ? "ACT NOW" :
+                           action.deadline.toLowerCase().includes("today") ? "DUE TODAY" : "OVERDUE"}
+                        </span>
+                      )}
                       {action.financialImpact && (
                         <span className="text-[9px] font-mono text-amber-700 dark:text-amber-500/80 uppercase tracking-wider">
                           ⚠ {action.financialImpact}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-bold text-[#0a0a0a] dark:text-stone-100 leading-snug">
+                    <p className={cn(
+                      "font-bold text-[#0a0a0a] dark:text-stone-100 leading-snug",
+                      isCritical ? "text-[15px]" : "text-sm",
+                    )}>
                       {action.title}
                     </p>
                     {action.why && (
@@ -298,7 +439,7 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
                   </div>
                 </div>
 
-                {/* Action to take */}
+                {/* Consequence text */}
                 <div className="px-3 pb-2 pl-[calc(0.75rem+1.5rem)]">
                   <p className="text-[11px] text-[#0a0a0a] dark:text-stone-300 leading-relaxed">
                     {action.impact}
@@ -339,7 +480,12 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
                     <span className="text-[9px] uppercase tracking-wider text-red-500/60 font-semibold block mb-0.5">
                       IF YOU DO NOTHING
                     </span>
-                    <p className="text-[11px] text-red-700/70 dark:text-red-300/60 leading-relaxed opacity-60 hover:opacity-100 transition-opacity duration-200">
+                    <p className={cn(
+                      "text-[11px] leading-relaxed transition-opacity duration-200",
+                      isCritical
+                        ? "text-red-700 dark:text-red-400/80 opacity-80 hover:opacity-100"
+                        : "text-red-700/70 dark:text-red-300/60 opacity-60 hover:opacity-100",
+                    )}>
                       {ifIgnored}
                     </p>
                   </div>
@@ -354,25 +500,22 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
               </div>
             );
           })}
-
-          {/* Grade progress motivator */}
-          {nextGrade && gradeSteps.length > 0 && (
-            <div className="border border-[#e2e2e0] dark:border-[#1a1a1a] px-3 py-2.5 bg-[#fafafa] dark:bg-[#0a0a0a] space-y-1">
-              <span className="text-[9px] uppercase tracking-[0.15em] text-stone-500 font-semibold block">
-                PATH TO GRADE {nextGrade} ({GRADE_THRESHOLDS[nextGrade] - score} pts needed)
-              </span>
-              {gradeSteps.map((step, i) => (
-                <p key={i} className="text-[11px] font-mono text-stone-600 dark:text-stone-500">
-                  <span className="text-emerald-600 dark:text-emerald-500 font-bold">→</span>
-                  {" "}{step.text} → Grade {step.nextGrade}
-                </p>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* ════════════ RIGHT — System Status ════════════ */}
         <div className="p-4 space-y-4 bg-[#fafafa] dark:bg-[#0a0a0a]">
+
+          {/* Brain recommendation */}
+          {brainRec && (
+            <div className="border-l-[3px] border-l-amber-500 border border-[#e2e2e0] dark:border-[#2a2a2a] bg-[#fffdf5] dark:bg-amber-950/10 px-3 py-2.5 font-mono">
+              <span className="text-[9px] uppercase tracking-wider text-amber-700 dark:text-amber-500 font-bold block mb-1">
+                ⚡ BRAIN RECOMMENDATION
+              </span>
+              <p className="text-[11px] text-[#0a0a0a] dark:text-stone-200 leading-relaxed">
+                {brainRec}
+              </p>
+            </div>
+          )}
 
           {/* Score + Grade + Trend */}
           <div className="font-mono">
@@ -419,6 +562,25 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
               </div>
             ))}
           </div>
+
+          {/* Fastest path to next grade */}
+          {nextGrade && gradeSteps.length > 0 && (
+            <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 font-mono space-y-1.5">
+              <span className="text-[9px] uppercase tracking-[0.15em] text-amber-700 dark:text-amber-500 font-bold block">
+                FASTEST PATH TO GRADE {nextGrade}
+              </span>
+              {gradeSteps.map((step, i) => (
+                <p key={i} className="text-[10px] text-amber-700 dark:text-amber-400">
+                  <span className="font-bold">→</span> {step.label}
+                </p>
+              ))}
+              {gradeSteps.length >= 2 && (
+                <p className="text-[10px] text-stone-500 dark:text-stone-600">
+                  Reach Grade {nextGrade} with both done
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Recovery window */}
           {recoveryMeter && !recoveryMeter.isOnTrack && (
@@ -491,9 +653,9 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
             {gmSituation.tier !== "Unknown" && (
               <span className={cn(
                 "text-[10px] font-bold ml-2",
-                gmSituation.tier === "Elite"  ? "text-emerald-600 dark:text-emerald-400" :
-                gmSituation.tier === "Strong" ? "text-emerald-700 dark:text-emerald-500" :
-                gmSituation.tier === "Average" ? "text-amber-600 dark:text-amber-400"   :
+                gmSituation.tier === "Elite"   ? "text-emerald-600 dark:text-emerald-400" :
+                gmSituation.tier === "Strong"  ? "text-emerald-700 dark:text-emerald-500" :
+                gmSituation.tier === "Average" ? "text-amber-600 dark:text-amber-400"     :
                 "text-red-600 dark:text-red-400",
               )}>
                 {gmSituation.tier}
