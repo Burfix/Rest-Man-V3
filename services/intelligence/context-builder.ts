@@ -207,7 +207,7 @@ export async function buildOperationsContext(
 
   // ── Labour ─────────────────────────────────────────────────────────────────
   const labRows         = (labRes.data ?? []) as { labour_cost: number | null }[];
-  const targetLabourPct = ((siteRes.data as any)?.target_labour_pct as number | null) ?? 30;
+  const targetLabourPct = ((siteRes.data as any)?.target_labour_pct as number | null) ?? 15;
   const labourCost      = labRows.reduce((s, r) => s + (r.labour_cost ?? 0), 0);
   const actualPercent   = actual > 0 ? +(labourCost / actual * 100).toFixed(1) : 0;
   const labourVariance  = +(actualPercent - targetLabourPct).toFixed(1);
