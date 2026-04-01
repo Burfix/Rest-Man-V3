@@ -28,10 +28,10 @@ const SEV_BORDER: Record<string, string> = {
 };
 
 const SEV_BADGE: Record<string, string> = {
-  critical: "text-red-400 border-red-900/50 bg-red-950/20",
-  high:     "text-amber-400 border-amber-900/50 bg-amber-950/20",
-  medium:   "text-yellow-400 border-yellow-900/50 bg-yellow-950/20",
-  low:      "text-stone-500 border-stone-700 bg-stone-900/20",
+  critical: "bg-[#fef2f2] text-[#991b1b] border-[#fca5a5] dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/50",
+  high:     "bg-[#fffbeb] text-[#92400e] border-[#fcd34d] dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/50",
+  medium:   "bg-[#fefce8] text-[#713f12] border-[#fde047] dark:bg-yellow-950/20 dark:text-yellow-400 dark:border-yellow-900/50",
+  low:      "bg-[#f9fafb] text-[#6b7280] border-[#d1d5db] dark:bg-stone-900/20 dark:text-stone-500 dark:border-stone-700",
 };
 
 const SEV_MONEY: Record<string, string> = {
@@ -42,11 +42,11 @@ const SEV_MONEY: Record<string, string> = {
 };
 
 const GRADE_COLOR: Record<string, string> = {
-  A:   "text-emerald-400",
-  B:   "text-emerald-500",
-  C:   "text-amber-400",
-  D:   "text-amber-500",
-  F:   "text-red-400",
+  A:   "text-emerald-600 dark:text-emerald-400",
+  B:   "text-emerald-700 dark:text-emerald-500",
+  C:   "text-amber-600 dark:text-amber-400",
+  D:   "text-amber-700 dark:text-amber-500",
+  F:   "text-red-600 dark:text-red-400",
   "?": "text-stone-600",
 };
 
@@ -57,16 +57,16 @@ const TREND_ARROW: Record<string, string> = {
 };
 
 const TREND_COLOR: Record<string, string> = {
-  improving: "text-emerald-400",
+  improving: "text-emerald-600 dark:text-emerald-400",
   stable:    "text-stone-500",
-  declining: "text-red-400",
+  declining: "text-red-600 dark:text-red-400",
 };
 
 const TIER_COLOR: Record<string, string> = {
-  Elite:    "text-emerald-400",
-  Strong:   "text-emerald-500",
-  Average:  "text-amber-400",
-  "At Risk":"text-red-400",
+  Elite:    "text-emerald-600 dark:text-emerald-400",
+  Strong:   "text-emerald-700 dark:text-emerald-500",
+  Average:  "text-amber-600 dark:text-amber-400",
+  "At Risk":"text-red-600 dark:text-red-400",
   Unknown:  "text-stone-600",
 };
 
@@ -81,20 +81,20 @@ export default function OperatingBrain({ brain }: Props) {
   const sev = primaryThreat.severity;
 
   return (
-    <div className="border border-[#1a1a1a] bg-[#060606]">
+    <div className="border border-[#e2e2e0] dark:border-[#1a1a1a] bg-white dark:bg-[#060606]">
 
       {/* ── Voice line — full width bar ── */}
       {voiceLine && (
-        <div className="border-b border-[#1a1a1a] px-4 py-2 bg-[#0a0a0a]">
-          <p className="text-[11px] text-stone-400 font-mono leading-relaxed">{voiceLine}</p>
+        <div className="border-b border-[#e2e2e0] dark:border-[#1a1a1a] px-4 py-2 bg-[#f8f8f6] dark:bg-[#0a0a0a]">
+          <p className="text-[11px] text-[#52524e] dark:text-stone-400 font-mono leading-relaxed">{voiceLine}</p>
         </div>
       )}
 
       {/* ── 3-column grid ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[5fr_3fr_2fr] divide-y lg:divide-y-0 lg:divide-x divide-[#1a1a1a]">
+      <div className="grid grid-cols-1 lg:grid-cols-[5fr_3fr_2fr] divide-y lg:divide-y-0 lg:divide-x divide-[#e2e2e0] dark:divide-[#1a1a1a]">
 
         {/* ════════════ LEFT — Primary Threat ════════════ */}
-        <div className={cn("border-l-[6px] p-4 space-y-3 bg-[#0f0f0f]", SEV_BORDER[sev])}>
+        <div className={cn("border-l-[6px] p-4 space-y-3 bg-white dark:bg-[#0f0f0f]", SEV_BORDER[sev])}>
 
           {/* Section label */}
           <span className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-medium block">
@@ -112,7 +112,7 @@ export default function OperatingBrain({ brain }: Props) {
             {primaryThreat.modulesInvolved.map((mod) => (
               <span
                 key={mod}
-                className="text-[9px] font-mono uppercase tracking-wider text-stone-600 border border-[#2a2a2a] px-1.5 py-0.5"
+                className="text-[9px] font-mono uppercase tracking-wider text-stone-500 dark:text-stone-600 border border-[#e2e2e0] dark:border-[#2a2a2a] px-1.5 py-0.5"
               >
                 {mod}
               </span>
@@ -121,7 +121,7 @@ export default function OperatingBrain({ brain }: Props) {
 
           {/* Title + description */}
           <div>
-            <p className="text-sm font-bold text-stone-100 leading-snug">{primaryThreat.title}</p>
+            <p className="text-sm font-bold text-[#0a0a0a] dark:text-stone-100 leading-snug">{primaryThreat.title}</p>
             {primaryThreat.description && (
               <p className="text-[11px] text-stone-500 mt-0.5 leading-relaxed">{primaryThreat.description}</p>
             )}
@@ -131,7 +131,7 @@ export default function OperatingBrain({ brain }: Props) {
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
             <div>
               <span className="text-[9px] uppercase tracking-wider text-stone-600 block">OWNER</span>
-              <span className="text-stone-300">{primaryThreat.owner.name}</span>
+              <span className="text-[#0a0a0a] dark:text-stone-300">{primaryThreat.owner.name}</span>
             </div>
             {primaryThreat.moneyAtRisk > 0 && (
               <div>
@@ -141,7 +141,7 @@ export default function OperatingBrain({ brain }: Props) {
             )}
             <div>
               <span className="text-[9px] uppercase tracking-wider text-stone-600 block">TIME WINDOW</span>
-              <span className="text-stone-300">{primaryThreat.timeWindowLabel}</span>
+              <span className="text-[#0a0a0a] dark:text-stone-300">{primaryThreat.timeWindowLabel}</span>
             </div>
             <div>
               <span className="text-[9px] uppercase tracking-wider text-stone-600 block">CONFIDENCE</span>
@@ -150,20 +150,20 @@ export default function OperatingBrain({ brain }: Props) {
           </div>
 
           {/* Do this first */}
-          <div className="border-t border-[#1a1a1a] pt-3">
+          <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3">
             <span className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold block mb-1">
               DO THIS FIRST
             </span>
-            <p className="text-[11px] text-stone-300 leading-relaxed">{primaryThreat.recommendedAction}</p>
+            <p className="text-[11px] text-[#0a0a0a] dark:text-stone-300 leading-relaxed">{primaryThreat.recommendedAction}</p>
           </div>
 
           {/* If you do nothing */}
           {sev !== "low" && (
-            <div className="border-t border-[#1a1a1a] pt-3">
+            <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3">
               <span className="text-[9px] uppercase tracking-wider text-red-500/70 font-semibold block mb-1">
                 IF YOU DO NOTHING
               </span>
-              <p className="text-[11px] text-red-300/70 leading-relaxed opacity-60 hover:opacity-100 transition-opacity duration-200">
+              <p className="text-[11px] text-red-700/80 dark:text-red-300/70 leading-relaxed opacity-60 hover:opacity-100 transition-opacity duration-200">
                 {primaryThreat.ifIgnored}
               </p>
             </div>
@@ -176,7 +176,7 @@ export default function OperatingBrain({ brain }: Props) {
         </div>
 
         {/* ════════════ MIDDLE — Action Queue ════════════ */}
-        <div className="p-4 bg-[#0c0c0c]">
+        <div className="p-4 bg-[#fafafa] dark:bg-[#0c0c0c]">
           <span className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-medium block mb-3">
             DO NEXT
           </span>
@@ -190,7 +190,7 @@ export default function OperatingBrain({ brain }: Props) {
                     {action.priority}.
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-stone-300 leading-snug">
+                    <p className="text-[11px] font-semibold text-[#0a0a0a] dark:text-stone-300 leading-snug">
                       {action.title}
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -205,7 +205,7 @@ export default function OperatingBrain({ brain }: Props) {
                       )}
                     </div>
                     {action.financialImpact && (
-                      <span className="text-[10px] font-mono text-amber-500/70 mt-0.5 block">
+                      <span className="text-[10px] font-mono text-amber-700 dark:text-amber-500/70 mt-0.5 block">
                         {action.financialImpact}
                       </span>
                     )}
@@ -222,7 +222,7 @@ export default function OperatingBrain({ brain }: Props) {
         </div>
 
         {/* ════════════ RIGHT — System Pulse ════════════ */}
-        <div className="p-4 bg-[#0a0a0a] space-y-4">
+        <div className="p-4 bg-[#f8f8f6] dark:bg-[#0a0a0a] space-y-4">
           <span className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-medium block">
             SYSTEM PULSE
           </span>
@@ -230,7 +230,7 @@ export default function OperatingBrain({ brain }: Props) {
           {/* Score + Grade + Trend */}
           <div className="font-mono">
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-black text-stone-100">{systemHealth.score}</span>
+              <span className="text-3xl font-black text-[#0a0a0a] dark:text-stone-100">{systemHealth.score}</span>
               <span className={cn("text-xl font-black", GRADE_COLOR[systemHealth.grade] ?? "text-stone-500")}>
                 {systemHealth.grade}
               </span>
@@ -251,20 +251,20 @@ export default function OperatingBrain({ brain }: Props) {
 
           {/* Score Drivers */}
           {systemHealth.scoreDrivers.length > 0 && (
-            <div className="border-t border-[#1a1a1a] pt-3 space-y-1.5 font-mono">
+            <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-1.5 font-mono">
               <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE DRIVERS</span>
               {systemHealth.scoreDrivers.map((driver) => (
                 <div key={driver.module} className="flex items-start gap-1.5">
                   <span className={cn(
                     "text-[10px] font-bold leading-tight shrink-0",
-                    driver.direction === "up" ? "text-emerald-500" : "text-red-400",
+                    driver.direction === "up" ? "text-emerald-700 dark:text-emerald-500" : "text-red-600 dark:text-red-400",
                   )}>
                     {driver.direction === "up" ? "+" : "−"}
                   </span>
                   <div className="min-w-0">
                     <span className={cn(
                       "text-[9px] font-bold uppercase tracking-wider block leading-tight",
-                      driver.direction === "up" ? "text-emerald-600" : "text-red-400/70",
+                      driver.direction === "up" ? "text-emerald-700 dark:text-emerald-600" : "text-red-700/80 dark:text-red-400/70",
                     )}>
                       {driver.module}
                     </span>
@@ -278,21 +278,21 @@ export default function OperatingBrain({ brain }: Props) {
           )}
 
           {/* Forecast */}
-          <div className="border-t border-[#1a1a1a] pt-3 font-mono space-y-0.5">
+          <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 font-mono space-y-0.5">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block">
               {forecastSummary.isDayClosed ? "TODAY'S REVENUE" : "PROJECTED CLOSE"}
             </span>
             {forecastSummary.syncPending ? (
               <span className="text-[11px] text-amber-500 font-medium">Sync pending</span>
             ) : (
-              <span className="text-base font-bold text-stone-200">
+              <span className="text-base font-bold text-[#0a0a0a] dark:text-stone-200">
                 {forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"}
               </span>
             )}
             {forecastSummary.projectedClose > 0 && !forecastSummary.isDayClosed && !forecastSummary.syncPending && (
               <span className={cn(
                 "text-[11px] font-bold block",
-                (forecastSummary.vsTarget ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",
+                (forecastSummary.vsTarget ?? 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
               )}>
                 {(forecastSummary.vsTarget ?? 0) >= 0 ? "+" : ""}
                 {(forecastSummary.vsTarget ?? 0).toFixed(1)}% target
@@ -301,9 +301,9 @@ export default function OperatingBrain({ brain }: Props) {
           </div>
 
           {/* GM Situation */}
-          <div className="border-t border-[#1a1a1a] pt-3 font-mono">
+          <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 font-mono">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block mb-1">GM</span>
-            <span className="text-[11px] text-stone-300 block">{gmSituation.name}</span>
+            <span className="text-[11px] text-[#0a0a0a] dark:text-stone-300 block">{gmSituation.name}</span>
             <div className="flex items-center gap-1.5 flex-wrap">
               {gmSituation.tier !== "Unknown" && (
                 <span className={cn("text-[10px] font-bold", TIER_COLOR[gmSituation.tier] ?? "text-stone-500")}>
@@ -315,7 +315,7 @@ export default function OperatingBrain({ brain }: Props) {
               )}
             </div>
             {gmSituation.alertNeeded && (
-              <span className="text-[9px] text-red-400/70 block mt-0.5 leading-snug">
+              <span className="text-[9px] text-red-700/80 dark:text-red-400/70 block mt-0.5 leading-snug">
                 {gmSituation.alertReason}
               </span>
             )}

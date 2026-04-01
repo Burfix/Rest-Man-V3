@@ -86,21 +86,21 @@ export default function MaintenanceActions({
 
       {/* Slide-in panels */}
       {active === "equipment" && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50/30 p-5">
+        <div className="rounded-xl border border-[#e2e2e0] bg-white p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Add Equipment</h3>
           <AddEquipmentForm onClose={() => setActive(null)} />
         </div>
       )}
 
       {active === "issue" && (
-        <div className="rounded-xl border border-red-200 bg-red-50/30 p-5">
+        <div className="rounded-xl border border-[#e2e2e0] bg-white p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Log Maintenance Issue</h3>
           <AddIssueForm equipment={equipment} onClose={() => setActive(null)} />
         </div>
       )}
 
       {active === "resolve" && (
-        <div className="rounded-xl border border-green-200 bg-green-50/30 p-5">
+        <div className="rounded-xl border border-[#e2e2e0] bg-white p-5">
           <h3 className="text-sm font-semibold text-gray-900 mb-4">Resolve Issue</h3>
           {!resolveTarget ? (
             <div className="space-y-2">

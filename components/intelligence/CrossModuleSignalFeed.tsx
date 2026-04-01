@@ -18,24 +18,24 @@ const SEV_STYLES: Record<
   { badge: string; border: string; dot: string }
 > = {
   CRITICAL: {
-    badge:  "bg-red-500/15 text-red-400 border border-red-500/20",
+    badge:  "bg-[#fef2f2] text-[#991b1b] border border-[#fca5a5] dark:bg-red-500/15 dark:text-red-400 dark:border-red-500/20",
     border: "border-l-red-500",
-    dot:    "bg-red-400 animate-pulse",
+    dot:    "bg-red-600 dark:bg-red-400 animate-pulse",
   },
   HIGH: {
-    badge:  "bg-orange-500/15 text-orange-400 border border-orange-500/20",
+    badge:  "bg-[#fffbeb] text-[#92400e] border border-[#fcd34d] dark:bg-orange-500/15 dark:text-orange-400 dark:border-orange-500/20",
     border: "border-l-orange-400",
-    dot:    "bg-orange-400",
+    dot:    "bg-orange-600 dark:bg-orange-400",
   },
   MEDIUM: {
-    badge:  "bg-amber-500/15 text-amber-400 border border-amber-500/20",
+    badge:  "bg-[#fefce8] text-[#713f12] border border-[#fde047] dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/20",
     border: "border-l-amber-400",
-    dot:    "bg-amber-400",
+    dot:    "bg-amber-600 dark:bg-amber-400",
   },
   INFO: {
-    badge:  "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
+    badge:  "bg-[#f0fdf4] text-[#166534] border border-[#86efac] dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/20",
     border: "border-l-emerald-600",
-    dot:    "bg-emerald-500",
+    dot:    "bg-emerald-700 dark:bg-emerald-500",
   },
 };
 
@@ -54,7 +54,7 @@ function ModuleTags({ modules }: { modules: SignalModule[] }) {
     <div className="flex items-center gap-1 flex-wrap">
       {modules.map((m, i) => (
         <span key={m} className="flex items-center gap-0.5">
-          <span className="font-mono text-[9px] tracking-widest text-stone-400 uppercase">
+          <span className="font-mono text-[9px] tracking-widest text-stone-500 dark:text-stone-400 uppercase">
             {MODULE_LABEL[m]}
           </span>
           {i < modules.length - 1 && (
@@ -72,7 +72,7 @@ function SignalCard({ signal }: { signal: CrossModuleSignal }) {
   return (
     <div
       className={`
-        group rounded-sm border border-stone-800/40 bg-[#0f0f0f]
+        group rounded-sm border border-[#e2e2e0] dark:border-stone-800/40 bg-white dark:bg-[#0f0f0f]
         ${sev.border} border-l-[6px]
         px-4 py-3 space-y-2
       `}
@@ -99,12 +99,12 @@ function SignalCard({ signal }: { signal: CrossModuleSignal }) {
       <ModuleTags modules={signal.modules} />
 
       {/* Title */}
-      <p className="text-sm font-semibold text-stone-100 leading-snug">
+      <p className="text-sm font-semibold text-[#0a0a0a] dark:text-stone-100 leading-snug">
         {signal.title}
       </p>
 
       {/* Recommendation */}
-      <p className="text-[11px] text-stone-400 leading-relaxed">
+      <p className="text-[11px] text-[#52524e] dark:text-stone-400 leading-relaxed">
         {signal.recommendation}
       </p>
 
@@ -114,7 +114,7 @@ function SignalCard({ signal }: { signal: CrossModuleSignal }) {
           <span className="text-[9px] font-mono tracking-widest text-stone-600 uppercase">
             Money at risk
           </span>
-          <span className="text-[11px] font-mono font-semibold text-amber-400">
+          <span className="text-[11px] font-mono font-semibold text-amber-700 dark:text-amber-400">
             R{Math.round(signal.moneyAtRisk).toLocaleString("en-ZA")}
           </span>
         </div>
@@ -157,7 +157,7 @@ export default function CrossModuleSignalFeed({ signals, variant = "command-cent
         <span className="text-[9px] font-mono tracking-[0.15em] text-stone-600 uppercase">
           Cross-Module Signals
         </span>
-        <div className="flex-1 h-px bg-stone-800/60" />
+        <div className="flex-1 h-px bg-[#e2e2e0] dark:bg-stone-800/60" />
         <span className="text-[9px] font-mono text-stone-700">
           {visible.length}
         </span>

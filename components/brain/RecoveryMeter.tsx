@@ -45,10 +45,10 @@ export default function RecoveryMeter({ brain }: Props) {
       : `${hoursLeft}h ${minsLeft}m left`;
 
   const statusColor = limitedWindow
-    ? "border-red-900/40 bg-red-950/10"
+    ? "border-[#e2e2e0] bg-white dark:border-red-900/40 dark:bg-red-950/10"
     : partialOnly
-    ? "border-amber-900/40 bg-amber-950/10"
-    : "border-stone-800 bg-[#0f0f0f]";
+    ? "border-[#e2e2e0] bg-white dark:border-amber-900/40 dark:bg-amber-950/10"
+    : "border-[#e2e2e0] bg-white dark:border-stone-800 dark:bg-[#0f0f0f]";
 
   const barColor = limitedWindow
     ? "bg-red-500"
@@ -65,7 +65,7 @@ export default function RecoveryMeter({ brain }: Props) {
         </span>
         <span className={cn(
           "text-[9px] font-mono uppercase tracking-wider font-bold",
-          limitedWindow ? "text-red-400" : partialOnly ? "text-amber-400" : "text-stone-500",
+          limitedWindow ? "text-red-600 dark:text-red-400" : partialOnly ? "text-amber-700 dark:text-amber-400" : "text-stone-500",
         )}>
           {timeLabel}
         </span>
@@ -75,13 +75,13 @@ export default function RecoveryMeter({ brain }: Props) {
       <div className="grid grid-cols-2 gap-4 font-mono">
         <div>
           <span className="text-[9px] uppercase tracking-wider text-stone-600 block">REVENUE GAP</span>
-          <span className="text-sm font-bold text-red-400">{fmt(revenueGap)}</span>
+          <span className="text-sm font-bold text-red-600 dark:text-red-400">{fmt(revenueGap)}</span>
         </div>
         <div>
           <span className="text-[9px] uppercase tracking-wider text-stone-600 block">RECOVERABLE</span>
           <span className={cn(
             "text-sm font-bold",
-            limitedWindow ? "text-red-400" : partialOnly ? "text-amber-400" : "text-emerald-400",
+            limitedWindow ? "text-red-600 dark:text-red-400" : partialOnly ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400",
           )}>
             {fmt(recoverable)}
           </span>
@@ -111,7 +111,7 @@ export default function RecoveryMeter({ brain }: Props) {
 
       {/* Top recovery actions */}
       {topActions.length > 0 && (
-        <div className="border-t border-[#1a1a1a] pt-2.5 space-y-1">
+        <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-2.5 space-y-1">
           <span className="text-[9px] uppercase tracking-wider text-stone-600 block">TOP ACTIONS</span>
           {topActions.slice(0, 2).map((action, i) => (
             <p key={i} className="text-[10px] text-stone-500 leading-snug font-mono">
