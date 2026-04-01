@@ -32,12 +32,8 @@ import { getSiteConfig } from "@/lib/config/site";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import AccountabilityAlert from "@/components/accountability/AccountabilityAlert";
-import OperatingBrain from "@/components/brain/OperatingBrain";
-import RecoveryMeter  from "@/components/brain/RecoveryMeter";
-
-import ControlBar              from "@/components/operating-brain/ControlBar";
-import OperatingScoreHero     from "@/components/operating-brain/OperatingScoreHero";
-import SinceLastCheck         from "@/components/operating-brain/SinceLastCheck";
+import HeroStrip         from "@/components/brain/HeroStrip";
+import PriorityActionBoard from "@/components/brain/PriorityActionBoard";
 import CommandFeed            from "@/components/operating-brain/CommandFeedV2";
 import ServicePulse           from "@/components/operating-brain/ServicePulse";
 import BusinessStatusRail     from "@/components/operating-brain/BusinessStatusRail";
@@ -309,19 +305,9 @@ export default async function OperationsDashboard() {
 
   const scoreTotal = operatingScore?.total ?? engineOutput.operatingScoreBreakdown.reduce((s, b) => s + b.score, 0);
 
-  const barStatus = engineOutput.operatingCommandBar.status;
   const revenueVariance = (salesSnapshot.targetSales ?? 0) > 0
     ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
     : 0;
-
-  // Determine top risk for hero
-  const topRisk = engineOutput.commandFeed.length > 0
-    ? engineOutput.commandFeed[0].title
-    : undefined;
-
-  const lastSyncLabel = labourSummary?.lastSyncAt
-    ? new Date(labourSummary.lastSyncAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })
-    : undefined;
 
   // Await brain (was started in parallel above)
   const brain = await brainPromise.catch(() => null);
@@ -338,72 +324,69 @@ export default async function OperationsDashboard() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-0">
 
-      {/* ── 0. Operating Brain — Biggest risk + action queue + pulse ── */}
-      {brain && <OperatingBrain brain={brain} />}
-      {brain && <RecoveryMeter brain={brain} />}
+      {/* ── LAYER 1 — Hero Strip (score · KPIs · sync) ── */}
+      {brain && (
+        <HeroStrip
+          brain={brain}
+          salesSnapshot={salesSnapshot}
+          revenueVariance={revenueVariance}
+          servicePeriod={servicePeriod}
+          freshnessMinutes={salesAgeMinutes}
+        />
+      )}
 
-      {/* ── 1. Control Bar — Revenue Risk | Time Pressure | Score ── */}
-      <ControlBar
-        revenueAtRisk={engineOutput.operatingCommandBar.revenueAtRisk ?? 0}
-        variancePercent={revenueVariance}
-        timePressure={engineOutput.operatingCommandBar.timeToPeakLabel ?? servicePeriod}
-        score={scoreTotal}
-        status={barStatus}
-        servicePeriod={servicePeriod}
-        lastSyncAt={lastSyncLabel}
-      />
+      {/* ── LAYER 2 — Priority Action Board ── */}
+      {brain && (
+        <PriorityActionBoard brain={brain} siteId={siteId} />
+      )}
 
-      {/* ── 2. Threat Bar — Full-width score + grade + issues ── */}
-      <OperatingScoreHero
-        score={scoreTotal}
-        status={barStatus}
-        issueCount={engineOutput.operatingCommandBar.issueCount}
-        topRisk={topRisk}
-      />
+      {/* ── LAYER 3 — Detail layer (below fold) ── */}
+      <div className="space-y-4 pt-4">
 
-      {/* ── 3. Since Last Check ── */}
-      <SinceLastCheck items={engineOutput.sinceLastCheck} />
+        <AccountabilityAlert />
 
-      {/* ── 4. Main Grid: Primary + Secondary ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+        {/* ── Main Grid: Primary + Secondary ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
 
-        {/* Primary Column (dominant) */}
-        <div className="lg:col-span-8 space-y-4">
-          <DataHealthWarning health={engineOutput.dataHealth} />
-          <AccountabilityAlert />
-          <CommandFeed decisions={engineOutput.commandFeed} />
-          <ServicePulse
-            actual={salesSnapshot.netSales}
-            target={salesSnapshot.targetSales ?? 0}
-            variancePercent={revenueVariance}
-            covers={salesSnapshot.covers}
-            avgSpend={salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0}
-            peakWindow={undefined}
-            timeToPeakMinutes={null}
-            forecastCovers={forecast?.forecast_covers}
-            insights={engineOutput.servicePulseInsights}
-            isLive={salesSnapshot.isLive}
-            source={salesSnapshot.source}
-            sourceNote={salesSnapshot.notes?.[0]}
-          />
+          {/* Primary Column */}
+          <div className="lg:col-span-8 space-y-4">
+            <ServicePulse
+              actual={salesSnapshot.netSales}
+              target={salesSnapshot.targetSales ?? 0}
+              variancePercent={revenueVariance}
+              covers={salesSnapshot.covers}
+              avgSpend={salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0}
+              peakWindow={undefined}
+              timeToPeakMinutes={null}
+              forecastCovers={forecast?.forecast_covers}
+              insights={engineOutput.servicePulseInsights}
+              isLive={salesSnapshot.isLive}
+              source={salesSnapshot.source}
+              sourceNote={salesSnapshot.notes?.[0]}
+            />
+            <CommandFeed decisions={engineOutput.commandFeed} />
+          </div>
+
+          {/* Secondary Column */}
+          <div className="lg:col-span-4 space-y-4">
+            <BusinessStatusRail status={engineOutput.businessStatus} />
+            <FeedbackLoop />
+          </div>
         </div>
 
-        {/* Secondary Column */}
-        <div className="lg:col-span-4 space-y-4">
-          <BusinessStatusRail status={engineOutput.businessStatus} />
-          <FeedbackLoop />
-        </div>
+        {/* ── Partial data gaps banner (below fold) ── */}
+        <DataHealthWarning health={engineOutput.dataHealth} />
+
+        {/* ── Secondary Drilldowns ── */}
+        <SecondaryInsights
+          reviews={reviews}
+          maintenance={maintenance}
+          hasEquipment={maintenance.totalEquipment > 0}
+          hasReviews={reviews.totalReviews > 0}
+        />
       </div>
-
-      {/* ── 5. Secondary Drilldowns (below fold) ── */}
-      <SecondaryInsights
-        reviews={reviews}
-        maintenance={maintenance}
-        hasEquipment={maintenance.totalEquipment > 0}
-        hasReviews={reviews.totalReviews > 0}
-      />
     </div>
   );
 }

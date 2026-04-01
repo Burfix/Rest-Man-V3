@@ -98,6 +98,8 @@ export type BrainOutput = {
     criticalCount: number;
     highCount: number;
     scoreDrivers: ScoreDriver[];
+    /** All 5 module drivers in fixed order — used for score breakdown bars */
+    allScoreDrivers: ScoreDriver[];
     /** True before 11:00 (first 60 min of service) — show "Day Starting" label */
     isDayStarting: boolean;
     /** True from noon onwards — duty completion is scored from this point */
@@ -157,6 +159,7 @@ export const BRAIN_FALLBACK: BrainOutput = {
     criticalCount: 0,
     highCount: 0,
     scoreDrivers: [],
+    allScoreDrivers: [],
     isDayStarting: false,
     isDutyWindow: true,
   },
@@ -382,16 +385,16 @@ function computeSystemHealth(
   ];
 
   // Sort by impact on score (biggest losers first, then biggest winners)
-  const scoreDrivers = [...allDrivers]
+  const sortedDrivers = [...allDrivers]
     .sort((a, b) => {
       const lossA = (a.direction === "down" ? 1 : 0) * (30 - a.pts);
       const lossB = (b.direction === "down" ? 1 : 0) * (30 - b.pts);
       if (lossA !== lossB) return lossB - lossA;
       return b.pts - a.pts;
-    })
-    .slice(0, 3);
+    });
+  const scoreDrivers = sortedDrivers.slice(0, 3);
 
-  return { score, grade, trend, criticalCount, highCount, scoreDrivers, isDayStarting, isDutyWindow };
+  return { score, grade, trend, criticalCount, highCount, scoreDrivers, allScoreDrivers: allDrivers, isDayStarting, isDutyWindow };
 }
 
 // ── Do-nothing consequences ────────────────────────────────────────────────────
