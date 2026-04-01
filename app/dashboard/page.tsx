@@ -31,9 +31,10 @@ import { getServicePeriod } from "@/lib/commandCenter";
 import { getSiteConfig } from "@/lib/config/site";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
+import { createServerClient } from "@/lib/supabase/server";
 import AccountabilityAlert from "@/components/accountability/AccountabilityAlert";
 import HeroStrip         from "@/components/brain/HeroStrip";
-import PriorityActionBoard from "@/components/brain/PriorityActionBoard";
+import PriorityActionBoard, { type DutiesData } from "@/components/brain/PriorityActionBoard";
 import CommandFeed            from "@/components/operating-brain/CommandFeedV2";
 import ServicePulse           from "@/components/operating-brain/ServicePulse";
 import BusinessStatusRail, { type PredictiveSignals } from "@/components/operating-brain/BusinessStatusRail";
@@ -312,6 +313,51 @@ export default async function OperationsDashboard() {
   // Await brain (was started in parallel above)
   const brain = await brainPromise.catch(() => null);
 
+  // ─── Duty tasks — inline drilldown for PriorityActionBoard ──────────────
+  let dutiesData: DutiesData | undefined;
+  try {
+    const supabase = createServerClient() as any;
+    const today_date_local = new Date().toLocaleDateString("en-CA");
+    const { data: taskRows } = await supabase
+      .from("daily_ops_tasks")
+      .select("id, action_name, status, assigned_to, due_time")
+      .eq("site_id", siteId)
+      .eq("task_date", today_date_local)
+      .order("sort_order", { ascending: true });
+
+    if (taskRows && taskRows.length > 0) {
+      // Resolve assigned_to names
+      const userIds = Array.from(new Set(
+        (taskRows as any[]).map((t: any) => t.assigned_to).filter(Boolean)
+      )) as string[];
+      const profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, full_name, email")
+          .in("id", userIds);
+        for (const p of (profiles ?? []) as any[]) {
+          profileMap[p.id] = p.full_name || p.email;
+        }
+      }
+      const allTasks = (taskRows as any[]).map((t: any) => ({
+        id:               t.id as string,
+        action_name:      t.action_name as string,
+        status:           t.status as string,
+        assigned_to_name: t.assigned_to ? (profileMap[t.assigned_to] ?? null) : null,
+        due_time:         t.due_time as string | null,
+      }));
+      const completedCount = allTasks.filter((t) => t.status === "completed").length;
+      dutiesData = {
+        tasks:          allTasks,
+        totalCount:     allTasks.length,
+        completedCount,
+      };
+    }
+  } catch {
+    // non-fatal — PriorityActionBoard degrades without dutiesData
+  }
+
   // Align brain system health score with the canonical operating score so both
   // the OperatingBrain panel and the existing score hero show the same number.
   if (brain && scoreTotal > 0) {
@@ -385,7 +431,7 @@ export default async function OperationsDashboard() {
 
       {/* ── LAYER 2 — Priority Action Board ── */}
       {brain && (
-        <PriorityActionBoard brain={brain} siteId={siteId} />
+        <PriorityActionBoard brain={brain} siteId={siteId} dutiesData={dutiesData} />
       )}
 
       {/* ── LAYER 3 — Detail layer (below fold) ── */}

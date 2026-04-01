@@ -2,7 +2,7 @@
  * PriorityActionBoard — Layer 2 of the Command Center.
  *
  * 2-column layout:
- *   LEFT (65%) — Numbered action cards
+ *   LEFT (65%) — Numbered action cards (with inline duty task drilldown)
  *   RIGHT (35%) — Brain recommendation + Score bars + Grade path + Recovery + Forecast + GM
  *
  * Server Component (ActionTakenButton is the only client leaf).
@@ -12,9 +12,26 @@ import { cn } from "@/lib/utils";
 import type { BrainOutput, BrainThreatSeverity, ScoreDriver } from "@/services/brain/operating-brain";
 import ActionTakenButton from "./ActionTakenButton";
 
+// ── Exported types (consumed by dashboard/page.tsx) ────────────────────────────
+
+export type DutyTask = {
+  id: string;
+  action_name: string;
+  status: string;           // not_started | in_progress | completed | escalated | blocked
+  assigned_to_name: string | null;
+  due_time: string | null;  // e.g. "17:45"
+};
+
+export type DutiesData = {
+  tasks: DutyTask[];         // ALL tasks today (component filters to incomplete)
+  totalCount: number;
+  completedCount: number;
+};
+
 type Props = {
   brain: BrainOutput;
   siteId: string;
+  dutiesData?: DutiesData;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -66,6 +83,20 @@ const GRADE_COLOR: Record<string, string> = {
   "?": "text-stone-600",
 };
 
+/** Task status display config */
+const TASK_STATUS_LABEL: Record<string, string> = {
+  not_started: "NOT STARTED",
+  in_progress: "STARTED",
+  escalated:   "ESCALATED",
+  blocked:     "BLOCKED",
+};
+const TASK_STATUS_COLOR: Record<string, string> = {
+  not_started: "text-stone-400 dark:text-stone-600",
+  in_progress: "text-amber-600 dark:text-amber-400",
+  escalated:   "text-red-600 dark:text-red-400",
+  blocked:     "text-red-600 dark:text-red-400",
+};
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmtZAR(n: number): string {
@@ -84,6 +115,12 @@ function fmtMins(mins: number): string {
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
+}
+
+/** Returns true when the action title relates to duties/checklists. */
+function isDutiesCard(title: string): boolean {
+  const t = title.toLowerCase();
+  return t.includes("dut") || t.includes("checklist") || t.includes("daily check");
 }
 
 /** Compute SAST-relative deadline countdown. */
@@ -126,12 +163,16 @@ function makeOperationalTitle(
   driver: ScoreDriver,
   brain: BrainOutput,
   saHour: number,
+  dutiesIncomplete?: number,
 ): string {
   const nextSession = saHour < 17 ? "dinner service" : "close";
   const nextSessionTime = saHour < 17 ? "17:00" : "22:00";
 
   switch (driver.module) {
     case "DUTIES": {
+      if (dutiesIncomplete !== undefined && dutiesIncomplete > 0) {
+        return `${dutiesIncomplete} ${dutiesIncomplete === 1 ? "duty" : "duties"} incomplete before ${nextSession}`;
+      }
       const completionPct = Math.round((driver.pts / MODULE_MAX.DUTIES) * 100);
       const remaining = 100 - completionPct;
       if (completionPct === 0) return `Daily checklist not started — service risk before ${nextSessionTime}`;
@@ -248,6 +289,7 @@ function buildBrainRecommendation(brain: BrainOutput): string | null {
 function gradeMotivator(
   score: number,
   allScoreDrivers: BrainOutput["systemHealth"]["allScoreDrivers"],
+  dutiesIncompleteCount?: number,
 ): Array<{ label: string; pts: number; nextGrade: string }> {
   const gradeOrder: Array<keyof typeof GRADE_THRESHOLDS> = ["D", "C", "B", "A"];
   const nextGrade = gradeOrder.find((g) => score < GRADE_THRESHOLDS[g]);
@@ -260,15 +302,22 @@ function gradeMotivator(
     const max = MODULE_MAX[driver.module] ?? 20;
     const potential = max - driver.pts;
     if (potential > 0) {
-      const label = driver.module === "DUTIES"
-        ? `Complete duties (+${potential})`
-        : driver.module === "COMPLIANCE"
-        ? `Renew compliance item (+${potential})`
-        : driver.module === "MAINTENANCE"
-        ? `Clear urgent maintenance (+${potential})`
-        : driver.module === "LABOUR"
-        ? `Trim labour excess (+${potential})`
-        : `Fix ${driver.module.toLowerCase()} (+${potential})`;
+      let label: string;
+      if (driver.module === "DUTIES") {
+        const n = dutiesIncompleteCount;
+        const timeEst = n ? `~${n * 8} min` : "~30 min";
+        label = n !== undefined && n > 0
+          ? `Complete ${n} remaining ${n === 1 ? "duty" : "duties"} (+${potential} pts) ${timeEst}`
+          : `Complete duties (+${potential} pts) ${timeEst}`;
+      } else if (driver.module === "COMPLIANCE") {
+        label = `Renew compliance item (+${potential} pts) ~20 min`;
+      } else if (driver.module === "MAINTENANCE") {
+        label = `Clear urgent maintenance (+${potential} pts)`;
+      } else if (driver.module === "LABOUR") {
+        label = `Trim labour excess (+${potential} pts)`;
+      } else {
+        label = `Fix ${driver.module.toLowerCase()} (+${potential} pts)`;
+      }
       results.push({ label, pts: potential, nextGrade: String(nextGrade) });
     }
   });
@@ -281,7 +330,7 @@ function gradeMotivator(
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export default function PriorityActionBoard({ brain, siteId }: Props) {
+export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props) {
   const {
     primaryThreat,
     actionQueue,
@@ -306,6 +355,12 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
   const minutesToClose    = Math.max(0, 22 * 60 - totalMins);
   const minutesToMidnight = Math.max(0, 24 * 60 - totalMins);
 
+  // ── Duties drilldown data ──────────────────────────────────────────────────
+  const incompleteTasks = dutiesData
+    ? dutiesData.tasks.filter((t) => t.status !== "completed")
+    : [];
+  const dutiesIncompleteCount = dutiesData ? incompleteTasks.length : undefined;
+
   // ── Action list ─────────────────────────────────────────────────────────────
   const score = systemHealth.score;
   const hasRealActions = actionQueue.length > 0;
@@ -317,7 +372,7 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
         .filter((d) => d.direction === "down")
         .map((d, i) => ({
           priority:         i + 1,
-          title:            makeOperationalTitle(d, brain, saHour),
+          title:            makeOperationalTitle(d, brain, saHour, d.module === "DUTIES" ? dutiesIncompleteCount : undefined),
           why:              d.reason,
           impact:           makeOperationalConsequence(d, brain, saHour),
           owner:            gmSituation.name,
@@ -334,7 +389,7 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
   const hasActions = displayActions.length > 0;
 
   // ── Grade motivator ────────────────────────────────────────────────────────
-  const gradeSteps = gradeMotivator(score, systemHealth.allScoreDrivers);
+  const gradeSteps = gradeMotivator(score, systemHealth.allScoreDrivers, dutiesIncompleteCount);
   const gradeOrder: Array<keyof typeof GRADE_THRESHOLDS> = ["D", "C", "B", "A"];
   const nextGrade = gradeOrder.find((g) => score < GRADE_THRESHOLDS[g]);
 
@@ -389,6 +444,7 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
             const ifIgnored = isTop
               ? primaryThreat.ifIgnored
               : doNothingConsequences[idx - 1]?.consequence ?? null;
+            const showDrilldown = isDutiesCard(action.title) && incompleteTasks.length > 0;
 
             return (
               <div
@@ -445,6 +501,45 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
                     {action.impact}
                   </p>
                 </div>
+
+                {/* Duties drilldown — incomplete task list */}
+                {showDrilldown && (
+                  <div className="mx-3 ml-[calc(0.75rem+1.5rem)] mb-2 border border-[#ebebea] dark:border-[#1e1e1e] bg-[#fafafa] dark:bg-[#080808]">
+                    <div className="px-2.5 py-1.5 border-b border-[#ebebea] dark:border-[#1e1e1e] flex items-center justify-between">
+                      <span className="text-[9px] uppercase tracking-wider text-stone-500 font-semibold">
+                        INCOMPLETE DUTIES ({incompleteTasks.length} remaining)
+                      </span>
+                      {dutiesData && (
+                        <span className="text-[9px] font-mono text-stone-500">
+                          {dutiesData.completedCount}/{dutiesData.totalCount} done
+                        </span>
+                      )}
+                    </div>
+                    <div className="divide-y divide-[#ebebea] dark:divide-[#1e1e1e]">
+                      {incompleteTasks.map((task) => {
+                        const statusLabel = TASK_STATUS_LABEL[task.status] ?? task.status.toUpperCase();
+                        const statusColor = TASK_STATUS_COLOR[task.status] ?? "text-stone-500";
+                        return (
+                          <div key={task.id} className="px-2.5 py-1.5 flex items-center gap-2 font-mono">
+                            <span className="text-stone-400 dark:text-stone-700 shrink-0">●</span>
+                            <span className="text-[11px] text-[#0a0a0a] dark:text-stone-300 flex-1 min-w-0 truncate">
+                              {task.action_name}
+                            </span>
+                            <span className={cn("text-[9px] font-bold shrink-0 uppercase tracking-wider", statusColor)}>
+                              {statusLabel}
+                            </span>
+                            <span className="text-[9px] text-stone-500 shrink-0 w-16 text-right truncate">
+                              {task.assigned_to_name ?? "—"}
+                            </span>
+                            <span className="text-[9px] text-stone-500 dark:text-stone-600 shrink-0 w-12 text-right">
+                              {task.due_time ? `SLA: ${task.due_time}` : "—"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Meta row: owner · deadline · escalate */}
                 <div className="px-3 pb-2 pl-[calc(0.75rem+1.5rem)] flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] text-stone-600 dark:text-stone-500 border-t border-[#f0f0ee] dark:border-[#181818] pt-2">
@@ -541,26 +636,38 @@ export default function PriorityActionBoard({ brain, siteId }: Props) {
           </div>
 
           {/* Score breakdown bars */}
-          <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-2 font-mono">
+          <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-2.5 font-mono">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE BREAKDOWN</span>
-            {scoreBars.map(({ driver, max, pct, barColor, textColor }) => (
-              <div key={driver.module}>
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] uppercase tracking-wider text-stone-600">
-                    {driver.module}
-                  </span>
-                  <span className={cn("text-[9px] font-bold", textColor)}>
-                    {driver.pts}/{max}
-                  </span>
+            {scoreBars.map(({ driver, max, pct, barColor, textColor }) => {
+              // Duties-specific sub-line
+              const dutiesSubLine = driver.module === "DUTIES" && dutiesData
+                ? `${dutiesData.completedCount} of ${dutiesData.totalCount} duties complete (${pct}%) · Full 20 pts at 100%`
+                : null;
+
+              return (
+                <div key={driver.module}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[9px] uppercase tracking-wider text-stone-600">
+                      {driver.module}
+                    </span>
+                    <span className={cn("text-[9px] font-bold", textColor)}>
+                      {driver.pts}/{max}
+                    </span>
+                  </div>
+                  <div className="h-1.5 bg-[#e5e5e5] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full", barColor)}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {dutiesSubLine && (
+                    <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
+                      {dutiesSubLine}
+                    </p>
+                  )}
                 </div>
-                <div className="h-1.5 bg-[#e5e5e5] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
-                  <div
-                    className={cn("h-full rounded-full", barColor)}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Fastest path to next grade */}
