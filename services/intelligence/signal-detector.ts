@@ -296,22 +296,33 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
     });
   }
 
-  // ── SIGNAL 11 — Compliance Overdue (standalone) ────────────────────────────
-  // Fires when compliance items are overdue even without urgent maintenance.
-  // S4 already handles the compound compliance + maintenance case.
+  // ── SIGNAL 11 — Compliance Overdue / At Risk (standalone) ─────────────────
+  // Fires on ANY overdue item (CRITICAL) or any at-risk item (HIGH).
+  // Even a single expired certificate is a legal/audit risk — threshold is 1.
+  // S4 handles the compound compliance + maintenance case; suppressed here.
   if (
-    comp.overdueCount >= 2 &&
+    (comp.overdueCount >= 1 || comp.atRiskCount > 0) &&
     !signals.some((s) => s.id === "S4_COMPLIANCE_MAINTENANCE_COMPOUND")
   ) {
+    const isExpired = comp.overdueCount >= 1;
+    const itemCount = isExpired ? comp.overdueCount : comp.atRiskCount;
+    const itemWord  = itemCount === 1 ? "item" : "items";
     signals.push({
       id: "S11_COMPLIANCE_OVERDUE",
       modules: ["COMPLIANCE"],
-      severity: comp.overdueCount >= 4 ? "CRITICAL" : "HIGH",
-      title: comp.overdueCount >= 4 ? "Critical Compliance Exposure" : "Compliance Items Overdue",
-      recommendation: `${comp.overdueCount} compliance items overdue. Audit exposure growing — escalate to GM and schedule resolution today.`,
+      severity: isExpired ? "CRITICAL" : "HIGH",
+      title: isExpired
+        ? `${itemCount} Expired Compliance ${itemWord === "item" ? "Item" : "Items"}`
+        : `${itemCount} Compliance ${itemCount === 1 ? "Item" : "Items"} At Risk`,
+      recommendation: isExpired
+        ? `${itemCount} compliance ${itemWord} expired. Operating with expired certificates creates legal, audit, and insurance exposure. Escalate to head office and schedule renewal immediately.`
+        : `${itemCount} compliance ${itemWord} due soon. Action before expiry to avoid operational risk.`,
+      moneyAtRisk: isExpired ? 50_000 : 0,
       timeWindow: "Today",
-      confidence: 90,
-      triggeredConditions: [`${comp.overdueCount} compliance items overdue`],
+      confidence: 95,
+      triggeredConditions: isExpired
+        ? [`${itemCount} compliance ${itemWord} overdue — legal and audit exposure`]
+        : [`${itemCount} compliance ${itemWord} at risk of expiry`],
     });
   }
 

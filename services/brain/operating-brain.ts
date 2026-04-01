@@ -547,20 +547,31 @@ function buildContextualThreat(
     };
   }
 
-  // Compliance overdue with no urgent maintenance (mirrors voice state 13)
-  if (ctx.compliance.overdueCount > 0 && ctx.revenue.variance > -10) {
-    const sev: BrainThreatSeverity = ctx.compliance.overdueCount >= 4 ? "high" : "medium";
+  // Compliance overdue or at risk — no revenue guard.
+  // Even one expired certificate = CRITICAL regardless of trading performance.
+  if (ctx.compliance.overdueCount > 0 || ctx.compliance.atRiskCount > 0) {
+    const isExpired = ctx.compliance.overdueCount > 0;
+    const itemCount = isExpired ? ctx.compliance.overdueCount : ctx.compliance.atRiskCount;
+    const sev: BrainThreatSeverity = isExpired ? "critical" : "high";
     return {
-      title:             `${ctx.compliance.overdueCount} Compliance ${ctx.compliance.overdueCount === 1 ? "Item" : "Items"} Overdue`,
-      description:       `Audit exposure growing. ${ctx.maintenance.urgentCount > 0 ? `${ctx.maintenance.urgentCount} maintenance issues also unresolved.` : ""}`,
+      title:             isExpired
+        ? `${itemCount} Expired Compliance ${itemCount === 1 ? "Item" : "Items"}`
+        : `${itemCount} Compliance ${itemCount === 1 ? "Item" : "Items"} At Risk`,
+      description:       isExpired
+        ? `Operating with expired certificates. Legal, audit, and insurance exposure.${ctx.maintenance.urgentCount > 0 ? ` ${ctx.maintenance.urgentCount} maintenance issues also unresolved.` : ""}`
+        : `${itemCount} compliance ${itemCount === 1 ? "item" : "items"} due soon — action before expiry.`,
       severity:          sev,
       modulesInvolved:   ["COMPLIANCE"],
       owner:             gmOwner,
-      moneyAtRisk:       0,
+      moneyAtRisk:       isExpired ? 50_000 : 0,
       timeWindowMinutes: 24 * 60,
       timeWindowLabel:   "Today",
-      ifIgnored:         "Overdue compliance exposure compounds daily — audit risk increases until resolved.",
-      recommendedAction: "Action overdue items today — assign owner and set deadline for each.",
+      ifIgnored:         isExpired
+        ? "Expired compliance compounds daily — potential closure, fine, or insurance exposure."
+        : "Compliance items expire — creating the same legal and audit risk as overdue items.",
+      recommendedAction: isExpired
+        ? "Escalate to head office and schedule renewal immediately."
+        : "Action overdue items today — assign owner and set deadline for each.",
       confidence:        "high",
     };
   }
@@ -654,7 +665,7 @@ function buildIfIgnored(
     return `Revenue gap of ${fmt(revGap)} grows as ops backlog compounds — recovery window narrows with each hour.`;
   }
   if (sig.id === "S11_COMPLIANCE_OVERDUE") {
-    return "Compliance exposure compounds daily — audit risk increases until resolved.";
+    return "Expired compliance exposure compounds daily — potential closure, fine, or insurance exposure if not resolved.";
   }
   return sig.recommendation.split(".")[0] + ".";
 }
@@ -986,6 +997,8 @@ export async function runOperatingBrain(
       : ctx;
 
   const signals = detectSignals(effectiveCtx);
+  // TODO: remove after confirming compliance signals flow correctly
+  console.log("[Brain] signals:", signals.map((s) => `${s.id}(${s.severity})`).join(", ") || "NONE");
 
   // Rank signals (exclude INFO)
   const rankedSignals = signals
