@@ -20,6 +20,7 @@ import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { todayISO } from "@/lib/utils";
 import BrainCopilotHero from "@/components/brain/BrainCopilotHero";
 import BrainTopDecisions from "@/components/brain/BrainTopDecisions";
+import RecoveryMeter     from "@/components/brain/RecoveryMeter";
 
 import AllDecisions      from "@/components/copilot/AllDecisions";
 import InsightsPanel     from "@/components/copilot/InsightsPanel";
@@ -69,6 +70,7 @@ export default async function GMCoPilotPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-2 space-y-4">
             {brain && <BrainTopDecisions brain={brain} />}
+            {brain && <RecoveryMeter brain={brain} />}
             <AllDecisions decisions={copilot.decisions} />
             <InsightsPanel insights={copilot.insights} />
           </div>

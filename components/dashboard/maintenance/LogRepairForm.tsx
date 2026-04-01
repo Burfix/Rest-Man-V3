@@ -70,60 +70,60 @@ export default function LogRepairForm({ equipmentId, onClose }: Props) {
       {/* Date + Cost */}
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">
+          <label className="form-label">
             Repair Date <span className="text-red-500">*</span>
           </label>
           <input type="date" value={form.repair_date} onChange={e => set("repair_date", e.target.value)}
-            className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="form-input" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Repair Cost (R)</label>
+          <label className="form-label">Repair Cost (R)</label>
           <input type="number" min={0} step="0.01" value={form.repair_cost} onChange={e => set("repair_cost", e.target.value)}
             placeholder="e.g. 4800"
-            className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="form-input" />
         </div>
       </div>
 
       {/* Contractor */}
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Contractor Name</label>
+          <label className="form-label">Contractor Name</label>
           <input type="text" value={form.contractor_name} onChange={e => set("contractor_name", e.target.value)}
             placeholder="e.g. Raymond"
-            className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="form-input" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Company</label>
+          <label className="form-label">Company</label>
           <input type="text" value={form.contractor_company} onChange={e => set("contractor_company", e.target.value)}
             placeholder="e.g. IceTech"
-            className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="form-input" />
         </div>
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Phone</label>
+          <label className="form-label">Phone</label>
           <input type="tel" value={form.contractor_phone} onChange={e => set("contractor_phone", e.target.value)}
             placeholder="+27…"
-            className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+            className="form-input" />
         </div>
       </div>
 
       {/* Issue & Work */}
       <div>
-        <label className="block text-xs font-medium text-stone-600 mb-1">Issue Reported</label>
+        <label className="form-label">Issue Reported</label>
         <textarea rows={2} value={form.issue_reported} onChange={e => set("issue_reported", e.target.value)}
           placeholder="Describe the fault…"
-          className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          className="form-input" />
       </div>
       <div>
-        <label className="block text-xs font-medium text-stone-600 mb-1">Work Done</label>
+        <label className="form-label">Work Done</label>
         <textarea rows={2} value={form.work_done} onChange={e => set("work_done", e.target.value)}
           placeholder="Describe the repair…"
-          className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          className="form-input" />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-stone-600 mb-1">Next Service Due</label>
+        <label className="form-label">Next Service Due</label>
         <input type="date" value={form.next_service_due} onChange={e => set("next_service_due", e.target.value)}
-          className="w-full rounded-md border border-stone-300 bg-stone-50 px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400" />
+          className="form-input" />
       </div>
 
       <div className="flex items-center gap-3 pt-1">
@@ -132,7 +132,8 @@ export default function LogRepairForm({ equipmentId, onClose }: Props) {
           {saving ? "Saving…" : "Log Repair"}
         </button>
         <button type="button" onClick={onClose}
-          className="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-600 hover:bg-stone-50">
+          className="rounded-md border px-4 py-2 text-sm"
+          style={{ borderColor: "var(--border)", color: "var(--text-secondary)" }}>
           Cancel
         </button>
       </div>

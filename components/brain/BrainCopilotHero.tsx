@@ -101,10 +101,15 @@ export default function BrainCopilotHero({ brain }: Props) {
           }
         />
         <MetricCell
-          label="PROJ CLOSE"
-          value={forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"}
+          label={forecastSummary.isDayClosed ? "TODAY'S REV" : "PROJ CLOSE"}
+          value={
+            forecastSummary.syncPending
+              ? "Sync pending"
+              : forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"
+          }
           tone={
-            (forecastSummary.vsTarget ?? 0) >= 0 ? "positive"
+            forecastSummary.syncPending ? "warning"
+            : (forecastSummary.vsTarget ?? 0) >= 0 ? "positive"
             : (forecastSummary.vsTarget ?? 0) > -15 ? "warning"
             : "critical"
           }

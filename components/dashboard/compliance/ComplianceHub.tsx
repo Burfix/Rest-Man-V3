@@ -260,42 +260,42 @@ function EditPanel({
     <div className="mt-3 space-y-3 rounded-lg border border-stone-200 bg-stone-50 p-4">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Last Inspection Date</label>
+          <label className="form-label">Last Inspection Date</label>
           <input
             type="date"
             value={form.last_inspection_date}
             onChange={(e) => setForm((f) => ({ ...f, last_inspection_date: e.target.value }))}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+            className="form-input"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Next Due Date</label>
+          <label className="form-label">Next Due Date</label>
           <input
             type="date"
             value={form.next_due_date}
             onChange={(e) => setForm((f) => ({ ...f, next_due_date: e.target.value }))}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+            className="form-input"
           />
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-stone-600 mb-1">Responsible Party</label>
+        <label className="form-label">Responsible Party</label>
         <input
           type="text"
           placeholder="e.g. City of Cape Town EHP, John Smith"
           value={form.responsible_party}
           onChange={(e) => setForm((f) => ({ ...f, responsible_party: e.target.value }))}
-          className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+          className="form-input"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-stone-600 mb-1">Notes</label>
+        <label className="form-label">Notes</label>
         <textarea
           rows={2}
           placeholder="Any relevant notes..."
           value={form.notes}
           onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-          className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+          className="form-input"
         />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -392,33 +392,33 @@ function SchedulePanel({
       <p className="text-xs font-semibold text-stone-700">📅 Schedule Renewal / Service</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Renewal Date *</label>
+          <label className="form-label">Renewal Date *</label>
           <input
             type="date"
             value={form.scheduled_service_date}
             onChange={(e) => setForm((f) => ({ ...f, scheduled_service_date: e.target.value }))}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="form-input"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Provider / Vendor</label>
+          <label className="form-label">Provider / Vendor</label>
           <input
             type="text"
             placeholder="e.g. FireTech Solutions"
             value={form.scheduled_with}
             onChange={(e) => setForm((f) => ({ ...f, scheduled_with: e.target.value }))}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="form-input"
           />
         </div>
       </div>
       <div>
-        <label className="block text-xs font-medium text-stone-600 mb-1">Note (optional)</label>
+        <label className="form-label">Note (optional)</label>
         <input
           type="text"
           placeholder="e.g. Deposit paid, confirmed via email"
           value={form.schedule_note}
           onChange={(e) => setForm((f) => ({ ...f, schedule_note: e.target.value }))}
-          className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-400"
+          className="form-input"
         />
       </div>
       {error && <p className="text-xs text-red-600">{error}</p>}
@@ -797,41 +797,41 @@ function AddCustomItemForm({ onAdded, onClose }: { onAdded: (item: ComplianceIte
       <h3 className="text-sm font-semibold text-stone-800 mb-4">Add Custom Compliance Item</h3>
       <div className="space-y-3">
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Name *</label>
+          <label className="form-label">Name *</label>
           <input
             type="text"
             placeholder="e.g. Environmental Impact Assessment"
             value={form.display_name}
             onChange={(e) => setForm((f) => ({ ...f, display_name: e.target.value }))}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+            className="form-input"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Description</label>
+          <label className="form-label">Description</label>
           <textarea
             rows={2}
             value={form.description}
             onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+            className="form-input"
           />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="block text-xs font-medium text-stone-600 mb-1">Next Due Date</label>
+            <label className="form-label">Next Due Date</label>
             <input
               type="date"
               value={form.next_due_date}
               onChange={(e) => setForm((f) => ({ ...f, next_due_date: e.target.value }))}
-              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+              className="form-input"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-stone-600 mb-1">Responsible Party</label>
+            <label className="form-label">Responsible Party</label>
             <input
               type="text"
               value={form.responsible_party}
               onChange={(e) => setForm((f) => ({ ...f, responsible_party: e.target.value }))}
-              className="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm focus:border-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-400"
+              className="form-input"
             />
           </div>
         </div>

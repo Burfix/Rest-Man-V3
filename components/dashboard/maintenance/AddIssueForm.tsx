@@ -81,14 +81,14 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
       <div className="grid grid-cols-2 gap-3">
         {/* Link to existing equipment (optional) */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Equipment (optional)
           </label>
           <select
             value={selectedEquipId}
             onChange={(e) => setSelectedEquipId(e.target.value)}
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           >
             <option value="">— Not linked to existing item —</option>
             {equipment.map((eq) => (
@@ -101,7 +101,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
 
         {/* Unit name — pre-filled when equipment selected */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Unit name <span className="text-red-500">*</span>
           </label>
           <input
@@ -112,13 +112,13 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             defaultValue={selectedEquip?.unit_name ?? ""}
             placeholder="e.g. Walk-in freezer"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         {/* Issue title */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Issue title <span className="text-red-500">*</span>
           </label>
           <input
@@ -127,13 +127,13 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             required
             placeholder="Brief description of the problem"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         {/* Priority */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Priority <span className="text-red-500">*</span>
           </label>
           <select
@@ -141,7 +141,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             required
             defaultValue=""
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           >
             <option value="" disabled>Select…</option>
             <option value="urgent">Urgent</option>
@@ -153,7 +153,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
 
         {/* Business impact */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Business Impact <span className="text-red-500">*</span>
           </label>
           <select
@@ -161,7 +161,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             required
             defaultValue="none"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           >
             <option value="none">No operational impact</option>
             <option value="minor">Minor impact</option>
@@ -174,7 +174,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
 
         {/* Reported by */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Reported by
           </label>
           <input
@@ -182,20 +182,20 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             type="text"
             placeholder="e.g. Marco, FOH Manager"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         {/* Repair status */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Status
           </label>
           <select
             name="repair_status"
             defaultValue="open"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           >
             <option value="open">Open</option>
             <option value="in_progress">In Progress</option>
@@ -207,20 +207,20 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
 
         {/* Date reported */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Date reported
           </label>
           <input
             name="date_reported"
             type="date"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         {/* Description */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Description
           </label>
           <textarea
@@ -228,7 +228,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             rows={2}
             placeholder="Additional details…"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50 resize-none"
+            className="form-input"
           />
         </div>
       </div>
@@ -238,7 +238,8 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+          className="rounded-md px-3 py-2 text-sm disabled:opacity-50"
+          style={{ color: "var(--text-secondary)" }}
         >
           Cancel
         </button>

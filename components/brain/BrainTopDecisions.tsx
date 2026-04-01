@@ -5,7 +5,6 @@
  * in the GM Co-Pilot page.
  */
 
-import { cn } from "@/lib/utils";
 import type { BrainOutput } from "@/services/brain/operating-brain";
 
 type Props = {
@@ -51,7 +50,7 @@ export default function BrainTopDecisions({ brain }: Props) {
               </p>
               <p className="text-[10px] text-stone-500 leading-relaxed">{action.why}</p>
               <div className="flex items-center gap-2 flex-wrap pt-0.5">
-                <span className="text-[10px] font-mono text-stone-600">{action.owner}</span>
+                <span className="text-[10px] font-mono text-stone-500">{action.ownerRole}</span>
                 <span className="text-stone-700">·</span>
                 <span className="text-[10px] font-mono text-stone-600">~{action.estimatedMinutes} min</span>
                 {action.moneyAtRisk != null && action.moneyAtRisk > 0 && (
@@ -63,10 +62,16 @@ export default function BrainTopDecisions({ brain }: Props) {
                   </>
                 )}
               </div>
+              {action.financialImpact && (
+                <p className="text-[10px] font-mono text-amber-500/60">{action.financialImpact}</p>
+              )}
+              {action.escalateTo && (
+                <p className="text-[9px] font-mono text-stone-600 uppercase tracking-wider">
+                  Escalate → {action.escalateTo}
+                </p>
+              )}
               {/* Impact line */}
-              <p className={cn(
-                "text-[10px] text-stone-600 leading-snug italic pt-0.5",
-              )}>
+              <p className="text-[10px] text-stone-600 leading-snug italic pt-0.5">
                 {action.impact}
               </p>
             </div>

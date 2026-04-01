@@ -33,6 +33,7 @@ import { getUserContext } from "@/lib/auth/get-user-context";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import AccountabilityAlert from "@/components/accountability/AccountabilityAlert";
 import OperatingBrain from "@/components/brain/OperatingBrain";
+import RecoveryMeter  from "@/components/brain/RecoveryMeter";
 
 import ControlBar              from "@/components/operating-brain/ControlBar";
 import OperatingScoreHero     from "@/components/operating-brain/OperatingScoreHero";
@@ -332,8 +333,8 @@ export default async function OperationsDashboard() {
     brain.systemHealth.grade =
       scoreTotal >= 90 ? "A" :
       scoreTotal >= 80 ? "B" :
-      scoreTotal >= 70 ? "C" :
-      scoreTotal >= 60 ? "D" : "F";
+      scoreTotal >= 65 ? "C" :
+      scoreTotal >= 50 ? "D" : "F";
   }
 
   return (
@@ -341,6 +342,7 @@ export default async function OperationsDashboard() {
 
       {/* ── 0. Operating Brain — Biggest risk + action queue + pulse ── */}
       {brain && <OperatingBrain brain={brain} />}
+      {brain && <RecoveryMeter brain={brain} />}
 
       {/* ── 1. Control Bar — Revenue Risk | Time Pressure | Score ── */}
       <ControlBar

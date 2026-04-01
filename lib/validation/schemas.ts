@@ -174,7 +174,10 @@ export const patchMaintenanceIssueSchema = z.object({
   id: uuidString,
   repair_status: z.string().min(1).max(50),
   fixed_by: z.string().max(200).optional().nullable(),
-  fixed_by_type: z.enum(["internal", "contractor", "warranty"]).optional().nullable(),
+  fixed_by_type: z.preprocess(
+    (v) => (typeof v === "string" ? v.toLowerCase() : v),
+    z.enum(["internal_staff", "contractor", "supplier", "unknown"]).optional().nullable()
+  ),
   contractor_name: z.string().max(200).optional().nullable(),
   contractor_contact: z.string().max(200).optional().nullable(),
   date_fixed: dateString.optional().nullable(),

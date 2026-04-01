@@ -25,7 +25,7 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen bg-stone-50 dark:bg-[#0f0f0e]">
+    <div className="flex h-screen bg-[#f8f8f6] dark:bg-[#0f0f0e]">
       <ImpersonationBanner />
       <Sidebar role={role} footer={
         <div>
@@ -34,7 +34,7 @@ export default async function DashboardLayout({
         </div>
       } />
       {/* pt-14 reserves space for the fixed mobile top bar; lg:pt-0 removes it on desktop */}
-      <main className="flex-1 overflow-y-auto p-4 pt-[72px] lg:p-8 lg:pt-8 bg-stone-50 dark:bg-[#0f0f0e]">
+      <main className="flex-1 overflow-y-auto p-4 pt-[72px] lg:p-8 lg:pt-8 bg-[#f8f8f6] dark:bg-[#0f0f0e]">
         <AutoRefresh />
         <RoleGuard role={role}>
           {children}

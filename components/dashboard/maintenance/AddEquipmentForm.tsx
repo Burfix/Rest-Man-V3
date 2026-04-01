@@ -69,7 +69,7 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Unit name <span className="text-red-500">*</span>
           </label>
           <input
@@ -78,12 +78,12 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
             required
             placeholder="e.g. Convection Oven #2"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Category <span className="text-red-500">*</span>
           </label>
           <select
@@ -91,7 +91,7 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
             required
             disabled={isSubmitting}
             defaultValue=""
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           >
             <option value="" disabled>
               Select…
@@ -104,14 +104,14 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Status
           </label>
           <select
             name="status"
             defaultValue="operational"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           >
             <option value="operational">Operational</option>
             <option value="needs_attention">Needs Attention</option>
@@ -120,7 +120,7 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Location
           </label>
           <input
@@ -128,12 +128,12 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
             type="text"
             placeholder="e.g. Main kitchen, rear wall"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Notes
           </label>
           <textarea
@@ -141,13 +141,13 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
             rows={2}
             placeholder="Any additional details…"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50 resize-none"
+            className="form-input"
           />
         </div>
 
         {/* Asset profile fields */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Serial number
           </label>
           <input
@@ -155,12 +155,12 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
             type="text"
             placeholder="e.g. SN-2024-001"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Supplier
           </label>
           <input
@@ -168,31 +168,31 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
             type="text"
             placeholder="e.g. Cape Kitchen Supplies"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Purchase date
           </label>
           <input
             name="purchase_date"
             type="date"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Warranty expiry
           </label>
           <input
             name="warranty_expiry"
             type="date"
             disabled={isSubmitting}
-            className="block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50"
+            className="form-input"
           />
         </div>
       </div>
@@ -202,7 +202,8 @@ export default function AddEquipmentForm({ onClose }: { onClose: () => void }) {
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 disabled:opacity-50"
+          className="rounded-md px-3 py-2 text-sm disabled:opacity-50"
+          style={{ color: "var(--text-secondary)" }}
         >
           Cancel
         </button>

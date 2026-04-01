@@ -5,6 +5,7 @@
  * Assembles a single-sentence intelligent briefing from BrainOutput.
  *
  * No AI API call — pure logic-driven string assembly.
+ * 15+ situation-specific voice states, priority-ordered.
  */
 
 import type { BrainOutput } from "./operating-brain";
@@ -20,13 +21,41 @@ function pct(n: number, showPlus = false): string {
 }
 
 export function generateVoice(brain: BrainOutput, ctx: OperationsContext): string {
-  const { primaryThreat, forecastSummary, gmSituation, systemHealth } = brain;
+  const { primaryThreat, forecastSummary, gmSituation, systemHealth, recoveryMeter } = brain;
   const sev = primaryThreat.severity;
 
-  // ── Sports event uplift ───────────────────────────────────────────────────
-  // Proactive: fires whenever an active event is detected. Requires floor
-  // preparation — overrides nominal and revenue paths. Yields only to
-  // critical MAINTENANCE (that takes priority: fix equipment to serve the crowd).
+  // ── 1. After hours — sync pending ─────────────────────────────────────────
+  if (forecastSummary.isDayClosed && forecastSummary.syncPending) {
+    return "After hours. Revenue sync pending — check again after midnight.";
+  }
+
+  // ── 2. After hours — day is closed with actuals ───────────────────────────
+  if (forecastSummary.isDayClosed) {
+    const closeRevenue = fmt(forecastSummary.projectedClose);
+    const vt = forecastSummary.vsTarget ?? 0;
+
+    if (vt >= 0) {
+      // Good day
+      const labNote = ctx.labour.variance > 0
+        ? ` Labour ${pct(ctx.labour.variance, true)} over — review roster before tomorrow.`
+        : " Labour on budget.";
+      return `Strong close. Today finished at ${closeRevenue}, ${pct(vt, true)} vs target.${labNote}`;
+    } else if (vt < -15) {
+      // Weak day — flag for tomorrow
+      const labNote = ctx.labour.variance > 0
+        ? ` Labour ${pct(ctx.labour.variance, true)} over target adds further cost pressure.`
+        : "";
+      return `Day closed at ${closeRevenue}, ${pct(vt)} vs target. Review covers and conversion gaps before tomorrow's prep.${labNote}`;
+    } else {
+      // Slightly behind
+      const labNote = ctx.labour.variance > 0
+        ? ` Labour ${pct(ctx.labour.variance, true)} over target.`
+        : "";
+      return `After hours. Today closed at ${closeRevenue}, ${pct(vt)} vs target.${labNote} Review roster for tomorrow.`;
+    }
+  }
+
+  // ── 3. Sports / confirmed event uplift ────────────────────────────────────
   if (
     forecastSummary.activeEvent &&
     forecastSummary.eventUplift &&
@@ -41,9 +70,7 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
     );
   }
 
-  // ── Ramadan suppression ───────────────────────────────────────────────────
-  // Contextualise revenue suppression as a known cause — don't alarm the GM.
-  // Only yields to MAINTENANCE primary threats (those need separate attention).
+  // ── 4. Ramadan suppression ────────────────────────────────────────────────
   if (
     forecastSummary.isRamadan &&
     !primaryThreat.modulesInvolved.includes("MAINTENANCE")
@@ -55,22 +82,15 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
     return `Ramadan period. Revenue suppression expected.${revNote} Focus on dinner recovery and cost control.`;
   }
 
-  // ── All systems nominal ────────────────────────────────────────────────────
-  if (sev === "low" && systemHealth.score >= 75) {
-    const revNote =
-      forecastSummary.vsTarget > 2
-        ? `${pct(forecastSummary.vsTarget, true)} ahead of target`
-        : forecastSummary.vsTarget < -2
-        ? `${pct(forecastSummary.vsTarget)} vs target`
-        : "tracking on target";
-
-    return (
-      `All systems nominal. ${revNote.charAt(0).toUpperCase() + revNote.slice(1)}.` +
-      ` Monitor floor energy and walk-in conversion.`
-    );
+  // ── 5. Critical: service-blocking maintenance ─────────────────────────────
+  if (sev === "critical" && ctx.maintenance.serviceBlocking) {
+    const costNote = primaryThreat.moneyAtRisk > 0
+      ? ` ${fmt(primaryThreat.moneyAtRisk)} at risk.`
+      : "";
+    return `Service-blocking maintenance is unresolved.${costNote} Resolve immediately — escalate to GM if not fixed in 30 minutes.`;
   }
 
-  // ── Critical: lead with money + cause + directive ─────────────────────────
+  // ── 6. Critical: revenue collapse + compound signals ─────────────────────
   if (sev === "critical") {
     const parts: string[] = [];
 
@@ -80,13 +100,9 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
     ) {
       parts.push(`Revenue is ${fmt(primaryThreat.moneyAtRisk)} behind`);
     }
-
-    if (primaryThreat.modulesInvolved.includes("MAINTENANCE") && ctx.maintenance.serviceBlocking) {
-      parts.push("service maintenance is blocking operations");
-    } else if (primaryThreat.modulesInvolved.includes("LABOUR") && ctx.labour.variance > 8) {
+    if (primaryThreat.modulesInvolved.includes("LABOUR") && ctx.labour.variance > 8) {
       parts.push(`labour is ${pct(ctx.labour.variance, true)} over target`);
     }
-
     if (
       primaryThreat.timeWindowMinutes > 0 &&
       primaryThreat.timeWindowMinutes <= 120
@@ -94,36 +110,102 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
       const hrs = Math.round(primaryThreat.timeWindowMinutes / 60);
       parts.push(hrs <= 1 ? "with less than an hour left" : `with ${hrs} hours left`);
     }
-
-    // Add a directive from the recommendation (first sentence only)
     const directive = primaryThreat.recommendedAction.split(".")[0];
     if (directive && directive.length > 10) {
       return parts.join(" — ") + ". " + directive + ".";
     }
-
     if (parts.length > 0) return parts.join(" — ") + ".";
   }
 
-  // ── Revenue focus (high/medium) ────────────────────────────────────────────
+  // ── 7. Revenue recovery possible (realistic window, not too far gone) ─────
+  if (
+    recoveryMeter &&
+    !recoveryMeter.isOnTrack &&
+    !recoveryMeter.limitedWindow &&
+    !recoveryMeter.partialOnly &&
+    recoveryMeter.recoverable > 2_000
+  ) {
+    const gap         = fmt(recoveryMeter.revenueGap);
+    const recoverable = fmt(recoveryMeter.recoverable);
+    const hoursLeft   = Math.round(recoveryMeter.timeLeftMinutes / 60);
+    return `Revenue gap of ${gap}. ${recoverable} recoverable in the next ${hoursLeft}h — push floor conversion now.`;
+  }
+
+  // ── 8. Revenue behind + partial recovery only ─────────────────────────────
+  if (
+    recoveryMeter &&
+    recoveryMeter.partialOnly &&
+    recoveryMeter.recoverable > 0
+  ) {
+    const gap         = fmt(recoveryMeter.revenueGap);
+    const recoverable = fmt(recoveryMeter.recoverable);
+    return `Revenue ${pct(forecastSummary.vsTarget)} vs target. Partial recovery possible — up to ${recoverable} of ${gap} gap.`;
+  }
+
+  // ── 9. Limited window — narrow recovery ───────────────────────────────────
+  if (recoveryMeter && recoveryMeter.limitedWindow) {
+    const gap = fmt(recoveryMeter.revenueGap);
+    return `Revenue gap of ${gap} with less than 1 hour left. Limited recovery window — maximise table turn and conversions now.`;
+  }
+
+  // ── 10. Pre-service labour surge ──────────────────────────────────────────
+  if (
+    ctx.meta.timeOfDay === "pre-service" &&
+    ctx.labour.variance > 10
+  ) {
+    return `Labour entering service ${pct(ctx.labour.variance, true)} over budget. Review roster and send home non-essential staff before opening.`;
+  }
+
+  // ── 11. Revenue behind + weak duty completion ─────────────────────────────
+  if (
+    ctx.revenue.variance < -10 &&
+    ctx.dailyOps.completionRate < 70
+  ) {
+    return `Revenue ${pct(ctx.revenue.variance)} vs target with only ${ctx.dailyOps.completionRate}% of duties complete — compound operational risk. Address backlog immediately.`;
+  }
+
+  // ── 12. Labour over target only (no revenue alert) ────────────────────────
+  if (
+    ctx.labour.variance > 8 &&
+    ctx.revenue.variance > -5 &&
+    !primaryThreat.modulesInvolved.includes("REVENUE")
+  ) {
+    const suggestion = ctx.meta.timeOfDay === "post-service"
+      ? "Adjust tomorrow's roster."
+      : "Consider early send-home to bring cost back to target.";
+    return `Labour running ${pct(ctx.labour.variance, true)} over target. ${suggestion}`;
+  }
+
+  // ── 13. Compliance overdue (S4 compound or compliance primary) ─────────────
+  if (
+    ctx.compliance.overdueCount > 0 &&
+    ctx.revenue.variance > -10 &&
+    sev !== "critical"
+  ) {
+    const itemWord = ctx.compliance.overdueCount === 1 ? "item" : "items";
+    const maintNote = ctx.maintenance.urgentCount > 0
+      ? ` ${ctx.maintenance.urgentCount} maintenance issues also unresolved.`
+      : "";
+    return `${ctx.compliance.overdueCount} compliance ${itemWord} overdue.${maintNote} Audit exposure growing — action required today.`;
+  }
+
+  // ── 14. Revenue focus (high/medium threat) ────────────────────────────────
   if (primaryThreat.modulesInvolved.includes("REVENUE")) {
     const moneyNote =
       primaryThreat.moneyAtRisk > 0
         ? `${fmt(primaryThreat.moneyAtRisk)} at risk`
         : `revenue ${pct(forecastSummary.vsTarget)} vs target`;
-
     const windowNote =
       primaryThreat.timeWindowMinutes > 0 && primaryThreat.timeWindowMinutes <= 240
         ? ` with ${Math.round(primaryThreat.timeWindowMinutes / 60)} hour${
             Math.round(primaryThreat.timeWindowMinutes / 60) > 1 ? "s" : ""
           } left`
         : "";
-
     const directive = primaryThreat.recommendedAction.split(".")[0];
-
     return `${moneyNote}${windowNote}. ${directive}.`;
   }
 
-  // ── Maintenance compound ───────────────────────────────────────────────────
+  // ── 15. Maintenance compound ──────────────────────────────────────────────
   if (primaryThreat.modulesInvolved.includes("MAINTENANCE")) {
     const maintNote =
       ctx.maintenance.urgentCount > 1
@@ -131,32 +213,35 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
         : ctx.maintenance.serviceBlocking
         ? "service-blocking maintenance is unresolved"
         : "maintenance items are accumulating";
-
     const compNote =
       ctx.compliance.overdueCount === 0 ? " No compliance risk today." : "";
-
     const gmNote = gmSituation.alertNeeded
       ? ` GM performance declining — score at ${gmSituation.score}/100.`
       : "";
-
     return `${maintNote}.${compNote}${gmNote}`;
   }
 
-  // ── Labour only ────────────────────────────────────────────────────────────
-  if (
-    primaryThreat.modulesInvolved.includes("LABOUR") &&
-    !primaryThreat.modulesInvolved.includes("REVENUE")
-  ) {
-    return `Labour running ${pct(ctx.labour.variance, true)} over target. ${
-      primaryThreat.recommendedAction.split(".")[0]
-    }.`;
-  }
-
-  // ── GM declining ──────────────────────────────────────────────────────────
+  // ── 16. GM declining performance ──────────────────────────────────────────
   if (gmSituation.alertNeeded) {
     return `GM performance at ${gmSituation.score}/100 — review task completion and escalation patterns.`;
   }
 
-  // ── Fallback ──────────────────────────────────────────────────────────────
+  // ── 17. Strong pace — all good, ahead of target ───────────────────────────
+  if (sev === "low" && systemHealth.score >= 75) {
+    const vt = forecastSummary.vsTarget ?? 0;
+    if (vt > 5) {
+      return `Strong pace. Revenue ${pct(vt, true)} ahead of target. Monitor walk-in conversion for sustained lead.`;
+    }
+    const revNote =
+      vt >= -2
+        ? "tracking on target"
+        : `${pct(vt)} vs target`;
+    return (
+      `All systems nominal. ${revNote.charAt(0).toUpperCase() + revNote.slice(1)}.` +
+      ` Monitor floor energy and walk-in conversion.`
+    );
+  }
+
+  // ── 18. Fallback ──────────────────────────────────────────────────────────
   return `${primaryThreat.title}. ${primaryThreat.recommendedAction.split(".")[0]}.`;
 }

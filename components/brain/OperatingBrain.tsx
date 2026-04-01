@@ -194,7 +194,7 @@ export default function OperatingBrain({ brain }: Props) {
                       {action.title}
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                      <span className="text-[10px] font-mono text-stone-600">{action.owner}</span>
+                      <span className="text-[10px] font-mono text-stone-500">{action.ownerRole}</span>
                       <span className="text-stone-700">·</span>
                       <span className="text-[10px] font-mono text-stone-600">~{action.estimatedMinutes} min</span>
                       {action.deadline && (
@@ -204,9 +204,14 @@ export default function OperatingBrain({ brain }: Props) {
                         </>
                       )}
                     </div>
-                    {action.moneyAtRisk != null && action.moneyAtRisk > 0 && (
-                      <span className="text-[10px] font-mono text-amber-500/60 mt-0.5 block">
-                        {fmt(action.moneyAtRisk)} at risk
+                    {action.financialImpact && (
+                      <span className="text-[10px] font-mono text-amber-500/70 mt-0.5 block">
+                        {action.financialImpact}
+                      </span>
+                    )}
+                    {action.escalateTo && (
+                      <span className="text-[9px] font-mono text-stone-600 uppercase tracking-wider mt-0.5 block">
+                        Escalate → {action.escalateTo}
                       </span>
                     )}
                   </div>
@@ -244,13 +249,47 @@ export default function OperatingBrain({ brain }: Props) {
             </div>
           </div>
 
+          {/* Score Drivers */}
+          {systemHealth.scoreDrivers.length > 0 && (
+            <div className="border-t border-[#1a1a1a] pt-3 space-y-1.5 font-mono">
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE DRIVERS</span>
+              {systemHealth.scoreDrivers.map((driver) => (
+                <div key={driver.module} className="flex items-start gap-1.5">
+                  <span className={cn(
+                    "text-[10px] font-bold leading-tight shrink-0",
+                    driver.direction === "up" ? "text-emerald-500" : "text-red-400",
+                  )}>
+                    {driver.direction === "up" ? "+" : "−"}
+                  </span>
+                  <div className="min-w-0">
+                    <span className={cn(
+                      "text-[9px] font-bold uppercase tracking-wider block leading-tight",
+                      driver.direction === "up" ? "text-emerald-600" : "text-red-400/70",
+                    )}>
+                      {driver.module}
+                    </span>
+                    <span className="text-[9px] text-stone-600 leading-snug">
+                      {driver.reason}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Forecast */}
           <div className="border-t border-[#1a1a1a] pt-3 font-mono space-y-0.5">
-            <span className="text-[9px] uppercase tracking-wider text-stone-600 block">PROJECTED CLOSE</span>
-            <span className="text-base font-bold text-stone-200">
-              {forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"}
+            <span className="text-[9px] uppercase tracking-wider text-stone-600 block">
+              {forecastSummary.isDayClosed ? "TODAY'S REVENUE" : "PROJECTED CLOSE"}
             </span>
-            {forecastSummary.projectedClose > 0 && (
+            {forecastSummary.syncPending ? (
+              <span className="text-[11px] text-amber-500 font-medium">Sync pending</span>
+            ) : (
+              <span className="text-base font-bold text-stone-200">
+                {forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"}
+              </span>
+            )}
+            {forecastSummary.projectedClose > 0 && !forecastSummary.isDayClosed && !forecastSummary.syncPending && (
               <span className={cn(
                 "text-[11px] font-bold block",
                 (forecastSummary.vsTarget ?? 0) >= 0 ? "text-emerald-400" : "text-red-400",

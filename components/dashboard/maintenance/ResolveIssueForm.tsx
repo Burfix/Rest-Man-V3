@@ -105,7 +105,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
       <div className="grid grid-cols-2 gap-3">
         {/* Who fixed it */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Fixed by
           </label>
           <input
@@ -119,7 +119,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
 
         {/* Type of fixer */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Fixed by type
           </label>
           <select
@@ -137,7 +137,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
 
         {/* Date fixed */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Date fixed
           </label>
           <input
@@ -154,7 +154,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
         {fixedByType === "contractor" && (
           <>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="form-label">
                 Contractor name
               </label>
               <input
@@ -166,7 +166,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
+              <label className="form-label">
                 Contractor contact
               </label>
               <input
@@ -182,7 +182,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
 
         {/* Cost & downtime */}
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Actual cost (R)
           </label>
           <input
@@ -197,7 +197,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Downtime (minutes)
           </label>
           <input
@@ -213,7 +213,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
 
         {/* Root cause */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Root cause
           </label>
           <textarea
@@ -227,7 +227,7 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
 
         {/* Resolution notes */}
         <div className="col-span-2">
-          <label className="block text-xs font-medium text-gray-700 mb-1">
+          <label className="form-label">
             Resolution notes
           </label>
           <textarea
@@ -249,13 +249,13 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
               disabled={isSubmitting}
               className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-500"
             />
-            <span className="text-xs font-medium text-gray-700">Follow-up required</span>
+            <span className="text-xs font-medium" style={{ color: "var(--text-secondary)" }}>Follow-up required</span>
           </label>
         </div>
 
         {followUp && (
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-gray-700 mb-1">
+            <label className="form-label">
               Follow-up notes
             </label>
             <textarea
@@ -281,7 +281,8 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          className="rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors"
+          style={{ borderColor: "var(--border)", background: "var(--surface)", color: "var(--text-secondary)" }}
         >
           Cancel
         </button>
@@ -290,5 +291,4 @@ export default function ResolveIssueForm({ issue, onClose }: Props) {
   );
 }
 
-const inputCls =
-  "block w-full rounded-md border border-gray-300 px-3 py-2 text-sm placeholder:text-gray-400 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 disabled:opacity-50";
+const inputCls = "form-input";

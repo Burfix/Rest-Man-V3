@@ -35,6 +35,23 @@ import type { SportsEvent } from "@/services/forecasting/events-calendar";
 export type BrainThreatSeverity = "critical" | "high" | "medium" | "low";
 export type BrainConfidence = "high" | "medium" | "low";
 
+export type ScoreDriver = {
+  module: string;
+  reason: string;
+  pts: number;
+  direction: "up" | "down";
+};
+
+export type RecoveryMeter = {
+  revenueGap: number;
+  recoverable: number;
+  timeLeftMinutes: number;
+  isOnTrack: boolean;
+  limitedWindow: boolean;
+  partialOnly: boolean;
+  topActions: string[];
+};
+
 export type BrainOutput = {
   timestamp: string;
   siteId: string;
@@ -62,6 +79,10 @@ export type BrainOutput = {
     estimatedMinutes: number;
     moneyAtRisk: number | null;
     deadline: string | null;
+    financialImpact: string | null;
+    ownerRole: "Shift Lead" | "GM" | "Head Office";
+    escalateTo: "GM" | "Head Office" | "Facilities" | null;
+    status: "not_started" | "in_progress" | "completed";
   }>;
 
   doNothingConsequences: Array<{
@@ -76,6 +97,7 @@ export type BrainOutput = {
     trend: "improving" | "stable" | "declining";
     criticalCount: number;
     highCount: number;
+    scoreDrivers: ScoreDriver[];
   };
 
   forecastSummary: {
@@ -87,6 +109,8 @@ export type BrainOutput = {
     isRamadan: boolean;
     activeEvent: string | null;
     eventUplift: number | null;
+    isDayClosed: boolean;
+    syncPending: boolean;
   };
 
   gmSituation: {
@@ -96,6 +120,8 @@ export type BrainOutput = {
     alertNeeded: boolean;
     alertReason: string | null;
   };
+
+  recoveryMeter: RecoveryMeter | null;
 
   voiceLine: string;
 };
@@ -124,6 +150,7 @@ export const BRAIN_FALLBACK: BrainOutput = {
     trend: "stable",
     criticalCount: 0,
     highCount: 0,
+    scoreDrivers: [],
   },
   forecastSummary: {
     projectedClose: 0,
@@ -134,6 +161,8 @@ export const BRAIN_FALLBACK: BrainOutput = {
     isRamadan: false,
     activeEvent: null,
     eventUplift: null,
+    isDayClosed: false,
+    syncPending: false,
   },
   gmSituation: {
     name: "Unknown",
@@ -142,6 +171,7 @@ export const BRAIN_FALLBACK: BrainOutput = {
     alertNeeded: false,
     alertReason: null,
   },
+  recoveryMeter: null,
   voiceLine: "Operational data is loading. Check back shortly.",
 };
 
@@ -261,8 +291,8 @@ function computeSystemHealth(
   const grade =
     score >= 90 ? "A" :
     score >= 80 ? "B" :
-    score >= 70 ? "C" :
-    score >= 60 ? "D" : "F";
+    score >= 65 ? "C" :
+    score >= 50 ? "D" : "F";
 
   const criticalCount = signals.filter((s) => s.severity === "CRITICAL").length;
   const highCount     = signals.filter((s) => s.severity === "HIGH").length;
@@ -271,7 +301,64 @@ function computeSystemHealth(
     ctx.revenue.trend === "recovering" ? "improving" :
     ctx.revenue.trend === "declining"  ? "declining" : "stable";
 
-  return { score, grade, trend, criticalCount, highCount };
+  // ── Score drivers: top 3 by deviation from maximum ──────────────────────
+  const MAX = { REVENUE: 30, LABOUR: 20, DUTIES: 20, MAINTENANCE: 15, COMPLIANCE: 15 };
+  const allDrivers: ScoreDriver[] = [
+    {
+      module:    "REVENUE",
+      pts:       Math.round(revPts),
+      direction: revPts >= 25 ? "up" : "down",
+      reason:    revPts >= 28
+        ? `On or above target (+${Math.round(revPts)}/30 pts)`
+        : `${Math.abs(ctx.revenue.variance).toFixed(0)}% below target — -${Math.round(MAX.REVENUE - revPts)} pts`,
+    },
+    {
+      module:    "LABOUR",
+      pts:       Math.round(labPts),
+      direction: labPts >= 17 ? "up" : "down",
+      reason:    labPts >= 17
+        ? `Labour on budget (+${Math.round(labPts)}/20 pts)`
+        : `${ctx.labour.variance.toFixed(1)}% over target — -${Math.round(MAX.LABOUR - labPts)} pts`,
+    },
+    {
+      module:    "DUTIES",
+      pts:       Math.round(dutyPts),
+      direction: dutyPts >= 16 ? "up" : "down",
+      reason:    dutyPts >= 16
+        ? `${ctx.dailyOps.completionRate}% complete (+${Math.round(dutyPts)}/20 pts)`
+        : `${ctx.dailyOps.completionRate}% complete — -${Math.round(MAX.DUTIES - dutyPts)} pts`,
+    },
+    {
+      module:    "MAINTENANCE",
+      pts:       Math.round(maintPts),
+      direction: maintPts >= 13 ? "up" : "down",
+      reason:    ctx.maintenance.serviceBlocking
+        ? `Service blocked — -${MAX.MAINTENANCE} pts`
+        : ctx.maintenance.urgentCount > 0
+        ? `${ctx.maintenance.urgentCount} urgent issue${ctx.maintenance.urgentCount > 1 ? "s" : ""} — -${Math.round(MAX.MAINTENANCE - maintPts)} pts`
+        : `No urgent issues (+${Math.round(maintPts)}/15 pts)`,
+    },
+    {
+      module:    "COMPLIANCE",
+      pts:       Math.round(compPts),
+      direction: compPts >= 13 ? "up" : "down",
+      reason:    ctx.compliance.overdueCount === 0
+        ? `All items current (+${Math.round(compPts)}/15 pts)`
+        : `${ctx.compliance.overdueCount} overdue — -${Math.round(MAX.COMPLIANCE - compPts)} pts`,
+    },
+  ];
+
+  // Sort by impact on score (biggest losers first, then biggest winners)
+  const scoreDrivers = [...allDrivers]
+    .sort((a, b) => {
+      const lossA = (a.direction === "down" ? 1 : 0) * (30 - a.pts);
+      const lossB = (b.direction === "down" ? 1 : 0) * (30 - b.pts);
+      if (lossA !== lossB) return lossB - lossA;
+      return b.pts - a.pts;
+    })
+    .slice(0, 3);
+
+  return { score, grade, trend, criticalCount, highCount, scoreDrivers };
 }
 
 // ── Do-nothing consequences ────────────────────────────────────────────────────
@@ -454,10 +541,90 @@ const ESTIMATED_MINUTES: Partial<Record<string, number>> = {
   S8_UNEXPLAINED_REVENUE_GAP:        20,
 };
 
+function getOwnerRole(sig: CrossModuleSignal): "Shift Lead" | "GM" | "Head Office" {
+  if (sig.severity === "CRITICAL") return "GM";
+  if (sig.id === "S2_SERVICE_COLLAPSE_RISK")          return "Shift Lead";
+  if (sig.id === "S3_LABOUR_EFFICIENCY_ALERT")        return "Shift Lead";
+  if (sig.id === "S6_PRE_SERVICE_LABOUR_SURGE")       return "Shift Lead";
+  if (sig.id === "S7_OPS_MAINTENANCE_OVERLOAD")       return "Shift Lead";
+  if (sig.id === "S4_COMPLIANCE_MAINTENANCE_COMPOUND") return "GM";
+  return "GM";
+}
+
+function getEscalateTo(sig: CrossModuleSignal): "GM" | "Head Office" | "Facilities" | null {
+  if (sig.severity === "CRITICAL")                     return "Head Office";
+  if (sig.id === "S2_SERVICE_COLLAPSE_RISK")           return "GM";
+  if (sig.id === "S4_COMPLIANCE_MAINTENANCE_COMPOUND") return "Head Office";
+  if (sig.id === "S7_OPS_MAINTENANCE_OVERLOAD")        return "GM";
+  return null;
+}
+
+function buildFinancialImpact(
+  sig: CrossModuleSignal,
+  ctx: OperationsContext,
+  saHour: number,
+): string | null {
+  const hoursLeft = Math.max(0, 22 - saHour);
+  const runRate   = saHour > 0 ? ctx.revenue.actual / saHour : 0;
+
+  if (sig.id === "S1_REVENUE_RECOVERY_WINDOW" || sig.id === "S8_UNEXPLAINED_REVENUE_GAP") {
+    const gap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
+    if (gap > 0) return `${fmt(gap)} revenue gap`;
+  }
+  if (sig.id === "S2_SERVICE_COLLAPSE_RISK") {
+    const atRisk = Math.round(runRate * hoursLeft);
+    if (atRisk > 0) return `~${fmt(atRisk)} revenue exposure`;
+  }
+  if (sig.id === "S3_LABOUR_EFFICIENCY_ALERT") {
+    const labourCost = ctx.revenue.actual * ctx.labour.actualPercent / 100;
+    const targetCost = ctx.revenue.actual * ctx.labour.targetPercent / 100;
+    const excess     = Math.max(0, labourCost - targetCost);
+    if (excess > 0) return `${fmt(excess)} excess cost`;
+  }
+  if (sig.id === "S6_PRE_SERVICE_LABOUR_SURGE") {
+    const projRev = runRate > 0 ? runRate * 11 : 0;
+    if (projRev > 0) {
+      const excess = projRev * (ctx.labour.variance / 100);
+      if (excess > 0) return `~${fmt(excess)} excess if not corrected`;
+    }
+  }
+  if (sig.moneyAtRisk && sig.moneyAtRisk > 0) return `${fmt(sig.moneyAtRisk)} at risk`;
+  return null;
+}
+
+function buildRecoveryMeter(
+  ctx: OperationsContext,
+  saHour: number,
+  actionQueue: BrainOutput["actionQueue"],
+): RecoveryMeter | null {
+  // Only during service with a meaningful gap
+  if (ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed") return null;
+  const revenueGap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
+  if (revenueGap < 2_000) return null;
+
+  const hoursLeft      = Math.max(0, 22 - saHour);
+  const timeLeftMinutes = hoursLeft * 60;
+  const runRate         = saHour > 0 ? ctx.revenue.actual / saHour : 0;
+  const projRemaining   = runRate * hoursLeft;
+
+  const recoverable    = Math.min(revenueGap, projRemaining * 0.4);
+  const isOnTrack      = recoverable >= revenueGap;
+  const limitedWindow  = timeLeftMinutes < 60 && !isOnTrack;
+  const partialOnly    = revenueGap > recoverable * 1.1 && !isOnTrack;
+
+  const topActions: string[] = [];
+  if (actionQueue.length > 0) topActions.push(actionQueue[0].impact);
+  if (actionQueue.length > 1) topActions.push(actionQueue[1].impact);
+  if (topActions.length < 2)  topActions.push("Push walk-in conversion and floor energy.");
+
+  return { revenueGap, recoverable, timeLeftMinutes, isOnTrack, limitedWindow, partialOnly, topActions };
+}
+
 function buildActionQueue(
   rankedSignals: Array<{ sig: CrossModuleSignal; score: number }>,
   gmName: string,
   ctx: OperationsContext,
+  saHour: number,
 ): BrainOutput["actionQueue"] {
   return rankedSignals.slice(0, 5).map(({ sig }, idx) => ({
     priority:         idx + 1,
@@ -468,6 +635,10 @@ function buildActionQueue(
     estimatedMinutes: ESTIMATED_MINUTES[sig.id] ?? 15,
     moneyAtRisk:      sig.moneyAtRisk ?? null,
     deadline:         sig.timeWindow ?? null,
+    financialImpact:  buildFinancialImpact(sig, ctx, saHour),
+    ownerRole:        getOwnerRole(sig),
+    escalateTo:       getEscalateTo(sig),
+    status:           "not_started" as const,
   }));
 }
 
@@ -632,7 +803,7 @@ export async function runOperatingBrain(
       };
 
   const systemHealth   = computeSystemHealth(ctx, signals);
-  const actionQueue    = buildActionQueue(rankedSignals, gmData.name, ctx);
+  const actionQueue    = buildActionQueue(rankedSignals, gmData.name, ctx, saHour);
   const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), ctx, saHour);
 
   const hoursRemaining = Math.max(0, 22 - saHour);
@@ -656,10 +827,15 @@ export async function runOperatingBrain(
     isRamadan:         fcst.isRamadan,
     activeEvent:       fcst.activeEvent,
     eventUplift:       fcst.eventUplift,
+    isDayClosed:       ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed",
+    syncPending:       (ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed") &&
+                       ctx.revenue.actual < 5_000,
   };
 
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)
   const { userId: _uid, ...gmSituation } = gmData;
+
+  const recoveryMeter = buildRecoveryMeter(ctx, saHour, actionQueue);
 
   const brain: BrainOutput = {
     timestamp: new Date().toISOString(),
@@ -670,6 +846,7 @@ export async function runOperatingBrain(
     systemHealth,
     forecastSummary,
     gmSituation,
+    recoveryMeter,
     voiceLine: "",
   };
 
