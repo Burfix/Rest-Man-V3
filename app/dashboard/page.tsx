@@ -358,17 +358,6 @@ export default async function OperationsDashboard() {
     // non-fatal — PriorityActionBoard degrades without dutiesData
   }
 
-  // Align brain system health score with the canonical operating score so both
-  // the OperatingBrain panel and the existing score hero show the same number.
-  if (brain && scoreTotal > 0) {
-    brain.systemHealth.score = scoreTotal;
-    brain.systemHealth.grade =
-      scoreTotal >= 90 ? "A" :
-      scoreTotal >= 80 ? "B" :
-      scoreTotal >= 65 ? "C" :
-      scoreTotal >= 50 ? "D" : "F";
-  }
-
   // ─── Predictive signals for BusinessStatusRail ───────────────────────────
   const dutiesDriver   = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "DUTIES");
   const dutiesCompPct  = dutiesDriver ? Math.round((dutiesDriver.pts / 20) * 100) : 100;

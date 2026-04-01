@@ -316,8 +316,12 @@ function computeSystemHealth(
     ? 0
     : Math.max(0, 15 - ctx.maintenance.urgentCount * 4);
 
-  // Compliance: 15 pts (each overdue removes 5)
-  const compPts = Math.max(0, 15 - ctx.compliance.overdueCount * 5);
+  // Compliance: 15 pts
+  // Any expired/overdue item = full deduction (0/15) — legal/insurance exposure.
+  // At-risk items (due soon) = partial deduction.
+  const compPts = ctx.compliance.overdueCount > 0
+    ? 0
+    : Math.max(0, 15 - ctx.compliance.atRiskCount * 7);
 
   const score = Math.round(revPts + labPts + dutyPts + maintPts + compPts);
   let grade =
@@ -378,9 +382,11 @@ function computeSystemHealth(
       module:    "COMPLIANCE",
       pts:       Math.round(compPts),
       direction: compPts >= 13 ? "up" : "down",
-      reason:    ctx.compliance.overdueCount === 0
-        ? `All items current (+${Math.round(compPts)}/15 pts)`
-        : `${ctx.compliance.overdueCount} overdue — -${Math.round(MAX.COMPLIANCE - compPts)} pts`,
+      reason:    ctx.compliance.overdueCount > 0
+        ? `${ctx.compliance.overdueCount} expired — legal exposure, 0/15 pts`
+        : ctx.compliance.atRiskCount > 0
+        ? `${ctx.compliance.atRiskCount} item${ctx.compliance.atRiskCount > 1 ? "s" : ""} at risk — -${15 - Math.round(compPts)} pts`
+        : `All items current (+${Math.round(compPts)}/15 pts)`,
     },
   ];
 
