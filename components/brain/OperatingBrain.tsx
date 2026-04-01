@@ -231,9 +231,15 @@ export default function OperatingBrain({ brain }: Props) {
           <div className="font-mono">
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-black text-[#0a0a0a] dark:text-stone-100">{systemHealth.score}</span>
-              <span className={cn("text-xl font-black", GRADE_COLOR[systemHealth.grade] ?? "text-stone-500")}>
-                {systemHealth.grade}
-              </span>
+              {systemHealth.isDayStarting ? (
+                <span className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider">
+                  DAY STARTING
+                </span>
+              ) : (
+                <span className={cn("text-xl font-black", GRADE_COLOR[systemHealth.grade] ?? "text-stone-500")}>
+                  {systemHealth.grade}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
               <span className={cn("text-base font-bold leading-none", TREND_COLOR[systemHealth.trend])}>
@@ -247,6 +253,11 @@ export default function OperatingBrain({ brain }: Props) {
                   : "nominal"}
               </span>
             </div>
+            {!systemHealth.isDutyWindow && !systemHealth.isDayStarting && (
+              <p className="text-[9px] text-stone-500 dark:text-stone-600 font-mono mt-0.5">
+                Score reflects revenue + labour only · Duties scored from noon
+              </p>
+            )}
           </div>
 
           {/* Score Drivers */}

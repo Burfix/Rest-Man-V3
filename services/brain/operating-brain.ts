@@ -98,6 +98,10 @@ export type BrainOutput = {
     criticalCount: number;
     highCount: number;
     scoreDrivers: ScoreDriver[];
+    /** True before 11:00 (first 60 min of service) — show "Day Starting" label */
+    isDayStarting: boolean;
+    /** True from noon onwards — duty completion is scored from this point */
+    isDutyWindow: boolean;
   };
 
   forecastSummary: {
@@ -153,6 +157,8 @@ export const BRAIN_FALLBACK: BrainOutput = {
     criticalCount: 0,
     highCount: 0,
     scoreDrivers: [],
+    isDayStarting: false,
+    isDutyWindow: true,
   },
   forecastSummary: {
     projectedClose: 0,
@@ -295,7 +301,12 @@ function computeSystemHealth(
   const labPts = Math.max(0, 20 * (1 - labExcess / 20));
 
   // Duty completion: 20 pts
-  const dutyPts = (ctx.dailyOps.completionRate / 100) * 20;
+  // Duties are not expected to start in the first 2 hours of the day (before noon).
+  // Suppress penalty during this window to avoid false F-grade at 11:30.
+  const isDutyWindow = minutesElapsed >= 120;
+  const dutyPts = isDutyWindow
+    ? (ctx.dailyOps.completionRate / 100) * 20
+    : 20; // full credit until duty window opens
 
   // Maintenance: 15 pts (service-blocking = 0; each urgent removes 4)
   const maintPts = ctx.maintenance.serviceBlocking
@@ -306,11 +317,15 @@ function computeSystemHealth(
   const compPts = Math.max(0, 15 - ctx.compliance.overdueCount * 5);
 
   const score = Math.round(revPts + labPts + dutyPts + maintPts + compPts);
-  const grade =
+  let grade =
     score >= 90 ? "A" :
     score >= 80 ? "B" :
     score >= 65 ? "C" :
     score >= 50 ? "D" : "F";
+
+  // Before noon: clamp grade floor at D (duties haven't opened yet)
+  if (minutesElapsed < 120 && grade === "F") grade = "D";
+  const isDayStarting = minutesElapsed < 60; // before 11:00
 
   const criticalCount = signals.filter((s) => s.severity === "CRITICAL").length;
   const highCount     = signals.filter((s) => s.severity === "HIGH").length;
@@ -376,7 +391,7 @@ function computeSystemHealth(
     })
     .slice(0, 3);
 
-  return { score, grade, trend, criticalCount, highCount, scoreDrivers };
+  return { score, grade, trend, criticalCount, highCount, scoreDrivers, isDayStarting, isDutyWindow };
 }
 
 // ── Do-nothing consequences ────────────────────────────────────────────────────
@@ -411,7 +426,8 @@ function buildConsequences(
   for (const sig of signals.slice(0, 5)) {
     if (
       sig.id === "S1_REVENUE_RECOVERY_WINDOW" ||
-      sig.id === "S8_UNEXPLAINED_REVENUE_GAP"
+      sig.id === "S8_UNEXPLAINED_REVENUE_GAP" ||
+      sig.id === "S9_REVENUE_BEHIND_PACE"
     ) {
       if (hoursLeft > 1) {
         consequences.push({
@@ -523,6 +539,9 @@ function buildIfIgnored(
   if (sig.id === "S8_UNEXPLAINED_REVENUE_GAP") {
     return `Revenue ${pct(-Math.abs(ctx.revenue.variance))} behind with no clear operational cause — floor conversion opportunity missed by close.`;
   }
+  if (sig.id === "S9_REVENUE_BEHIND_PACE") {
+    return `Revenue gap of ${fmt(revGap)} locks in as session closes — no recovery path after service ends.`;
+  }
   return sig.recommendation.split(".")[0] + ".";
 }
 
@@ -560,6 +579,7 @@ const ESTIMATED_MINUTES: Partial<Record<string, number>> = {
   S6_PRE_SERVICE_LABOUR_SURGE:       10,
   S7_OPS_MAINTENANCE_OVERLOAD:       20,
   S8_UNEXPLAINED_REVENUE_GAP:        20,
+  S9_REVENUE_BEHIND_PACE:            15,
 };
 
 function getOwnerRole(sig: CrossModuleSignal): "Shift Lead" | "GM" | "Head Office" {
@@ -588,7 +608,7 @@ function buildFinancialImpact(
   const hoursLeft = Math.max(0, 22 - saHour);
   const runRate   = saHour > 0 ? ctx.revenue.actual / saHour : 0;
 
-  if (sig.id === "S1_REVENUE_RECOVERY_WINDOW" || sig.id === "S8_UNEXPLAINED_REVENUE_GAP") {
+  if (sig.id === "S1_REVENUE_RECOVERY_WINDOW" || sig.id === "S8_UNEXPLAINED_REVENUE_GAP" || sig.id === "S9_REVENUE_BEHIND_PACE") {
     const gap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
     if (gap > 0) return `${fmt(gap)} revenue gap`;
   }
@@ -780,8 +800,6 @@ export async function runOperatingBrain(
     return { ...BRAIN_FALLBACK, siteId, timestamp: new Date().toISOString() };
   }
 
-  const signals = detectSignals(ctx);
-
   // ── SAST time with minute precision ────────────────────────────────────────
   const saTimeStr = new Date().toLocaleString("en-US", {
     timeZone: "Africa/Johannesburg",
@@ -800,10 +818,36 @@ export async function runOperatingBrain(
   const minutesElapsed  = Math.max(0, totalMinutes - OPENING_HOUR * 60);
   const minutesRemaining = Math.max(0, CLOSE_HOUR * 60 - totalMinutes);
 
+  // ── Forecast (computed before signal detection to enable effectiveCtx) ─────
+  const fcst = forecastToday(
+    date,
+    ctx.revenue.actual,
+    minutesElapsed,
+    minutesRemaining,
+    ctx.revenue.target > 0 ? ctx.revenue.target : undefined,
+    siteId,
+    dbEvents,
+  );
+
+  // ── Patch ctx when no DB target: use DOW baseline so signals see real variance
+  const effectiveCtx: OperationsContext =
+    ctx.revenue.target === 0 && (fcst.dayBaseline ?? 0) > 0
+      ? {
+          ...ctx,
+          revenue: {
+            ...ctx.revenue,
+            target:   fcst.dayBaseline!,
+            variance: +((ctx.revenue.actual - fcst.dayBaseline!) / fcst.dayBaseline! * 100).toFixed(1),
+          },
+        }
+      : ctx;
+
+  const signals = detectSignals(effectiveCtx);
+
   // Rank signals (exclude INFO)
   const rankedSignals = signals
     .filter((s) => s.severity !== "INFO")
-    .map((sig) => ({ sig, score: scoreSignal(sig, ctx, saHour) }))
+    .map((sig) => ({ sig, score: scoreSignal(sig, effectiveCtx, saHour) }))
     .sort((a, b) => b.score - a.score);
 
   const topSignal = rankedSignals[0]?.sig;
@@ -816,7 +860,7 @@ export async function runOperatingBrain(
 
   // Nominal state when no actionable threats
   const primaryThreat: BrainOutput["primaryThreat"] = topSignal
-    ? buildPrimaryThreat(topSignal, ctx, saHour, gmOwner)
+    ? buildPrimaryThreat(topSignal, effectiveCtx, saHour, gmOwner)
     : {
         title:             "All Systems Nominal",
         description:       "No active threats detected across any module.",
@@ -831,19 +875,9 @@ export async function runOperatingBrain(
         confidence:        "high",
       };
 
-  const systemHealth   = computeSystemHealth(ctx, signals, minutesElapsed);
-  const actionQueue    = buildActionQueue(rankedSignals, gmData.name, ctx, saHour);
-  const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), ctx, minutesElapsed, minutesRemaining);
-
-  const fcst = forecastToday(
-    date,
-    ctx.revenue.actual,
-    minutesElapsed,
-    minutesRemaining,
-    ctx.revenue.target > 0 ? ctx.revenue.target : undefined,
-    siteId,
-    dbEvents,
-  );
+  const systemHealth   = computeSystemHealth(effectiveCtx, signals, minutesElapsed);
+  const actionQueue    = buildActionQueue(rankedSignals, gmData.name, effectiveCtx, saHour);
+  const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), effectiveCtx, minutesElapsed, minutesRemaining);
 
   const forecastSummary: BrainOutput["forecastSummary"] = {
     projectedClose:    fcst.projectedClose,
@@ -856,16 +890,16 @@ export async function runOperatingBrain(
     isRamadan:         fcst.isRamadan,
     activeEvent:       fcst.activeEvent,
     eventUplift:       fcst.eventUplift,
-    isDayClosed:       ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed",
-    syncPending:       (ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed") &&
-                       ctx.revenue.actual < 5_000,
+    isDayClosed:       effectiveCtx.meta.timeOfDay === "post-service" || effectiveCtx.meta.timeOfDay === "closed",
+    syncPending:       (effectiveCtx.meta.timeOfDay === "post-service" || effectiveCtx.meta.timeOfDay === "closed") &&
+                       effectiveCtx.revenue.actual < 5_000,
     isPreService:      fcst.isPreService,
   };
 
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)
   const { userId: _uid, ...gmSituation } = gmData;
 
-  const recoveryMeter = buildRecoveryMeter(ctx, minutesElapsed, minutesRemaining, actionQueue);
+  const recoveryMeter = buildRecoveryMeter(effectiveCtx, minutesElapsed, minutesRemaining, actionQueue);
 
   const brain: BrainOutput = {
     timestamp: new Date().toISOString(),
@@ -880,7 +914,7 @@ export async function runOperatingBrain(
     voiceLine: "",
   };
 
-  brain.voiceLine = generateVoice(brain, ctx);
+  brain.voiceLine = generateVoice(brain, effectiveCtx);
 
   return brain;
 }

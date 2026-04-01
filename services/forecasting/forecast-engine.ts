@@ -39,9 +39,16 @@ export type ForecastResult = {
   vsSameDayLastYear: number | null;
   /**
    * % vs daily revenue target — compares PROJECTED CLOSE to target, not current revenue.
-   * Positive = ahead of target. 0 if no target provided.
+   * Uses DB target if available; falls back to DOW-adjusted SDLY baseline.
+   * Positive = ahead of target. 0 if neither target nor baseline is available.
    */
   vsTarget: number;
+  /**
+   * Day-of-week adjusted SDLY baseline (ZAR).
+   * sdlyDailyAvg × dow_weight — used as fallback target when no DB target exists.
+   * Null if no SDLY data is available.
+   */
+  dayBaseline: number | null;
   /** Seasonality multiplier for this calendar month */
   seasonalityIndex: number;
   /** How reliable this projection is */
@@ -62,6 +69,28 @@ export type ForecastResult = {
   /** True when no trading minutes have elapsed yet — showing SDLY baseline, not a live projection */
   isPreService: boolean;
 };
+
+// ── Day-of-week weight table ───────────────────────────────────────────────────
+
+/**
+ * Si Cantina day-of-week revenue weights relative to the monthly average.
+ * Derived from 20-month dataset. Sun/Sat are strongest; Mon/Tue/Wed weakest.
+ * Used as a fallback daily target when no DB target is configured.
+ */
+const SI_CANTINA_DOW_WEIGHT: Record<number, number> = {
+  0: 1.25, // Sun
+  1: 0.65, // Mon
+  2: 0.70, // Tue
+  3: 0.70, // Wed
+  4: 0.80, // Thu
+  5: 1.10, // Fri
+  6: 1.30, // Sat
+};
+
+function getDowWeight(dayOfWeek: number, siteKey: SiteKey): number {
+  if (siteKey === "si-cantina") return SI_CANTINA_DOW_WEIGHT[dayOfWeek] ?? 1.0;
+  return 1.0;
+}
 
 // ── Site routing ──────────────────────────────────────────────────────────────
 
@@ -174,6 +203,10 @@ export function forecastToday(
   const siteKey  = resolveSiteKey(siteId);
   const seasIdx  = monthlySeasonalityIndex(calMonth, siteId);
 
+  // Day-of-week for DOW baseline (use noon to avoid DST edge)
+  const dow    = new Date(date + "T12:00:00").getDay();
+  const dowWt  = getDowWeight(dow, siteKey);
+
   // ── 1. Event uplift (evaluated first) ──────────────────────────────────────
   const eventData = eventUpliftFactor(date, siteId, dbEvents);
 
@@ -246,10 +279,12 @@ export function forecastToday(
   }
 
   // ── 5. vs Target — compare PROJECTED CLOSE to target (not current revenue) ─
-  const vsTarget =
-    revenueTarget && revenueTarget > 0
-      ? +((projectedClose - revenueTarget) / revenueTarget * 100).toFixed(1)
-      : 0;
+  // DB target takes priority; DOW-adjusted SDLY baseline is the fallback.
+  const dayBaseline  = sdlyDaily !== null ? Math.round(sdlyDaily * dowWt) : null;
+  const effectiveTgt = (revenueTarget ?? 0) > 0 ? revenueTarget! : (dayBaseline ?? 0);
+  const vsTarget     = effectiveTgt > 0
+    ? +((projectedClose - effectiveTgt) / effectiveTgt * 100).toFixed(1)
+    : 0;
 
   // ── 6. vs SDLY ────────────────────────────────────────────────────────────
   let vsSameDayLastYear: number | null = null;
@@ -274,6 +309,7 @@ export function forecastToday(
   return {
     projectedClose:    Math.round(projectedClose),
     sdlyDailyAvg:      sdlyDaily !== null ? Math.round(sdlyDaily) : null,
+    dayBaseline,
     vsSameDayLastYear,
     vsTarget,
     seasonalityIndex:  seasIdx,

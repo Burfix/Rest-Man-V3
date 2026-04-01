@@ -243,6 +243,29 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
     });
   }
 
+  // ── SIGNAL 9 — Revenue Behind Pace (Service, standalone) ───────────────────
+  // Fires when revenue is significantly behind during service without requiring
+  // compound conditions (unlike S1 which also needs labour + ops triggers).
+  // Guards against duplicate: suppressed when S1 is already active.
+  if (
+    meta.timeOfDay === "service" &&
+    rev.variance < -20 &&
+    rev.target > 0 &&
+    !signals.some((s) => s.id === "S1_REVENUE_RECOVERY_WINDOW")
+  ) {
+    signals.push({
+      id: "S9_REVENUE_BEHIND_PACE",
+      modules: ["REVENUE"],
+      severity: rev.variance < -35 ? "CRITICAL" : "HIGH",
+      title: rev.variance < -35 ? "Revenue Critically Behind Pace" : "Revenue Behind Pace",
+      recommendation: `Revenue ${pct(rev.variance)} behind target during service. Push floor conversion, walk-in capture, and table turn rate.`,
+      moneyAtRisk: revGapAbs,
+      timeWindow: "This session",
+      confidence: 88,
+      triggeredConditions: [`Revenue ${pct(rev.variance)} during service`],
+    });
+  }
+
   // ── Sort by severity ────────────────────────────────────────────────────────
   return signals.sort((a, b) => SEV_WEIGHT[b.severity] - SEV_WEIGHT[a.severity]);
 }
