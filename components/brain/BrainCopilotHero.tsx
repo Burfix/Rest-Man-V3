@@ -101,7 +101,7 @@ export default function BrainCopilotHero({ brain }: Props) {
           }
         />
         <MetricCell
-          label={forecastSummary.isDayClosed ? "TODAY'S REV" : "PROJ CLOSE"}
+          label={forecastSummary.isDayClosed ? "TODAY'S REV" : forecastSummary.isPreService ? "BASELINE" : "PROJ CLOSE"}
           value={
             forecastSummary.syncPending
               ? "Sync pending"
@@ -109,6 +109,7 @@ export default function BrainCopilotHero({ brain }: Props) {
           }
           tone={
             forecastSummary.syncPending ? "warning"
+            : forecastSummary.isPreService ? "neutral"
             : (forecastSummary.vsTarget ?? 0) >= 0 ? "positive"
             : (forecastSummary.vsTarget ?? 0) > -15 ? "warning"
             : "critical"

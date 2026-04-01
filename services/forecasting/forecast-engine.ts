@@ -38,7 +38,7 @@ export type ForecastResult = {
    */
   vsSameDayLastYear: number | null;
   /**
-   * % vs daily revenue target.
+   * % vs daily revenue target — compares PROJECTED CLOSE to target, not current revenue.
    * Positive = ahead of target. 0 if no target provided.
    */
   vsTarget: number;
@@ -59,6 +59,8 @@ export type ForecastResult = {
   activeEvent: string | null;
   /** Uplift multiplier applied (e.g. 1.40). Null if no event. */
   eventUplift: number | null;
+  /** True when no trading minutes have elapsed yet — showing SDLY baseline, not a live projection */
+  isPreService: boolean;
 };
 
 // ── Site routing ──────────────────────────────────────────────────────────────
@@ -147,31 +149,30 @@ export function monthlySeasonalityIndex(
  * Processing order:
  *   1. Evaluate event uplift (needed before September SDLY decision)
  *   2. SDLY lookup — apply Aug/Oct fallback for anomalous September if no event
- *   3. Blend run-rate with SDLY (weighted by service progress)
+ *   3. Blend run-rate (from opening time) with SDLY daily average
  *   4. Apply event uplift multiplier
  *   5. Apply Ramadan suppression (only when no active event)
  *
- * @param date            ISO "YYYY-MM-DD"
- * @param currentRevenue  Revenue recorded so far today (ZAR)
- * @param hoursRemaining  Hours left in service window (0 = service closed)
- * @param revenueTarget   Optional daily revenue target (ZAR)
- * @param siteId          Site identifier — UUID or org slug (e.g. "si-cantina")
- * @param dbEvents        Events from site_events DB table, loaded by the caller
+ * @param date             ISO "YYYY-MM-DD"
+ * @param currentRevenue   Revenue recorded so far today (ZAR)
+ * @param minutesElapsed   Minutes since restaurant opened (0 if pre-service)
+ * @param minutesRemaining Minutes until restaurant closes (0 if closed)
+ * @param revenueTarget    Optional daily revenue target (ZAR)
+ * @param siteId           Site identifier — UUID or org slug (e.g. "si-cantina")
+ * @param dbEvents         Events from site_events DB table, loaded by the caller
  */
 export function forecastToday(
   date: string,
   currentRevenue: number,
-  hoursRemaining: number,
+  minutesElapsed: number,
+  minutesRemaining: number,
   revenueTarget?: number,
   siteId = "si-cantina",
   dbEvents: SportsEvent[] = [],
 ): ForecastResult {
-  const SERVICE_END_HOUR = 22;
-  const hoursElapsed     = Math.max(0, SERVICE_END_HOUR - hoursRemaining);
-  const calMonth         = parseInt(date.split("-")[1], 10);  // 1–12
-  const siteKey          = resolveSiteKey(siteId);
-
-  const seasIdx = monthlySeasonalityIndex(calMonth, siteId);
+  const calMonth = parseInt(date.split("-")[1], 10);  // 1–12
+  const siteKey  = resolveSiteKey(siteId);
+  const seasIdx  = monthlySeasonalityIndex(calMonth, siteId);
 
   // ── 1. Event uplift (evaluated first) ──────────────────────────────────────
   const eventData = eventUpliftFactor(date, siteId, dbEvents);
@@ -181,8 +182,6 @@ export function forecastToday(
   let sdlyDaily   = rawSdly?.dailyAvg ?? null;
   let sdlyAnomaly = rawSdly?.anomaly  ?? null;
 
-  // September SDLY fallback: when SDLY is an anomalous September AND no event
-  // confirmed today → substitute the Aug/Oct average to exclude the event spike.
   if (
     calMonth === 9 &&
     rawSdly?.anomaly &&
@@ -202,23 +201,32 @@ export function forecastToday(
     }
   }
 
-  // ── 3. Projected close (run-rate × SDLY blend) ────────────────────────────
+  // ── 3. Projected close ────────────────────────────────────────────────────
+  //
+  // Run rate is calculated from actual minutes traded since opening.
+  // SDLY daily average is already a full-day revenue figure — no multiplier needed.
+  //
   let projectedClose: number;
   let confidence: ForecastResult["confidence"] = "medium";
 
-  if (hoursRemaining <= 0) {
+  if (minutesRemaining <= 0) {
+    // Day is closed — actuals are final
     projectedClose = currentRevenue;
     confidence     = "high";
 
-  } else if (hoursElapsed > 0) {
-    const runRateProjection = (currentRevenue / hoursElapsed) * SERVICE_END_HOUR;
+  } else if (minutesElapsed > 0) {
+    // Service is live: run rate = revenue per minute since opening
+    const runRate           = currentRevenue / minutesElapsed;
+    const runRateProjection = currentRevenue + runRate * minutesRemaining;
 
     if (sdlyDaily !== null) {
-      const progress   = hoursElapsed / SERVICE_END_HOUR;
-      const runWeight  = Math.min(0.85, progress * 1.4);
-      const sdlyWeight = 1 - runWeight;
+      const totalMinutes = minutesElapsed + minutesRemaining;
+      const progress     = minutesElapsed / totalMinutes;
+      const runWeight    = Math.min(0.85, progress * 1.4);
+      const sdlyWeight   = 1 - runWeight;
 
-      projectedClose = runRateProjection * runWeight + (sdlyDaily * SERVICE_END_HOUR) * sdlyWeight;
+      // sdlyDaily is the full-day average — blend directly (no × SERVICE_END_HOUR)
+      projectedClose = runRateProjection * runWeight + sdlyDaily * sdlyWeight;
       confidence     = progress > 0.5 ? "high" : "medium";
     } else {
       projectedClose = runRateProjection;
@@ -226,28 +234,29 @@ export function forecastToday(
     }
 
   } else {
-    projectedClose = sdlyDaily !== null ? sdlyDaily * SERVICE_END_HOUR : 0;
+    // Pre-service: no trading minutes yet — show SDLY daily average as baseline
+    projectedClose = sdlyDaily !== null ? sdlyDaily : 0;
     confidence     = "low";
   }
 
   // ── 4. Apply event uplift multiplier ──────────────────────────────────────
-  if (eventData.multiplier > 1.0 && hoursRemaining > 0) {
+  if (eventData.multiplier > 1.0 && minutesRemaining > 0) {
     projectedClose = projectedClose * eventData.multiplier;
     if (confidence === "low") confidence = "medium";
   }
 
-  // ── 5. vs Target ──────────────────────────────────────────────────────────
+  // ── 5. vs Target — compare PROJECTED CLOSE to target (not current revenue) ─
   const vsTarget =
     revenueTarget && revenueTarget > 0
-      ? +((currentRevenue - revenueTarget) / revenueTarget * 100).toFixed(1)
+      ? +((projectedClose - revenueTarget) / revenueTarget * 100).toFixed(1)
       : 0;
 
   // ── 6. vs SDLY ────────────────────────────────────────────────────────────
   let vsSameDayLastYear: number | null = null;
   if (sdlyDaily !== null && sdlyDaily > 0) {
-    if (hoursRemaining <= 0) {
+    if (minutesRemaining <= 0) {
       vsSameDayLastYear = +((currentRevenue - sdlyDaily) / sdlyDaily * 100).toFixed(1);
-    } else if (hoursElapsed > 0) {
+    } else if (minutesElapsed > 0) {
       vsSameDayLastYear = +((projectedClose - sdlyDaily) / sdlyDaily * 100).toFixed(1);
     }
   }
@@ -257,7 +266,7 @@ export function forecastToday(
 
   // ── 8. Ramadan suppression (skipped when event active) ────────────────────
   const ramadan = isRamadanPeriod(date);
-  if (ramadan && hoursRemaining > 0 && eventData.multiplier <= 1.0) {
+  if (ramadan && minutesRemaining > 0 && eventData.multiplier <= 1.0) {
     projectedClose = projectedClose * 0.70;
     if (confidence === "low") confidence = "medium";
   }
@@ -274,5 +283,6 @@ export function forecastToday(
     ramadanWarning:    ramadan ? RAMADAN_WARNING : null,
     activeEvent:       eventData.eventName,
     eventUplift:       eventData.multiplier > 1.0 ? eventData.multiplier : null,
+    isPreService:      minutesElapsed === 0 && minutesRemaining > 0,
   };
 }

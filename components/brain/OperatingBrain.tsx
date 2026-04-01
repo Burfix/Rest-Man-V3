@@ -280,7 +280,11 @@ export default function OperatingBrain({ brain }: Props) {
           {/* Forecast */}
           <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 font-mono space-y-0.5">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block">
-              {forecastSummary.isDayClosed ? "TODAY'S REVENUE" : "PROJECTED CLOSE"}
+              {forecastSummary.isDayClosed
+                ? "TODAY'S REVENUE"
+                : forecastSummary.isPreService
+                ? "FORECAST · BASELINE"
+                : "PROJECTED CLOSE"}
             </span>
             {forecastSummary.syncPending ? (
               <span className="text-[11px] text-amber-500 font-medium">Sync pending</span>
@@ -289,13 +293,14 @@ export default function OperatingBrain({ brain }: Props) {
                 {forecastSummary.projectedClose > 0 ? fmt(forecastSummary.projectedClose) : "—"}
               </span>
             )}
-            {forecastSummary.projectedClose > 0 && !forecastSummary.isDayClosed && !forecastSummary.syncPending && (
+            {/* Show ±% vs target for live projection and closed day; suppress for pre-service baseline */}
+            {forecastSummary.projectedClose > 0 && !forecastSummary.isPreService && !forecastSummary.syncPending && (
               <span className={cn(
                 "text-[11px] font-bold block",
                 (forecastSummary.vsTarget ?? 0) >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400",
               )}>
                 {(forecastSummary.vsTarget ?? 0) >= 0 ? "+" : ""}
-                {(forecastSummary.vsTarget ?? 0).toFixed(1)}% target
+                {(forecastSummary.vsTarget ?? 0).toFixed(1)}% vs target
               </span>
             )}
           </div>

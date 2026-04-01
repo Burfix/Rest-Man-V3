@@ -111,6 +111,8 @@ export type BrainOutput = {
     eventUplift: number | null;
     isDayClosed: boolean;
     syncPending: boolean;
+    /** True when no trading minutes have elapsed — showing SDLY baseline, not a live projection */
+    isPreService: boolean;
   };
 
   gmSituation: {
@@ -163,6 +165,7 @@ export const BRAIN_FALLBACK: BrainOutput = {
     eventUplift: null,
     isDayClosed: false,
     syncPending: false,
+    isPreService: false,
   },
   gmSituation: {
     name: "Unknown",
@@ -268,9 +271,24 @@ function scoreSignal(
 function computeSystemHealth(
   ctx: OperationsContext,
   signals: CrossModuleSignal[],
+  minutesElapsed: number,
 ): BrainOutput["systemHealth"] {
-  // Revenue: 30 pts (full at target, degrades linearly)
-  const revPts = Math.max(0, Math.min(30, 30 * (1 + ctx.revenue.variance / 100)));
+  // ── Revenue: 30 pts ─────────────────────────────────────────────────────
+  // Early service (first 3 hours): use prorated target so the score reflects
+  // progress relative to elapsed trading time, not the full day.
+  const SERVICE_DURATION_MINUTES = 720; // 10:00–22:00
+  let revenueVarianceForScore = ctx.revenue.variance;
+  if (
+    minutesElapsed > 0 &&
+    minutesElapsed < 360 &&
+    ctx.revenue.target > 0
+  ) {
+    const proratedTarget = ctx.revenue.target * (minutesElapsed / SERVICE_DURATION_MINUTES);
+    revenueVarianceForScore = +(
+      (ctx.revenue.actual - proratedTarget) / proratedTarget * 100
+    ).toFixed(1);
+  }
+  const revPts = Math.max(0, Math.min(30, 30 * (1 + revenueVarianceForScore / 100)));
 
   // Labour: 20 pts (over-target reduces score)
   const labExcess = Math.max(0, ctx.labour.variance);
@@ -310,7 +328,7 @@ function computeSystemHealth(
       direction: revPts >= 25 ? "up" : "down",
       reason:    revPts >= 28
         ? `On or above target (+${Math.round(revPts)}/30 pts)`
-        : `${Math.abs(ctx.revenue.variance).toFixed(0)}% below target — -${Math.round(MAX.REVENUE - revPts)} pts`,
+        : `${Math.abs(revenueVarianceForScore).toFixed(0)}% below target — -${Math.round(MAX.REVENUE - revPts)} pts`,
     },
     {
       module:    "LABOUR",
@@ -375,16 +393,19 @@ function pct(n: number): string {
 function buildConsequences(
   signals: CrossModuleSignal[],
   ctx: OperationsContext,
-  hour: number,
+  minutesElapsed: number,
+  minutesRemaining: number,
 ): BrainOutput["doNothingConsequences"] {
   const consequences: BrainOutput["doNothingConsequences"] = [];
-  const hoursLeft = Math.max(0, 22 - hour);
-  const revGap = ctx.revenue.target > 0
+  const hoursLeft  = Math.round(minutesRemaining / 60);
+  const revGap     = ctx.revenue.target > 0
     ? Math.abs(ctx.revenue.actual - ctx.revenue.target)
     : 0;
 
-  const runRate    = hour > 0 ? ctx.revenue.actual / hour : 0;
-  const projClose  = runRate * 22;
+  const runRate    = minutesElapsed > 0 ? ctx.revenue.actual / minutesElapsed : 0;
+  const projClose  = minutesElapsed > 0
+    ? ctx.revenue.actual + runRate * minutesRemaining
+    : 0;
   const expectedGap = Math.max(0, ctx.revenue.target - projClose);
 
   for (const sig of signals.slice(0, 5)) {
@@ -594,7 +615,8 @@ function buildFinancialImpact(
 
 function buildRecoveryMeter(
   ctx: OperationsContext,
-  saHour: number,
+  minutesElapsed: number,
+  minutesRemaining: number,
   actionQueue: BrainOutput["actionQueue"],
 ): RecoveryMeter | null {
   // Only during service with a meaningful gap
@@ -602,10 +624,9 @@ function buildRecoveryMeter(
   const revenueGap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
   if (revenueGap < 2_000) return null;
 
-  const hoursLeft      = Math.max(0, 22 - saHour);
-  const timeLeftMinutes = hoursLeft * 60;
-  const runRate         = saHour > 0 ? ctx.revenue.actual / saHour : 0;
-  const projRemaining   = runRate * hoursLeft;
+  const timeLeftMinutes = minutesRemaining;
+  const runRate         = minutesElapsed > 0 ? ctx.revenue.actual / minutesElapsed : 0;
+  const projRemaining   = runRate * minutesRemaining;
 
   const recoverable    = Math.min(revenueGap, projRemaining * 0.4);
   const isOnTrack      = recoverable >= revenueGap;
@@ -761,15 +782,23 @@ export async function runOperatingBrain(
 
   const signals = detectSignals(ctx);
 
-  // SAST hour
-  const saHour = parseInt(
-    new Date().toLocaleString("en-US", {
-      timeZone: "Africa/Johannesburg",
-      hour: "numeric",
-      hour12: false,
-    }),
-    10,
-  );
+  // ── SAST time with minute precision ────────────────────────────────────────
+  const saTimeStr = new Date().toLocaleString("en-US", {
+    timeZone: "Africa/Johannesburg",
+    hour:     "numeric",
+    minute:   "2-digit",
+    hour12:   false,
+  });
+  const [saHourStr, saMinStr] = saTimeStr.split(":");
+  const saHour   = parseInt(saHourStr, 10);
+  const saMinute = parseInt(saMinStr ?? "0", 10);
+
+  // Minutes since restaurant opened (10:00) and until close (22:00)
+  const OPENING_HOUR = 10;
+  const CLOSE_HOUR   = 22;
+  const totalMinutes    = saHour * 60 + saMinute;
+  const minutesElapsed  = Math.max(0, totalMinutes - OPENING_HOUR * 60);
+  const minutesRemaining = Math.max(0, CLOSE_HOUR * 60 - totalMinutes);
 
   // Rank signals (exclude INFO)
   const rankedSignals = signals
@@ -802,15 +831,15 @@ export async function runOperatingBrain(
         confidence:        "high",
       };
 
-  const systemHealth   = computeSystemHealth(ctx, signals);
+  const systemHealth   = computeSystemHealth(ctx, signals, minutesElapsed);
   const actionQueue    = buildActionQueue(rankedSignals, gmData.name, ctx, saHour);
-  const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), ctx, saHour);
+  const doNothingConsequences = buildConsequences(rankedSignals.map((r) => r.sig), ctx, minutesElapsed, minutesRemaining);
 
-  const hoursRemaining = Math.max(0, 22 - saHour);
   const fcst = forecastToday(
     date,
     ctx.revenue.actual,
-    hoursRemaining,
+    minutesElapsed,
+    minutesRemaining,
     ctx.revenue.target > 0 ? ctx.revenue.target : undefined,
     siteId,
     dbEvents,
@@ -818,10 +847,10 @@ export async function runOperatingBrain(
 
   const forecastSummary: BrainOutput["forecastSummary"] = {
     projectedClose:    fcst.projectedClose,
-    vsTarget:          ctx.revenue.variance,
+    vsTarget:          fcst.vsTarget,   // projected close vs target (not current revenue)
     vsSameDayLastYear: fcst.vsSameDayLastYear,
-    recoverable:       ctx.revenue.variance > -30,
-    recoveryAction:    ctx.revenue.variance < -10
+    recoverable:       fcst.vsTarget > -30,
+    recoveryAction:    fcst.vsTarget < -10
       ? "Push floor conversion and walk-in capture to close the gap."
       : null,
     isRamadan:         fcst.isRamadan,
@@ -830,12 +859,13 @@ export async function runOperatingBrain(
     isDayClosed:       ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed",
     syncPending:       (ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed") &&
                        ctx.revenue.actual < 5_000,
+    isPreService:      fcst.isPreService,
   };
 
   // Remove gmSituation's internal userId before returning (it's already in primaryThreat.owner)
   const { userId: _uid, ...gmSituation } = gmData;
 
-  const recoveryMeter = buildRecoveryMeter(ctx, saHour, actionQueue);
+  const recoveryMeter = buildRecoveryMeter(ctx, minutesElapsed, minutesRemaining, actionQueue);
 
   const brain: BrainOutput = {
     timestamp: new Date().toISOString(),
