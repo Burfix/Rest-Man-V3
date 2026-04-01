@@ -92,16 +92,27 @@ export async function buildOperationsContext(
   const supabase = createServerClient();
   const now = Date.now();
 
-  const [revRes, manualRes, snapRes, labRes, siteRes, actRes, maintRes, compRes] =
+  // ── Step 1: Resolve MICROS connection ID (needed for daily sales query) ──
+  // micros_connections has no site_id FK — convention-based single-site lookup.
+  const connRes = await (supabase as any)
+    .from("micros_connections")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const microsConnectionId = (connRes.data as { id: string } | null)?.id ?? null;
+
+  // ── Step 2: Parallel fetch everything ──────────────────────────────────────
+  const [revRes, manualRes, microsRes, snapRes, labRes, siteRes, actRes, maintRes, compRes] =
     await Promise.all([
-      // Revenue records (secondary / fallback)
+      // Revenue records (tertiary fallback)
       supabase
         .from("revenue_records")
         .select("net_vat_excl, net_sales")
         .eq("site_id", siteId)
         .eq("service_date", date),
 
-      // Manual sales upload (primary — same source as Business Status panel)
+      // Manual sales upload (secondary fallback)
       (supabase as any)
         .from("manual_sales_uploads")
         .select("net_sales, gross_sales")
@@ -110,6 +121,16 @@ export async function buildOperationsContext(
         .order("uploaded_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+
+      // MICROS daily sales (primary — same source as Business Status panel)
+      microsConnectionId
+        ? (supabase as any)
+            .from("micros_sales_daily")
+            .select("net_sales, gross_sales")
+            .eq("connection_id", microsConnectionId)
+            .eq("business_date", date)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
 
       // Target from snapshot
       supabase
@@ -157,14 +178,27 @@ export async function buildOperationsContext(
     ]);
 
   // ── Revenue ────────────────────────────────────────────────────────────────
-  const revRows    = (revRes.data   ?? []) as { net_vat_excl: number | null; net_sales: number | null }[];
-  const snapRows   = (snapRes.data  ?? []) as { revenue_target: number | null }[];
-  const manualRow  = manualRes.data as { net_sales: number | null; gross_sales: number | null } | null;
+  const revRows   = (revRes.data  ?? []) as { net_vat_excl: number | null; net_sales: number | null }[];
+  const snapRows  = (snapRes.data ?? []) as { revenue_target: number | null }[];
+  const manualRow = manualRes.data as { net_sales: number | null; gross_sales: number | null } | null;
+  const microsRow = microsRes.data as { net_sales: number | null; gross_sales: number | null } | null;
 
-  // Prefer manual_sales_uploads (same source as Business Status panel) → fall back to revenue_records
-  const actual     = manualRow
-    ? (manualRow.net_sales ?? manualRow.gross_sales ?? 0)
-    : revRows.reduce((s, r) => s + (r.net_vat_excl ?? r.net_sales ?? 0), 0);
+  // Priority: MICROS live daily → manual upload → revenue_records
+  // (Identical resolution order to Business Status panel / getCurrentSalesSnapshot)
+  let actual: number;
+  let revenueSource: string;
+  if (microsRow && (microsRow.net_sales ?? 0) > 0) {
+    actual = microsRow.net_sales!;
+    revenueSource = `micros_sales_daily net_sales (conn ${microsConnectionId})`;
+  } else if (manualRow && (manualRow.net_sales ?? manualRow.gross_sales ?? 0) > 0) {
+    actual = manualRow.net_sales ?? manualRow.gross_sales ?? 0;
+    revenueSource = "manual_sales_uploads";
+  } else {
+    actual = revRows.reduce((s, r) => s + (r.net_vat_excl ?? r.net_sales ?? 0), 0);
+    revenueSource = `revenue_records (${revRows.length} rows)`;
+  }
+
+  console.log(`[ContextBuilder] Revenue source: R${Math.round(actual)} from ${revenueSource} | date=${date} | site=${siteId}`);
   const target     = snapRows[0]?.revenue_target ? Number(snapRows[0].revenue_target) : 0;
   const variance   = target > 0 ? +((actual - target) / target * 100).toFixed(1) : 0;
   const trend: RevenueContext["trend"] =
