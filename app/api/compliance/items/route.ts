@@ -3,6 +3,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { createComplianceItemSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
+import { invalidateBrainCacheForSite } from "@/lib/brain/cache";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,6 @@ export async function GET() {
     const { data, error } = await (supabase as any)
       .from("compliance_items")
       .select("*, compliance_documents(*)")
-      .eq("site_id", ctx.siteId)
       .order("next_due_date", { ascending: true });
 
     if (error) throw error;
@@ -40,7 +40,6 @@ export async function POST(req: NextRequest) {
     const { data, error } = await (supabase as any)
       .from("compliance_items")
       .insert({
-        site_id: ctx.siteId,
         display_name: d.display_name.trim(),
         category: d.category ?? null,
         description: d.description?.trim() || null,
@@ -53,6 +52,7 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) throw error;
+    invalidateBrainCacheForSite(ctx.siteId);
     logger.info("Compliance item created", { route: "POST /api/compliance/items", siteId: ctx.siteId });
     return NextResponse.json({ item: data }, { status: 201 });
   } catch (err) {

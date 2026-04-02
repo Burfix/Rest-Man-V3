@@ -28,6 +28,7 @@ import {
 } from "@/services/accountability/score-calculator";
 import { generateVoice } from "./voice-generator";
 import { forecastToday } from "@/services/forecasting/forecast-engine";
+import { getCachedBrain, setCachedBrain } from "@/lib/brain/cache";
 import type { SportsEvent } from "@/services/forecasting/events-calendar";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -299,8 +300,12 @@ function computeSystemHealth(
   }
   const revPts = Math.max(0, Math.min(30, 30 * (1 + revenueVarianceForScore / 100)));
 
-  // Labour: 20 pts (over-target reduces score)
-  const labExcess = Math.max(0, ctx.labour.variance);
+  // Labour: 20 pts (over-target reduces score).
+  // "On target" allows a +2pp tolerance above configured target.
+  const labourOnTarget = ctx.labour.actualPercent <= (ctx.labour.targetPercent + 2);
+  const labExcess = labourOnTarget
+    ? 0
+    : Math.max(0, ctx.labour.actualPercent - (ctx.labour.targetPercent + 2));
   const labPts = Math.max(0, 20 * (1 - labExcess / 20));
 
   // Duty completion: 20 pts
@@ -357,10 +362,10 @@ function computeSystemHealth(
     {
       module:    "LABOUR",
       pts:       Math.round(labPts),
-      direction: labPts >= 17 ? "up" : "down",
-      reason:    labPts >= 17
-        ? `Labour on budget (+${Math.round(labPts)}/20 pts)`
-        : `${ctx.labour.variance.toFixed(1)}% over target — -${Math.round(MAX.LABOUR - labPts)} pts`,
+      direction: labourOnTarget ? "up" : "down",
+      reason:    labourOnTarget
+        ? `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target ✓`
+        : `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target — ${ctx.labour.variance.toFixed(1)}% over${ctx.labour.note ? ` · ${ctx.labour.note}` : ""}`,
     },
     {
       module:    "DUTIES",
@@ -478,9 +483,10 @@ function buildConsequences(
       const targetCost  = ctx.revenue.actual > 0
         ? ctx.revenue.actual * ctx.labour.targetPercent / 100 : 0;
       const excessCost  = Math.max(0, labourCost - targetCost);
+      const labConsequence = `Labour ${pct(ctx.labour.variance)} over target. ${fmt(excessCost)} unnecessary cost confirmed on P&L if no reduction now.${ctx.labour.note ? ` ${ctx.labour.note}.` : ""}`;
       consequences.push({
         timeframe: "By close",
-        consequence: `Labour ${pct(ctx.labour.variance)} over target. ${fmt(excessCost)} unnecessary cost confirmed on P&L if no reduction now.`,
+        consequence: labConsequence,
         financialImpact: excessCost,
       });
     }
@@ -496,7 +502,7 @@ function buildConsequences(
     if (sig.id === "S6_PRE_SERVICE_LABOUR_SURGE") {
       consequences.push({
         timeframe: "Start of service",
-        consequence: `Labour enters service session ${pct(ctx.labour.variance)} over budget with no revenue yet to absorb it.`,
+        consequence: `Labour enters service session ${pct(ctx.labour.variance)} over budget with no revenue yet to absorb it.${ctx.labour.note ? ` ${ctx.labour.note}.` : ""}`,
         financialImpact: null,
       });
     }
@@ -952,6 +958,9 @@ export async function runOperatingBrain(
   siteId: string,
   date: string,
 ): Promise<BrainOutput> {
+  const cached = getCachedBrain(siteId, date);
+  if (cached) return cached;
+
   const supabase = createServerClient();
 
   // Run context build + GM lookup + site events in parallel
@@ -1072,6 +1081,7 @@ export async function runOperatingBrain(
   };
 
   brain.voiceLine = generateVoice(brain, effectiveCtx);
+  setCachedBrain(siteId, date, brain);
 
   return brain;
 }

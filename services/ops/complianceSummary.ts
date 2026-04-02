@@ -8,8 +8,8 @@
  *
  * Status logic (applied at query time so it is always up-to-date):
  *   expired   — next_due_date < today
- *   due_soon  — next_due_date <= today + DUE_SOON_DAYS
- *   compliant — next_due_date > today + DUE_SOON_DAYS
+ *   due_soon  — next_due_date <= today + 14 days
+ *   compliant — next_due_date > today + 14 days
  *   unknown   — next_due_date is null
  */
 
@@ -18,16 +18,14 @@ import { todayISO } from "@/lib/utils";
 import { computeComplianceStatus } from "@/lib/compliance/scoring";
 import type { ComplianceItem, ComplianceSummary, ComplianceDocument, ComplianceStatus } from "@/types";
 
-/** Days ahead that counts as "due soon" */
-const DUE_SOON_DAYS = 30;
-
 // ── Status computation ────────────────────────────────────────────────────────
 
 export function computeStatus(
   nextDueDate:           string | null,
   scheduledServiceDate?: string | null,
+  storedStatus?:         string | null,
 ): ComplianceStatus {
-  return computeComplianceStatus(nextDueDate, scheduledServiceDate);
+  return computeComplianceStatus(nextDueDate, scheduledServiceDate, storedStatus);
 }
 
 /** Days until the due date (negative = overdue) */
@@ -72,7 +70,7 @@ export async function getAllComplianceItems(): Promise<ComplianceItem[]> {
   // Recompute live status and attach documents
   return items.map((item) => ({
     ...item,
-    status: computeStatus(item.next_due_date, item.scheduled_service_date),
+    status: computeStatus(item.next_due_date, item.scheduled_service_date, item.status),
     documents: docsByItem[item.id] ?? [],
   }));
 }
@@ -146,7 +144,7 @@ export async function getComplianceItem(id: string): Promise<ComplianceItem | nu
   const item = itemResult.data as ComplianceItem;
   return {
     ...item,
-    status: computeStatus(item.next_due_date, item.scheduled_service_date),
+    status: computeStatus(item.next_due_date, item.scheduled_service_date, item.status),
     documents: (docsResult.data ?? []) as ComplianceDocument[],
   };
 }

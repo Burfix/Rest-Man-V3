@@ -48,6 +48,8 @@ function rands(v: number): string {
 export default function CopilotHero({ brief }: Props) {
   const issueCount = brief.topThreeActions.length;
   const topRisk = brief.topThreeActions[0]?.title ?? null;
+  const labourTarget = brief.targetLabourPercent ?? 30;
+  const labourOverBy = brief.labourPercent - labourTarget;
 
   return (
     <div className="space-y-2">
@@ -83,8 +85,8 @@ export default function CopilotHero({ brief }: Props) {
         />
         <MetricCell
           label="LABOUR"
-          value={`${brief.labourPercent.toFixed(1)}%`}
-          tone={brief.labourPercent > 37 ? "critical" : brief.labourPercent > 32 ? "warning" : "positive"}
+          value={`${brief.labourPercent.toFixed(1)}% vs ${labourTarget.toFixed(1)}%`}
+          tone={labourOverBy > 10 ? "critical" : labourOverBy > 2 ? "warning" : "positive"}
         />
         <MetricCell
           label="COVERS"
@@ -97,6 +99,12 @@ export default function CopilotHero({ brief }: Props) {
           tone={brief.avgSpend < 200 ? "warning" : "positive"}
         />
       </div>
+
+      {brief.labourReliabilityNote && (
+        <div className="px-1">
+          <span className="text-[10px] font-mono text-amber-400">{brief.labourReliabilityNote}</span>
+        </div>
+      )}
 
       {/* Service risk signals */}
       {brief.serviceRiskSummary.length > 0 && (

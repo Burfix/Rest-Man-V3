@@ -320,10 +320,11 @@ export async function getOperatingScore(
   // ── Fetch all data sources in parallel ────────────────────────────────────
   const [complianceResult, maintenanceResult, foodCostResult] = await Promise.all([
 
-    // Compliance items — live status recomputed from date fields
+    // Compliance items — live status recomputed from date fields.
+    // Also fetch stored status as fallback for items where next_due_date is null.
     supabase
       .from("compliance_items")
-      .select("next_due_date, scheduled_service_date"),
+      .select("next_due_date, scheduled_service_date, status"),
 
     // Open maintenance issues for this site
     supabase
@@ -409,9 +410,10 @@ export async function getOperatingScore(
   const complianceRows = (complianceResult.data as unknown as {
     next_due_date: string | null;
     scheduled_service_date?: string | null;
+    status?: string | null;
   }[] | null) ?? [];
   const complianceItems = complianceRows.map((c) => ({
-    status: computeComplianceStatus(c.next_due_date, c.scheduled_service_date),
+    status: computeComplianceStatus(c.next_due_date, c.scheduled_service_date, c.status),
   }));
   const expiredCount   = complianceItems.filter((c) => c.status === "expired").length;
   const dueSoonCount   = complianceItems.filter((c) => c.status === "due_soon").length;

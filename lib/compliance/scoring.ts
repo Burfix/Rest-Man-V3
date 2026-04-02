@@ -27,7 +27,7 @@ import { todayISO } from "@/lib/utils";
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 /** Days ahead of expiry that triggers the "due soon" check. */
-export const COMPLIANCE_DUE_SOON_DAYS = 30;
+export const COMPLIANCE_DUE_SOON_DAYS = 14;
 
 /**
  * Risk penalty weights per status (0 = no risk, 1 = full risk).
@@ -63,8 +63,20 @@ export const COMPLIANCE_RISK_WEIGHTS: Record<ComplianceStatus, number> = {
 export function computeComplianceStatus(
   nextDueDate:           string | null,
   scheduledServiceDate?: string | null,
+  storedStatus?:         string | null,  // fallback when nextDueDate is null
 ): ComplianceStatus {
-  if (!nextDueDate) return "unknown";
+  if (!nextDueDate) {
+    // Honour stored status (case-insensitive) for items missing a due date
+    if (storedStatus) {
+      const s = storedStatus.toLowerCase();
+      if (s === "expired" || s === "overdue" || s === "due_today") return "expired";
+      if (s === "due_soon") return "due_soon";
+      if (s === "compliant" || s === "scheduled" || s === "in_progress" || s === "blocked") {
+        return s as ComplianceStatus;
+      }
+    }
+    return "unknown";
+  }
 
   const today = todayISO();
 

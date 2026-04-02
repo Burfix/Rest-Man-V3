@@ -87,10 +87,10 @@ async function main() {
           const res = await fetch(url, {
             method: 'POST',
             headers: {
-              'Content-Type': 'text/xml; charset=utf-8',
-              'SOAPAction': 'http://micros.com/POSWebService/GetStockOnHandList',
-              ...auth.headers,
-            },
+  'Content-Type': 'text/xml; charset=utf-8',
+  'SOAPAction': 'http://micros.com/POSWebService/GetStockOnHand',
+  ...(auth.headers as Record<string, string>),
+} as HeadersInit,
             body: soapBody,
             signal: controller.signal,
           });

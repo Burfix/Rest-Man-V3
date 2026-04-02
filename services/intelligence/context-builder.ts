@@ -25,6 +25,7 @@ export type LabourContext = {
   targetPercent: number;
   variance: number;        // % over target (positive = over)
   staffOnFloor: number;
+  note: string | null;
 };
 
 export type DailyOpsContext = {
@@ -98,14 +99,18 @@ export async function buildOperationsContext(
   // micros_connections has no site_id FK — convention-based single-site lookup.
   const connRes = await (supabase as any)
     .from("micros_connections")
-    .select("id")
+    .select("id, loc_ref")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   const microsConnectionId = (connRes.data as { id: string } | null)?.id ?? null;
+  const microsLocRef = (connRes.data as { id: string; loc_ref?: string | null } | null)?.loc_ref
+    ?? process.env.MICROS_LOCATION_REF
+    ?? process.env.MICROS_LOC_REF
+    ?? null;
 
   // ── Step 2: Parallel fetch everything ──────────────────────────────────────
-  const [revRes, manualRes, microsRes, snapRes, labRes, siteRes, actRes, maintRes, compRes] =
+  const [revRes, manualRes, microsRes, snapRes, labSummaryRes, labFallbackRes, siteRes, actRes, maintRes, compRes] =
     await Promise.all([
       // Revenue records (tertiary fallback)
       supabase
@@ -143,7 +148,17 @@ export async function buildOperationsContext(
         .order("snapshot_date", { ascending: false })
         .limit(1),
 
-      // Labour
+      // Labour (primary): MICROS labour_daily_summary
+      microsLocRef
+        ? (supabase as any)
+            .from("labour_daily_summary")
+            .select("total_pay, labour_pct, net_sales")
+            .eq("loc_ref", microsLocRef)
+            .eq("business_date", date)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+
+      // Labour (fallback): canonical labour_records
       supabase
         .from("labour_records")
         .select("labour_cost")
@@ -172,10 +187,11 @@ export async function buildOperationsContext(
         .in("repair_status", ["open", "in_progress", "awaiting_parts"]),
 
       // Compliance — no site_id or is_active columns on this table (single-tenant)
-      // Status column is stale; use date comparison as canonical source of truth
+      // Status column is stale for date-based items; use date comparison as canonical source of truth.
+      // However, fall back to stored status (case-insensitive) for items where next_due_date is null.
       supabase
         .from("compliance_items")
-        .select("id, next_due_date")
+        .select("id, next_due_date, status")
     ]);
 
   // ── Revenue ────────────────────────────────────────────────────────────────
@@ -206,11 +222,31 @@ export async function buildOperationsContext(
     variance > 2 ? "recovering" : variance < -5 ? "declining" : "stable";
 
   // ── Labour ─────────────────────────────────────────────────────────────────
-  const labRows         = (labRes.data ?? []) as { labour_cost: number | null }[];
+  const labSummary      = (labSummaryRes.data ?? null) as {
+    total_pay: number | null;
+    labour_pct: number | null;
+    net_sales: number | null;
+  } | null;
+  const labRows         = (labFallbackRes.data ?? []) as { labour_cost: number | null }[];
   const targetLabourPct = ((siteRes.data as any)?.target_labour_pct as number | null) ?? 15;
-  const labourCost      = labRows.reduce((s, r) => s + (r.labour_cost ?? 0), 0);
-  const actualPercent   = actual > 0 ? +(labourCost / actual * 100).toFixed(1) : 0;
+  const fallbackLabourCost = labRows.reduce((s, r) => s + (r.labour_cost ?? 0), 0);
+  const labourCost      = labSummary?.total_pay != null ? Number(labSummary.total_pay) : fallbackLabourCost;
+  const actualPercent   = labSummary?.labour_pct != null
+    ? +Number(labSummary.labour_pct).toFixed(1)
+    : actual > 0 ? +(labourCost / actual * 100).toFixed(1) : 0;
   const labourVariance  = +(actualPercent - targetLabourPct).toFixed(1);
+  const labourNote = actual < 5000
+    ? "Labour % unreliable — insufficient revenue data"
+    : null;
+  console.log("Labour:", {
+    actual: actualPercent,
+    target: targetLabourPct,
+    variance: labourVariance,
+    labourCost,
+    revenue: actual,
+    source: labSummary?.labour_pct != null ? "labour_daily_summary.labour_pct" : "derived_from_cost",
+    note: labourNote,
+  });
 
   // ── Daily ops (daily_ops_tasks — today only) ───────────────────────────────
   const taskRows       = (actRes.data ?? []) as { id: string; status: string; due_time: string | null }[];
@@ -233,19 +269,24 @@ export async function buildOperationsContext(
   );
 
   // ── Compliance ─────────────────────────────────────────────────────────────
-  // DB status column is stale (not auto-updated on expiry). Derive purely from dates,
-  // matching the same logic as computeComplianceStatus() in lib/compliance/scoring.ts.
-  const compRows      = (compRes.data ?? []) as { id: string; next_due_date: string | null }[];
-  console.log(`[ContextBuilder] Compliance rows (${compRows.length}): ${compRows.map((c) => `${c.id.slice(0,8)} due=${c.next_due_date}`).join(", ")}`);
-  // Expired: past due OR due today (certificate no longer valid as of today)
-  const overdueCount  = compRows.filter(
-    (c) => c.next_due_date != null && c.next_due_date <= date
-  ).length;
-  const dueSoonCutoff = new Date(now + 30 * 86_400_000).toISOString().slice(0, 10);
-  // At risk: due within 30 days (but not already expired)
-  const atRiskCount   = compRows.filter(
-    (c) => c.next_due_date != null && c.next_due_date > date && c.next_due_date <= dueSoonCutoff
-  ).length;
+  // Always fetched live from compliance_items in this request (no extra caching here).
+  // DB status column can be stale, so date rules are canonical.
+  const compRows      = (compRes.data ?? []) as { id: string; next_due_date: string | null; status?: string | null }[];
+  console.log(`[ContextBuilder] Compliance rows (${compRows.length}): ${compRows.map((c) => `${c.id.slice(0,8)} due=${c.next_due_date} status=${c.status}`).join(", ")}`);
+  // Expired: past due date OR stored status indicates expiry (case-insensitive, for items with null dates)
+  const EXPIRED_STATUSES = new Set(["expired", "overdue", "due_today"]);
+  const overdueCount  = compRows.filter((c) => {
+    if (c.next_due_date != null && c.next_due_date < date) return true;
+    if (c.next_due_date == null && c.status && EXPIRED_STATUSES.has(c.status.toLowerCase())) return true;
+    return false;
+  }).length;
+  const atRiskCutoff  = new Date(now + 7 * 86_400_000).toISOString().slice(0, 10);
+  // At risk: due within 7 days (but not already expired)
+  const atRiskCount   = compRows.filter((c) => {
+    if (c.next_due_date != null && c.next_due_date >= date && c.next_due_date <= atRiskCutoff) return true;
+    if (c.next_due_date == null && c.status && c.status.toLowerCase() === "due_today") return true;
+    return false;
+  }).length;
 
   // ── Meta ───────────────────────────────────────────────────────────────────
   const saTime    = new Date().toLocaleString("en-US", {
@@ -259,7 +300,7 @@ export async function buildOperationsContext(
 
   return {
     revenue:     { actual, target, variance, trend },
-    labour:      { actualPercent, targetPercent: targetLabourPct, variance: labourVariance, staffOnFloor: 0 },
+    labour:      { actualPercent, targetPercent: targetLabourPct, variance: labourVariance, staffOnFloor: 0, note: labourNote },
     dailyOps:    { totalTasks, completed, overdue, blocked, completionRate },
     maintenance: { openCount: maintRows.length, urgentCount, serviceBlocking },
     compliance:  { overdueCount, atRiskCount },

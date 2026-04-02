@@ -19,6 +19,8 @@ export interface BriefInput {
   revenueActual: number;
   revenueTarget: number;
   labourPercent: number;
+  targetLabourPercent?: number;
+  labourReliabilityNote?: string | null;
   coversActual: number;
   coversForecast: number;
   avgSpend: number;
@@ -35,6 +37,7 @@ export function generateGMBrief(input: BriefInput): GMBrief {
   const {
     serviceWindow, serviceState, serviceImpact,
     revenueActual, revenueTarget, labourPercent,
+    targetLabourPercent, labourReliabilityNote,
     coversActual, coversForecast, avgSpend,
     maintenanceUrgent, complianceExpired,
     decisions,
@@ -146,6 +149,8 @@ export function generateGMBrief(input: BriefInput): GMBrief {
     actualRevenue: revenueActual,
     revenueGap,
     labourPercent,
+    targetLabourPercent,
+    labourReliabilityNote,
     coversActual,
     coversForecast,
     avgSpend,

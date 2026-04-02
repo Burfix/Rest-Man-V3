@@ -93,6 +93,11 @@ export default function HeroStrip({
   const labourDriver     = systemHealth.allScoreDrivers.find((d) => d.module === "LABOUR");
   const compDriver       = systemHealth.allScoreDrivers.find((d) => d.module === "COMPLIANCE");
   const maintDriver      = systemHealth.allScoreDrivers.find((d) => d.module === "MAINTENANCE");
+  const labourPctMatch = labourDriver?.reason.match(/([\d.]+)%\s+vs\s+([\d.]+)%\s+target/i);
+  const labourPctText = labourPctMatch ? Number(labourPctMatch[1]).toFixed(1) : null;
+  const labourReliabilityNote = labourDriver?.reason.includes("Labour % unreliable — insufficient revenue data")
+    ? "Labour % unreliable — insufficient revenue data"
+    : null;
 
   // Sync
   const { text: syncText, stale } = syncLabel(freshnessMinutes);
@@ -178,7 +183,9 @@ export default function HeroStrip({
                 LABOUR
               </span>
               <span className="font-bold">
-                {labourDriver.direction === "up" ? "On target ✓" : "Over target ✕"}
+                {labourPctText
+                  ? `${labourPctText}% ${labourDriver.direction === "up" ? "✓" : "▲"}`
+                  : labourDriver.direction === "up" ? "On target ✓" : "Over target ✕"}
               </span>
             </div>
           )}
@@ -217,6 +224,14 @@ export default function HeroStrip({
             </div>
           )}
         </div>
+
+        {labourReliabilityNote && (
+          <div className="px-5 pb-2">
+            <span className="text-[10px] font-mono text-amber-600 dark:text-amber-400">
+              {labourReliabilityNote}
+            </span>
+          </div>
+        )}
 
         {/* ── RIGHT — Sync + Session + Button ── */}
         <div className="px-5 py-3 flex flex-col justify-center gap-1.5">

@@ -39,6 +39,9 @@ const TONE_BORDER: Record<Tone, string> = {
 };
 
 export default function BusinessStatus({ brief, score }: Props) {
+  const labourTarget = brief.targetLabourPercent ?? 30;
+  const labourOverBy = brief.labourPercent - labourTarget;
+  const labourLabel = `${brief.labourPercent.toFixed(1)}% vs ${labourTarget.toFixed(1)}% target${brief.labourReliabilityNote ? " (est.)" : ""}`;
   const items: StatusItem[] = [
     {
       label: "Revenue",
@@ -50,9 +53,9 @@ export default function BusinessStatus({ brief, score }: Props) {
     },
     {
       label: "Labour",
-      value: `${brief.labourPercent.toFixed(1)}%`,
-      tone: brief.labourPercent > 37 ? "critical"
-        : brief.labourPercent > 32 ? "warning" : "positive",
+      value: labourLabel,
+      tone: labourOverBy > 10 ? "critical"
+        : labourOverBy > 2 ? "warning" : "positive",
     },
     {
       label: "Covers",

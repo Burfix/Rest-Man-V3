@@ -93,6 +93,8 @@ export interface GMBrief {
   actualRevenue: number;
   revenueGap: number;
   labourPercent: number;
+  targetLabourPercent?: number;
+  labourReliabilityNote?: string | null;
   coversActual: number;
   coversForecast: number;
   avgSpend: number;

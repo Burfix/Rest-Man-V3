@@ -119,6 +119,9 @@ export async function runCopilot(): Promise<CopilotOutput> {
 
   const netSales = salesSnapshot.netSales;
   const targetSales = salesSnapshot.targetSales ?? forecast?.forecast_sales ?? 0;
+  const labourReliabilityNote = netSales < 5000
+    ? "Labour % unreliable — insufficient revenue data"
+    : null;
   const covers = salesSnapshot.covers;
   const forecastCovers = forecast?.forecast_covers ?? today.totalCovers;
   const avgSpend = covers > 0 ? netSales / covers : 0;
@@ -195,6 +198,8 @@ export async function runCopilot(): Promise<CopilotOutput> {
     revenueActual: netSales,
     revenueTarget: targetSales,
     labourPercent: labourPct,
+    targetLabourPercent: TARGET_LABOUR_PCT,
+    labourReliabilityNote,
     coversActual: covers,
     coversForecast: forecastCovers,
     avgSpend,

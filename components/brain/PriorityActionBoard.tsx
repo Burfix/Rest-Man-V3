@@ -196,6 +196,9 @@ function makeOperationalTitle(
     }
 
     case "LABOUR": {
+      if (driver.reason.includes("Data sync issue")) {
+        return "Data sync issue — check MICROS connection";
+      }
       const match = driver.reason.match(/([\d.]+)% over/i);
       const overPct = match ? match[1] : "?";
       const gap = brain.recoveryMeter?.revenueGap

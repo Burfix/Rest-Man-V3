@@ -29,12 +29,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unsupported file type" }, { status: 415 });
     }
 
-    // Verify item exists and belongs to site
+    // Verify item exists
     const { data: item } = await (supabase as any)
       .from("compliance_items")
       .select("id")
       .eq("id", itemId)
-      .eq("site_id", ctx.siteId)
       .maybeSingle();
     if (!item) return NextResponse.json({ error: "Compliance item not found" }, { status: 404 });
 

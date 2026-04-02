@@ -108,7 +108,14 @@ function DaysChip({ days }: { days: number | null }) {
       </span>
     );
   }
-  if (days <= 30) {
+  if (days <= 7) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+        At risk · {days}d left
+      </span>
+    );
+  }
+  if (days <= 14) {
     return (
       <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
         {days}d left

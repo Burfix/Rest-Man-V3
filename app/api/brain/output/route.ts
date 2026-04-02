@@ -2,7 +2,8 @@
  * GET /api/brain/output
  *
  * Returns full BrainOutput for the caller's site.
- * Cached for 3 minutes (s-maxage=180).
+ * Uses server-side 3-minute cache in runOperatingBrain().
+ * Route response is no-store so invalidation can take effect immediately.
  *
  * Query params:
  *   ?siteId=  — optional override (head_office and above only)
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(brain, {
     headers: {
-      "Cache-Control": "s-maxage=180, stale-while-revalidate=60",
+      "Cache-Control": "no-store",
     },
   });
 }
