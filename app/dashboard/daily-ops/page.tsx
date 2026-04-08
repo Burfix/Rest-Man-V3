@@ -15,7 +15,9 @@ export default async function DailyOpsPage() {
   }
 
   const supabase = createServerClient() as any;
-  const today = new Date().toLocaleDateString("en-CA");
+  // Use site timezone (Africa/Johannesburg = UTC+2) so the date matches what
+  // staff see on the clock, not the Vercel server's UTC time.
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
 
   // Auto-generate today's tasks if not yet created
   const { count } = await supabase

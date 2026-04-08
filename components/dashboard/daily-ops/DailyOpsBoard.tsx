@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
@@ -120,6 +120,13 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
       setTasks(data.tasks);
     } catch { /* ignore */ }
   }, []);
+
+  // Auto-poll every 30 s so all managers at the same store see live updates
+  // without needing to manually refresh.
+  useEffect(() => {
+    const id = setInterval(refresh, 30_000);
+    return () => clearInterval(id);
+  }, [refresh]);
 
   const loadStats = useCallback(async () => {
     if (stats) return;
