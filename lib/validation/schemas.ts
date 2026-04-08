@@ -54,6 +54,7 @@ export const createActionSchema = z.object({
   why_it_matters: z.string().max(1000).optional().nullable(),
   impact_weight: severity.optional().nullable(),
   decision_id: uuidString.optional().nullable(),
+  completion_note: z.string().max(2000).optional().nullable(),
 });
 
 export const patchActionSchema = z.object({
@@ -269,6 +270,62 @@ export const microsSettingsSchema = z.object({
   app_server_url: z.string().url().min(1),
   client_id: z.string().min(1).max(200),
   org_identifier: z.string().min(1).max(200),
+});
+
+// ── Admin: Stores ─────────────────────────────────────────────────────────────
+
+export const createStoreSchema = z.object({
+  name: z.string().min(1).max(200),
+  store_code: z.string().min(1).max(50),
+  address: z.string().max(500).optional().nullable(),
+  city: z.string().max(200).optional().nullable(),
+  timezone: z.string().max(100).optional().default("Africa/Johannesburg"),
+  region_id: z.string().uuid().optional().nullable(),
+  seating_capacity: z.number().int().positive().optional().nullable(),
+  target_avg_spend: z.number().nonnegative().optional().nullable(),
+  target_labour_pct: z.number().min(0).max(100).optional().nullable(),
+  target_margin_pct: z.number().min(0).max(100).optional().nullable(),
+});
+
+export const patchStoreSchema = z.object({
+  name: z.string().min(1).max(200).optional(),
+  store_code: z.string().min(1).max(50).optional(),
+  address: z.string().max(500).optional().nullable(),
+  city: z.string().max(200).optional().nullable(),
+  timezone: z.string().max(100).optional(),
+  region_id: z.string().uuid().optional().nullable(),
+  seating_capacity: z.number().int().positive().optional().nullable(),
+  target_avg_spend: z.number().nonnegative().optional().nullable(),
+  target_labour_pct: z.number().min(0).max(100).optional().nullable(),
+  target_margin_pct: z.number().min(0).max(100).optional().nullable(),
+  is_active: z.boolean().optional(),
+});
+
+// ── Admin: Users ──────────────────────────────────────────────────────────────
+
+export const inviteUserSchema = z.object({
+  email: z.string().email().max(300),
+  full_name: z.string().min(1).max(200),
+  role: z.enum([
+    "super_admin", "executive", "head_office", "area_manager",
+    "gm", "supervisor", "contractor", "auditor", "viewer",
+  ]),
+  site_id: z.string().uuid().optional().nullable(),
+  region_id: z.string().uuid().optional().nullable(),
+});
+
+export const patchUserRoleSchema = z.object({
+  role: z.enum([
+    "super_admin", "executive", "head_office", "area_manager",
+    "gm", "supervisor", "contractor", "auditor", "viewer",
+  ]),
+  site_id: z.string().uuid().optional().nullable(),
+  site_ids: z.array(z.string().uuid()).optional(),
+  region_id: z.string().uuid().optional().nullable(),
+});
+
+export const grantSiteAccessSchema = z.object({
+  site_ids: z.array(z.string().uuid()).min(1),
 });
 
 // ── Helper: safe parse + respond ──────────────────────────────────────────────
