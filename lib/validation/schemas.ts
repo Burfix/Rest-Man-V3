@@ -54,7 +54,6 @@ export const createActionSchema = z.object({
   why_it_matters: z.string().max(1000).optional().nullable(),
   impact_weight: severity.optional().nullable(),
   decision_id: uuidString.optional().nullable(),
-  completion_note: z.string().max(2000).optional().nullable(),
 });
 
 export const patchActionSchema = z.object({
@@ -160,11 +159,11 @@ export const patchEquipmentSchema = z.object({
 export const createMaintenanceIssueSchema = z.object({
   unit_name: z.string().min(1).max(300),
   issue_title: z.string().min(1).max(500),
-  priority: z.enum(["low", "medium", "high", "urgent", "critical"]),
+  priority: z.enum(["low", "medium", "high", "critical"]),
   equipment_id: uuidString.optional().nullable(),
   category: z.string().max(100).optional().nullable(),
   issue_description: z.string().max(2000).optional().nullable(),
-  impact_level: z.enum(["none", "minor", "service_disruption", "revenue_loss", "compliance_risk", "food_safety_risk"]).optional().nullable(),
+  impact_level: z.enum(["none", "low", "medium", "high", "service_blocking"]).optional().nullable(),
   reported_by: z.string().max(200).optional().nullable(),
   repair_status: z.string().max(50).optional().nullable(),
   date_reported: dateString.optional().nullable(),
@@ -174,10 +173,7 @@ export const patchMaintenanceIssueSchema = z.object({
   id: uuidString,
   repair_status: z.string().min(1).max(50),
   fixed_by: z.string().max(200).optional().nullable(),
-  fixed_by_type: z.preprocess(
-    (v) => (typeof v === "string" ? v.toLowerCase() : v),
-    z.enum(["internal_staff", "contractor", "supplier", "unknown"]).optional().nullable()
-  ),
+  fixed_by_type: z.enum(["contractor", "internal_staff", "supplier", "unknown"]).optional().nullable(),
   contractor_name: z.string().max(200).optional().nullable(),
   contractor_contact: z.string().max(200).optional().nullable(),
   date_fixed: dateString.optional().nullable(),
@@ -276,64 +272,6 @@ export const microsSettingsSchema = z.object({
 });
 
 // ── Helper: safe parse + respond ──────────────────────────────────────────────
-
-// ── Admin: Stores ─────────────────────────────────────────────────────────────
-
-export const createStoreSchema = z.object({
-  name: z.string().min(1).max(200),
-  store_code: z.string().min(1).max(50),
-  address: z.string().max(500).optional().nullable(),
-  city: z.string().max(200).optional().nullable(),
-  timezone: z.string().max(100).optional().default("Africa/Johannesburg"),
-  region_id: z.string().uuid().optional().nullable(),
-  seating_capacity: z.number().int().positive().optional().nullable(),
-  target_avg_spend: z.number().nonnegative().optional().nullable(),
-  target_labour_pct: z.number().min(0).max(100).optional().nullable(),
-  target_margin_pct: z.number().min(0).max(100).optional().nullable(),
-});
-
-export const patchStoreSchema = z.object({
-  name: z.string().min(1).max(200).optional(),
-  store_code: z.string().min(1).max(50).optional(),
-  address: z.string().max(500).optional().nullable(),
-  city: z.string().max(200).optional().nullable(),
-  timezone: z.string().max(100).optional(),
-  region_id: z.string().uuid().optional().nullable(),
-  seating_capacity: z.number().int().positive().optional().nullable(),
-  target_avg_spend: z.number().nonnegative().optional().nullable(),
-  target_labour_pct: z.number().min(0).max(100).optional().nullable(),
-  target_margin_pct: z.number().min(0).max(100).optional().nullable(),
-  is_active: z.boolean().optional(),
-});
-
-// ── Admin: Users ──────────────────────────────────────────────────────────────
-
-export const inviteUserSchema = z.object({
-  email: z.string().email().max(300),
-  full_name: z.string().min(1).max(200),
-  role: z.enum([
-    "super_admin", "executive", "head_office", "area_manager",
-    "gm", "supervisor", "contractor", "auditor", "viewer",
-  ]),
-  site_id: z.string().uuid().optional().nullable(),
-  region_id: z.string().uuid().optional().nullable(),
-});
-
-export const patchUserRoleSchema = z.object({
-  role: z.enum([
-    "super_admin", "executive", "head_office", "area_manager",
-    "gm", "supervisor", "contractor", "auditor", "viewer",
-  ]),
-  site_id: z.string().uuid().optional().nullable(),
-  site_ids: z.array(z.string().uuid()).optional(),
-  region_id: z.string().uuid().optional().nullable(),
-});
-
-export const grantSiteAccessSchema = z.object({
-  site_ids: z.array(z.string().uuid()).min(1),
-});
-
-// ── Validator helper ──────────────────────────────────────────────────────────
 
 export function validateBody<T>(
   schema: z.ZodSchema<T>,

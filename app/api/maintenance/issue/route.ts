@@ -85,10 +85,13 @@ export async function PATCH(req: NextRequest) {
       .eq("id", id)
       .eq("site_id", ctx.siteId)
       .select()
-      .single();
+      .maybeSingle();
 
-    if (error) throw error;
-    if (!log) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (error) {
+      logger.error("Supabase update error", { route: "PATCH /api/maintenance/issue", err: error, issueId: id, siteId: ctx.siteId });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (!log) return NextResponse.json({ error: "Issue not found or does not belong to your site" }, { status: 404 });
     return NextResponse.json({ log });
   } catch (err) {
     logger.error("Failed to update maintenance issue", { route: "PATCH /api/maintenance/issue", err });

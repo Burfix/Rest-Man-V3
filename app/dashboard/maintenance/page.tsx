@@ -24,6 +24,7 @@ import {
 import MaintenanceActions from "@/components/dashboard/maintenance/MaintenanceActions";
 import EditStatusButton from "@/components/dashboard/maintenance/EditStatusButton";
 import Link from "next/link";
+import { getUserContext } from "@/lib/auth/get-user-context";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -78,10 +79,18 @@ export default async function MaintenancePage() {
   let riskScore: MaintenanceRiskScore | null = null;
   let loadError: string | null = null;
 
+  let siteId: string | undefined;
+  try {
+    const ctx = await getUserContext();
+    siteId = ctx.siteId;
+  } catch {
+    // fall through — page will show data without site filter
+  }
+
   try {
     [equipment, logs, upcomingServices, expiringWarranties, riskScore] = await Promise.all([
       getAllEquipment(),
-      getAllMaintenanceLogs({ limit: 100 }),
+      getAllMaintenanceLogs({ limit: 100, siteId }),
       getUpcomingServices(30),
       getExpiringWarranties(60),
       getMaintenanceRiskScore(),

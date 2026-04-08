@@ -113,6 +113,7 @@ export async function getAllEquipment(): Promise<Equipment[]> {
 export async function getAllMaintenanceLogs(options?: {
   openOnly?: boolean;
   limit?: number;
+  siteId?: string;
 }): Promise<MaintenanceLog[]> {
   const supabase = createServerClient();
 
@@ -120,6 +121,10 @@ export async function getAllMaintenanceLogs(options?: {
     .from("maintenance_logs")
     .select("*")
     .order("date_reported", { ascending: false });
+
+  if (options?.siteId) {
+    query = query.eq("site_id", options.siteId);
+  }
 
   if (options?.openOnly) {
     query = query.in("repair_status", [...OPEN_STATUSES]);
