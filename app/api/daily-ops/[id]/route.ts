@@ -115,16 +115,52 @@ export async function PATCH(
     // Auto-assign to the signed-in user performing the action
     updates.assigned_to = ctx.userId;
 
-    const { data: updated, error: updateErr } = await supabase
+    // Accountability columns (added in migration 051) — extract them so that if
+    // the migration hasn't been applied yet we can fall back to a core-only update.
+    const accountabilityKeys = ["started_by", "completed_by", "blocked_by", "blocked_at",
+      "blocked_reason", "delayed_at", "escalated_by", "escalated_at", "time_to_complete_minutes"] as const;
+    const accountabilityUpdates: Record<string, unknown> = {};
+    for (const key of accountabilityKeys) {
+      if (key in updates) {
+        accountabilityUpdates[key] = updates[key];
+        delete updates[key];
+      }
+    }
+
+    // Merge accountability fields in; if the column is missing the whole update
+    // would fail, so we try with them first and fall back without them.
+    const fullUpdates = { ...updates, ...accountabilityUpdates };
+
+    let updated: any;
+    const { data: d1, error: updateErr1 } = await supabase
       .from("daily_ops_tasks")
-      .update(updates)
+      .update(fullUpdates)
       .eq("id", params.id)
       .select("*")
       .single();
 
-    if (updateErr) {
-      logger.error("Failed to update daily ops task", { err: updateErr });
-      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    if (updateErr1) {
+      // If the error looks like a missing column (migration 051 not applied),
+      // retry with only the core fields.
+      const missingColumn = updateErr1.message?.includes("column") || updateErr1.code === "42703";
+      if (!missingColumn) {
+        logger.error("Failed to update daily ops task", { err: updateErr1 });
+        return NextResponse.json({ error: updateErr1.message }, { status: 500 });
+      }
+      logger.warn("Accountability columns missing — retrying with core update only", { err: updateErr1 });
+      const { data: d2, error: updateErr2 } = await supabase
+        .from("daily_ops_tasks")
+        .update(updates)
+        .eq("id", params.id)
+        .select("*")
+        .single();
+      if (updateErr2) {
+        logger.error("Failed to update daily ops task (core-only retry)", { err: updateErr2 });
+        return NextResponse.json({ error: updateErr2.message }, { status: 500 });
+      }
+      updated = d2;
+    } else {
+      updated = d1;
     }
 
     // ── Write accountability log entry ────────────────────────────────────────

@@ -108,6 +108,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
   const [activeForm, setActiveForm] = useState<{ id: string; type: "start" | "complete" | "block" } | null>(null);
   const [formData, setFormData] = useState({ comment: "", blocker_reason: "", escalated_to: "", assigned_to: "" });
   const [saving, setSaving] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [tab, setTab] = useState<"board" | "notes" | "stats">("board");
   const [stats, setStats] = useState<any>(null);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -134,46 +135,66 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
   const handleStart = async (taskId: string) => {
     if (!formData.comment.trim()) return;
     setSaving(taskId);
+    setFormError(null);
     try {
-      await apiFetch(`/api/daily-ops/${taskId}`, {
+      const data = await apiFetch(`/api/daily-ops/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "started", comments_start: formData.comment }),
       });
+      // Optimistically update local state from API response so the task shows
+      // as started immediately, even if the background refresh fails.
+      if (data?.task) {
+        setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...data.task } : t));
+      }
       setActiveForm(null);
       setFormData({ comment: "", blocker_reason: "", escalated_to: "", assigned_to: "" });
-      await refresh();
-    } catch { /* ignore */ } finally { setSaving(null); }
+      refresh(); // background refresh — don't await so a slow fetch can't re-hide the update
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to start task. Please try again.");
+    } finally { setSaving(null); }
   };
 
   const handleComplete = async (taskId: string) => {
     if (!formData.comment.trim()) return;
     setSaving(taskId);
+    setFormError(null);
     try {
-      await apiFetch(`/api/daily-ops/${taskId}`, {
+      const data = await apiFetch(`/api/daily-ops/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "completed", comments_end: formData.comment }),
       });
+      if (data?.task) {
+        setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...data.task } : t));
+      }
       setActiveForm(null);
       setFormData({ comment: "", blocker_reason: "", escalated_to: "", assigned_to: "" });
-      await refresh();
-    } catch { /* ignore */ } finally { setSaving(null); }
+      refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to complete task. Please try again.");
+    } finally { setSaving(null); }
   };
 
   const handleBlock = async (taskId: string, status: "blocked" | "delayed" | "escalated") => {
     if (!formData.blocker_reason.trim() || !formData.escalated_to.trim()) return;
     setSaving(taskId);
+    setFormError(null);
     try {
-      await apiFetch(`/api/daily-ops/${taskId}`, {
+      const data = await apiFetch(`/api/daily-ops/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status, blocker_reason: formData.blocker_reason, escalated_to: formData.escalated_to }),
       });
+      if (data?.task) {
+        setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...data.task } : t));
+      }
       setActiveForm(null);
       setFormData({ comment: "", blocker_reason: "", escalated_to: "", assigned_to: "" });
-      await refresh();
-    } catch { /* ignore */ } finally { setSaving(null); }
+      refresh();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to update task. Please try again.");
+    } finally { setSaving(null); }
   };
 
   const handleUpload = async (taskId: string, file: File) => {
@@ -424,16 +445,17 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                       <p className="text-xs font-semibold text-blue-400">Start Comment <span className="text-red-400">*</span></p>
                       <textarea
                         value={formData.comment}
-                        onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                        onChange={(e) => { setFormData({ ...formData, comment: e.target.value }); setFormError(null); }}
                         placeholder="e.g. FOH briefing started late because two staff members arrived late."
                         className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-blue-500 focus:outline-none"
                         rows={2}
                       />
+                      {formError && <p className="text-xs text-red-400">{formError}</p>}
                       <div className="flex gap-2">
                         <button onClick={() => handleStart(task.id)} disabled={!formData.comment.trim() || isSaving} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors">
                           {isSaving ? "Saving…" : "Confirm Start"}
                         </button>
-                        <button onClick={() => setActiveForm(null)} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
+                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
@@ -443,16 +465,17 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                       <p className="text-xs font-semibold text-emerald-400">Completion Comment <span className="text-red-400">*</span></p>
                       <textarea
                         value={formData.comment}
-                        onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                        onChange={(e) => { setFormData({ ...formData, comment: e.target.value }); setFormError(null); }}
                         placeholder="e.g. Deep clean completed but kitchen extractor still needs maintenance."
                         className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-emerald-500 focus:outline-none"
                         rows={2}
                       />
+                      {formError && <p className="text-xs text-red-400">{formError}</p>}
                       <div className="flex gap-2">
                         <button onClick={() => handleComplete(task.id)} disabled={!formData.comment.trim() || isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors">
                           {isSaving ? "Saving…" : "Confirm Complete"}
                         </button>
-                        <button onClick={() => setActiveForm(null)} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
+                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
@@ -487,6 +510,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         placeholder="Escalation contact (e.g. Head Chef, GM)"
                         className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-red-500 focus:outline-none"
                       />
+                      {formError && <p className="text-xs text-red-400">{formError}</p>}
                       <div className="flex gap-2 flex-wrap">
                         <button onClick={() => handleBlock(task.id, "blocked")} disabled={!formData.blocker_reason.trim() || !formData.escalated_to.trim() || isSaving} className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-500 disabled:opacity-40 transition-colors">
                           {isSaving ? "Saving…" : "Mark Blocked"}
@@ -497,7 +521,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         <button onClick={() => handleBlock(task.id, "escalated")} disabled={!formData.blocker_reason.trim() || !formData.escalated_to.trim() || isSaving} className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-40 transition-colors">
                           Escalate
                         </button>
-                        <button onClick={() => setActiveForm(null)} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
+                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
