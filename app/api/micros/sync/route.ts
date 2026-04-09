@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { logger } from "@/lib/logger";
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    Sentry.captureException(err, { tags: { route: "POST /api/micros/sync" } });
     logger.error("MICROS sync crashed", { route: "POST /api/micros/sync", err });
     return NextResponse.json({ ok: false, message: msg, errors: [msg], source: "manual" }, { status: 500 });
   }
@@ -76,6 +78,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    Sentry.captureException(err, { tags: { route: "GET /api/micros/sync", trigger: "cron" } });
     logger.error("MICROS cron sync crashed", { route: "GET /api/micros/sync", err });
     return NextResponse.json({ ok: false, message: msg, source: "cron" }, { status: 500 });
   }

@@ -22,6 +22,7 @@
  *     -H "Authorization: Bearer <ALERTS_CRON_SECRET>"
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { NextResponse } from "next/server";
 import { runAlertsEngine } from "@/services/alerts/engine";
 
@@ -42,6 +43,7 @@ export async function POST(req: Request): Promise<NextResponse> {
     const result = await runAlertsEngine();
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
+    Sentry.captureException(err, { tags: { route: "POST /api/alerts/run", trigger: "cron" } });
     console.error("[POST /api/alerts/run]", err);
     return NextResponse.json(
       { error: "Alerts engine failed", detail: String(err) },

@@ -9,6 +9,7 @@
  *   ?siteId=  — optional override (head_office and above only)
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { apiGuard } from "@/lib/auth/api-guard";
@@ -24,7 +25,12 @@ export async function GET(req: NextRequest) {
   const siteId = req.nextUrl.searchParams.get("siteId") ?? ctx.siteId;
   const date   = todayISO();
 
-  const brain = await runOperatingBrain(siteId, date).catch(() => null);
+  let brain = null;
+  try {
+    brain = await runOperatingBrain(siteId, date);
+  } catch (err) {
+    Sentry.captureException(err, { tags: { route: "GET /api/brain/output", siteId } });
+  }
   if (!brain) {
     return NextResponse.json(
       { error: "Brain unavailable — data sources unreachable" },

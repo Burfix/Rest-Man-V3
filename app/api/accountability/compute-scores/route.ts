@@ -4,6 +4,7 @@
  * Protected by CRON_SECRET (used by Vercel cron at 23:55 SAST).
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { computeAndStoreDailyScores } from "@/services/accountability/score-calculator";
 
@@ -21,7 +22,13 @@ export async function POST(req: NextRequest) {
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
   const date = searchParams.get("date") ?? today;
 
-  const result = await computeAndStoreDailyScores(date);
+  let result;
+  try {
+    result = await computeAndStoreDailyScores(date);
+  } catch (err) {
+    Sentry.captureException(err, { tags: { route: "POST /api/accountability/compute-scores", trigger: "cron", date } });
+    return NextResponse.json({ ok: false, error: String(err) }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, date, ...result });
 }

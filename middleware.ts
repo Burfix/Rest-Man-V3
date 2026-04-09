@@ -11,6 +11,7 @@
  *   /api/actions/daily-reset  → cron-triggered
  */
 
+import * as Sentry from "@sentry/nextjs";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
@@ -103,7 +104,8 @@ export async function middleware(request: NextRequest) {
 
     response.headers.set("x-request-id", requestId);
     return response;
-  } catch {
+  } catch (err) {
+    Sentry.captureException(err, { tags: { route: "middleware", pathname: request.nextUrl.pathname } });
     if (isApiRoute) {
       return NextResponse.json({ error: "Authentication error" }, { status: 401 });
     }
