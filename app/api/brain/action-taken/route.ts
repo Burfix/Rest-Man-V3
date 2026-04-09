@@ -47,6 +47,25 @@ export async function POST(req: NextRequest) {
     })
     .catch(() => null); // Non-fatal — don't block response
 
+  // Mark the matching copilot_decision as actioned (if one exists for this site + title)
+  const { data: matchedDecisions } = await (supabase as any)
+    .from("copilot_decisions")
+    .select("id")
+    .eq("site_id", ctx.siteId)
+    .ilike("title", signalId)
+    .in("status", ["active", "superseded"])
+    .order("generated_at", { ascending: false })
+    .limit(1)
+    .catch(() => ({ data: null }));
+
+  if (matchedDecisions?.[0]?.id) {
+    await (supabase as any)
+      .from("copilot_decisions")
+      .update({ status: "actioned" })
+      .eq("id", matchedDecisions[0].id)
+      .catch(() => null); // Non-fatal
+  }
+
   // Event 2 — brain_recommendation_actioned
   getPosthog()?.capture({
     distinctId: ctx.siteId,
