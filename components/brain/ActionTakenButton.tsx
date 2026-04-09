@@ -10,11 +10,15 @@ import { useState } from "react";
 type Props = {
   signalId: string;
   siteId:   string;
+  severity?: string;
+  category?: string;
+  title?:    string;
 };
 
-export default function ActionTakenButton({ signalId, siteId }: Props) {
+export default function ActionTakenButton({ signalId, siteId, severity, category, title }: Props) {
   const [done,    setDone]    = useState(false);
   const [pending, setPending] = useState(false);
+  const startedAt = useState(() => Date.now())[0];
 
   async function handleClick() {
     setPending(true);
@@ -22,7 +26,15 @@ export default function ActionTakenButton({ signalId, siteId }: Props) {
       await fetch("/api/brain/action-taken", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ signalId, actionType: "manual_acknowledgment", notes: "" }),
+        body:    JSON.stringify({
+          signalId,
+          actionType: "manual_acknowledgment",
+          notes: "",
+          severity,
+          category,
+          title,
+          time_to_action_seconds: Math.round((Date.now() - startedAt) / 1000),
+        }),
       });
       setDone(true);
     } catch {

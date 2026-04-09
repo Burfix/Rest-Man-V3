@@ -171,7 +171,13 @@ export default function OperatingBrain({ brain }: Props) {
 
           {/* Action button */}
           {sev !== "low" && (
-            <ActionTakenButton signalId={primaryThreat.title} siteId={brain.siteId} />
+            <ActionTakenButton
+              signalId={primaryThreat.title}
+              siteId={brain.siteId}
+              severity={sev}
+              category={primaryThreat.modulesInvolved[0] ?? "unknown"}
+              title={primaryThreat.title}
+            />
           )}
         </div>
 

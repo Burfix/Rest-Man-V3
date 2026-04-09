@@ -4,6 +4,7 @@ import { createMaintenanceIssueSchema, patchMaintenanceIssueSchema, validateBody
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { sendMaintenanceEmail, sendMaintenanceWhatsApp } from "@/services/notifications/maintenanceNotifications";
+import { getPosthog } from "@/lib/posthog";
 
 function todayJHB(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
@@ -40,6 +41,18 @@ export async function POST(req: NextRequest) {
 
     if (error) throw error;
     logger.info("Maintenance issue created", { route: "POST /api/maintenance/issue", siteId: ctx.siteId });
+
+    // Event 4 — maintenance_issue_logged
+    getPosthog()?.capture({
+      distinctId: ctx.siteId,
+      event: "maintenance_issue_logged",
+      properties: {
+        site_id:     ctx.siteId,
+        priority:    d.priority,
+        ticket_type: d.category ?? "other",
+        impact_level: d.impact_level ?? "none",
+      },
+    });
 
     // Resolve store name for notifications
     const { data: site } = await supabase

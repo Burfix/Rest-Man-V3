@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
+import { getPosthog } from "@/lib/posthog";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "signalId required" }, { status: 400 });
   }
 
-  const { signalId, actionType = "manual_acknowledgment", notes = "" } = body as {
+  const { signalId, actionType = "manual_acknowledgment", notes = "", severity, category, title, time_to_action_seconds } = body as {
     signalId: string;
     actionType?: string;
     notes?: string;
+    severity?: string;
+    category?: string;
+    title?: string;
+    time_to_action_seconds?: number;
   };
 
   // Log to task_accountability_log (task_id is nullable for brain signals)
@@ -41,6 +46,19 @@ export async function POST(req: NextRequest) {
       created_at: new Date().toISOString(),
     })
     .catch(() => null); // Non-fatal — don't block response
+
+  // Event 2 — brain_recommendation_actioned
+  getPosthog()?.capture({
+    distinctId: ctx.siteId,
+    event: "brain_recommendation_actioned",
+    properties: {
+      site_id:               ctx.siteId,
+      decision_id:           signalId,
+      severity:              severity ?? null,
+      category:              category ?? null,
+      time_to_action_seconds: time_to_action_seconds ?? null,
+    },
+  });
 
   return NextResponse.json({
     ok:          true,

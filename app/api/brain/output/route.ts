@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { todayISO } from "@/lib/utils";
+import { getPosthog } from "@/lib/posthog";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,17 @@ export async function GET(req: NextRequest) {
       { status: 503 },
     );
   }
-
+  // Event 1 — brain_recommendation_viewed
+  getPosthog()?.capture({
+    distinctId: siteId,
+    event: "brain_recommendation_viewed",
+    properties: {
+      site_id:  siteId,
+      severity: brain.primaryThreat.severity,
+      category: brain.primaryThreat.modulesInvolved[0] ?? "unknown",
+      title:    brain.primaryThreat.title,
+    },
+  });
   return NextResponse.json(brain, {
     headers: {
       "Cache-Control": "no-store",

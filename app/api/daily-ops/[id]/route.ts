@@ -8,6 +8,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { logger } from "@/lib/logger";
 import { computeSla } from "@/services/accountability/score-calculator";
+import { getPosthog } from "@/lib/posthog";
 
 export async function PATCH(
   req: NextRequest,
@@ -189,6 +190,23 @@ export async function PATCH(
 
       // Fire-and-forget — don't block the response on log write
       supabase.from("task_accountability_log").insert(logEntry).then(() => {});
+    }
+
+    // Event 3 — daily_ops_task_completed
+    if (status === "completed" && updated) {
+      const t = updated as any;
+      getPosthog()?.capture({
+        distinctId: ctx.siteId,
+        event: "daily_ops_task_completed",
+        properties: {
+          site_id:          ctx.siteId,
+          task_id:          params.id,
+          department:       t.department ?? null,
+          priority:         t.priority ?? null,
+          duration_minutes: t.duration_minutes ?? null,
+          on_time:          slaMet ?? null,
+        },
+      });
     }
 
     return NextResponse.json({ task: updated });
