@@ -73,7 +73,7 @@ export default function MobileBusinessSnapshot({ brief, score }: Props) {
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Business Snapshot
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4 space-y-3">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 p-4 space-y-3">
         {rows.map((r) => (
           <div key={r.label} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -87,7 +87,7 @@ export default function MobileBusinessSnapshot({ brief, score }: Props) {
         ))}
 
         {/* Operating score footer */}
-        <div className="border-t border-stone-800/30 pt-2 flex items-center justify-between">
+        <div className="border-t border-stone-200 dark:border-stone-800/30 pt-2 flex items-center justify-between">
           <span className="text-[10px] uppercase tracking-wider text-stone-500">Operating Score</span>
           <span className={cn(
             "text-sm font-bold font-mono",

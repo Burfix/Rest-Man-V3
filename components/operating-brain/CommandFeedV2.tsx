@@ -201,7 +201,7 @@ export default function CommandFeed({ decisions }: Props) {
 
   if (decisions.length === 0) {
     return (
-      <div className="rounded border border-stone-800/40 bg-stone-900/50 px-5 py-8 text-center">
+      <div className="rounded border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-8 text-center">
         <p className="text-sm text-stone-500 font-mono">— operations clear —</p>
       </div>
     );
@@ -223,7 +223,7 @@ export default function CommandFeed({ decisions }: Props) {
             <div
               key={d.id}
               className={cn(
-                "group rounded-sm border border-stone-800/40 bg-stone-900/50 border-l-[3px] px-4 py-3 transition-opacity",
+                "group rounded-sm border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 border-l-[3px] px-4 py-3 transition-opacity",
                 sev.border,
                 isDone && "opacity-40",
               )}
@@ -259,7 +259,7 @@ export default function CommandFeed({ decisions }: Props) {
               </div>
 
               {/* Title */}
-              <h3 className="mt-1.5 text-sm font-semibold text-stone-100 leading-snug">
+              <h3 className="mt-1.5 text-sm font-semibold text-stone-900 dark:text-stone-100 leading-snug">
                 {d.title}
               </h3>
 
@@ -273,7 +273,7 @@ export default function CommandFeed({ decisions }: Props) {
                 <span className="text-[9px] uppercase tracking-widest text-stone-600 font-semibold shrink-0 mt-0.5">
                   ACTION
                 </span>
-                <span className="text-sm text-stone-100 font-bold leading-snug">
+                <span className="text-sm text-stone-900 dark:text-stone-100 font-bold leading-snug">
                   {d.action}
                 </span>
               </div>

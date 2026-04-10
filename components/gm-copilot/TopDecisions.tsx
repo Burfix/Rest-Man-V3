@@ -33,12 +33,12 @@ export default function TopDecisions({ decisions }: Props) {
         {decisions.slice(0, 3).map((d, i) => (
           <div
             key={d.id}
-            className="rounded-lg border border-stone-800/40 bg-stone-900/50 px-4 py-3.5"
+            className="rounded-lg border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-4 py-3.5"
           >
             <div className="flex items-start gap-3">
               <span className={cn("h-2.5 w-2.5 rounded-full mt-1 shrink-0", SEV_DOT[d.severity])} />
               <div className="flex-1">
-                <h3 className="text-sm font-semibold text-stone-100">
+                <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
                   {d.title}
                 </h3>
                 <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">

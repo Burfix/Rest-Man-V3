@@ -181,7 +181,7 @@ export default async function AccountabilityPage({
         <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-stone-500 mb-1">
           Accountability
         </p>
-        <h1 className="text-xl font-semibold text-stone-100">
+        <h1 className="text-xl font-semibold text-stone-900 dark:text-stone-100">
           Performance Scores
         </h1>
         <p className="text-xs text-stone-500 mt-0.5">

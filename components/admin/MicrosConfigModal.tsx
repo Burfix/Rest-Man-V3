@@ -149,7 +149,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-6 py-4 rounded-t-2xl">
           <div>
-            <h2 className="text-base font-semibold text-stone-100">Configure Micros</h2>
+            <h2 className="text-base font-semibold text-stone-900 dark:text-stone-100">Configure Micros</h2>
             <p className="text-xs text-stone-500 mt-0.5">{storeName}</p>
           </div>
           <button

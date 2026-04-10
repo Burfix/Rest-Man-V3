@@ -74,7 +74,7 @@ function gradeFromScore(s: number | null): string {
 function severityCls(sev: string): string {
   if (sev === "critical") return "bg-red-950/60 border-red-900/50";
   if (sev === "high") return "bg-amber-950/40 border-amber-900/40";
-  return "bg-stone-800/50 border-stone-700/40";
+  return "bg-stone-100 dark:bg-stone-800/50 border-stone-300 dark:border-stone-700/40";
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
@@ -165,7 +165,7 @@ export default function WeeklyReportClient() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-stone-100">
+          <h1 className="text-lg font-bold text-stone-900 dark:text-stone-100">
             📊 Weekly Report — W{report.weekRange.weekNumber}/{report.weekRange.year}
           </h1>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
@@ -197,13 +197,13 @@ export default function WeeklyReportClient() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-stone-700/50 text-stone-500 dark:text-stone-400">
+              <tr className="border-b border-stone-300 dark:border-stone-700/50 text-stone-500 dark:text-stone-400">
                 <Th>#</Th><Th>Store</Th><Th right>Score</Th><Th right>Revenue</Th><Th right>Gap%</Th><Th right>Done%</Th><Th center>Trend</Th>
               </tr>
             </thead>
             <tbody>
               {storeRanking.map((store) => (
-                <tr key={store.siteId} className={cn("border-b border-stone-800/50", store.rank <= 3 && "bg-emerald-950/20", store.avgExecutionScore != null && store.avgExecutionScore < 45 && "bg-red-950/20")}>
+                <tr key={store.siteId} className={cn("border-b border-stone-200 dark:border-stone-800/50", store.rank <= 3 && "bg-emerald-950/20", store.avgExecutionScore != null && store.avgExecutionScore < 45 && "bg-red-950/20")}>
                   <Td className="font-bold text-stone-500 dark:text-stone-400">{store.rank}</Td>
                   <Td className="font-medium text-stone-700 dark:text-stone-200">{store.storeName}</Td>
                   <Td right className={cn("font-bold", gradeCls(gradeFromScore(store.avgExecutionScore)))}>{store.avgExecutionScore ?? "—"}</Td>
@@ -223,13 +223,13 @@ export default function WeeklyReportClient() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-stone-700/50 text-stone-500 dark:text-stone-400">
+              <tr className="border-b border-stone-300 dark:border-stone-700/50 text-stone-500 dark:text-stone-400">
                 <Th>GM</Th><Th>Store</Th><Th right>Score</Th><Th right>Δ</Th><Th right>Done%</Th><Th right>Overdue</Th><Th right>Escalations</Th><Th right>Impact</Th>
               </tr>
             </thead>
             <tbody>
               {gmPerformance.map((gm) => (
-                <tr key={gm.siteId} className="border-b border-stone-800/50">
+                <tr key={gm.siteId} className="border-b border-stone-200 dark:border-stone-800/50">
                   <Td className="text-stone-700 dark:text-stone-200">{gm.gmName ?? "—"}</Td>
                   <Td className="text-stone-500 dark:text-stone-400">{gm.storeName}</Td>
                   <Td right className={cn("font-bold", gradeCls(gradeFromScore(gm.executionScore)))}>{gm.executionScore ?? "—"}</Td>
@@ -268,7 +268,7 @@ export default function WeeklyReportClient() {
               <h4 className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">By Store</h4>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {impactSummary.byStore.map((s) => (
-                  <div key={s.siteId} className="bg-stone-800/50 rounded-lg px-3 py-2">
+                  <div key={s.siteId} className="bg-stone-100 dark:bg-stone-800/50 rounded-lg px-3 py-2">
                     <div className="text-xs font-medium text-stone-700 dark:text-stone-200">{s.storeName}</div>
                     <div className="text-sm font-bold text-emerald-400">{money(s.totalImpact)}</div>
                   </div>
@@ -321,7 +321,7 @@ export default function WeeklyReportClient() {
         <Section title="🎯 Next Week Focus">
           <div className="space-y-2">
             {nextWeekFocus.map((f, i) => (
-              <div key={i} className="flex items-start gap-3 py-2 border-b border-stone-800/50 last:border-0">
+              <div key={i} className="flex items-start gap-3 py-2 border-b border-stone-200 dark:border-stone-800/50 last:border-0">
                 <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 min-w-[100px]">{f.area}</span>
                 <span className="text-xs text-stone-500 dark:text-stone-400">{f.description}</span>
               </div>
@@ -372,9 +372,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Tile({ label, value, sub, trend, valueClass }: { label: string; value: string; sub?: string; trend?: TrendDirection; valueClass?: string }) {
   return (
-    <div className="bg-stone-800/60 rounded-lg px-3.5 py-3">
+    <div className="bg-stone-100 dark:bg-stone-800/60 rounded-lg px-3.5 py-3">
       <div className="text-[11px] text-stone-500 dark:text-stone-400">{label}</div>
-      <div className={cn("text-lg font-bold text-stone-100 mt-0.5", valueClass)}>{value}</div>
+      <div className={cn("text-lg font-bold text-stone-900 dark:text-stone-100 mt-0.5", valueClass)}>{value}</div>
       {(sub || trend) && (
         <div className="flex items-center gap-1 mt-0.5">
           {trend && <span className={cn("text-[11px] font-medium", trendCls(trend))}>{arrow(trend)}</span>}

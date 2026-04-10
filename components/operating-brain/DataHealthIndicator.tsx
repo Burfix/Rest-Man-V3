@@ -109,7 +109,7 @@ export default function DataHealthIndicator({ health }: Props) {
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Data Health
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50">
         <button
           onClick={() => setOpen(!open)}
           className="w-full flex items-center justify-between px-4 py-3 text-left"
@@ -130,7 +130,7 @@ export default function DataHealthIndicator({ health }: Props) {
 
         {/* Expandable details */}
         {open && (
-          <div className="border-t border-stone-800/40 px-4 py-2 space-y-1.5">
+          <div className="border-t border-stone-200 dark:border-stone-800/40 px-4 py-2 space-y-1.5">
             {health.details.map((d) => (
               <div key={d.source} className="flex items-center justify-between text-xs">
                 <span className="text-stone-500 dark:text-stone-400">{d.source}</span>
@@ -142,7 +142,7 @@ export default function DataHealthIndicator({ health }: Props) {
             ))}
 
             {/* Sync All button */}
-            <div className="pt-2 border-t border-stone-800/30">
+            <div className="pt-2 border-t border-stone-200 dark:border-stone-800/30">
               <button
                 onClick={handleSync}
                 disabled={syncing}

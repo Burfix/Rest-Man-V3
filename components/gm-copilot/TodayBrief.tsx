@@ -36,7 +36,7 @@ export default function TodayBrief({
         : "Revenue significantly behind — action needed now";
 
   return (
-    <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-5">
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 p-5">
       <div className="flex items-center gap-2 mb-3">
         <span className="text-lg">🧭</span>
         <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium">
@@ -93,7 +93,7 @@ export default function TodayBrief({
 
       {/* Insights */}
       {servicePulseInsights.length > 0 && (
-        <div className="mt-4 space-y-1 border-t border-stone-800/40 pt-3">
+        <div className="mt-4 space-y-1 border-t border-stone-200 dark:border-stone-800/40 pt-3">
           {servicePulseInsights.slice(0, 3).map((insight, i) => (
             <p
               key={i}
@@ -111,11 +111,11 @@ export default function TodayBrief({
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-stone-800/40 px-3 py-2">
+    <div className="rounded-lg bg-stone-100 dark:bg-stone-800/40 px-3 py-2">
       <span className="text-[10px] uppercase tracking-wider text-stone-500">
         {label}
       </span>
-      <p className="text-sm font-semibold text-stone-100 mt-0.5 truncate">
+      <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 mt-0.5 truncate">
         {value}
       </p>
     </div>

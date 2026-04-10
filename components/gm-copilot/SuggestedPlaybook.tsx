@@ -19,7 +19,7 @@ export default function SuggestedPlaybook({ playbook }: Props) {
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Suggested Playbook
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-4 py-3">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-4 py-3">
         <ol className="space-y-2">
           {playbook.map((item, i) => (
             <li key={i} className="flex items-start gap-2.5 text-sm">

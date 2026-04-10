@@ -120,11 +120,11 @@ export default function StockOnHand() {
       <div className="space-y-4 animate-pulse">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 rounded-xl bg-stone-800/50" />
+            <div key={i} className="h-20 rounded-xl bg-stone-100 dark:bg-stone-800/50" />
           ))}
         </div>
-        <div className="h-10 rounded-lg bg-stone-800/50 w-72" />
-        <div className="h-96 rounded-xl bg-stone-800/50" />
+        <div className="h-10 rounded-lg bg-stone-100 dark:bg-stone-800/50 w-72" />
+        <div className="h-96 rounded-xl bg-stone-100 dark:bg-stone-800/50" />
       </div>
     );
   }
@@ -166,7 +166,7 @@ export default function StockOnHand() {
             placeholder="Search items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-stone-800/60 bg-stone-900/50 pl-9 pr-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
+            className="w-full rounded-lg border border-stone-200 dark:border-stone-800/60 bg-stone-50 dark:bg-stone-900/50 pl-9 pr-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
           />
         </div>
 
@@ -182,7 +182,7 @@ export default function StockOnHand() {
                   "rounded-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                   statusFilter === t.key
                     ? "bg-stone-700 text-stone-100"
-                    : "bg-stone-900/50 text-stone-500 hover:bg-stone-800 hover:text-stone-300",
+                    : "bg-stone-50 dark:bg-stone-900/50 text-stone-500 hover:bg-stone-800 hover:text-stone-300",
                 )}
               >
                 {t.label} ({count})
@@ -224,7 +224,7 @@ export default function StockOnHand() {
             onClick={fetchData}
             disabled={refreshing}
             className={cn(
-              "flex items-center gap-1.5 rounded-lg border border-stone-800/60 px-3 py-1.5 text-xs font-medium transition-colors",
+              "flex items-center gap-1.5 rounded-lg border border-stone-200 dark:border-stone-800/60 px-3 py-1.5 text-xs font-medium transition-colors",
               refreshing
                 ? "text-stone-600 cursor-wait"
                 : "text-stone-500 dark:text-stone-400 hover:bg-stone-800 hover:text-stone-200",
@@ -274,11 +274,11 @@ export default function StockOnHand() {
       )}
 
       {/* ── Table ──────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 overflow-hidden">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-stone-800/30 text-stone-500">
+              <tr className="bg-stone-100 dark:bg-stone-800/30 text-stone-500">
                 <th className="text-left px-4 py-2.5 font-semibold">Item Name</th>
                 <th className="text-right px-4 py-2.5 font-semibold">Stock on Hand</th>
                 <th className="text-left px-4 py-2.5 font-semibold">Unit</th>
@@ -288,7 +288,7 @@ export default function StockOnHand() {
                 <th className="text-right px-4 py-2.5 font-semibold">Last Updated</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-800/30">
+            <tbody className="divide-y divide-stone-200 dark:divide-stone-800/30">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-8 text-center text-stone-600">
@@ -363,12 +363,12 @@ function SummaryCard({
   dotColor?: string;
 }) {
   return (
-    <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-4 py-3">
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-4 py-3">
       <div className="flex items-center gap-1.5 mb-1">
         {dotColor && <span className={cn("h-1.5 w-1.5 rounded-full", dotColor)} />}
         <p className="text-[10px] uppercase tracking-wide text-stone-500 font-semibold">{label}</p>
       </div>
-      <p className={cn("text-2xl font-bold tabular-nums", color ?? "text-stone-100")}>{value}</p>
+      <p className={cn("text-2xl font-bold tabular-nums", color ?? "text-stone-900 dark:text-stone-100")}>{value}</p>
     </div>
   );
 }

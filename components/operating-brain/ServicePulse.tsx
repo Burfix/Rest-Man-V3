@@ -66,7 +66,7 @@ export default function ServicePulse({
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Service Pulse
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 p-4">
         {/* Pace bar */}
         <div className="flex items-end justify-between mb-2">
           <div>
@@ -74,7 +74,7 @@ export default function ServicePulse({
               {revenueLabel}
             </span>
             <div className="flex items-baseline gap-2 mt-0.5">
-              <span className="text-xl font-bold text-stone-100 font-mono">
+              <span className="text-xl font-bold text-stone-900 dark:text-stone-100 font-mono">
                 R{actual.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}
               </span>
               <span className="text-xs text-stone-500">
@@ -151,7 +151,7 @@ export default function ServicePulse({
 
         {/* Insights */}
         {insights.length > 0 && (
-          <div className="mt-3 space-y-1 border-t border-stone-800/40 pt-3">
+          <div className="mt-3 space-y-1 border-t border-stone-200 dark:border-stone-800/40 pt-3">
             {insights.map((insight, i) => (
               <p key={i} className="text-xs text-stone-600 dark:text-stone-300 flex items-start gap-1.5">
                 <span className="text-stone-600 shrink-0">→</span>

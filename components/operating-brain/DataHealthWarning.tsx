@@ -197,7 +197,7 @@ export default function DataHealthWarning({ health }: Props) {
               key={d.source}
               className={cn(
                 "px-2.5 py-1.5 border",
-                isIssue ? "border-stone-800/50 bg-stone-900/50" : "border-transparent",
+                isIssue ? "border-stone-200 dark:border-stone-800/50 bg-stone-50 dark:bg-stone-900/50" : "border-transparent",
               )}
             >
               <div className="flex items-center justify-between">
@@ -222,7 +222,7 @@ export default function DataHealthWarning({ health }: Props) {
       {/* Sync result */}
       {syncResult && (
         <div className={cn(
-          "text-[10px] font-mono pt-2 border-t border-stone-800/30",
+          "text-[10px] font-mono pt-2 border-t border-stone-200 dark:border-stone-800/30",
           syncResult.failed > 0 ? "text-red-400" : "text-emerald-500",
         )}>
           {syncResult.failed > 0

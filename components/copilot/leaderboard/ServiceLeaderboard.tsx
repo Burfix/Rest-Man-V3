@@ -47,10 +47,10 @@ export default function ServiceLeaderboard({ topPerformers, mostImproved, atRisk
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-bold text-stone-100">Service Leaderboard</h2>
+          <h2 className="text-lg font-bold text-stone-900 dark:text-stone-100">Service Leaderboard</h2>
           <p className="text-xs text-stone-500 mt-0.5">Competitive service performance across all stores</p>
         </div>
-        <span className="text-[10px] uppercase tracking-widest text-stone-500 bg-stone-800/50 px-2 py-1 rounded">
+        <span className="text-[10px] uppercase tracking-widest text-stone-500 bg-stone-100 dark:bg-stone-800/50 px-2 py-1 rounded">
           Live
         </span>
       </div>
@@ -95,7 +95,7 @@ export default function ServiceLeaderboard({ topPerformers, mostImproved, atRisk
             {shiftAwards.map((award, i) => (
               <div
                 key={`${award.type}-${i}`}
-                className="flex items-center justify-between rounded-lg bg-stone-800/30 border border-stone-700/30 px-3 py-2"
+                className="flex items-center justify-between rounded-lg bg-stone-100 dark:bg-stone-800/30 border border-stone-300 dark:border-stone-700/30 px-3 py-2"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm">🏆</span>
@@ -127,7 +127,7 @@ function Section({
       "rounded-xl border p-4 space-y-3",
       variant === "danger"
         ? "border-red-800/30 bg-red-950/10"
-        : "border-stone-800/40 bg-stone-900/50",
+        : "border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50",
     )}>
       <h3 className={cn(
         "text-xs uppercase tracking-widest font-medium",
@@ -152,7 +152,7 @@ function LeaderboardRow({
   const risk = RISK_COLOR[entry.serviceRisk] ?? RISK_COLOR.moderate;
 
   return (
-    <div className="flex items-center justify-between rounded-lg bg-stone-800/20 border border-stone-700/20 px-3 py-2.5">
+    <div className="flex items-center justify-between rounded-lg bg-stone-100 dark:bg-stone-800/20 border border-stone-300 dark:border-stone-700/20 px-3 py-2.5">
       {/* Left: rank + name */}
       <div className="flex items-center gap-2.5 min-w-0">
         {showMedal && index < 3 ? (

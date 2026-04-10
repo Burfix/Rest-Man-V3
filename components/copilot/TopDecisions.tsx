@@ -153,7 +153,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="text-[13px] font-semibold text-stone-100 leading-tight">
+            <h3 className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 leading-tight">
               {d.title}
             </h3>
             <span className={cn("text-[9px] uppercase tracking-wider font-bold flex-shrink-0", SEV_TEXT[d.severity])}>

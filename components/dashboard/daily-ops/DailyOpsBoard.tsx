@@ -252,7 +252,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-stone-100">Daily Operations Tracker</h1>
+          <h1 className="text-xl font-bold text-stone-900 dark:text-stone-100">Daily Operations Tracker</h1>
           <p className="text-xs text-stone-500">{new Date(date).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
         </div>
         <button onClick={() => { refresh(); router.refresh(); }} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-700 transition-colors">
@@ -269,7 +269,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
           { label: "Blocked", value: summary.blocked, color: summary.blocked > 0 ? "text-red-400" : "text-stone-500" },
           { label: "Avg Duration", value: summary.avgDuration ? `${summary.avgDuration}m` : "—", color: "text-stone-500 dark:text-stone-400" },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 px-4 py-3">
+          <div key={s.label} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 px-4 py-3">
             <p className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{s.label}</p>
             <p className={cn("text-2xl font-bold", s.color)}>{s.value}</p>
           </div>
@@ -277,7 +277,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-1 rounded-lg bg-stone-800/50 p-1">
+      <div className="flex gap-1 rounded-lg bg-stone-100 dark:bg-stone-800/50 p-1">
         {(["board", "notes", "stats"] as const).map((t) => (
           <button
             key={t}
@@ -306,7 +306,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               <div
                 key={task.id}
                 className={cn(
-                  "rounded-xl border bg-stone-900/60 overflow-hidden transition-all",
+                  "rounded-xl border bg-stone-50 dark:bg-stone-900/60 overflow-hidden transition-all",
                   task.status === "completed" ? "border-emerald-500/20" :
                   overdue || task.status === "blocked" || task.status === "missed" ? "border-red-500/30" :
                   task.status === "delayed" ? "border-amber-500/30" :
@@ -329,7 +329,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h3 className="text-sm font-semibold text-stone-100">{task.action_name}</h3>
+                        <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100">{task.action_name}</h3>
                         <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium border", sc.bg, sc.color)}>
                           <span className={cn("inline-block h-1.5 w-1.5 rounded-full mr-1", sc.dot)} />
                           {sc.label}
@@ -385,7 +385,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
 
                   {/* Comments */}
                   {(task.comments_start || task.comments_end) && (
-                    <div className="space-y-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-800/30 p-2.5">
+                    <div className="space-y-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-800/30 p-2.5">
                       {task.comments_start && (
                         <div>
                           <p className="text-[10px] font-medium text-blue-400">Start Note</p>
@@ -448,7 +448,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
 
                   {/* Inline Forms */}
                   {isActive && activeForm.type === "start" && (
-                    <div className="rounded-lg border border-blue-800/50 bg-stone-900/80 p-3 space-y-2">
+                    <div className="rounded-lg border border-blue-800/50 bg-stone-50 dark:bg-stone-900/80 p-3 space-y-2">
                       <p className="text-xs font-semibold text-blue-400">Start Comment <span className="text-red-400">*</span></p>
                       <textarea
                         value={formData.comment}
@@ -468,7 +468,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   )}
 
                   {isActive && activeForm.type === "complete" && (
-                    <div className="rounded-lg border border-emerald-800/50 bg-stone-900/80 p-3 space-y-2">
+                    <div className="rounded-lg border border-emerald-800/50 bg-stone-50 dark:bg-stone-900/80 p-3 space-y-2">
                       <p className="text-xs font-semibold text-emerald-400">Completion Comment <span className="text-red-400">*</span></p>
                       <textarea
                         value={formData.comment}
@@ -488,7 +488,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   )}
 
                   {isActive && activeForm.type === "block" && (
-                    <div className="rounded-lg border border-red-800/50 bg-stone-900/80 p-3 space-y-2">
+                    <div className="rounded-lg border border-red-800/50 bg-stone-50 dark:bg-stone-900/80 p-3 space-y-2">
                       <p className="text-xs font-semibold text-red-400">Report Issue</p>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <select
@@ -554,7 +554,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               <p className="text-sm text-stone-500">No notes yet. Comments will appear here as tasks are started and completed.</p>
             </div>
           ) : (
-            <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+            <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
               {notesEntries.map((entry, i) => (
                 <div key={i} className="px-4 py-3 space-y-1">
                   <div className="flex items-center gap-2">
@@ -598,7 +598,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                     { label: "Missed", value: stats.today.missed, color: stats.today.missed > 0 ? "text-red-500" : "text-stone-500" },
                     { label: "Total", value: stats.today.total, color: "text-stone-600 dark:text-stone-300" },
                   ].map((s) => (
-                    <div key={s.label} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 px-3 py-2">
+                    <div key={s.label} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 px-3 py-2">
                       <p className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{s.label}</p>
                       <p className={cn("text-xl font-bold", s.color)}>{s.value}</p>
                     </div>
@@ -610,7 +610,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               {stats.avgCompletionTimes.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Avg Completion Time (30d)</h3>
-                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
                     {stats.avgCompletionTimes.map((a: any) => (
                       <div key={a.action_name} className="flex items-center justify-between px-4 py-2.5">
                         <span className="text-xs text-stone-700 dark:text-stone-200">{a.action_name}</span>
@@ -628,7 +628,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               {stats.recurringBlockers.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Recurring Blockers (30d)</h3>
-                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-red-500/20 bg-stone-900/60 overflow-hidden">
+                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-red-500/20 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
                     {stats.recurringBlockers.map((b: any, i: number) => (
                       <div key={i} className="flex items-center justify-between px-4 py-2.5">
                         <span className="text-xs text-red-300">{b.reason}</span>
@@ -643,7 +643,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               {stats.teamRates.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Team Completion Rates (30d)</h3>
-                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
                     {stats.teamRates.map((t: any) => (
                       <div key={t.user_id} className="flex items-center justify-between px-4 py-2.5">
                         <span className="text-xs text-stone-700 dark:text-stone-200">{t.name}</span>

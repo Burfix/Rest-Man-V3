@@ -53,7 +53,7 @@ export default function OperatingScoreHero({
 
   return (
     <div className={cn("w-full rounded border bg-stone-950/80 overflow-hidden", borderColor)}>
-      <div className="flex items-stretch divide-x divide-stone-800/60">
+      <div className="flex items-stretch divide-x divide-stone-200 dark:divide-stone-800/60">
 
         {/* Grade */}
         <div className="flex items-center px-4 py-2.5 shrink-0">

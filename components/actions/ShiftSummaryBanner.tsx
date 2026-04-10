@@ -33,12 +33,12 @@ export default function ShiftSummaryBanner({
           ? "bg-red-950/40 border-red-800/30"
           : urgentCount > 0
             ? "bg-amber-950/40 border-amber-800/30"
-            : "bg-stone-900/50 border-stone-800/40",
+            : "bg-stone-50 dark:bg-stone-900/50 border-stone-200 dark:border-stone-800/40",
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-stone-100">
+          <h2 className="text-sm font-semibold text-stone-900 dark:text-stone-100">
             {urgentCount > 0
               ? `${urgentCount} urgent action${urgentCount !== 1 ? "s" : ""} need attention`
               : "Shift actions on track"}

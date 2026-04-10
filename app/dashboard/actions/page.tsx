@@ -245,7 +245,7 @@ export default async function ActionsPage() {
 
       {/* Co-Pilot logged actions — shows completed + active from today */}
       {!loadError && copilotToday.length > 0 && (
-        <div className="rounded-xl border border-stone-700/50 bg-stone-900/40 p-4 space-y-2">
+        <div className="rounded-xl border border-stone-300 dark:border-stone-700/50 bg-stone-50 dark:bg-stone-900/40 p-4 space-y-2">
           <div className="flex items-center gap-2">
             <span className="text-xs uppercase tracking-widest text-stone-500 font-medium">
               Logged from Co-Pilot Today
@@ -258,7 +258,7 @@ export default async function ActionsPage() {
             {copilotToday.map((a) => (
               <div
                 key={a.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-stone-800/40 bg-stone-900/60 px-3 py-2"
+                className="flex items-center justify-between gap-3 rounded-lg border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/60 px-3 py-2"
               >
                 <span className={`text-sm leading-snug ${a.status === "completed" ? "line-through text-stone-500" : "text-stone-700 dark:text-stone-200"}`}>
                   {a.title}

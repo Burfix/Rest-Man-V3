@@ -31,7 +31,7 @@ const IMPACT_STYLES: Record<string, string> = {
 export default function WhatToDoNow({ decisions }: Props) {
   if (decisions.length === 0) {
     return (
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-6 text-center">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-6 text-center">
         <p className="text-sm text-emerald-400 font-medium">Nothing urgent — you're on track</p>
         <p className="text-xs text-stone-500 mt-1">Check back before next service period</p>
       </div>
@@ -47,7 +47,7 @@ export default function WhatToDoNow({ decisions }: Props) {
         {decisions.map((d, i) => (
           <div
             key={d.id}
-            className="rounded-lg border border-stone-800/40 bg-stone-900/50 px-4 py-3.5"
+            className="rounded-lg border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-4 py-3.5"
           >
             <div className="flex items-start gap-3">
               {/* Number + severity dot */}
@@ -58,7 +58,7 @@ export default function WhatToDoNow({ decisions }: Props) {
 
               <div className="flex-1 min-w-0">
                 {/* Problem */}
-                <h3 className="text-sm font-semibold text-stone-100 leading-snug">
+                <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-snug">
                   {d.title}
                 </h3>
 

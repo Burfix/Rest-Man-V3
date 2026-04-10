@@ -18,8 +18,8 @@ type Props = {
 const SEV_STYLE: Record<GMDecisionSeverity, { bg: string; text: string; border: string }> = {
   critical: { bg: "bg-red-950/30",    text: "text-red-400",    border: "border-red-800/40" },
   high:     { bg: "bg-amber-950/20",  text: "text-amber-400",  border: "border-amber-800/30" },
-  medium:   { bg: "bg-stone-900/50",  text: "text-stone-500 dark:text-stone-400",  border: "border-stone-700/40" },
-  low:      { bg: "bg-stone-900/30",  text: "text-stone-500",  border: "border-stone-800/30" },
+  medium:   { bg: "bg-stone-50 dark:bg-stone-900/50",  text: "text-stone-500 dark:text-stone-400",  border: "border-stone-300 dark:border-stone-700/40" },
+  low:      { bg: "bg-stone-50 dark:bg-stone-900/30",  text: "text-stone-500",  border: "border-stone-200 dark:border-stone-800/30" },
 };
 
 const RANK_STYLE = [
@@ -33,7 +33,7 @@ export default function MobileDecisions({ decisions }: Props) {
 
   if (top.length === 0) {
     return (
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 p-4">
         <p className="text-sm text-stone-500">No critical decisions right now.</p>
       </div>
     );
@@ -115,7 +115,7 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold text-stone-100 leading-tight">
+            <h3 className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-tight">
               {d.title}
             </h3>
             <span className={cn("text-[10px] uppercase tracking-wider font-bold flex-shrink-0", sev.text)}>

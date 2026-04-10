@@ -29,7 +29,7 @@ export default function OperatingScoreBreakdown({ breakdown }: Props) {
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Operating Score
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 p-4">
         {/* Score headline */}
         <div className="flex items-baseline gap-2 mb-3">
           <span className={cn("text-2xl font-bold font-mono", tone)}>

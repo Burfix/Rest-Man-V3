@@ -71,7 +71,7 @@ function ConfidencePips({ level }: { level?: "low" | "medium" | "high" }) {
 export default function CommandFeed({ decisions }: Props) {
   if (decisions.length === 0) {
     return (
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-8 text-center">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-8 text-center">
         <p className="text-sm text-stone-500">No active decisions — operations are clear</p>
       </div>
     );
@@ -89,7 +89,7 @@ export default function CommandFeed({ decisions }: Props) {
             <div
               key={d.id}
               className={cn(
-                "rounded-lg border border-stone-800/40 bg-stone-900/50 border-l-[3px] px-4 py-3.5",
+                "rounded-lg border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 border-l-[3px] px-4 py-3.5",
                 sev.border,
               )}
             >
@@ -119,7 +119,7 @@ export default function CommandFeed({ decisions }: Props) {
               </div>
 
               {/* Title */}
-              <h3 className="mt-2 text-sm font-semibold text-stone-100 leading-snug">
+              <h3 className="mt-2 text-sm font-semibold text-stone-900 dark:text-stone-100 leading-snug">
                 {d.title}
               </h3>
 

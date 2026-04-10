@@ -42,7 +42,7 @@ export default function ControlBar({
       ? "border-red-800/50"
       : status === "needs_attention"
         ? "border-amber-800/40"
-        : "border-stone-800/40";
+        : "border-stone-200 dark:border-stone-800/40";
 
   // Pulsing red dot for after-hours/closed periods regardless of operational status
   const periodUpper = servicePeriod.toUpperCase();
@@ -106,7 +106,7 @@ export default function ControlBar({
         </div>
 
         {/* Divider */}
-        <div className="h-8 w-px bg-stone-800/60" />
+        <div className="h-8 w-px bg-stone-100 dark:bg-stone-800/60" />
 
         {/* Time Pressure */}
         <div className="flex flex-col items-center">
@@ -119,7 +119,7 @@ export default function ControlBar({
         </div>
 
         {/* Divider */}
-        <div className="h-8 w-px bg-stone-800/60" />
+        <div className="h-8 w-px bg-stone-100 dark:bg-stone-800/60" />
 
         {/* Score */}
         <div className="flex flex-col items-center">

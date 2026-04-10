@@ -44,7 +44,7 @@ export default async function AccountabilityAlert() {
             <p className="text-[9px] font-mono uppercase tracking-widest text-red-500 mb-0.5">
               Accountability Alert
             </p>
-            <p className="text-sm font-medium text-stone-100">
+            <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
               Your score yesterday was{" "}
               <span className="font-mono font-bold text-red-400">{score}</span>
               {" "}— At Risk

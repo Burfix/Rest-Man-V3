@@ -88,7 +88,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
       <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1">
         Business Status
       </h2>
-      <div className="rounded border border-stone-800/40 bg-stone-900/50 divide-y divide-stone-800/40">
+      <div className="rounded border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 divide-y divide-stone-200 dark:divide-stone-800/40">
         {KEYS.map((key) => {
           const item = status[key];
           const tone = TONE_STYLES[item.tone];
@@ -145,7 +145,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
           <h2 className="text-[9px] uppercase tracking-[0.2em] text-stone-600 font-semibold px-1 pt-1">
             Forecast
           </h2>
-          <div className="rounded border border-stone-800/40 bg-stone-900/50 divide-y divide-stone-800/40 font-mono">
+          <div className="rounded border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 divide-y divide-stone-200 dark:divide-stone-800/40 font-mono">
 
             {/* Dinner / session risk */}
             <div className="px-4 py-2.5">

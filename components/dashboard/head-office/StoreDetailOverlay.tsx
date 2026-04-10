@@ -166,7 +166,7 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
         {/* ── Header ────────────────────────────────────────────────────── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800 print:border-stone-300">
           <div>
-            <h2 className="text-lg font-bold text-stone-100 print:text-stone-900">{store.store}</h2>
+            <h2 className="text-lg font-bold text-stone-900 dark:text-stone-100 print:text-stone-900">{store.store}</h2>
             <p className="text-xs text-stone-500 dark:text-stone-400 print:text-stone-600">{store.city} · Daily Report · {reportDate}</p>
           </div>
           <div className="flex items-center gap-3">
@@ -208,7 +208,7 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
                 </thead>
                 <tbody>
                   {store.tasks.map((t, i) => (
-                    <tr key={i} className={cn("border-b border-stone-800/30 print:border-stone-200", t.status === "blocked" || t.status === "missed" ? "bg-red-950/10 print:bg-red-50" : "")}>
+                    <tr key={i} className={cn("border-b border-stone-200 dark:border-stone-800/30 print:border-stone-200", t.status === "blocked" || t.status === "missed" ? "bg-red-950/10 print:bg-red-50" : "")}>
                       <td className="px-2 py-1.5 text-stone-700 dark:text-stone-200 print:text-stone-800 font-medium">{t.action}</td>
                       <td className="px-2 py-1.5 text-center">
                         <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", statusBadge(t.status))}>
@@ -310,11 +310,11 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
                 Actions
               </h3>
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2.5">
+                <div className="bg-stone-100 dark:bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2.5">
                   <div className="text-[10px] text-stone-500 dark:text-stone-400 print:text-stone-600">Open</div>
                   <div className={cn("text-lg font-bold mt-0.5", store.actions.open_count > 0 ? "text-amber-400 print:text-amber-700" : "text-stone-600")}>{store.actions.open_count}</div>
                 </div>
-                <div className="bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2.5">
+                <div className="bg-stone-100 dark:bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2.5">
                   <div className="text-[10px] text-stone-500 dark:text-stone-400 print:text-stone-600">Overdue</div>
                   <div className={cn("text-lg font-bold mt-0.5", store.actions.overdue_count > 0 ? "text-red-400 print:text-red-700" : "text-stone-600")}>{store.actions.overdue_count}</div>
                 </div>
@@ -353,9 +353,9 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
 
 function KPI({ label, value, sub, cls }: { label: string; value: string; sub?: string; cls?: string }) {
   return (
-    <div className="bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2">
+    <div className="bg-stone-100 dark:bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2">
       <div className="text-[10px] text-stone-500 dark:text-stone-400 print:text-stone-600">{label}</div>
-      <div className={cn("text-base font-bold text-stone-100 print:text-stone-900 mt-0.5 leading-tight", cls)}>{value}</div>
+      <div className={cn("text-base font-bold text-stone-900 dark:text-stone-100 print:text-stone-900 mt-0.5 leading-tight", cls)}>{value}</div>
       {sub && <div className="text-[9px] text-stone-500 print:text-stone-500 mt-0.5">{sub}</div>}
     </div>
   );

@@ -55,7 +55,7 @@ export default function MobileServicePulse({ serviceState, serviceImpact, servic
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Service Pulse
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 p-4 space-y-3">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 p-4 space-y-3">
         {/* Score + grade header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export default function MobileServicePulse({ serviceState, serviceImpact, servic
         </div>
 
         {/* Service risk bar */}
-        <div className="flex items-center gap-2 border-t border-stone-800/30 pt-3">
+        <div className="flex items-center gap-2 border-t border-stone-200 dark:border-stone-800/30 pt-3">
           <div className={cn("h-2 w-2 rounded-full", RISK_BG[serviceState.serviceRiskLevel] ?? RISK_BG.moderate)} />
           <span className="text-xs text-stone-500 dark:text-stone-400 capitalize">
             Service risk: {serviceState.serviceRiskLevel}

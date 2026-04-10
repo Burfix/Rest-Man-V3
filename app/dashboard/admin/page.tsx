@@ -222,9 +222,9 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 function StatCard({ icon, label, value, sub, accent }: { icon: string; label: string; value: string | number; sub?: string; accent?: string }) {
   return (
-    <div className={cn("rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-4 transition-colors hover:border-stone-700", accent && `ring-1 ${accent}`)}>
+    <div className={cn("rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 p-4 transition-colors hover:border-stone-700", accent && `ring-1 ${accent}`)}>
       <div className="text-lg">{icon}</div>
-      <div className="mt-1 text-2xl font-bold text-stone-100">{value}</div>
+      <div className="mt-1 text-2xl font-bold text-stone-900 dark:text-stone-100">{value}</div>
       <div className="mt-0.5 text-[11px] font-medium text-stone-500 uppercase tracking-wide">{label}</div>
       {sub && <div className="mt-1 text-[10px] text-stone-600">{sub}</div>}
     </div>
@@ -257,7 +257,7 @@ function IntegrationBadge({ status }: { status: string }) {
 
 function SectionCard({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
       <div className="flex items-center justify-between px-5 py-3 border-b border-stone-200 dark:border-stone-800">
         <h3 className="text-sm font-semibold text-stone-600 dark:text-stone-300">{title}</h3>
         {action}
@@ -271,7 +271,7 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-3">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 h-16 animate-pulse" />
+        <div key={i} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 h-16 animate-pulse" />
       ))}
     </div>
   );
@@ -329,7 +329,7 @@ function OverviewPanel({ data }: { data: OverviewData | null }) {
           ) : (
             <div className="space-y-2">
               {Object.entries(data.orgBreakdown).map(([id, org]) => (
-                <div key={id} className="flex items-center justify-between rounded-lg bg-stone-800/40 px-3 py-2">
+                <div key={id} className="flex items-center justify-between rounded-lg bg-stone-100 dark:bg-stone-800/40 px-3 py-2">
                   <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{org.name}</span>
                   <div className="flex items-center gap-3 text-[11px] text-stone-500">
                     <span>{org.stores} store{org.stores !== 1 ? "s" : ""}</span>
@@ -360,7 +360,7 @@ function OrganisationsPanel({ data }: { data: OverviewData | null }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {orgs.map(([id, org]) => (
-            <div key={id} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-5 space-y-3">
+            <div key={id} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 p-5 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300 text-lg font-bold">
                   {org.name.charAt(0)}
@@ -371,12 +371,12 @@ function OrganisationsPanel({ data }: { data: OverviewData | null }) {
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-lg bg-stone-800/50 p-3 text-center">
-                  <div className="text-lg font-bold text-stone-100">{org.stores}</div>
+                <div className="rounded-lg bg-stone-100 dark:bg-stone-800/50 p-3 text-center">
+                  <div className="text-lg font-bold text-stone-900 dark:text-stone-100">{org.stores}</div>
                   <div className="text-[10px] text-stone-500 uppercase">Stores</div>
                 </div>
-                <div className="rounded-lg bg-stone-800/50 p-3 text-center">
-                  <div className="text-lg font-bold text-stone-100">{org.users}</div>
+                <div className="rounded-lg bg-stone-100 dark:bg-stone-800/50 p-3 text-center">
+                  <div className="text-lg font-bold text-stone-900 dark:text-stone-100">{org.users}</div>
                   <div className="text-[10px] text-stone-500 uppercase">Users</div>
                 </div>
               </div>
@@ -447,7 +447,7 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
       </div>
 
       {showNew && (
-        <div className="rounded-xl border border-emerald-800/50 bg-stone-900/80 p-4 space-y-3">
+        <div className="rounded-xl border border-emerald-800/50 bg-stone-50 dark:bg-stone-900/80 p-4 space-y-3">
           <h4 className="text-sm font-semibold text-stone-700 dark:text-stone-200">New Store</h4>
           <div className="grid grid-cols-2 gap-3">
             <input placeholder="Store Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" />
@@ -468,7 +468,7 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
         </div>
       )}
 
-      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
         {stores.map((store) => (
           <div key={store.id} className="flex items-center justify-between px-4 py-3 hover:bg-stone-800/40 transition-colors">
             <div className="space-y-0.5">
@@ -643,7 +643,7 @@ function TeamPanel({
       </div>
 
       {showInvite && (
-        <div className="rounded-xl border border-blue-800/50 bg-stone-900/80 p-4 space-y-3">
+        <div className="rounded-xl border border-blue-800/50 bg-stone-50 dark:bg-stone-900/80 p-4 space-y-3">
           <h4 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Invite Team Member</h4>
           <div className="grid grid-cols-2 gap-3">
             <input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" />
@@ -667,12 +667,12 @@ function TeamPanel({
         </div>
       )}
 
-      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
         {users.map((u) => {
           const primaryRole = u.roles.find((r) => r.is_active);
           const isEditing = editingUser === u.id;
           return (
-            <div key={u.id} className={cn("px-4 py-3 hover:bg-stone-800/40 transition-colors", isEditing && "bg-stone-800/30")}>
+            <div key={u.id} className={cn("px-4 py-3 hover:bg-stone-800/40 transition-colors", isEditing && "bg-stone-100 dark:bg-stone-800/30")}>
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -740,7 +740,7 @@ function TeamPanel({
 
               {/* Inline edit form for role + stores */}
               {isEditing && (
-                <div className="mt-3 pt-3 border-t border-stone-700/50 space-y-3">
+                <div className="mt-3 pt-3 border-t border-stone-300 dark:border-stone-700/50 space-y-3">
                   <div className="flex items-center gap-3">
                     <label className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Role:</label>
                     <select
@@ -814,7 +814,7 @@ function RolesPanel({ users }: { users: UserEntry[] | null }) {
   return (
     <div className="space-y-3">
       {allRoles.map((role) => (
-        <div key={role} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-4 flex items-center justify-between">
+        <div key={role} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 p-4 flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <RoleBadge role={role} />
@@ -850,9 +850,9 @@ function IntegrationsPanel({ data, onRefresh }: { data: IntegrationsData | null;
       </div>
 
       {/* Per-store list */}
-      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
         {/* Header */}
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider bg-stone-800/40">
+        <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider bg-stone-100 dark:bg-stone-800/40">
           <div className="col-span-3">Store</div>
           <div className="col-span-2">MICROS</div>
           <div className="col-span-2">Reviews</div>
@@ -1003,8 +1003,8 @@ function SyncLogsPanel({ data, page, setPage }: { data: SyncLogsData | null; pag
       </div>
 
       {/* Runs table */}
-      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider bg-stone-800/40">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
+        <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider bg-stone-100 dark:bg-stone-800/40">
           <div className="col-span-3">Store</div>
           <div className="col-span-2">Type</div>
           <div className="col-span-2">Status</div>
@@ -1082,7 +1082,7 @@ function AuditPanel({ entries, users }: { entries: AuditEntry[] | null; users: U
       {entries.length === 0 ? (
         <EmptyState message="No audit events recorded yet" />
       ) : (
-        <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+        <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
           {entries.map((e) => (
             <div key={e.id} className="px-4 py-3 hover:bg-stone-800/40 transition-colors">
               <div className="flex items-center justify-between">
@@ -1258,14 +1258,14 @@ export default function AdminDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-stone-100 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
             <span>🛡️</span> Platform Control Center
           </h1>
           <p className="mt-0.5 text-xs text-stone-500">Super admin · Full platform visibility & control</p>
         </div>
         <button
           onClick={handleRefresh}
-          className="rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-800/60 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 hover:text-stone-200 transition-colors"
+          className="rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800/60 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 hover:text-stone-200 transition-colors"
         >
           ↻ Refresh
         </button>
@@ -1280,7 +1280,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Tab bar – scrollable, professional */}
-      <div className="flex gap-1 overflow-x-auto rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-1 scrollbar-none">
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 p-1 scrollbar-none">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -1288,7 +1288,7 @@ export default function AdminDashboard() {
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap",
               tab === t.id
-                ? "bg-stone-100 dark:bg-stone-800 text-stone-100 shadow-sm"
+                ? "bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 shadow-sm"
                 : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/40",
             )}
           >

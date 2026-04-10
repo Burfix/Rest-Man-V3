@@ -279,7 +279,7 @@ export default function DailyReportClient() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-lg font-bold text-stone-100">Head Office Daily Report — {report.date}</h1>
+          <h1 className="text-lg font-bold text-stone-900 dark:text-stone-100">Head Office Daily Report — {report.date}</h1>
           <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
             {g.stores_reporting} store{g.stores_reporting !== 1 ? "s" : ""} ·
             Generated {new Date(report.generatedAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
@@ -307,7 +307,7 @@ export default function DailyReportClient() {
             className={cn(
               "whitespace-nowrap px-3 py-2 text-xs font-semibold transition-colors rounded-t-lg",
               activeTab === tab.id
-                ? "bg-stone-100 dark:bg-stone-800 text-stone-100 border-b-2 border-stone-100"
+                ? "bg-stone-100 dark:bg-stone-800 text-stone-900 dark:text-stone-100 border-b-2 border-stone-100"
                 : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/40"
             )}
           >
@@ -411,13 +411,13 @@ function StoreStatusCard({ store, onClick }: { store: StoreData; onClick?: () =>
       {/* Header */}
       <div className={cn("flex items-center justify-between px-3 py-2", store.riskLevel === "red" ? "bg-red-950/40" : store.riskLevel === "yellow" ? "bg-amber-950/20" : "bg-emerald-950/20")}>
         <div>
-          <span className="text-xs font-bold text-stone-100">{store.store}</span>
+          <span className="text-xs font-bold text-stone-900 dark:text-stone-100">{store.store}</span>
           <span className="ml-2 text-[10px] text-stone-500">{store.city}</span>
         </div>
         <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", risk.bg)}>{risk.label}</span>
       </div>
       {/* Body */}
-      <div className="p-3 space-y-2 bg-stone-900/50">
+      <div className="p-3 space-y-2 bg-stone-50 dark:bg-stone-900/50">
         {/* Completion bar */}
         <div className="flex items-center justify-between text-[11px]">
           <span className="text-stone-500 dark:text-stone-400">Duties</span>
@@ -506,7 +506,7 @@ function StoreComparisonTab({ stores, onSelectStore }: { stores: StoreData[]; on
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-stone-800/50 text-stone-500">
+            <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
               <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
               <th className="px-3 py-2 text-center font-semibold text-[10px] uppercase tracking-wide">Risk</th>
               <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Duties %</th>
@@ -526,7 +526,7 @@ function StoreComparisonTab({ stores, onSelectStore }: { stores: StoreData[]; on
               const risk = riskBadge(store.riskLevel);
               const f = store.financials;
               return (
-                <tr key={store.siteId} className={cn("border-b border-stone-800/30", store.riskLevel === "red" ? "bg-red-950/10" : "")}>
+                <tr key={store.siteId} className={cn("border-b border-stone-200 dark:border-stone-800/30", store.riskLevel === "red" ? "bg-red-950/10" : "")}>
                   <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">
                     <button onClick={() => onSelectStore(store)} className="hover:text-amber-400 hover:underline transition-colors text-left">{store.store}</button>
                   </td>
@@ -622,7 +622,7 @@ function DailyDutiesTab({ stores }: { stores: StoreData[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
-            <tr className="border-b border-stone-800/50 text-stone-500">
+            <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
               <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
               <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Duty</th>
               <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Manager</th>
@@ -639,7 +639,7 @@ function DailyDutiesTab({ stores }: { stores: StoreData[] }) {
           </thead>
           <tbody>
             {filtered.map((row, i) => (
-              <tr key={`${row.siteId}-${row.action}-${i}`} className={cn("border-b border-stone-800/30", row.status === "blocked" || row.status === "missed" ? "bg-red-950/10" : "")}>
+              <tr key={`${row.siteId}-${row.action}-${i}`} className={cn("border-b border-stone-200 dark:border-stone-800/30", row.status === "blocked" || row.status === "missed" ? "bg-red-950/10" : "")}>
                 <td className="px-3 py-2 text-stone-600 dark:text-stone-300 font-medium">{row.storeName}</td>
                 <td className="px-3 py-2 text-stone-700 dark:text-stone-200">{row.action}</td>
                 <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{row.started_by ?? "—"}</td>
@@ -697,7 +697,7 @@ function LabourTurnoverTab({ stores, g }: { stores: StoreData[]; g: GroupSummary
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-stone-800/50 text-stone-500">
+              <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
                 <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
                 <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Revenue</th>
                 <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Target</th>
@@ -712,7 +712,7 @@ function LabourTurnoverTab({ stores, g }: { stores: StoreData[]; g: GroupSummary
               {sorted.map((store) => {
                 const f = store.financials;
                 return (
-                  <tr key={store.siteId} className="border-b border-stone-800/30">
+                  <tr key={store.siteId} className="border-b border-stone-200 dark:border-stone-800/30">
                     <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">{store.store}</td>
                     <td className="px-3 py-2.5 text-right text-stone-600 dark:text-stone-300">{fmtZAR(f.sales_net_vat)}</td>
                     <td className="px-3 py-2.5 text-right text-stone-500">{fmtZAR(f.revenue_target)}</td>
@@ -769,11 +769,11 @@ function MaintenanceComplianceTab({ stores }: { stores: StoreData[] }) {
           <div className="space-y-3">
             {stores.filter((s) => s.maintenance.open_count > 0).map((store) => (
               <div key={store.siteId} className="rounded-lg border border-stone-200 dark:border-stone-800 overflow-hidden">
-                <div className="px-3 py-2 bg-stone-800/40 flex items-center justify-between">
+                <div className="px-3 py-2 bg-stone-100 dark:bg-stone-800/40 flex items-center justify-between">
                   <span className="text-xs font-bold text-stone-700 dark:text-stone-200">{store.store}</span>
                   <span className="text-[10px] text-stone-500 dark:text-stone-400">{store.maintenance.open_count} issue{store.maintenance.open_count !== 1 ? "s" : ""}</span>
                 </div>
-                <div className="divide-y divide-stone-800/30">
+                <div className="divide-y divide-stone-200 dark:divide-stone-800/30">
                   {store.maintenance.issues.map((issue, i) => (
                     <div key={i} className="px-3 py-2 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
@@ -802,7 +802,7 @@ function MaintenanceComplianceTab({ stores }: { stores: StoreData[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-stone-800/50 text-stone-500">
+                <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Item</th>
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Category</th>
@@ -813,7 +813,7 @@ function MaintenanceComplianceTab({ stores }: { stores: StoreData[] }) {
               <tbody>
                 {stores.flatMap((store) =>
                   store.compliance.overdue_items.map((item, i) => (
-                    <tr key={`${store.siteId}-${i}`} className={cn("border-b border-stone-800/30", item.critical ? "bg-red-950/10" : "")}>
+                    <tr key={`${store.siteId}-${i}`} className={cn("border-b border-stone-200 dark:border-stone-800/30", item.critical ? "bg-red-950/10" : "")}>
                       <td className="px-3 py-2 text-stone-600 dark:text-stone-300 font-medium">{store.store}</td>
                       <td className="px-3 py-2 text-stone-700 dark:text-stone-200">{item.name}</td>
                       <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{item.category}</td>
@@ -855,7 +855,7 @@ function GuestExperienceTab({ stores }: { stores: StoreData[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-stone-800/50 text-stone-500">
+              <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
                 <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
                 <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Reviews</th>
                 <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Avg Rating</th>
@@ -865,7 +865,7 @@ function GuestExperienceTab({ stores }: { stores: StoreData[] }) {
             </thead>
             <tbody>
               {stores.map((store) => (
-                <tr key={store.siteId} className="border-b border-stone-800/30">
+                <tr key={store.siteId} className="border-b border-stone-200 dark:border-stone-800/30">
                   <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">{store.store}</td>
                   <td className="px-3 py-2.5 text-right text-stone-500 dark:text-stone-400">{store.reviews.total_7d}</td>
                   <td className={cn("px-3 py-2.5 text-right font-bold", store.reviews.avg_rating != null ? (store.reviews.avg_rating >= 4 ? "text-emerald-400" : store.reviews.avg_rating >= 3 ? "text-amber-400" : "text-red-400") : "text-stone-600")}>
@@ -966,7 +966,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
                 <div className="space-y-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Incomplete Duties:</span>
                   {store.tasks.filter((t) => t.status !== "completed").map((t, i) => (
-                    <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-stone-800/20">
+                    <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-stone-200 dark:border-stone-800/20">
                       <div className="flex items-center gap-2">
                         <span className={cn("text-[9px] font-bold uppercase px-1 py-0.5 rounded border", statusBadgeClass(t.status))}>{t.status.replace(/_/g, " ")}</span>
                         <span className="text-stone-600 dark:text-stone-300">{t.action}</span>
@@ -980,7 +980,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
                 </div>
                 {/* Blocker themes */}
                 {store.summary.blocker_reasons.length > 0 && (
-                  <div className="mt-3 pt-2 border-t border-stone-800/30">
+                  <div className="mt-3 pt-2 border-t border-stone-200 dark:border-stone-800/30">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Blocker Themes:</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {store.summary.blocker_reasons.map((reason, i) => (
@@ -1001,7 +1001,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-stone-800/50 text-stone-500">
+                <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
                   <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Duties %</th>
                   <th className="px-3 py-2 text-right font-semibold text-[10px] uppercase tracking-wide">Blocked</th>
@@ -1011,7 +1011,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
               </thead>
               <tbody>
                 {yellowStores.map((store) => (
-                  <tr key={store.siteId} className="border-b border-stone-800/30 bg-amber-950/5">
+                  <tr key={store.siteId} className="border-b border-stone-200 dark:border-stone-800/30 bg-amber-950/5">
                     <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">{store.store}</td>
                     <td className={cn("px-3 py-2.5 text-right font-bold", pctColor(store.summary.completion_pct))}>{store.summary.completion_pct}%</td>
                     <td className={cn("px-3 py-2.5 text-right", store.summary.blocked > 0 ? "text-red-400" : "text-stone-600")}>{store.summary.blocked}</td>
@@ -1037,7 +1037,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-stone-800/50 text-stone-500">
+                <tr className="border-b border-stone-200 dark:border-stone-800/50 text-stone-500">
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Store</th>
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Duty</th>
                   <th className="px-3 py-2 text-left font-semibold text-[10px] uppercase tracking-wide">Escalated To</th>
@@ -1047,7 +1047,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
               </thead>
               <tbody>
                 {escalatedTasks.map((t, i) => (
-                  <tr key={i} className="border-b border-stone-800/30">
+                  <tr key={i} className="border-b border-stone-200 dark:border-stone-800/30">
                     <td className="px-3 py-2 text-stone-600 dark:text-stone-300 font-medium">{t.storeName}</td>
                     <td className="px-3 py-2 text-stone-700 dark:text-stone-200">{t.action}</td>
                     <td className="px-3 py-2 text-amber-400">{t.escalated_to || "—"}</td>
@@ -1089,9 +1089,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Tile({ label, value, valueClass, sub }: { label: string; value: string; valueClass?: string; sub?: string }) {
   return (
-    <div className="bg-stone-800/60 rounded-lg px-3 py-2.5">
+    <div className="bg-stone-100 dark:bg-stone-800/60 rounded-lg px-3 py-2.5">
       <div className="text-[10px] text-stone-500 dark:text-stone-400">{label}</div>
-      <div className={cn("text-lg font-bold text-stone-100 mt-0.5 leading-tight", valueClass)}>{value}</div>
+      <div className={cn("text-lg font-bold text-stone-900 dark:text-stone-100 mt-0.5 leading-tight", valueClass)}>{value}</div>
       {sub && <div className="text-[9px] text-stone-500 mt-0.5">{sub}</div>}
     </div>
   );

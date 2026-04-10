@@ -41,7 +41,7 @@ export default function RisksAndBottlenecks({ businessStatus }: Props) {
 
   if (risks.length === 0) {
     return (
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-4 text-center">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-4 text-center">
         <p className="text-sm text-emerald-400 font-medium">No active risks</p>
         <p className="text-xs text-stone-500 mt-0.5">All operational areas healthy</p>
       </div>
@@ -53,7 +53,7 @@ export default function RisksAndBottlenecks({ businessStatus }: Props) {
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium px-1">
         Risks &amp; Bottlenecks
       </h2>
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 divide-y divide-stone-800/40">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 divide-y divide-stone-200 dark:divide-stone-800/40">
         {risks.map((key) => {
           const item = businessStatus[key];
           return (

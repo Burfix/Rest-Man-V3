@@ -89,9 +89,9 @@ export default function FeedbackLoop({
 
   if (loading) {
     return (
-      <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-6 animate-pulse">
+      <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-6 animate-pulse">
         <div className="h-3 w-24 bg-stone-100 dark:bg-stone-800 rounded mb-4" />
-        <div className="h-12 bg-stone-800/50 rounded" />
+        <div className="h-12 bg-stone-100 dark:bg-stone-800/50 rounded" />
       </div>
     );
   }
@@ -115,7 +115,7 @@ export default function FeedbackLoop({
   const bestDayLabel = bestDay ? shortDate(bestDay.stat_date) : null;
 
   return (
-    <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-4 space-y-4">
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-4 space-y-4">
       <h2 className="text-xs uppercase tracking-widest text-stone-500 font-medium">
         Performance Momentum
       </h2>
@@ -123,7 +123,7 @@ export default function FeedbackLoop({
       {/* ── Momentum row ── */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-baseline gap-1.5">
-          <span className="text-2xl font-black font-mono text-stone-100">{score}</span>
+          <span className="text-2xl font-black font-mono text-stone-900 dark:text-stone-100">{score}</span>
           <span className="text-base font-black font-mono text-amber-400">{grade}</span>
         </div>
         <span className={cn("text-[11px] font-mono font-semibold", trendColor)}>
@@ -225,7 +225,7 @@ export default function FeedbackLoop({
 
       {/* ── Best shift this week ── */}
       {bestDay && bestDay.total_completed > 0 && (
-        <div className="border-t border-stone-800/40 pt-3">
+        <div className="border-t border-stone-200 dark:border-stone-800/40 pt-3">
           <span className="text-[9px] uppercase tracking-wider text-stone-600 font-medium block mb-0.5">
             Best Shift This Week
           </span>
@@ -242,7 +242,7 @@ export default function FeedbackLoop({
       {/* ── Consequence if ignored ── */}
       {isAtRisk && (
         <div className={cn(
-          "border-t border-stone-800/40 pt-3",
+          "border-t border-stone-200 dark:border-stone-800/40 pt-3",
         )}>
           <p className={cn(
             "text-[10px] font-mono leading-snug",
@@ -253,7 +253,7 @@ export default function FeedbackLoop({
         </div>
       )}
       {!isAtRisk && grade === "D" && (
-        <div className="border-t border-stone-800/40 pt-3">
+        <div className="border-t border-stone-200 dark:border-stone-800/40 pt-3">
           <p className="text-[10px] font-mono text-amber-500 leading-snug">
             Sustained Grade D performance leads to Head Office escalation.
           </p>

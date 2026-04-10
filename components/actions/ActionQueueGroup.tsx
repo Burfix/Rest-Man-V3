@@ -69,7 +69,7 @@ export default function ActionQueueGroup({
           return (
             <div
               key={action.id}
-              className="rounded-lg border border-stone-800/40 bg-stone-900/50 px-4 py-3"
+              className="rounded-lg border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-4 py-3"
             >
               {/* Top row: priority + category + due */}
               <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -92,7 +92,7 @@ export default function ActionQueueGroup({
               </div>
 
               {/* Title */}
-              <h4 className="text-sm font-semibold text-stone-100 leading-snug">
+              <h4 className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-snug">
                 {action.title}
               </h4>
 

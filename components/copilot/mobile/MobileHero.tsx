@@ -66,7 +66,7 @@ export default function MobileHero({ brief, serviceScore }: Props) {
       </div>
 
       {/* Headline */}
-      <h1 className="text-lg font-bold text-stone-100 leading-tight">
+      <h1 className="text-lg font-bold text-stone-900 dark:text-stone-100 leading-tight">
         {brief.headline}
       </h1>
 
@@ -123,7 +123,7 @@ function MobilePill({
     critical: "text-red-400",
   };
   return (
-    <div className="rounded-lg bg-stone-900/50 border border-stone-800/30 px-3 py-2">
+    <div className="rounded-lg bg-stone-50 dark:bg-stone-900/50 border border-stone-200 dark:border-stone-800/30 px-3 py-2">
       <span className="text-[10px] uppercase tracking-wider text-stone-500 block">{label}</span>
       <span className={cn("text-sm font-bold font-mono", colors[tone])}>{value}</span>
     </div>
