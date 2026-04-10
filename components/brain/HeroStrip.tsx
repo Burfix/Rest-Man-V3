@@ -218,8 +218,12 @@ export default function HeroStrip({
               </span>
               <span className="font-bold">
                 {maintDriver.pts >= 13
-                  ? "Clear ✓"
-                  : `${maintDriver.pts}/15 pts ${driverIcon(maintDriver.pts, 15)}`}
+                  ? "All Clear ✓"
+                  : maintDriver.reason.includes("Service blocked")
+                  ? `${maintDriver.pts}/15 🔴 Service blocked`
+                  : maintDriver.reason.includes("urgent")
+                  ? `${maintDriver.pts}/15 ⚠ Urgent issue open`
+                  : `${maintDriver.pts}/15 ${driverIcon(maintDriver.pts, 15)}`}
               </span>
             </div>
           )}

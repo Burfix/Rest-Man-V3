@@ -252,7 +252,11 @@ export async function runCopilot(): Promise<CopilotOutput> {
     labourPercent: labourPct,
     targetLabourPercent: TARGET_LABOUR_PCT,
     maintenanceUrgent: maintenance.urgentIssues.length,
+    maintenanceHighCount: maintenance.urgentIssues.filter((i) => i.priority === "high").length,
+    maintenanceMediumCount: 0,  // summary doesn't track medium separately; medium not in urgentIssues
+    maintenanceOpenCount: maintenance.openRepairs + maintenance.inProgress + maintenance.awaitingParts,
     maintenanceServiceBlocking: maintenance.serviceDisruptions > 0,
+    maintenanceOldestOpenDays: 0,  // summary doesn't carry age; brain context-builder handles this
     complianceExpired: complianceSummary.expired,
     complianceDueSoon: complianceSummary.due_soon,
   });

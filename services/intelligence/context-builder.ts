@@ -38,8 +38,11 @@ export type DailyOpsContext = {
 
 export type MaintenanceContext = {
   openCount: number;
-  urgentCount: number;
-  serviceBlocking: boolean;  // any open item with impact_level = service_disruption
+  urgentCount: number;      // priority = urgent | high | critical
+  highCount: number;        // priority = high (only)
+  mediumCount: number;      // priority = medium (only)
+  serviceBlocking: boolean; // any open item with service_blocking = true
+  oldestOpenDays: number;   // age of oldest open issue in days (0 if none)
 };
 
 export type ComplianceContext = {
@@ -182,7 +185,7 @@ export async function buildOperationsContext(
       // Maintenance — open issues
       supabase
         .from("maintenance_logs")
-        .select("id, priority, impact_level")
+        .select("id, priority, impact_level, service_blocking, date_reported")
         .eq("site_id", siteId)
         .in("repair_status", ["open", "in_progress", "awaiting_parts"]),
 
@@ -260,13 +263,28 @@ export async function buildOperationsContext(
   const completionRate = totalTasks > 0 ? Math.round(completed / totalTasks * 100) : 0;
 
   // ── Maintenance ────────────────────────────────────────────────────────────
-  const maintRows     = (maintRes.data ?? []) as { id: string; priority: string; impact_level: string | null }[];
+  const maintRows     = (maintRes.data ?? []) as { id: string; priority: string; impact_level: string | null; service_blocking: boolean | null; date_reported: string | null }[];
   const urgentCount   = maintRows.filter(
     (m) => m.priority === "urgent" || m.priority === "high" || m.priority === "critical"
   ).length;
+  const highCount     = maintRows.filter((m) => m.priority === "high").length;
+  const mediumCount   = maintRows.filter((m) => m.priority === "medium").length;
   const serviceBlocking = maintRows.some(
-    (m) => m.impact_level === "service_disruption"
+    (m) => m.service_blocking === true || m.impact_level === "service_disruption" || m.impact_level === "service_blocking"
   );
+
+  // Oldest open issue age in days (for SLA deduction)
+  let oldestOpenDays = 0;
+  if (maintRows.length > 0) {
+    const nowMs = Date.now();
+    for (const m of maintRows) {
+      if (m.date_reported) {
+        const ageDays = (nowMs - new Date(m.date_reported).getTime()) / 86_400_000;
+        if (ageDays > oldestOpenDays) oldestOpenDays = ageDays;
+      }
+    }
+    oldestOpenDays = Math.floor(oldestOpenDays);
+  }
 
   // ── Compliance ─────────────────────────────────────────────────────────────
   // Always fetched live from compliance_items in this request (no extra caching here).
@@ -302,7 +320,7 @@ export async function buildOperationsContext(
     revenue:     { actual, target, variance, trend },
     labour:      { actualPercent, targetPercent: targetLabourPct, variance: labourVariance, staffOnFloor: 0, note: labourNote },
     dailyOps:    { totalTasks, completed, overdue, blocked, completionRate },
-    maintenance: { openCount: maintRows.length, urgentCount, serviceBlocking },
+    maintenance: { openCount: maintRows.length, urgentCount, highCount, mediumCount, serviceBlocking, oldestOpenDays },
     compliance:  { overdueCount, atRiskCount },
     meta:        { timeOfDay, sessionPressure },
   };

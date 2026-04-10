@@ -407,6 +407,8 @@ export interface MaintenanceLog {
   root_cause: string | null;
   follow_up_required: boolean;
   follow_up_notes: string | null;
+  /** True when this issue is actively blocking service */
+  service_blocking: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -40,6 +40,7 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
           issue_description: fd.get("issue_description") || undefined,
           priority: fd.get("priority"),
           impact_level: fd.get("impact_level") || "none",
+          service_blocking: fd.get("service_blocking") === "on",
           reported_by: fd.get("reported_by") || undefined,
           repair_status: fd.get("repair_status") || "open",
           date_reported: fd.get("date_reported") || undefined,
@@ -170,6 +171,24 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             <option value="compliance_risk">Compliance risk</option>
             <option value="food_safety_risk">⚠ Food safety risk</option>
           </select>
+        </div>
+
+        {/* Service blocking */}
+        <div className="col-span-2">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              name="service_blocking"
+              type="checkbox"
+              disabled={isSubmitting}
+              className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              🔴 This issue is blocking service
+            </span>
+          </label>
+          <p className="text-[10px] text-gray-500 mt-0.5 ml-6">
+            Check if the equipment failure is preventing normal service delivery. This applies the maximum maintenance score deduction.
+          </p>
         </div>
 
         {/* Reported by */}

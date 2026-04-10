@@ -316,10 +316,27 @@ function computeSystemHealth(
     ? (ctx.dailyOps.completionRate / 100) * 20
     : 20; // full credit until duty window opens
 
-  // Maintenance: 15 pts (service-blocking = 0; each urgent removes 4)
-  const maintPts = ctx.maintenance.serviceBlocking
-    ? 0
-    : Math.max(0, 15 - ctx.maintenance.urgentCount * 4);
+  // Maintenance: 15 pts — penalty-from-full model (spec v1.0)
+  // Component 1: Severity deduction (max –10)
+  let sevDeduction = 0;
+  if (ctx.maintenance.serviceBlocking)              sevDeduction = 10;
+  else if (ctx.maintenance.urgentCount > 0)         sevDeduction = 8;
+  else if (ctx.maintenance.highCount > 0)           sevDeduction = 5;
+  else if (ctx.maintenance.mediumCount > 0)         sevDeduction = 2;
+
+  // Component 2: SLA age deduction (max –3)
+  let slaDeduction = 0;
+  const oldestDays = ctx.maintenance.oldestOpenDays;
+  if (oldestDays > 7)       slaDeduction = 3;
+  else if (oldestDays > 3)  slaDeduction = 2;
+  else if (oldestDays > 1)  slaDeduction = 1;
+
+  // Component 3: Volume deduction (max –2)
+  let volDeduction = 0;
+  if (ctx.maintenance.openCount >= 4)       volDeduction = 2;
+  else if (ctx.maintenance.openCount >= 2)  volDeduction = 1;
+
+  const maintPts = Math.max(0, 15 - sevDeduction - slaDeduction - volDeduction);
 
   // Compliance: 15 pts
   // Any expired/overdue item = full deduction (0/15) — legal/insurance exposure.
@@ -380,10 +397,12 @@ function computeSystemHealth(
       pts:       Math.round(maintPts),
       direction: maintPts >= 13 ? "up" : "down",
       reason:    ctx.maintenance.serviceBlocking
-        ? `Service blocked — -${MAX.MAINTENANCE} pts`
+        ? `Service blocked — fix now (–${sevDeduction + slaDeduction + volDeduction} pts)`
         : ctx.maintenance.urgentCount > 0
-        ? `${ctx.maintenance.urgentCount} urgent issue${ctx.maintenance.urgentCount > 1 ? "s" : ""} — -${Math.round(MAX.MAINTENANCE - maintPts)} pts`
-        : `No urgent issues (+${Math.round(maintPts)}/15 pts)`,
+        ? `${ctx.maintenance.urgentCount} urgent issue${ctx.maintenance.urgentCount > 1 ? "s" : ""} open${oldestDays > 1 ? ` · oldest ${oldestDays}d` : ""} — -${MAX.MAINTENANCE - Math.round(maintPts)} pts`
+        : ctx.maintenance.openCount > 0
+        ? `${ctx.maintenance.openCount} open issue${ctx.maintenance.openCount > 1 ? "s" : ""}${oldestDays > 1 ? ` · oldest ${oldestDays}d` : ""} — -${MAX.MAINTENANCE - Math.round(maintPts)} pts`
+        : `No open issues (+${Math.round(maintPts)}/15 pts)`,
     },
     {
       module:    "COMPLIANCE",

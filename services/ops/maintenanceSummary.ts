@@ -70,7 +70,9 @@ export async function getMaintenanceSummary(): Promise<MaintenanceSummary> {
 
   // ── Business impact counts from open issues ───────────────────────────
   const foodSafetyRisks   = openIssues.filter((l) => l.impact_level === "food_safety_risk").length;
-  const serviceDisruptions = openIssues.filter((l) => l.impact_level === "service_disruption").length;
+  const serviceDisruptions = openIssues.filter(
+    (l) => l.impact_level === "service_disruption" || (l as any).service_blocking === true
+  ).length;
   const complianceRisks   = openIssues.filter((l) => l.impact_level === "compliance_risk").length;
 
   return {

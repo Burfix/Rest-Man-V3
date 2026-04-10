@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
         issue_description: d.issue_description?.trim() || null,
         priority: d.priority,
         impact_level: d.impact_level || "none",
+        service_blocking: d.service_blocking ?? false,
         reported_by: d.reported_by?.trim() || null,
         repair_status: d.repair_status || "open",
         date_reported: d.date_reported || todayJHB(),
