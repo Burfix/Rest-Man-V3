@@ -263,7 +263,7 @@ export async function buildOperationsContext(
   const completionRate = totalTasks > 0 ? Math.round(completed / totalTasks * 100) : 0;
 
   // ── Maintenance ────────────────────────────────────────────────────────────
-  const maintRows     = (maintRes.data ?? []) as { id: string; priority: string; impact_level: string | null; service_blocking: boolean | null; date_reported: string | null }[];
+  const maintRows     = ((maintRes.data ?? []) as unknown) as { id: string; priority: string; impact_level: string | null; service_blocking: boolean | null; date_reported: string | null }[];
   const urgentCount   = maintRows.filter(
     (m) => m.priority === "urgent" || m.priority === "high" || m.priority === "critical"
   ).length;
