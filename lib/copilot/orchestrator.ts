@@ -84,7 +84,7 @@ export async function runCopilot(): Promise<CopilotOutput> {
     labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
-    getMaintenanceSummary(),
+    getMaintenanceSummary(cfg.site_id),
     generateRevenueForecast(today_iso),
     getComplianceSummary(),
     getMicrosStatus(),

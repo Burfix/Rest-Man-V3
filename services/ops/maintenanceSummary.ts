@@ -8,7 +8,7 @@ import { calcMTTR, getTopFailingAssets } from "@/lib/maintenance-utils";
 
 const OPEN_STATUSES = ["open", "in_progress", "awaiting_parts"] as const;
 
-export async function getMaintenanceSummary(): Promise<MaintenanceSummary> {
+export async function getMaintenanceSummary(siteId?: string): Promise<MaintenanceSummary> {
   const supabase = createServerClient();
 
   const sevenDaysAgo  = new Date(Date.now() - 7  * 86_400_000).toISOString().slice(0, 10);
@@ -17,27 +17,31 @@ export async function getMaintenanceSummary(): Promise<MaintenanceSummary> {
     new Date().getFullYear(), new Date().getMonth(), 1
   ).toISOString().slice(0, 10);
 
+  // Helper: scope a query to siteId when available
+  const scoped = (q: any) => siteId ? q.eq("site_id", siteId) : q;
+
   const [equipResult, openResult, recentResolvedResult, last30Result] =
     await Promise.all([
-      supabase.from("equipment").select("id, status"),
-      supabase
-        .from("maintenance_logs")
-        .select("*")
-        .in("repair_status", [...OPEN_STATUSES])
-        .order("date_reported", { ascending: false }),
-      // Recently resolved — for MTTR + "resolved this week"
-      supabase
-        .from("maintenance_logs")
-        .select("*")
-        .in("repair_status", ["resolved", "closed"])
-        .gte("updated_at", sevenDaysAgo + "T00:00:00Z")
-        .limit(100),
-      // Last 30 days all issues — for top problem asset + monthly cost
-      supabase
-        .from("maintenance_logs")
-        .select("*")
-        .gte("date_reported", thirtyDaysAgo)
-        .limit(200),
+      scoped(supabase.from("equipment").select("id, status")),
+      scoped(
+        supabase
+          .from("maintenance_logs")
+          .select("*")
+          .in("repair_status", [...OPEN_STATUSES])
+      ).order("date_reported", { ascending: false }),
+      scoped(
+        supabase
+          .from("maintenance_logs")
+          .select("*")
+          .in("repair_status", ["resolved", "closed"])
+          .gte("updated_at", sevenDaysAgo + "T00:00:00Z")
+      ).limit(100),
+      scoped(
+        supabase
+          .from("maintenance_logs")
+          .select("*")
+          .gte("date_reported", thirtyDaysAgo)
+      ).limit(200),
     ]);
 
   const equipment        = (equipResult.data        ?? []) as Pick<Equipment, "id" | "status">[];

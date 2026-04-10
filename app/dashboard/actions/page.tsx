@@ -130,7 +130,7 @@ export default async function ActionsPage() {
     labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
-    getMaintenanceSummary(),
+    getMaintenanceSummary(cfg.site_id),
     generateRevenueForecast(todayISO()),
     getComplianceSummary(),
     getMicrosStatus(),

@@ -153,7 +153,7 @@ export default async function OperationsDashboard() {
     getTodayBookingsSummary(),
     getSevenDayReviewSummary(),
     getLatestSalesSummary(),
-    getMaintenanceSummary(),
+    getMaintenanceSummary(siteId),
     getUpcomingEvents(),
     getDataFreshnessSummary(),
     generateRevenueForecast(todayISO(), orgId ?? undefined),
