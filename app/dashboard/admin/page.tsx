@@ -427,6 +427,16 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
     onRefresh();
   };
 
+  const handleDelete = async (store: Store) => {
+    if (!confirm(`Permanently delete "${store.name}"? This cannot be undone. All associated data will be removed.`)) return;
+    try {
+      await apiFetch(`/api/admin/stores/${store.id}`, { method: "DELETE" });
+      onRefresh();
+    } catch (e: any) {
+      alert(`Delete failed: ${e.message}`);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -474,12 +484,22 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
                 <span className="font-mono text-[10px] text-stone-600">{store.id.slice(0, 8)}</span>
               </div>
             </div>
-            <button
-              onClick={() => toggleActive(store)}
-              className={cn("rounded px-2 py-1 text-[10px] font-semibold transition-colors", store.is_active ? "bg-red-500/20 text-red-300 hover:bg-red-500/30" : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30")}
-            >
-              {store.is_active ? "Deactivate" : "Activate"}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toggleActive(store)}
+                className={cn("rounded px-2 py-1 text-[10px] font-semibold transition-colors", store.is_active ? "bg-red-500/20 text-red-300 hover:bg-red-500/30" : "bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30")}
+              >
+                {store.is_active ? "Deactivate" : "Activate"}
+              </button>
+              {!store.is_active && (
+                <button
+                  onClick={() => handleDelete(store)}
+                  className="rounded px-2 py-1 text-[10px] font-semibold border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
           </div>
         ))}
         {stores.length === 0 && <EmptyState message="No stores configured" />}
