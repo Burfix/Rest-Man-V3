@@ -20,7 +20,7 @@ const CAT_ICON: Record<GroupCriticalAction["category"], string> = {
 // ── Completion progress bar ───────────────────────────────────────────────────
 
 function ProgressBar({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="text-[11px] text-stone-300 dark:text-stone-700">—</span>;
+  if (pct === null) return <span className="text-[11px] text-stone-600 dark:text-stone-700">—</span>;
 
   const color =
     pct >= 80 ? "bg-emerald-500" :
@@ -82,11 +82,11 @@ export default function ActionOversightPanel({ stats, criticalActions = [] }: Pr
           { label: "Total",     value: totals.total,     color: "text-stone-700 dark:text-stone-300" },
           { label: "Completed", value: totals.completed, color: "text-emerald-600 dark:text-emerald-400" },
           { label: "Open",      value: totals.open,      color: "text-amber-600 dark:text-amber-400" },
-          { label: "Overdue",   value: totals.overdue,   color: totals.overdue > 0 ? "text-red-600 dark:text-red-400" : "text-stone-400" },
+          { label: "Overdue",   value: totals.overdue,   color: totals.overdue > 0 ? "text-red-600 dark:text-red-400" : "text-stone-500 dark:text-stone-400" },
         ].map(({ label, value, color }) => (
           <div key={label} className="px-4 py-2.5 text-center border-r border-stone-100 dark:border-stone-800 last:border-r-0">
             <p className={cn("text-lg font-black tabular-nums leading-none", color)}>{value}</p>
-            <p className="text-[10px] text-stone-400 mt-0.5">{label}</p>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">{label}</p>
           </div>
         ))}
       </div>
@@ -95,7 +95,7 @@ export default function ActionOversightPanel({ stats, criticalActions = [] }: Pr
       <div className="divide-y divide-stone-100 dark:divide-stone-800">
 
         {/* Column headers */}
-        <div className="grid grid-cols-[1fr_40px_40px_40px_100px] gap-3 px-5 py-2 text-[9px] font-bold uppercase tracking-widest text-stone-400">
+        <div className="grid grid-cols-[1fr_40px_40px_40px_100px] gap-3 px-5 py-2 text-[9px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
           <span>Store</span>
           <span className="text-center">Total</span>
           <span className="text-center">Done</span>
@@ -127,7 +127,7 @@ export default function ActionOversightPanel({ stats, criticalActions = [] }: Pr
             {/* Overdue */}
             <p className={cn(
               "text-[11px] tabular-nums text-center font-bold",
-              store.overdue > 0 ? "text-red-600 dark:text-red-400" : "text-stone-300 dark:text-stone-700"
+              store.overdue > 0 ? "text-red-600 dark:text-red-400" : "text-stone-600 dark:text-stone-700"
             )}>
               {store.overdue > 0 ? store.overdue : "—"}
             </p>
@@ -140,7 +140,7 @@ export default function ActionOversightPanel({ stats, criticalActions = [] }: Pr
 
       {/* Footer: group completion */}
       <div className="border-t border-stone-100 dark:border-stone-800 px-5 py-3 flex items-center justify-between">
-        <span className="text-[11px] text-stone-400">Group completion rate</span>
+        <span className="text-[11px] text-stone-500 dark:text-stone-400">Group completion rate</span>
         <ProgressBar pct={groupPct} />
       </div>
 

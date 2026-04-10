@@ -32,11 +32,11 @@ export default function PrepGuidanceCard({ items }: { items: PrepGuidanceItem[] 
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-stone-100 dark:border-stone-800">
-              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Item</th>
-              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">Category</th>
-              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500 text-right">Qty</th>
-              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500 text-center">Urgency</th>
-              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500 hidden sm:table-cell">Note</th>
+              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500">Item</th>
+              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500">Category</th>
+              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500 text-right">Qty</th>
+              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500 text-center">Urgency</th>
+              <th className="pb-2 text-[10px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500 hidden sm:table-cell">Note</th>
             </tr>
           </thead>
           <tbody>
@@ -51,7 +51,7 @@ export default function PrepGuidanceCard({ items }: { items: PrepGuidanceItem[] 
                     {item.itemCategory}
                   </td>
                   <td className="py-2.5 text-xs font-semibold text-stone-800 dark:text-stone-200 text-right">
-                    {item.estimatedQuantity} <span className="text-stone-400 font-normal">{item.unit}</span>
+                    {item.estimatedQuantity} <span className="text-stone-500 dark:text-stone-400 font-normal">{item.unit}</span>
                   </td>
                   <td className="py-2.5 text-center">
                     <span className={cn(

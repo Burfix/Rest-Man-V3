@@ -80,13 +80,13 @@ export default function CommandFeed({ items, maxVisible = 5 }: Props) {
   if (items.length === 0) {
     return (
       <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-6 sm:p-8 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-4">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-4">
           Command Feed
         </p>
         <p className="text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
           ✓ All clear — no issues requiring attention
         </p>
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
+        <p className="text-xs text-stone-500 dark:text-stone-500 mt-1">
           The system is monitoring all operational signals
         </p>
       </div>
@@ -98,14 +98,14 @@ export default function CommandFeed({ items, maxVisible = 5 }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-100 dark:border-stone-800">
         <div className="flex items-center gap-2">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
             Command Feed
           </p>
-          <span className="text-[10px] font-semibold text-stone-400 dark:text-stone-600">
+          <span className="text-[10px] font-semibold text-stone-500 dark:text-stone-600">
             · {items.length} item{items.length !== 1 ? "s" : ""}
           </span>
         </div>
-        <span className="hidden sm:inline text-[10px] text-stone-400 dark:text-stone-500 italic">
+        <span className="hidden sm:inline text-[10px] text-stone-500 dark:text-stone-500 italic">
           Sorted by urgency
         </span>
       </div>
@@ -139,7 +139,7 @@ export default function CommandFeed({ items, maxVisible = 5 }: Props) {
                 <span className="text-xs">{icon}</span>
                 {item.impactWeight && <ImpactTag weight={item.impactWeight} />}
                 {item.serviceWindow != null && (
-                  <span className="ml-auto text-[10px] font-semibold text-stone-400 dark:text-stone-500 tabular-nums">
+                  <span className="ml-auto text-[10px] font-semibold text-stone-500 dark:text-stone-500 tabular-nums">
                     {fmtCountdown(item.serviceWindow)}
                   </span>
                 )}
@@ -159,7 +159,7 @@ export default function CommandFeed({ items, maxVisible = 5 }: Props) {
                   → {item.action}
                 </p>
                 {item.impact && (
-                  <span className="text-[10px] text-stone-400 dark:text-stone-500 shrink-0 sm:max-w-[40%] sm:text-right">
+                  <span className="text-[10px] text-stone-500 dark:text-stone-500 shrink-0 sm:max-w-[40%] sm:text-right">
                     {item.impact}
                   </span>
                 )}
@@ -167,7 +167,7 @@ export default function CommandFeed({ items, maxVisible = 5 }: Props) {
 
               {/* Recovery metric */}
               {item.recoveryMetric && (
-                <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1.5 italic">
+                <p className="text-[10px] text-stone-500 dark:text-stone-500 mt-1.5 italic">
                   Target: {item.recoveryMetric}
                 </p>
               )}

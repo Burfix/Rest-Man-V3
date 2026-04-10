@@ -45,7 +45,7 @@ function Row({
       <span className="text-[11px] font-medium text-stone-500">{label}</span>
       <div className="text-right">
         <span className={cn("text-xs font-semibold", valueColor)}>{value}</span>
-        {sub && <p className="text-[10px] text-stone-400 leading-none mt-px">{sub}</p>}
+        {sub && <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-none mt-px">{sub}</p>}
       </div>
     </div>
   );
@@ -74,7 +74,7 @@ export default function TodayOpsPanel({
 
   const laborPct   = null as number | null;
   const laborColor =
-    laborPct == null   ? "text-stone-400" :
+    laborPct == null   ? "text-stone-500 dark:text-stone-400" :
     laborPct > 45      ? "text-red-600"   :
     laborPct > 35      ? "text-amber-600" :
     "text-emerald-700";
@@ -89,7 +89,7 @@ export default function TodayOpsPanel({
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800">
         <h2 className="text-xs font-semibold text-stone-700 dark:text-stone-300">Today at Venue</h2>
-        <Link href="/dashboard/bookings" className="text-[11px] text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors">
+        <Link href="/dashboard/bookings" className="text-[11px] text-stone-500 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors">
           All bookings →
         </Link>
       </div>
@@ -100,13 +100,13 @@ export default function TodayOpsPanel({
           label="Lunch"
           value={`${lunchBkgs.length} bookings`}
           sub={`${lunchCovers} covers · 12:00–15:00`}
-          valueColor={lunchBkgs.length > 0 ? "text-stone-800" : "text-stone-400"}
+          valueColor={lunchBkgs.length > 0 ? "text-stone-800" : "text-stone-500 dark:text-stone-400"}
         />
         <Row
           label="Dinner"
           value={`${dinnerBkgs.length} bookings`}
           sub={`${dinnerCovers} covers · 18:00–22:00`}
-          valueColor={dinnerBkgs.length > 0 ? "text-stone-800" : "text-stone-400"}
+          valueColor={dinnerBkgs.length > 0 ? "text-stone-800" : "text-stone-500 dark:text-stone-400"}
         />
         <Row
           label="Event tonight"
@@ -120,7 +120,7 @@ export default function TodayOpsPanel({
               ? `Starts ${fmtTime(todayEvent.start_time)}`
               : undefined
           }
-          valueColor={todayEvent ? "text-stone-800" : "text-stone-400"}
+          valueColor={todayEvent ? "text-stone-800" : "text-stone-500 dark:text-stone-400"}
         />
         <Row
           label="Labour cost"

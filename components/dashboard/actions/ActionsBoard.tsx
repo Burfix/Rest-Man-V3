@@ -381,7 +381,7 @@ function ActionCard({
             <div className="flex-1 min-w-0">
               <p
                 className={`text-sm font-semibold leading-snug ${
-                  action.status === "completed" ? "line-through text-stone-400" : "text-stone-900 dark:text-stone-100"
+                  action.status === "completed" ? "line-through text-stone-500" : "text-stone-900 dark:text-stone-100"
                 }`}
               >
                 {action.title}
@@ -421,7 +421,7 @@ function ActionCard({
               </span>
             )}
             {action.due_at && action.status !== "completed" && new Date(action.due_at) >= new Date() && (
-              <span className="text-xs text-stone-400">
+              <span className="text-xs text-stone-500 dark:text-stone-400">
                 Due {new Date(action.due_at).toLocaleDateString("en-ZA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </span>
             )}
@@ -445,11 +445,11 @@ function ActionCard({
             {action.assigned_to ? (
               <span>👤 {action.assigned_to}</span>
             ) : (
-              <span className="text-stone-400 italic">Unassigned</span>
+              <span className="text-stone-500 dark:text-stone-400 italic">Unassigned</span>
             )}
 
             {action.source_type && (
-              <span className="capitalize text-stone-400">{action.source_type}</span>
+              <span className="capitalize text-stone-500 dark:text-stone-400">{action.source_type}</span>
             )}
 
             <span className="ml-auto">{relativeTime(action.created_at)}</span>
@@ -461,7 +461,7 @@ function ActionCard({
 
           {/* Why it matters */}
           {action.why_it_matters && action.status !== "completed" && (
-            <p className="text-xs text-stone-400 italic border-l-2 border-stone-200 dark:border-stone-700 pl-2">
+            <p className="text-xs text-stone-500 dark:text-stone-400 italic border-l-2 border-stone-200 dark:border-stone-700 pl-2">
               {action.why_it_matters}
             </p>
           )}
@@ -698,7 +698,7 @@ function AddActionForm({ onCreated }: { onCreated: (a: Action) => void }) {
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-stone-600 mb-1">Quick Action type <span className="text-stone-400 font-normal">(optional)</span></label>
+          <label className="block text-xs font-medium text-stone-600 mb-1">Quick Action type <span className="text-stone-500 dark:text-stone-400 font-normal">(optional)</span></label>
           <div className="flex gap-1.5 flex-wrap">
             {(["call", "message", "staffing", "compliance", "order", "inspect"] as ExecutionType[]).map((t) => {
               const c = executionConfig[t];
@@ -865,7 +865,7 @@ export default function ActionsBoard({ initial }: { initial: Action[] }) {
 
       {/* Action list */}
       {sortedFiltered.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-stone-200 dark:border-stone-700 py-12 text-center text-sm text-stone-400">
+        <div className="rounded-xl border border-dashed border-stone-200 dark:border-stone-700 py-12 text-center text-sm text-stone-500 dark:text-stone-400">
           {filter === "all"
             ? "No active actions. Create one to get started."
             : `No ${filter.replace("_", " ")} actions.`}

@@ -23,7 +23,7 @@ const PRIORITY_STYLES: Record<string, { badge: string; dot: string }> = {
   critical: { badge: "bg-red-500/15 text-red-400", dot: "bg-red-400 animate-pulse" },
   high:     { badge: "bg-orange-500/15 text-orange-400", dot: "bg-orange-400" },
   medium:   { badge: "bg-amber-500/15 text-amber-400", dot: "bg-amber-400" },
-  low:      { badge: "bg-stone-500/15 text-stone-400", dot: "bg-stone-500" },
+  low:      { badge: "bg-stone-500/15 text-stone-500 dark:text-stone-400", dot: "bg-stone-500" },
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -58,7 +58,7 @@ export default function ActionQueueGroup({
         <h3 className="text-xs uppercase tracking-widest text-stone-500 font-medium">
           {title}
         </h3>
-        <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400 font-mono">
+        <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-[10px] text-stone-500 dark:text-stone-400 font-mono">
           {actions.length}
         </span>
       </div>
@@ -98,7 +98,7 @@ export default function ActionQueueGroup({
 
               {/* Why it matters */}
               {action.why_it_matters && (
-                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
                   {action.why_it_matters}
                 </p>
               )}
@@ -123,7 +123,7 @@ export default function ActionQueueGroup({
                     {action.status === "pending" && (
                       <button
                         onClick={() => onStatusChange(action.id, "in_progress")}
-                        className="rounded-md bg-stone-800 px-2.5 py-1 text-[10px] font-medium text-stone-300 hover:bg-stone-700 transition-colors"
+                        className="rounded-md bg-stone-100 dark:bg-stone-800 px-2.5 py-1 text-[10px] font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-700 transition-colors"
                       >
                         Start
                       </button>

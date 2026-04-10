@@ -233,7 +233,7 @@ export default async function AccountabilityPage({
               {/* Blocks */}
               <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-sm p-3">
                 <p className="text-[9px] font-mono uppercase tracking-widest text-stone-500 mb-1">Blocks</p>
-                <p className={`text-2xl font-mono font-bold ${myAggregate.totalBlocked > 0 ? "text-red-400" : "text-stone-400"}`}>
+                <p className={`text-2xl font-mono font-bold ${myAggregate.totalBlocked > 0 ? "text-red-400" : "text-stone-500 dark:text-stone-400"}`}>
                   {myAggregate.totalBlocked}
                 </p>
               </div>
@@ -273,15 +273,15 @@ export default async function AccountabilityPage({
                     const tier = getPerformanceTier(row.score);
                     return (
                       <tr key={row.period_date} className="border-b border-[#141414] hover:bg-[#141414]">
-                        <td className="px-3 py-2 font-mono text-stone-300">{row.period_date}</td>
+                        <td className="px-3 py-2 font-mono text-stone-600 dark:text-stone-300">{row.period_date}</td>
                         <td className={`px-3 py-2 text-right font-mono font-bold ${scoreColor(row.score)}`}>{row.score}</td>
                         <td className="px-3 py-2 text-right">
                           <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-sm ${tierBg(tier)}`}>{tier}</span>
                         </td>
-                        <td className="px-3 py-2 text-right font-mono text-stone-300">{pct(row.completion_rate)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-stone-300">{pct(row.on_time_rate)}</td>
-                        <td className="px-3 py-2 text-right font-mono text-stone-400">{row.tasks_assigned}</td>
-                        <td className="px-3 py-2 text-right font-mono text-stone-400">{row.tasks_completed}</td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-600 dark:text-stone-300">{pct(row.completion_rate)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-600 dark:text-stone-300">{pct(row.on_time_rate)}</td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-500 dark:text-stone-400">{row.tasks_assigned}</td>
+                        <td className="px-3 py-2 text-right font-mono text-stone-500 dark:text-stone-400">{row.tasks_completed}</td>
                         <td className={`px-3 py-2 text-right font-mono ${row.tasks_blocked > 0 ? "text-red-400" : "text-stone-500"}`}>{row.tasks_blocked}</td>
                       </tr>
                     );
@@ -362,20 +362,20 @@ export default async function AccountabilityPage({
                     >
                       <td className="px-3 py-2 font-mono text-stone-500 text-center">{i + 1}</td>
                       <td className="px-3 py-2">
-                        <span className={`font-medium ${entry.userId === ctx.userId ? "text-amber-400" : "text-stone-200"}`}>
+                        <span className={`font-medium ${entry.userId === ctx.userId ? "text-amber-400" : "text-stone-700 dark:text-stone-200"}`}>
                           {entry.name}
                           {entry.userId === ctx.userId && (
                             <span className="ml-1.5 text-[9px] text-amber-600 font-mono">(you)</span>
                           )}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-stone-400">{entry.site}</td>
+                      <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{entry.site}</td>
                       <td className={`px-3 py-2 text-right font-mono font-bold ${scoreColor(entry.avgScore)}`}>{entry.avgScore}</td>
                       <td className="px-3 py-2 text-right">
                         <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-sm ${tierBg(entry.tier)}`}>{entry.tier}</span>
                       </td>
-                      <td className="px-3 py-2 text-right font-mono text-stone-300">{pct(entry.completionRate)}</td>
-                      <td className="px-3 py-2 text-right font-mono text-stone-400">{entry.daysActive}</td>
+                      <td className="px-3 py-2 text-right font-mono text-stone-600 dark:text-stone-300">{pct(entry.completionRate)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-stone-500 dark:text-stone-400">{entry.daysActive}</td>
                       <td className={`px-3 py-2 text-right font-mono ${entry.totalBlocked > 0 ? "text-red-400" : "text-stone-500"}`}>{entry.totalBlocked}</td>
                       <td className={`px-3 py-2 text-right font-mono ${entry.totalEscalated > 0 ? "text-amber-400" : "text-stone-500"}`}>{entry.totalEscalated}</td>
                     </tr>

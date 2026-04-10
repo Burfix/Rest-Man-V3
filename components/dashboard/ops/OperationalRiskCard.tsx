@@ -116,11 +116,11 @@ export default function OperationalRiskCard({ compliance, maintenance }: Props) 
       <div className="px-5 py-4 border-b border-stone-100 dark:border-stone-800">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-1.5">
               Compliance
             </p>
             {compliance.total === 0 ? (
-              <p className="text-xs text-stone-400 dark:text-stone-600">
+              <p className="text-xs text-stone-500 dark:text-stone-600">
                 No certificates tracked — add items to monitor expiry dates
               </p>
             ) : (
@@ -130,7 +130,7 @@ export default function OperationalRiskCard({ compliance, maintenance }: Props) 
                     {compliance.compliance_pct}%
                   </span>{" "}
                   compliant ·{" "}
-                  <span className={compliance.compliant > 0 ? "text-emerald-600 dark:text-emerald-500" : "text-stone-400"}>
+                  <span className={compliance.compliant > 0 ? "text-emerald-600 dark:text-emerald-500" : "text-stone-500 dark:text-stone-400"}>
                     {compliance.compliant} current
                   </span>
                   {compliance.due_soon > 0 && (
@@ -160,7 +160,7 @@ export default function OperationalRiskCard({ compliance, maintenance }: Props) 
           </div>
           <Link
             href="/dashboard/compliance"
-            className="shrink-0 text-[11px] font-medium text-stone-400 dark:text-stone-600 hover:text-stone-800 dark:hover:text-stone-200 transition-colors whitespace-nowrap"
+            className="shrink-0 text-[11px] font-medium text-stone-500 dark:text-stone-600 hover:text-stone-800 dark:hover:text-stone-200 transition-colors whitespace-nowrap"
           >
             Manage →
           </Link>
@@ -171,11 +171,11 @@ export default function OperationalRiskCard({ compliance, maintenance }: Props) 
       <div className="flex-1 px-5 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-1.5">
               Maintenance
             </p>
             {maintenance.totalEquipment === 0 ? (
-              <p className="text-xs text-stone-400 dark:text-stone-600">
+              <p className="text-xs text-stone-500 dark:text-stone-600">
                 No equipment tracked — add units to monitor service status
               </p>
             ) : (
@@ -210,7 +210,7 @@ export default function OperationalRiskCard({ compliance, maintenance }: Props) 
           </div>
           <Link
             href="/dashboard/maintenance"
-            className="shrink-0 text-[11px] font-medium text-stone-400 dark:text-stone-600 hover:text-stone-800 dark:hover:text-stone-200 transition-colors whitespace-nowrap"
+            className="shrink-0 text-[11px] font-medium text-stone-500 dark:text-stone-600 hover:text-stone-800 dark:hover:text-stone-200 transition-colors whitespace-nowrap"
           >
             Manage →
           </Link>

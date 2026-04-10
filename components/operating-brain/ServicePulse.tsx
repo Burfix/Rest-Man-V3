@@ -93,7 +93,7 @@ export default function ServicePulse({
         </div>
 
         {/* Progress bar */}
-        <div className="h-1.5 w-full rounded-full bg-stone-800 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
           <div
             className={cn(
               "h-full rounded-full transition-all duration-700",
@@ -104,14 +104,14 @@ export default function ServicePulse({
         </div>
 
         {/* Stats row */}
-        <div className="flex items-center gap-4 mt-3 text-xs text-stone-400">
+        <div className="flex items-center gap-4 mt-3 text-xs text-stone-500 dark:text-stone-400">
           <span>{covers} covers</span>
           <span>R{avgSpend.toFixed(0)} avg</span>
           {forecastCovers != null && (
             <span>{forecastCovers} forecast covers</span>
           )}
           {showForecastBadge && (
-            <span className="rounded bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-500 font-medium">
+            <span className="rounded bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-500 font-medium">
               Forecast mode
             </span>
           )}
@@ -126,8 +126,8 @@ export default function ServicePulse({
         {(peakWindow || timeToPeakMinutes != null) && (
           <div className="flex items-center gap-3 mt-3 text-xs">
             {peakWindow && (
-              <span className="text-stone-400">
-                Peak: <span className="text-stone-200 font-medium">{peakWindow}</span>
+              <span className="text-stone-500 dark:text-stone-400">
+                Peak: <span className="text-stone-700 dark:text-stone-200 font-medium">{peakWindow}</span>
               </span>
             )}
             {timeToPeakMinutes != null && (
@@ -138,7 +138,7 @@ export default function ServicePulse({
                     ? "text-red-400"
                     : timeToPeakMinutes <= 60
                       ? "text-amber-400"
-                      : "text-stone-400",
+                      : "text-stone-500 dark:text-stone-400",
                 )}
               >
                 {timeToPeakMinutes <= 0
@@ -153,7 +153,7 @@ export default function ServicePulse({
         {insights.length > 0 && (
           <div className="mt-3 space-y-1 border-t border-stone-800/40 pt-3">
             {insights.map((insight, i) => (
-              <p key={i} className="text-xs text-stone-300 flex items-start gap-1.5">
+              <p key={i} className="text-xs text-stone-600 dark:text-stone-300 flex items-start gap-1.5">
                 <span className="text-stone-600 shrink-0">→</span>
                 {insight}
               </p>

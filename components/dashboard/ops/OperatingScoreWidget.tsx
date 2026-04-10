@@ -87,10 +87,10 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
     return (
       <div className="flex items-center gap-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-5 py-4">
         <div className="h-16 w-16 shrink-0 rounded-full ring-4 ring-stone-200 dark:ring-stone-700 flex items-center justify-center">
-          <span className="text-2xl font-bold text-stone-300 dark:text-stone-600">—</span>
+          <span className="text-2xl font-bold text-stone-600 dark:text-stone-600">—</span>
         </div>
         <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-0.5">
+          <p className="text-xs font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-0.5">
             Operating Score
           </p>
           <p className="text-sm text-stone-500 dark:text-stone-500">
@@ -111,7 +111,7 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
 
       {/* Header bar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-stone-800">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
           Operating Score
         </p>
         <span className={cn(
@@ -134,7 +134,7 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
           <span className={cn("text-3xl font-black tabular-nums leading-none", palette.number)}>
             {score.total}
           </span>
-          <span className="text-[10px] font-semibold text-stone-400 dark:text-stone-600 mt-0.5">
+          <span className="text-[10px] font-semibold text-stone-500 dark:text-stone-600 mt-0.5">
             /100
           </span>
         </div>
@@ -153,7 +153,7 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
                     {label}
                   </span>
                   <span className="text-[10px] font-bold tabular-nums text-stone-700 dark:text-stone-300">
-                    {comp.score}<span className="font-normal text-stone-400">/{max}</span>
+                    {comp.score}<span className="font-normal text-stone-500 dark:text-stone-400">/{max}</span>
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
@@ -163,7 +163,7 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
                   />
                 </div>
                 <div className="mt-0.5 flex items-center gap-1">
-                  <p className="text-[10px] text-stone-400 dark:text-stone-600 truncate" title={comp.detail}>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-600 truncate" title={comp.detail}>
                     {comp.detail}
                   </p>
                   {srcBadge && (

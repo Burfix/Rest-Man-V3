@@ -156,7 +156,7 @@ export default async function MaintenancePage() {
         <div className="rounded-lg border border-stone-200 bg-white px-5 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+              <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Maintenance Risk Score
               </p>
               <p
@@ -171,7 +171,7 @@ export default async function MaintenancePage() {
               >
                 {riskScore.risk_pct.toFixed(0)}%
               </p>
-              <p className="mt-0.5 text-xs text-stone-400">
+              <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
                 {riskScore.needs_attention} needing attention ·{" "}
                 {riskScore.out_of_service} out of service
               </p>
@@ -180,7 +180,7 @@ export default async function MaintenancePage() {
               <p>
                 <span className="font-semibold text-green-600">{riskScore.operational}</span> operational
               </p>
-              <p className="mt-0.5 text-xs text-stone-400">of {riskScore.total} total units</p>
+              <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">of {riskScore.total} total units</p>
             </div>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-stone-100">
@@ -271,8 +271,8 @@ export default async function MaintenancePage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {mttr != null && (
                 <div className="rounded-md border border-stone-100 bg-stone-50 px-3 py-2.5">
-                  <p className="text-xs text-stone-400">Avg Fix Time (MTTR)</p>
-                  <p className="mt-0.5 text-xl font-bold text-stone-800">{mttr.toFixed(1)}<span className="ml-1 text-xs font-normal text-stone-400">days</span></p>
+                  <p className="text-xs text-stone-500 dark:text-stone-400">Avg Fix Time (MTTR)</p>
+                  <p className="mt-0.5 text-xl font-bold text-stone-800">{mttr.toFixed(1)}<span className="ml-1 text-xs font-normal text-stone-500 dark:text-stone-400">days</span></p>
                 </div>
               )}
               {impact.foodSafetyRisks > 0 && (
@@ -306,12 +306,12 @@ export default async function MaintenancePage() {
             {/* Top failing assets */}
             {topAssets.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Top Failing Assets (90 days)</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Top Failing Assets (90 days)</p>
                 <div className="space-y-1">
                   {topAssets.map((a) => (
                     <div key={a.asset_name} className="flex items-center justify-between rounded-md bg-stone-50 px-3 py-2 text-sm">
                       <span className="font-medium text-stone-700">{a.asset_name}</span>
-                      <span className={cn("text-xs font-semibold", a.hasOpenIssue ? "text-red-600" : "text-stone-400")}>
+                      <span className={cn("text-xs font-semibold", a.hasOpenIssue ? "text-red-600" : "text-stone-500 dark:text-stone-400")}>
                         {a.count} issue{a.count > 1 ? "s" : ""}{a.hasOpenIssue ? " · open" : ""}
                       </span>
                     </div>
@@ -323,11 +323,11 @@ export default async function MaintenancePage() {
             {/* Contractor performance */}
             {contractors.length > 0 && (
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">Contractor Performance</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Contractor Performance</p>
                 <div className="overflow-x-auto">
                   <table className="min-w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs font-medium text-stone-400">
+                      <tr className="text-left text-xs font-medium text-stone-500 dark:text-stone-400">
                         <th className="pb-1 pr-4">Contractor</th>
                         <th className="pb-1 pr-4">Issues</th>
                         <th className="pb-1 pr-4">Avg Fix</th>
@@ -383,7 +383,7 @@ export default async function MaintenancePage() {
 
       {/* Equipment register */}
       {equipment.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center text-sm text-stone-400">
+        <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center text-sm text-stone-500 dark:text-stone-400">
           No equipment registered yet. Add units to the{" "}
           <code className="rounded bg-stone-100 px-1">equipment</code> table.
         </div>
@@ -395,7 +395,7 @@ export default async function MaintenancePage() {
           <div className="overflow-x-auto rounded-lg border border-stone-200">
             <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   <th className="px-4 py-3">Unit</th>
                   <th className="px-4 py-3">Category</th>
                   <th className="px-4 py-3">Location</th>
@@ -439,7 +439,7 @@ export default async function MaintenancePage() {
 function THead() {
   return (
     <thead>
-      <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+      <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
         <th className="px-4 py-3">Unit</th>
         <th className="px-4 py-3">Issue</th>
         <th className="px-4 py-3">Priority</th>
@@ -464,12 +464,12 @@ function LogRow({ log }: { log: MaintenanceLog }) {
     <tr className="hover:bg-stone-50">
       <td className="whitespace-nowrap px-4 py-3">
         <p className="font-medium text-stone-800">{log.unit_name}</p>
-        <p className="text-xs capitalize text-stone-400">{log.category}</p>
+        <p className="text-xs capitalize text-stone-500 dark:text-stone-400">{log.category}</p>
       </td>
       <td className="px-4 py-3 max-w-[220px]">
         <p className="font-medium text-stone-700">{log.issue_title}</p>
         {log.issue_description && (
-          <p className="mt-0.5 line-clamp-1 text-xs text-stone-400">
+          <p className="mt-0.5 line-clamp-1 text-xs text-stone-500 dark:text-stone-400">
             {log.issue_description}
           </p>
         )}
@@ -494,10 +494,10 @@ function LogRow({ log }: { log: MaintenanceLog }) {
           {sts.label}
         </span>
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-400">
+      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500 dark:text-stone-400">
         {formatShortDate(log.date_reported)}
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-400">
+      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500 dark:text-stone-400">
         {(log.date_fixed ?? log.date_resolved) ? formatShortDate((log.date_fixed ?? log.date_resolved)!) : "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500">
@@ -516,13 +516,13 @@ function EquipmentRow({ equipment: e, id }: { equipment: Equipment; id: string }
       <td className="whitespace-nowrap px-4 py-3 capitalize text-stone-500">
         {e.category}
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-400">
+      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500 dark:text-stone-400">
         {e.location ?? "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <EditStatusButton equipmentId={id} currentStatus={e.status} />
       </td>
-      <td className="px-4 py-3 max-w-[200px] text-xs text-stone-400">
+      <td className="px-4 py-3 max-w-[200px] text-xs text-stone-500 dark:text-stone-400">
         {e.notes ? (
           <span className="line-clamp-1">{e.notes}</span>
         ) : (
@@ -565,7 +565,7 @@ function SummaryCard({
 
   return (
     <div className={cn("rounded-lg border px-4 py-4", colorMap[color])}>
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p className={cn("mt-1 text-2xl font-bold", textMap[color])}>{value}</p>

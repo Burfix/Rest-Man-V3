@@ -52,12 +52,12 @@ export default function OperatingScoreBreakdown({ breakdown }: Props) {
             return (
               <div key={b.label}>
                 <div className="flex items-center justify-between text-[11px] mb-1">
-                  <span className="text-stone-400">{b.label}</span>
+                  <span className="text-stone-500 dark:text-stone-400">{b.label}</span>
                   <span className="text-stone-500 font-mono">
                     {b.score}/{b.maxScore}
                   </span>
                 </div>
-                <div className="h-1 w-full rounded-full bg-stone-800 overflow-hidden">
+                <div className="h-1 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
                   <div
                     className={cn("h-full rounded-full transition-all", itemTone)}
                     style={{ width: `${fillPct}%` }}

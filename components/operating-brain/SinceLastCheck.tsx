@@ -18,7 +18,7 @@ const TONE_STYLES: Record<string, { text: string; dot: string }> = {
   positive: { text: "text-emerald-400", dot: "bg-emerald-400" },
   warning:  { text: "text-amber-400",   dot: "bg-amber-400"   },
   critical: { text: "text-red-400",     dot: "bg-red-400"     },
-  neutral:  { text: "text-stone-400",   dot: "bg-stone-500"   },
+  neutral:  { text: "text-stone-500 dark:text-stone-400",   dot: "bg-stone-500"   },
 };
 
 const DIRECTION_ICON: Record<string, string> = {

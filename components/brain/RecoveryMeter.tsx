@@ -90,7 +90,7 @@ export default function RecoveryMeter({ brain }: Props) {
 
       {/* Progress bar */}
       <div>
-        <div className="w-full h-1.5 bg-stone-800 overflow-hidden">
+        <div className="w-full h-1.5 bg-stone-100 dark:bg-stone-800 overflow-hidden">
           <div
             className={cn("h-full transition-all duration-500", barColor)}
             style={{ width: `${recoverablePct}%` }}

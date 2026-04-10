@@ -98,7 +98,7 @@ function NavList({
       {filteredNav.map((group, gi) => (
         <div key={gi}>
           {group.group && (
-            <p className="mb-1 px-2 text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-400 dark:text-stone-700">
+            <p className="mb-1 px-2 text-[8px] font-semibold uppercase tracking-[0.2em] text-stone-500 dark:text-stone-700">
               {group.group}
             </p>
           )}
@@ -174,7 +174,7 @@ export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
             <p className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 leading-tight truncate">
               Ops Engine
             </p>
-            <p className="text-[10px] text-stone-400 dark:text-stone-600 leading-none">Operations</p>
+            <p className="text-[10px] text-stone-500 dark:text-stone-600 leading-none">Operations</p>
           </div>
         </div>
 
@@ -190,7 +190,7 @@ export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
           </div>
           <div>
             <p className="text-[13px] font-semibold text-stone-900 dark:text-stone-100 leading-tight">Ops Engine</p>
-            <p className="text-[9px] text-stone-400 dark:text-stone-600 leading-none">Operations</p>
+            <p className="text-[9px] text-stone-500 dark:text-stone-600 leading-none">Operations</p>
           </div>
         </div>
         <button
@@ -218,13 +218,13 @@ export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
                 </div>
                 <div>
                   <p className="text-[13px] font-semibold text-stone-900 dark:text-stone-100">Ops Engine</p>
-                  <p className="text-[9px] text-stone-400 dark:text-stone-600">Operations</p>
+                  <p className="text-[9px] text-stone-500 dark:text-stone-600">Operations</p>
                 </div>
               </div>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close navigation menu"
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 dark:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 dark:text-stone-600 hover:bg-stone-100 dark:hover:bg-stone-800"
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                   <path d="M3.22 3.22a.75.75 0 0 1 1.06 0L8 6.94l3.72-3.72a.75.75 0 1 1 1.06 1.06L9.06 8l3.72 3.72a.75.75 0 1 1-1.06 1.06L8 9.06l-3.72 3.72a.75.75 0 0 1-1.06-1.06L6.94 8 3.22 4.28a.75.75 0 0 1 0-1.06Z" />

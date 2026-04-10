@@ -127,7 +127,7 @@ function StatStrip({ items }: {
           )}>
             {item.value}
           </p>
-          <p className="text-[9px] text-stone-400 dark:text-stone-600 leading-tight mt-0.5 uppercase tracking-wide">
+          <p className="text-[9px] text-stone-500 dark:text-stone-600 leading-tight mt-0.5 uppercase tracking-wide">
             {item.label}
           </p>
         </div>
@@ -195,7 +195,7 @@ function ComplianceCard({ compliance }: { compliance: ComplianceSummary }) {
             <span className={cn("text-5xl font-bold tabular-nums leading-none", scoreColor)}>
               {compliance.compliance_pct}%
             </span>
-            <span className="text-xs text-stone-400 dark:text-stone-600">compliant</span>
+            <span className="text-xs text-stone-500 dark:text-stone-600">compliant</span>
           </div>
 
           <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
@@ -243,7 +243,7 @@ function MaintenanceCard({ maintenance }: { maintenance: MaintenanceSummary }) {
     <p className="text-[11px] text-stone-500">
       Urgent:{" "}
       <span className="font-semibold text-stone-700">{latestIssue.unit_name}</span>
-      <span className="text-stone-400"> — {latestIssue.issue_title}</span>
+      <span className="text-stone-500 dark:text-stone-400"> — {latestIssue.issue_title}</span>
     </p>
   ) : maintenance.totalEquipment > 0 ? (
     <p className="text-[11px] text-emerald-600 font-medium">✓ No urgent issues</p>
@@ -267,10 +267,10 @@ function MaintenanceCard({ maintenance }: { maintenance: MaintenanceSummary }) {
             <span className={cn("text-5xl font-bold tabular-nums leading-none", scoreColor)}>
               {totalOpen}
             </span>
-            <span className="text-xs text-stone-400 dark:text-stone-600">open issues</span>
+            <span className="text-xs text-stone-500 dark:text-stone-600">open issues</span>
           </div>
 
-          <p className="mt-1 text-[11px] text-stone-400 dark:text-stone-600">
+          <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-600">
             {maintenance.totalEquipment} units tracked
           </p>
 

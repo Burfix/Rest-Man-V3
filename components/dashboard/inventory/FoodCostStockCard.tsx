@@ -26,7 +26,7 @@ export default function FoodCostStockCard({ summary }: Props) {
       <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-5">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-sm">🥩</span>
-          <h3 className="text-xs font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
             Food Cost & Stock Risk
           </h3>
         </div>
@@ -44,7 +44,7 @@ export default function FoodCostStockCard({ summary }: Props) {
       <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-stone-800">
         <div className="flex items-center gap-2">
           <span className="text-sm">🥩</span>
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
             Food Cost & Stock Risk
           </h3>
         </div>
@@ -57,19 +57,19 @@ export default function FoodCostStockCard({ summary }: Props) {
         {/* KPIs */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-stone-600">Food Cost</p>
+            <p className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-600">Food Cost</p>
             <p className="text-lg font-bold tabular-nums text-stone-900 dark:text-stone-100">
               {summary.current_pct !== null ? `${summary.current_pct.toFixed(1)}%` : "—"}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-stone-600">Target</p>
+            <p className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-600">Target</p>
             <p className="text-lg font-bold tabular-nums text-stone-900 dark:text-stone-100">
               {summary.target_pct !== null ? `${summary.target_pct.toFixed(1)}%` : "—"}
             </p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-stone-600">Variance</p>
+            <p className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-600">Variance</p>
             <p className={cn(
               "text-lg font-bold tabular-nums",
               summary.variance_pct !== null && summary.variance_pct > 0
@@ -101,7 +101,7 @@ export default function FoodCostStockCard({ summary }: Props) {
               {stock_risk.healthy}
             </span>
           </div>
-          <span className="ml-auto text-[10px] text-stone-400 dark:text-stone-600">
+          <span className="ml-auto text-[10px] text-stone-500 dark:text-stone-600">
             {stock_risk.total_items} items tracked
           </span>
         </div>
@@ -109,7 +109,7 @@ export default function FoodCostStockCard({ summary }: Props) {
         {/* Top risks */}
         {stock_risk.top_risks.length > 0 && (
           <div className="space-y-1.5">
-            <p className="text-[10px] uppercase tracking-wide font-semibold text-stone-400 dark:text-stone-600">
+            <p className="text-[10px] uppercase tracking-wide font-semibold text-stone-500 dark:text-stone-600">
               Stock Alerts
             </p>
             {stock_risk.top_risks.slice(0, 3).map((item) => (

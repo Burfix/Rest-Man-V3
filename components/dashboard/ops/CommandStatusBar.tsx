@@ -179,7 +179,7 @@ export default function CommandStatusBar({
             <p className="text-sm font-semibold text-stone-900 dark:text-stone-100 leading-none truncate">
               Ops Engine
             </p>
-            <span className="text-stone-300 dark:text-stone-700 text-xs hidden sm:inline">·</span>
+            <span className="text-stone-600 dark:text-stone-700 text-xs hidden sm:inline">·</span>
             <p className="hidden sm:block text-xs text-stone-500 dark:text-stone-500 leading-none truncate">
               Operations Command
             </p>
@@ -192,7 +192,7 @@ export default function CommandStatusBar({
             {servicePeriod}
           </span>
           {/* Separator */}
-          <span className="hidden md:inline text-stone-300 dark:text-stone-700 text-xs">·</span>
+          <span className="hidden md:inline text-stone-600 dark:text-stone-700 text-xs">·</span>
           {/* Date */}
           <span className="hidden md:inline text-[11px] text-stone-500 dark:text-stone-500">
             {fmtDate(date)}
@@ -230,7 +230,7 @@ export default function CommandStatusBar({
             isCritical ? "text-red-500" :
             isWarning  ? "text-amber-600" :
             isOk       ? "text-emerald-600" :
-            "text-stone-400";
+            "text-stone-500 dark:text-stone-400";
 
           const dot =
             isCritical ? "bg-red-500" :
@@ -244,7 +244,7 @@ export default function CommandStatusBar({
               href={cell.href}
               className="flex flex-col gap-1 px-4 py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors group"
             >
-              <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 group-hover:text-stone-500 dark:group-hover:text-stone-400">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 group-hover:text-stone-500 dark:group-hover:text-stone-400">
                 {cell.label}
               </span>
               <p className={cn("text-sm font-bold leading-tight tabular-nums truncate", metricColor)}>

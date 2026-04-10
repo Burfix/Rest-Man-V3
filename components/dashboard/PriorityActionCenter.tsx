@@ -53,7 +53,7 @@ export default function PriorityActionCenter({ actions }: Props) {
   return (
     <div>
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-[11px] font-bold uppercase tracking-widest text-stone-400">
+        <p className="text-[11px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
           Priority Action Center
         </p>
         {topActions.length > 0 && (

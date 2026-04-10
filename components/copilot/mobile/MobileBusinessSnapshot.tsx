@@ -78,7 +78,7 @@ export default function MobileBusinessSnapshot({ brief, score }: Props) {
           <div key={r.label} className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className={cn("h-1.5 w-1.5 rounded-full", DOT[r.tone])} />
-              <span className="text-xs text-stone-400">{r.label}</span>
+              <span className="text-xs text-stone-500 dark:text-stone-400">{r.label}</span>
             </div>
             <span className={cn("text-xs font-medium", TEXT[r.tone])}>
               {r.value}

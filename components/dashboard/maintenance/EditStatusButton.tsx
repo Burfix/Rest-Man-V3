@@ -125,7 +125,7 @@ export default function EditStatusButton({
                 {opt.label}
               </span>
               {opt.value === currentStatus && (
-                <span className="ml-auto text-stone-400">✓</span>
+                <span className="ml-auto text-stone-500 dark:text-stone-400">✓</span>
               )}
             </button>
           ))}

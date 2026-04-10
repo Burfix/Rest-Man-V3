@@ -73,7 +73,7 @@ export function LoginForm({ next }: { next: string }) {
       <div className="mt-4 text-center">
         <a
           href="/forgot-password"
-          className="text-xs text-stone-400 underline-offset-2 hover:text-stone-600 hover:underline"
+          className="text-xs text-stone-500 dark:text-stone-400 underline-offset-2 hover:text-stone-600 hover:underline"
         >
           Forgot your password?
         </a>

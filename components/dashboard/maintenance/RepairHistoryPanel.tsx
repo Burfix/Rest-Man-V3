@@ -47,7 +47,7 @@ export default function RepairHistoryPanel({ equipmentId, repairs: initialRepair
       )}
 
       {initialRepairs.length === 0 && !showForm ? (
-        <p className="text-sm text-stone-400">No repairs logged yet.</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">No repairs logged yet.</p>
       ) : (
         <div className="space-y-3">
           {initialRepairs.map((repair) => (
@@ -69,7 +69,7 @@ export default function RepairHistoryPanel({ equipmentId, repairs: initialRepair
                 <p className="mt-1.5 text-sm font-medium text-stone-800">
                   {repair.contractor_name}
                   {repair.contractor_company && <span className="text-stone-500 font-normal"> · {repair.contractor_company}</span>}
-                  {repair.contractor_phone && <span className="text-stone-400 font-normal"> · {repair.contractor_phone}</span>}
+                  {repair.contractor_phone && <span className="text-stone-500 dark:text-stone-400 font-normal"> · {repair.contractor_phone}</span>}
                 </p>
               )}
 

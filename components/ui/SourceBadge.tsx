@@ -84,7 +84,7 @@ const STYLES: Record<SourceType, { cls: string; dot: string; label: string; puls
     label: "SYNC ERROR",
   },
   awaiting:     {
-    cls:   "bg-stone-50 text-stone-400 ring-stone-200",
+    cls:   "bg-stone-50 text-stone-500 dark:text-stone-400 ring-stone-200",
     dot:   "bg-stone-300",
     label: "AWAITING",
   },

@@ -57,18 +57,18 @@ export default function DataHealthIndicator({ freshness, microsIsLive, labourSyn
         onClick={() => setShowDetail(!showDetail)}
         className="flex flex-wrap items-center gap-2 sm:gap-3 w-full text-left group"
       >
-        <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 shrink-0">
+        <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 shrink-0">
           Data Health
         </span>
-        <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+        <span className="text-stone-700 dark:text-stone-700 text-xs shrink-0">·</span>
         <span className={cn("flex items-center gap-1.5 text-[11px] font-semibold", cfg.style)}>
           <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", cfg.dot)} />
           {cfg.text}
         </span>
 
         {/* Quick summary chips */}
-        <span className="hidden sm:inline text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
-        <span className="hidden sm:flex items-center gap-2 text-[10px] text-stone-400 dark:text-stone-500">
+        <span className="hidden sm:inline text-stone-700 dark:text-stone-700 text-xs shrink-0">·</span>
+        <span className="hidden sm:flex items-center gap-2 text-[10px] text-stone-500 dark:text-stone-500">
           <span>Sales: <span className={cn("font-medium", freshness.sales.stale ? "text-red-500" : "text-stone-600 dark:text-stone-400")}>{ageLabel(freshness.sales)}</span></span>
           {labourSyncAge && (
             <span>Labour: <span className="font-medium text-stone-600 dark:text-stone-400">{labourSyncAge}</span></span>
@@ -83,14 +83,14 @@ export default function DataHealthIndicator({ freshness, microsIsLive, labourSyn
 
         {staleCount > 0 && (
           <>
-            <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+            <span className="text-stone-700 dark:text-stone-700 text-xs shrink-0">·</span>
             <span className="text-[10px] text-red-500 dark:text-red-400 font-medium">
               {staleCount} stale
             </span>
           </>
         )}
 
-        <span className="ml-auto text-[10px] text-stone-300 dark:text-stone-600 group-hover:text-stone-400 dark:group-hover:text-stone-500 transition-colors">
+        <span className="ml-auto text-[10px] text-stone-600 dark:text-stone-600 group-hover:text-stone-400 dark:group-hover:text-stone-500 transition-colors">
           {showDetail ? "▲" : "▼"}
         </span>
       </button>
@@ -98,7 +98,7 @@ export default function DataHealthIndicator({ freshness, microsIsLive, labourSyn
       {/* Detail popover */}
       {showDetail && (
         <div className="mt-2 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 shadow-lg">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-3">
             System Freshness Detail
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -118,7 +118,7 @@ export default function DataHealthIndicator({ freshness, microsIsLive, labourSyn
                   </p>
                   <p className={cn(
                     "text-[10px]",
-                    item.stale ? "text-red-500 dark:text-red-400" : "text-stone-400 dark:text-stone-500"
+                    item.stale ? "text-red-500 dark:text-red-400" : "text-stone-500 dark:text-stone-500"
                   )}>
                     {ageLabel(item)}
                     {item.stale && " — action needed"}

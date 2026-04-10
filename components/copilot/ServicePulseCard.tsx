@@ -49,7 +49,7 @@ export default function ServicePulseCard({ serviceState, serviceImpact }: Props)
         "border border-[#1a1a1a] border-l-[3px] bg-[#0f0f0f] px-4 py-3",
         RISK_BORDER[serviceState.serviceRiskLevel],
       )}>
-        <p className="text-[11px] text-stone-400 leading-snug">
+        <p className="text-[11px] text-stone-500 dark:text-stone-400 leading-snug">
           {serviceState.serviceSummary}
         </p>
         <div className="flex items-center gap-2 mt-2">

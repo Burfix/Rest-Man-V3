@@ -26,7 +26,7 @@ interface Props {
 export default function OperatingContextRow({ forecast, today, events, date }: Props) {
   return (
     <div>
-      <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-stone-400">
+      <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
         Today&apos;s Operating Context
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -65,7 +65,7 @@ function RevenueContextCard({
             />
           )}
           {!forecast.target_sales && (
-            <p className="text-xs text-stone-400 mt-1">No target set</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-1">No target set</p>
           )}
         </>
       ) : (
@@ -164,7 +164,7 @@ function BookingsCard({ today }: { today: TodayBookingsSummary }) {
       )}
 
       {today.total === 0 && (
-        <p className="mt-2 text-xs text-stone-400">No bookings today</p>
+        <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">No bookings today</p>
       )}
     </ContextCard>
   );
@@ -187,7 +187,7 @@ function EventsContextCard({ events, date }: { events: VenueEvent[]; date: strin
         <>
           <p className={cn(
             "mt-2 text-xs font-bold uppercase tracking-widest",
-            isToday ? "text-purple-700" : "text-stone-400"
+            isToday ? "text-purple-700" : "text-stone-500 dark:text-stone-400"
           )}>
             {isToday ? "Tonight" : formatEventDate(displayEvent.event_date)}
           </p>
@@ -233,7 +233,7 @@ function ContextCard({
           <span>{icon}</span>
           {title}
         </p>
-        <Link href={href} className="text-xs text-stone-400 hover:text-stone-700">
+        <Link href={href} className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-700">
           Detail →
         </Link>
       </div>
@@ -262,7 +262,7 @@ function BigStat({
       )}>
         {value}
       </span>
-      <span className="text-xs text-stone-400">{label}</span>
+      <span className="text-xs text-stone-500 dark:text-stone-400">{label}</span>
     </div>
   );
 }
@@ -293,14 +293,14 @@ function MetaRow({
 }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs text-stone-400">{label}</span>
+      <span className="text-xs text-stone-500 dark:text-stone-400">{label}</span>
       <span className={cn("text-xs font-semibold text-stone-700", valueClass)}>{value}</span>
     </div>
   );
 }
 
 function NoData({ label }: { label: string }) {
-  return <p className="mt-3 text-xs text-stone-400">{label}</p>;
+  return <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">{label}</p>;
 }
 
 function formatEventDate(dateStr: string): string {

@@ -65,17 +65,17 @@ export default function MobileShiftReview({
             )}
           </div>
           <div className="flex items-center gap-1.5">
-            <span className={cn("text-xl font-bold font-mono", GRADE_COLOR[serviceGrade] ?? "text-stone-300")}>
+            <span className={cn("text-xl font-bold font-mono", GRADE_COLOR[serviceGrade] ?? "text-stone-600 dark:text-stone-300")}>
               {serviceScore}
             </span>
-            <span className={cn("text-xs font-bold", GRADE_COLOR[serviceGrade] ?? "text-stone-400")}>
+            <span className={cn("text-xs font-bold", GRADE_COLOR[serviceGrade] ?? "text-stone-500 dark:text-stone-400")}>
               {serviceGrade}
             </span>
           </div>
         </div>
 
         {/* Summary */}
-        <p className="text-sm text-stone-300 leading-relaxed">{shiftSummary}</p>
+        <p className="text-sm text-stone-600 dark:text-stone-300 leading-relaxed">{shiftSummary}</p>
 
         {/* Metrics grid */}
         <div className="grid grid-cols-3 gap-2">

@@ -23,7 +23,7 @@ const SEV_BORDER: Record<GMDecisionSeverity, string> = {
 const SEV_TEXT: Record<GMDecisionSeverity, string> = {
   critical: "text-red-400",
   high:     "text-amber-400",
-  medium:   "text-stone-400",
+  medium:   "text-stone-500 dark:text-stone-400",
   low:      "text-stone-500",
 };
 
@@ -160,7 +160,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
               {d.severity}
             </span>
           </div>
-          <p className="text-[11px] text-stone-400 mt-1 leading-snug font-mono">
+          <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1 leading-snug font-mono">
             {d.directInstruction}
           </p>
         </div>
@@ -233,7 +233,7 @@ function DecisionCard({ decision: d, rank }: { decision: GMDecision; rank: numbe
             onChange={(e) => setComment(e.target.value)}
             placeholder="e.g. Repositioned 2 servers to floor — avg spend improved within 30 min"
             rows={2}
-            className="w-full text-[11px] font-mono bg-[#0f0f0f] border border-[#1a1a1a] px-2 py-1.5 text-stone-300 placeholder-stone-700 resize-none focus:outline-none focus:border-emerald-800"
+            className="w-full text-[11px] font-mono bg-[#0f0f0f] border border-[#1a1a1a] px-2 py-1.5 text-stone-600 dark:text-stone-300 placeholder-stone-700 resize-none focus:outline-none focus:border-emerald-800"
           />
           <div className="flex gap-3 justify-end font-mono text-[10px]">
             <button

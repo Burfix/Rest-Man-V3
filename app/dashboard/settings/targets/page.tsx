@@ -18,7 +18,7 @@ export default async function TargetsPage() {
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-xs text-stone-400">
+      <div className="flex items-center gap-2 text-xs text-stone-500 dark:text-stone-400">
         <Link href="/dashboard/settings" className="hover:text-stone-700">
           Settings
         </Link>

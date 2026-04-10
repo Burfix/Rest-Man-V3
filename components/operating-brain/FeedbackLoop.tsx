@@ -82,7 +82,7 @@ export default function FeedbackLoop({
 
   // ── Momentum indicators ──────────────────────────────────────────────────
   const trendLabel  = tradingTrend === "improving" ? "↑ Improving" : tradingTrend === "declining" ? "↓ Declining" : "→ Stable";
-  const trendColor  = tradingTrend === "improving" ? "text-emerald-400" : tradingTrend === "declining" ? "text-red-400" : "text-stone-400";
+  const trendColor  = tradingTrend === "improving" ? "text-emerald-400" : tradingTrend === "declining" ? "text-red-400" : "text-stone-500 dark:text-stone-400";
 
   // ── At Risk escalation ───────────────────────────────────────────────────
   const isAtRisk = gmTier === "At Risk";
@@ -90,7 +90,7 @@ export default function FeedbackLoop({
   if (loading) {
     return (
       <div className="rounded-xl border border-stone-800/40 bg-stone-900/50 px-5 py-6 animate-pulse">
-        <div className="h-3 w-24 bg-stone-800 rounded mb-4" />
+        <div className="h-3 w-24 bg-stone-100 dark:bg-stone-800 rounded mb-4" />
         <div className="h-12 bg-stone-800/50 rounded" />
       </div>
     );
@@ -147,7 +147,7 @@ export default function FeedbackLoop({
               {progressFill}%
             </span>
           </div>
-          <div className="h-2 bg-stone-800 rounded-full overflow-hidden">
+          <div className="h-2 bg-stone-100 dark:bg-stone-800 rounded-full overflow-hidden">
             <div
               className="h-full bg-amber-500 rounded-full transition-all duration-700"
               style={{ width: `${progressFill}%` }}
@@ -182,7 +182,7 @@ export default function FeedbackLoop({
           <div>
             <span className={cn(
               "text-lg font-black font-mono",
-              totalRevRecovered > 0 ? "text-emerald-400" : totalRevRecovered < 0 ? "text-red-400" : "text-stone-300",
+              totalRevRecovered > 0 ? "text-emerald-400" : totalRevRecovered < 0 ? "text-red-400" : "text-stone-600 dark:text-stone-300",
             )}>
               {totalRevRecovered !== 0
                 ? `R${Math.abs(totalRevRecovered).toLocaleString("en-ZA", { maximumFractionDigits: 0 })}`
@@ -229,7 +229,7 @@ export default function FeedbackLoop({
           <span className="text-[9px] uppercase tracking-wider text-stone-600 font-medium block mb-0.5">
             Best Shift This Week
           </span>
-          <p className="text-[10px] font-mono text-stone-400">
+          <p className="text-[10px] font-mono text-stone-500 dark:text-stone-400">
             <span className="text-emerald-400 font-bold">{bestDayLabel}</span>
             {" · "}{bestDay.total_completed} actions completed
             {gmName && gmName !== "Unknown" && (

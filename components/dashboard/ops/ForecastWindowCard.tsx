@@ -36,12 +36,12 @@ export default function ForecastWindowCard({ outlook }: Props) {
     )}>
       {/* Label */}
       <div className="shrink-0 mt-0.5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
           Forecast Window
         </p>
         <div className="flex items-center gap-1.5 mt-1.5">
           <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", cfg.dot)} />
-          <span className="text-[10px] font-medium text-stone-400 dark:text-stone-500">
+          <span className="text-[10px] font-medium text-stone-500 dark:text-stone-500">
             {cfg.label}
           </span>
         </div>
@@ -54,7 +54,7 @@ export default function ForecastWindowCard({ outlook }: Props) {
       <p className={cn(
         "flex-1 text-sm leading-relaxed",
         outlook.confidence === "none"
-          ? "text-stone-400 dark:text-stone-600 italic"
+          ? "text-stone-500 dark:text-stone-600 italic"
           : "text-stone-700 dark:text-stone-300",
       )}>
         {outlook.text}

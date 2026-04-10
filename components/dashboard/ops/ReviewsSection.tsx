@@ -14,7 +14,7 @@ export default function ReviewsSection({ summary }: Props) {
         </h2>
         <a
           href="/dashboard/reviews"
-          className="text-xs font-medium text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300"
+          className="text-xs font-medium text-stone-500 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300"
         >
           All reviews →
         </a>
@@ -101,7 +101,7 @@ function PlatformCard({
   // Only apply colour when there are actual reviews — never colour a zero
   const ratingColor =
     stats.count === 0
-      ? "text-stone-400"
+      ? "text-stone-500 dark:text-stone-400"
       : stats.averageRating >= 4
       ? "text-green-700"
       : stats.averageRating >= 3
@@ -113,11 +113,11 @@ function PlatformCard({
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-stone-700 dark:text-stone-300">{platformLabel}</p>
         {stats.count === 0 ? (
-          <span className="text-xs text-stone-300">No reviews</span>
+          <span className="text-xs text-stone-600 dark:text-stone-300">No reviews</span>
         ) : (
           <span className={cn("text-xl font-bold", ratingColor)}>
             {stats.averageRating.toFixed(1)}
-            <span className="ml-0.5 text-sm font-normal text-stone-400"> / 5</span>
+            <span className="ml-0.5 text-sm font-normal text-stone-500 dark:text-stone-400"> / 5</span>
           </span>
         )}
       </div>
@@ -185,11 +185,11 @@ function FlaggedReviewRow({ review }: { review: Review }) {
           <span className="text-xs font-semibold capitalize text-stone-600">
             {review.platform}
           </span>
-          <span className="text-xs text-stone-400">
+          <span className="text-xs text-stone-500 dark:text-stone-400">
             {formatShortDate(review.review_date)}
           </span>
           {review.reviewer_name && (
-            <span className="text-xs text-stone-400">
+            <span className="text-xs text-stone-500 dark:text-stone-400">
               · {review.reviewer_name}
             </span>
           )}

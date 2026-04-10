@@ -42,7 +42,7 @@ export default async function UserProfile() {
           Sign out
         </button>
       </form>
-      <p className="mt-3 text-xs text-stone-300 dark:text-stone-600">V&amp;A Waterfront · Cape Town</p>
+      <p className="mt-3 text-xs text-stone-600 dark:text-stone-600">V&amp;A Waterfront · Cape Town</p>
     </div>
   );
 }

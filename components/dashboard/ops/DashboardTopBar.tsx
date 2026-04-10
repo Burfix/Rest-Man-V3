@@ -85,7 +85,7 @@ export default function DashboardTopBar({
     compliance.expired > 0  ? "text-red-600 dark:text-red-400"     :
     compliance.due_soon > 0 ? "text-amber-600 dark:text-amber-400" :
     compliance.total > 0    ? "text-emerald-600 dark:text-emerald-500" :
-    "text-stone-400 dark:text-stone-600";
+    "text-stone-500 dark:text-stone-600";
 
   // ── Maintenance tile ─────────────────────────────────────────────────────
   const maintMetric = maintenance.totalEquipment > 0 ? String(totalOpen) : "—";
@@ -99,7 +99,7 @@ export default function DashboardTopBar({
     maintenance.outOfService > 0  ? "text-red-600 dark:text-red-400"     :
     totalOpen > 0                  ? "text-amber-600 dark:text-amber-400" :
     maintenance.totalEquipment > 0 ? "text-emerald-600 dark:text-emerald-500" :
-    "text-stone-400 dark:text-stone-600";
+    "text-stone-500 dark:text-stone-600";
 
   // ── MICROS source badge — only when isLiveDataAvailable is explicitly true ─────
   const microsLive  = microsStatus?.isLiveDataAvailable === true;
@@ -124,7 +124,7 @@ export default function DashboardTopBar({
       ? `${Math.abs(variancePct).toFixed(0)}% behind target`
       : "No forecast available";
   const revSubColor =
-    variancePct == null                  ? "text-stone-400 dark:text-stone-600" :
+    variancePct == null                  ? "text-stone-500 dark:text-stone-600" :
     variancePct >= 0                     ? "text-emerald-600 dark:text-emerald-500" :
     Math.abs(variancePct) >= 20          ? "text-red-600 dark:text-red-400" :
     "text-amber-600 dark:text-amber-400";
@@ -155,7 +155,7 @@ export default function DashboardTopBar({
     laborPct <= 45   ? "Elevated — act now"   :
     "High — take action";
   const labourSubColor =
-    laborPct == null ? "text-stone-400 dark:text-stone-600"       :
+    laborPct == null ? "text-stone-500 dark:text-stone-600"       :
     laborPct <= 35   ? "text-emerald-600 dark:text-emerald-500"   :
     laborPct <= 45   ? "text-amber-600 dark:text-amber-400"       :
     "text-red-600 dark:text-red-400";
@@ -229,7 +229,7 @@ export default function DashboardTopBar({
           <span className="text-sm font-bold tracking-tight text-stone-900 dark:text-stone-100">
             Si Cantina Sociale
           </span>
-          <span className="text-stone-300 dark:text-stone-700 text-xs">·</span>
+          <span className="text-stone-600 dark:text-stone-700 text-xs">·</span>
           <span className="hidden sm:inline text-xs text-stone-500 dark:text-stone-500">
             Operations Command
           </span>
@@ -242,7 +242,7 @@ export default function DashboardTopBar({
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
-          <span className="hidden sm:inline text-[11px] text-stone-400 dark:text-stone-600">
+          <span className="hidden sm:inline text-[11px] text-stone-500 dark:text-stone-600">
             {formatDisplayDate(date)}
           </span>
           <span className={cn(
@@ -263,7 +263,7 @@ export default function DashboardTopBar({
             href={kpi.href}
             className="flex flex-col gap-1 px-4 py-4 hover:bg-stone-50 dark:hover:bg-stone-800/50 transition-colors group"
           >
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 group-hover:text-stone-500 dark:group-hover:text-stone-400">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 group-hover:text-stone-500 dark:group-hover:text-stone-400">
               {kpi.label}
             </span>
             <div className="flex items-baseline gap-1 leading-none">
@@ -271,7 +271,7 @@ export default function DashboardTopBar({
                 {kpi.metric}
               </span>
               {kpi.metricSub && (
-                <span className="text-[11px] text-stone-400 dark:text-stone-600">
+                <span className="text-[11px] text-stone-500 dark:text-stone-600">
                   {kpi.metricSub}
                 </span>
               )}
@@ -280,7 +280,7 @@ export default function DashboardTopBar({
               {kpi.sub}
             </span>
             {kpi.note && (
-              <span className="text-[10px] text-stone-400 dark:text-stone-600 leading-tight truncate">
+              <span className="text-[10px] text-stone-500 dark:text-stone-600 leading-tight truncate">
                 {kpi.note}
               </span>
             )}

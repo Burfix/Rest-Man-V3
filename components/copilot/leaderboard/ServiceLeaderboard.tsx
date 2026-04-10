@@ -100,7 +100,7 @@ export default function ServiceLeaderboard({ topPerformers, mostImproved, atRisk
                 <div className="flex items-center gap-2">
                   <span className="text-sm">🏆</span>
                   <div>
-                    <span className="text-xs text-stone-300 font-medium">{award.storeName}</span>
+                    <span className="text-xs text-stone-600 dark:text-stone-300 font-medium">{award.storeName}</span>
                     <p className="text-[11px] text-stone-500">{award.label}</p>
                   </div>
                 </div>
@@ -163,7 +163,7 @@ function LeaderboardRow({
           </span>
         )}
         <div className="min-w-0">
-          <span className="text-sm text-stone-200 font-medium truncate block">
+          <span className="text-sm text-stone-700 dark:text-stone-200 font-medium truncate block">
             {entry.storeName}
           </span>
           {entry.labels.length > 0 && (
@@ -214,13 +214,13 @@ function LeaderboardRow({
         <div className="flex items-center gap-1">
           <span className={cn(
             "text-base font-bold font-mono",
-            GRADE_COLOR[entry.serviceGrade] ?? "text-stone-300",
+            GRADE_COLOR[entry.serviceGrade] ?? "text-stone-600 dark:text-stone-300",
           )}>
             {entry.serviceScore}
           </span>
           <span className={cn(
             "text-[10px] font-bold",
-            GRADE_COLOR[entry.serviceGrade] ?? "text-stone-400",
+            GRADE_COLOR[entry.serviceGrade] ?? "text-stone-500 dark:text-stone-400",
           )}>
             {entry.serviceGrade}
           </span>

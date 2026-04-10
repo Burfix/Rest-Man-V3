@@ -43,7 +43,7 @@ const STYLES: Record<ImpactType, { bg: string; text: string; defaultLabel: strin
   },
   monitor: {
     bg: "bg-stone-500/10 border-stone-600/20",
-    text: "text-stone-400",
+    text: "text-stone-500 dark:text-stone-400",
     defaultLabel: "Monitor",
   },
 };

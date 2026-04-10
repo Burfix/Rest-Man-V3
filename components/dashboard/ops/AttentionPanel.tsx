@@ -79,7 +79,7 @@ export default function AttentionPanel({ actions }: Props) {
           <span className="text-2xl">✅</span>
           <div>
             <p className="text-sm font-semibold text-stone-700">No priority actions required</p>
-            <p className="text-xs text-stone-400 mt-0.5">All operational areas are on track for today&apos;s service.</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">All operational areas are on track for today&apos;s service.</p>
           </div>
         </div>
       )}
@@ -113,18 +113,18 @@ export default function AttentionPanel({ actions }: Props) {
                   <p className="mt-0.5 text-xs text-stone-500 leading-relaxed">
                     {action.message}
                   </p>
-                  <p className="mt-1 text-[11px] text-stone-400 italic">
+                  <p className="mt-1 text-[11px] text-stone-500 dark:text-stone-400 italic">
                     {action.recommendation}
                   </p>
                 </div>
 
                 {/* Meta */}
                 <div className="hidden sm:flex flex-col items-end gap-1.5 shrink-0 text-right">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                     Owner
                   </p>
                   <p className="text-xs font-medium text-stone-700 whitespace-nowrap">{owner}</p>
-                  <p className="text-[10px] text-stone-400 whitespace-nowrap">{due}</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400 whitespace-nowrap">{due}</p>
                 </div>
 
                 {/* Quick action */}

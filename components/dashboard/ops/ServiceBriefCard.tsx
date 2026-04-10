@@ -86,7 +86,7 @@ export default function ServiceBriefCard({
         <h2 className="text-xs font-bold uppercase tracking-widest text-stone-700 dark:text-stone-300">
           Today's Service Brief
         </h2>
-        <span className="text-[11px] text-stone-400 dark:text-stone-600">
+        <span className="text-[11px] text-stone-500 dark:text-stone-600">
           {servicePeriod}
         </span>
       </div>
@@ -96,7 +96,7 @@ export default function ServiceBriefCard({
         {/* ── Revenue ── */}
         <div className="px-5 py-4">
           <div className="flex items-center gap-2 mb-2">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600">
               Revenue
             </p>
             {sourceLabel && (
@@ -147,7 +147,7 @@ export default function ServiceBriefCard({
           <div className="space-y-1 mb-3">
             {lastYearSales != null ? (
               <div className="flex justify-between text-[11px]">
-                <span className="text-stone-400 dark:text-stone-600">Last year (same day)</span>
+                <span className="text-stone-500 dark:text-stone-600">Last year (same day)</span>
                 <span className="font-medium text-stone-600 dark:text-stone-400">
                   {formatCurrency(lastYearSales)}
                 </span>
@@ -155,10 +155,10 @@ export default function ServiceBriefCard({
             ) : null}
             {hasTarget && targetSales != null && (
               <div className="flex justify-between text-[11px]">
-                <span className="text-stone-400 dark:text-stone-600">
+                <span className="text-stone-500 dark:text-stone-600">
                   Today&apos;s target
                   {isAutoTarget && (
-                    <span className="ml-1 text-stone-300 dark:text-stone-700">(same day +10%)</span>
+                    <span className="ml-1 text-stone-600 dark:text-stone-700">(same day +10%)</span>
                   )}
                 </span>
                 <span className="font-medium text-stone-600 dark:text-stone-400">
@@ -172,7 +172,7 @@ export default function ServiceBriefCard({
           {progressPct != null && (
             <div>
               <div className="flex justify-between text-[11px] mb-1">
-                <span className="text-stone-400 dark:text-stone-600">
+                <span className="text-stone-500 dark:text-stone-600">
                   {ss?.source === "forecast" ? "Forecast progress" : "Progress to target"}
                 </span>
                 <span className={cn(
@@ -210,7 +210,7 @@ export default function ServiceBriefCard({
 
         {/* ── Bookings ── */}
         <div className="px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-2">
             Bookings
           </p>
           <div className="grid grid-cols-2 gap-3">
@@ -221,7 +221,7 @@ export default function ServiceBriefCard({
               )}>
                 {lunchBkgs.length > 0 ? `${lunchBkgs.length} lunch booking${lunchBkgs.length > 1 ? "s" : ""}` : "No lunch bookings"}
               </p>
-              <p className="text-[11px] text-stone-400 dark:text-stone-600 mt-0.5">
+              <p className="text-[11px] text-stone-500 dark:text-stone-600 mt-0.5">
                 {lunchBkgs.length > 0
                   ? `${lunchCovers} cover${lunchCovers !== 1 ? "s" : ""} · 12:00–15:00`
                   : "Walk-in trade important · 12:00–15:00"}
@@ -234,7 +234,7 @@ export default function ServiceBriefCard({
               )}>
                 {dinnerBkgs.length > 0 ? `${dinnerBkgs.length} dinner booking${dinnerBkgs.length > 1 ? "s" : ""}` : "No dinner bookings"}
               </p>
-              <p className="text-[11px] text-stone-400 dark:text-stone-600 mt-0.5">
+              <p className="text-[11px] text-stone-500 dark:text-stone-600 mt-0.5">
                 {dinnerBkgs.length > 0
                   ? `${dinnerCovers} cover${dinnerCovers !== 1 ? "s" : ""} · 18:00–22:00`
                   : "Push walk-ins from 18:00"}
@@ -245,7 +245,7 @@ export default function ServiceBriefCard({
 
         {/* ── Event tonight ── */}
         <div className="px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-1.5">
             Event Tonight
           </p>
           {todayEvent ? (
@@ -260,7 +260,7 @@ export default function ServiceBriefCard({
               </p>
             </>
           ) : (
-            <p className="text-xs text-stone-400 dark:text-stone-600">
+            <p className="text-xs text-stone-500 dark:text-stone-600">
               No event scheduled · standard service tonight
             </p>
           )}
@@ -268,7 +268,7 @@ export default function ServiceBriefCard({
 
         {/* ── Service focus ── */}
         <div className="px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-1.5">
             Service Focus
           </p>
           {topRec ? (
@@ -279,7 +279,7 @@ export default function ServiceBriefCard({
               {recCount > 1 && (
                 <Link
                   href="/dashboard/settings/targets"
-                  className="mt-1 inline-block text-[11px] text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
+                  className="mt-1 inline-block text-[11px] text-stone-500 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
                 >
                   +{recCount - 1} more suggestion{recCount > 2 ? "s" : ""} →
                 </Link>
@@ -296,7 +296,7 @@ export default function ServiceBriefCard({
               before peak service.
             </p>
           ) : (
-            <p className="text-xs text-stone-400 dark:text-stone-600">
+            <p className="text-xs text-stone-500 dark:text-stone-600">
               Set a revenue target to unlock AI-powered service recommendations.
             </p>
           )}
@@ -308,7 +308,7 @@ export default function ServiceBriefCard({
       <div className="border-t border-stone-100 dark:border-stone-800 px-5 py-3">
         <Link
           href="/dashboard/bookings"
-          className="text-[11px] font-medium text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
+          className="text-[11px] font-medium text-stone-500 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
         >
           View all bookings →
         </Link>

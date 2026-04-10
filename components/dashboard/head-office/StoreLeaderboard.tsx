@@ -47,7 +47,7 @@ export default function StoreLeaderboard({ entries }: Props) {
         <h2 className="text-xs font-bold uppercase tracking-widest text-stone-700 dark:text-stone-300">
           Store Leaderboard
         </h2>
-        <span className="text-[10px] text-stone-400">{entries.length} stores</span>
+        <span className="text-[10px] text-stone-500 dark:text-stone-400">{entries.length} stores</span>
       </div>
 
       {/* Rows */}
@@ -76,7 +76,7 @@ export default function StoreLeaderboard({ entries }: Props) {
                 ) : (
                   <span className={cn(
                     "text-xs font-black tabular-nums",
-                    entry.is_bottom ? "text-red-500" : "text-stone-400"
+                    entry.is_bottom ? "text-red-500" : "text-stone-500 dark:text-stone-400"
                   )}>
                     #{entry.rank}
                   </span>
@@ -90,7 +90,7 @@ export default function StoreLeaderboard({ entries }: Props) {
                   <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate leading-tight">
                     {entry.name}
                   </p>
-                  <p className="text-[10px] text-stone-400 dark:text-stone-500">{entry.city}</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-500">{entry.city}</p>
                 </div>
               </div>
 

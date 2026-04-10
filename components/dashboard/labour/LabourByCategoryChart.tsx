@@ -30,7 +30,7 @@ export default function LabourByCategoryChart({ categories, totalPay }: Props) {
   if (categories.length === 0) {
     return (
       <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-6 text-center">
-        <p className="text-sm text-stone-400 dark:text-stone-500">
+        <p className="text-sm text-stone-500 dark:text-stone-500">
           No category data available
         </p>
       </div>
@@ -66,7 +66,7 @@ export default function LabourByCategoryChart({ categories, totalPay }: Props) {
                   style={{ width: `${Math.max(pct, 1)}%` }}
                 />
               </div>
-              <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">
+              <p className="text-[10px] text-stone-500 dark:text-stone-500 mt-0.5">
                 {pct.toFixed(1)}% of total
               </p>
             </div>

@@ -59,7 +59,7 @@ export default function TodayBrief({
       </p>
 
       {/* Supporting text */}
-      <p className="mt-2 text-sm text-stone-400 leading-relaxed">
+      <p className="mt-2 text-sm text-stone-500 dark:text-stone-400 leading-relaxed">
         {businessStatus.revenue.supportingText}.{" "}
         {peakWindow ? `Peak window is ${peakWindow}.` : ""}{" "}
         {commandBar.issueCount > 0
@@ -97,7 +97,7 @@ export default function TodayBrief({
           {servicePulseInsights.slice(0, 3).map((insight, i) => (
             <p
               key={i}
-              className="text-xs text-stone-300 flex items-start gap-1.5"
+              className="text-xs text-stone-600 dark:text-stone-300 flex items-start gap-1.5"
             >
               <span className="text-stone-600 shrink-0">→</span>
               {insight}

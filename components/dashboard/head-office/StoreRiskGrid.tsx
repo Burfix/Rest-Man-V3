@@ -114,7 +114,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
             <p className="text-xs font-bold text-stone-900 dark:text-stone-100 truncate leading-tight">
               {store.name}
             </p>
-            <p className="text-[10px] text-stone-400 dark:text-stone-500">{store.city}</p>
+            <p className="text-[10px] text-stone-500 dark:text-stone-500">{store.city}</p>
           </div>
         </div>
 
@@ -130,7 +130,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
         {/* Score row */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Score</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">Score</p>
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-black tabular-nums text-stone-900 dark:text-stone-100 leading-none">
                 {store.operating_score ?? "—"}
@@ -146,7 +146,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
           {/* Compliance + Maintenance mini indicators */}
           <div className="flex flex-col items-end gap-1">
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-stone-400">Compliance</span>
+              <span className="text-[10px] text-stone-500 dark:text-stone-400">Compliance</span>
               <span className={cn("h-2.5 w-2.5 rounded-full", {
                 "bg-emerald-500": (store.compliance_score ?? 20) === 20,
                 "bg-amber-400":   (store.compliance_score ?? 20) === 10,
@@ -154,7 +154,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
               })} />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-stone-400">Maintenance</span>
+              <span className="text-[10px] text-stone-500 dark:text-stone-400">Maintenance</span>
               <span className={cn("h-2.5 w-2.5 rounded-full", {
                 "bg-emerald-500": (store.maintenance_score ?? 10) === 20,
                 "bg-amber-400":   (store.maintenance_score ?? 10) === 10,
@@ -167,7 +167,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
         {/* Revenue */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Revenue</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">Revenue</span>
             <span className="text-[11px] font-semibold text-stone-600 dark:text-stone-400 tabular-nums">
               {fmtZAR(store.sales_net_vat)}{store.revenue_target ? ` / ${fmtZAR(store.revenue_target)}` : ""}
             </span>
@@ -182,7 +182,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
 
         {/* Labour */}
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Labour</span>
+          <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">Labour</span>
           <span className={cn("text-[11px] font-bold tabular-nums", {
             "text-emerald-600 dark:text-emerald-400": (store.labour_pct ?? 40) <= 30,
             "text-amber-600 dark:text-amber-400":     (store.labour_pct ?? 40) <= 35,
@@ -195,7 +195,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
         {/* Actions */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Actions</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">Actions</span>
             <span className="text-[11px] text-stone-500 tabular-nums">
               {store.actions_completed}/{store.actions_total}
               {store.actions_overdue > 0 && (
@@ -216,7 +216,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
 
         {/* Snapshot date */}
         {store.snapshot_date && (
-          <p className="text-[10px] text-stone-300 dark:text-stone-700">
+          <p className="text-[10px] text-stone-600 dark:text-stone-700">
             Data: {store.snapshot_date}
           </p>
         )}
@@ -230,7 +230,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
             "block text-center text-[11px] font-bold uppercase tracking-wider py-0.5 transition-colors rounded",
             store.risk_level === "red"
               ? "text-red-600 dark:text-red-400 hover:text-red-900"
-              : "text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
+              : "text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
           )}
         >
           {store.risk_level === "red" ? "🚨 Needs attention →" : "Open dashboard →"}
@@ -250,7 +250,7 @@ export default function StoreRiskGrid({ stores }: Props) {
   if (stores.length === 0) {
     return (
       <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-5 py-8 text-center">
-        <p className="text-sm text-stone-400">No active stores found.</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">No active stores found.</p>
       </div>
     );
   }
@@ -261,7 +261,7 @@ export default function StoreRiskGrid({ stores }: Props) {
         <h2 className="text-xs font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
           Store Risk Map
         </h2>
-        <span className="text-[11px] text-stone-400">{stores.length} stores</span>
+        <span className="text-[11px] text-stone-500 dark:text-stone-400">{stores.length} stores</span>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {stores.map((store) => (

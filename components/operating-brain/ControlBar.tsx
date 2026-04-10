@@ -66,7 +66,7 @@ export default function ControlBar({
       {/* Left: Status + Service Period */}
       <div className="flex items-center gap-3 shrink-0">
         <span className={cn("h-2 w-2 rounded-full shrink-0", statusDot)} />
-        <span className="text-xs font-semibold text-stone-300 uppercase tracking-wider font-mono">
+        <span className="text-xs font-semibold text-stone-600 dark:text-stone-300 uppercase tracking-wider font-mono">
           {servicePeriod}
         </span>
         {lastSyncAt && (
@@ -113,7 +113,7 @@ export default function ControlBar({
           <span className="text-[9px] uppercase tracking-widest text-stone-600 font-medium">
             Time Pressure
           </span>
-          <span className="text-sm font-bold text-stone-200 mt-0.5 font-mono">
+          <span className="text-sm font-bold text-stone-700 dark:text-stone-200 mt-0.5 font-mono">
             {timePressure}
           </span>
         </div>

@@ -50,7 +50,7 @@ export default async function AccountabilityAlert() {
               {" "}— At Risk
             </p>
             {data.tasks_blocked > 0 && (
-              <p className="text-xs text-stone-400 mt-0.5">
+              <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
                 {data.tasks_blocked} blocked task{data.tasks_blocked > 1 ? "s" : ""}
                 {data.completion_rate != null && ` · ${Number(data.completion_rate).toFixed(0)}% completion`}
               </p>
@@ -58,7 +58,7 @@ export default async function AccountabilityAlert() {
           </div>
           <Link
             href="/dashboard/accountability"
-            className="shrink-0 text-[10px] font-mono text-stone-400 hover:text-stone-200 border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-sm px-2 py-1 transition-colors"
+            className="shrink-0 text-[10px] font-mono text-stone-500 dark:text-stone-400 hover:text-stone-200 border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-sm px-2 py-1 transition-colors"
           >
             View scores
           </Link>

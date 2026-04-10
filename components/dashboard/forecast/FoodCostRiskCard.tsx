@@ -112,7 +112,7 @@ export default function FoodCostRiskCard() {
             <p className="text-[10px] font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">Actual</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-stone-400 dark:text-stone-500">
+            <p className="text-2xl font-bold text-stone-500 dark:text-stone-500">
               {data.target_pct?.toFixed(1)}%
             </p>
             <p className="text-[10px] font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">Target</p>
@@ -127,7 +127,7 @@ export default function FoodCostRiskCard() {
       )}
 
       {!hasFC && (
-        <p className="text-xs text-stone-400 dark:text-stone-500 mb-4">
+        <p className="text-xs text-stone-500 dark:text-stone-500 mb-4">
           No food cost data available yet. Upload purchase data to begin tracking.
         </p>
       )}
@@ -149,7 +149,7 @@ export default function FoodCostRiskCard() {
                 </span>
                 <span className="text-sm font-medium text-stone-800 dark:text-stone-200 truncate">{r.name}</span>
               </div>
-              <span className="text-xs text-stone-400 dark:text-stone-500 shrink-0 ml-2">
+              <span className="text-xs text-stone-500 dark:text-stone-500 shrink-0 ml-2">
                 {r.current_stock} units left
               </span>
             </div>

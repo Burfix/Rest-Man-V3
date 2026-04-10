@@ -44,7 +44,7 @@ export default function OperatingBrainHeader({ venueName, date, servicePeriod, a
 
       {/* Right: Date + Period + Alerts */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        <span className="text-[10px] sm:text-xs text-stone-400 dark:text-stone-500">
+        <span className="text-[10px] sm:text-xs text-stone-500 dark:text-stone-500">
           {formatDisplayDate(date)}
         </span>
         <span className={cn(

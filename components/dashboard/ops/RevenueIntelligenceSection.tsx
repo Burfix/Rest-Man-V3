@@ -25,7 +25,7 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
     return (
       <section className="rounded-xl border border-stone-200 bg-white p-6">
         <SectionHeader date={date} />
-        <p className="mt-4 text-sm text-stone-400">
+        <p className="mt-4 text-sm text-stone-500 dark:text-stone-400">
           Unable to compute forecast — check service configuration.
         </p>
       </section>
@@ -44,7 +44,7 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
           <p className="text-sm font-semibold text-stone-600">
             No forecasting data available yet
           </p>
-          <p className="mt-1 text-xs text-stone-400 max-w-sm mx-auto">
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400 max-w-sm mx-auto">
             Upload historical daily sales to enable
             revenue forecasting and recommendations.
           </p>
@@ -94,7 +94,7 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
           <RiskBadge level={risk_level} />
           <Link
             href="/dashboard/settings/targets"
-            className="text-xs text-stone-400 underline hover:text-stone-700"
+            className="text-xs text-stone-500 dark:text-stone-400 underline hover:text-stone-700"
           >
             Targets ↗
           </Link>
@@ -145,7 +145,7 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
             sub={
               <Link
                 href="/dashboard/settings/targets"
-                className="text-[10px] text-stone-400 underline hover:text-stone-600"
+                className="text-[10px] text-stone-500 dark:text-stone-400 underline hover:text-stone-600"
               >
                 Set a target →
               </Link>
@@ -238,7 +238,7 @@ export default function RevenueIntelligenceSection({ forecast, date }: Props) {
       {/* ── Recommended actions ── */}
       {recommendations.length > 0 && (
         <div className="border-t border-stone-100 px-5 py-4">
-          <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-stone-400">
+          <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
             {recommendations.length} Recommended Action
             {recommendations.length > 1 ? "s" : ""}
           </p>
@@ -261,7 +261,7 @@ function SectionHeader({ date }: { date: string }) {
       <span className="text-base leading-none">⚡</span>
       <div>
         <h2 className="text-sm font-bold text-stone-900">Revenue Intelligence</h2>
-        <p className="text-[10px] text-stone-400">{formatShortDate(date)} forecast</p>
+        <p className="text-[10px] text-stone-500 dark:text-stone-400">{formatShortDate(date)} forecast</p>
       </div>
     </div>
   );
@@ -309,7 +309,7 @@ function MetricCell({
 }) {
   return (
     <div className="bg-white px-5 py-4">
-      <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">
+      <p className="text-[9px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p
@@ -323,7 +323,7 @@ function MetricCell({
         {value}
       </p>
       {sub != null && (
-        <p className="mt-0.5 text-[10px] text-stone-400 leading-snug">{sub}</p>
+        <p className="mt-0.5 text-[10px] text-stone-500 dark:text-stone-400 leading-snug">{sub}</p>
       )}
     </div>
   );
@@ -340,13 +340,13 @@ function SignalCell({
 }) {
   return (
     <div className="bg-white px-5 py-3">
-      <p className="text-[9px] font-medium uppercase tracking-wide text-stone-400">
+      <p className="text-[9px] font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p
         className={cn(
           "mt-0.5 text-xs font-semibold",
-          available ? "text-stone-700" : "text-stone-300"
+          available ? "text-stone-700" : "text-stone-600 dark:text-stone-300"
         )}
       >
         {value}

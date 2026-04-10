@@ -30,7 +30,7 @@ const VARIANTS: Record<StatusVariant, string> = {
   ok:       "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200",
   info:     "bg-blue-50   text-blue-800  ring-1 ring-blue-200",
   neutral:  "bg-stone-100 text-stone-600 ring-1 ring-stone-200",
-  muted:    "text-stone-400 ring-1 ring-stone-200 bg-transparent",
+  muted:    "text-stone-500 dark:text-stone-400 ring-1 ring-stone-200 bg-transparent",
 };
 
 const SIZES: Record<StatusSize, string> = {

@@ -63,11 +63,11 @@ export default function CopilotHero({ brief }: Props) {
             {brief.urgencyState.replace("_", " ")}
           </span>
           <span className="text-stone-500">·</span>
-          <span className="text-stone-300">{brief.criticalIssues} issues active</span>
+          <span className="text-stone-600 dark:text-stone-300">{brief.criticalIssues} issues active</span>
           {topRisk && (
             <>
               <span className="text-stone-600">·</span>
-              <span className="text-stone-500">Top risk: <span className="text-stone-300">{topRisk}</span></span>
+              <span className="text-stone-500">Top risk: <span className="text-stone-600 dark:text-stone-300">{topRisk}</span></span>
             </>
           )}
           <span className="ml-auto text-stone-600 text-[10px] tracking-widest">

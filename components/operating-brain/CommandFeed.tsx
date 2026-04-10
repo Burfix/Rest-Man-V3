@@ -35,7 +35,7 @@ const SEV_STYLES: Record<
     dot: "bg-amber-400",
   },
   low: {
-    badge: "bg-stone-500/15 text-stone-400 border-stone-600/20",
+    badge: "bg-stone-500/15 text-stone-500 dark:text-stone-400 border-stone-600/20",
     border: "border-l-stone-600",
     dot: "bg-stone-500",
   },
@@ -124,7 +124,7 @@ export default function CommandFeed({ decisions }: Props) {
               </h3>
 
               {/* Explanation */}
-              <p className="mt-1 text-xs text-stone-400 leading-relaxed">
+              <p className="mt-1 text-xs text-stone-500 dark:text-stone-400 leading-relaxed">
                 {d.explanation}
               </p>
 
@@ -133,7 +133,7 @@ export default function CommandFeed({ decisions }: Props) {
                 <span className="text-[10px] uppercase tracking-wider text-stone-500 font-medium shrink-0 mt-0.5">
                   Action
                 </span>
-                <span className="text-xs text-stone-300 font-medium">
+                <span className="text-xs text-stone-600 dark:text-stone-300 font-medium">
                   {d.action}
                 </span>
               </div>
@@ -167,7 +167,7 @@ function ImpactPill({
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-medium border",
-        styles[impact.type] ?? "bg-stone-800 text-stone-400",
+        styles[impact.type] ?? "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400",
       )}
     >
       {impact.label}

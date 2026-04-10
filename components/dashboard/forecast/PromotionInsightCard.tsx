@@ -89,7 +89,7 @@ function ImpactMetric({
 }) {
   return (
     <div className="rounded-md bg-white dark:bg-stone-800 px-2.5 py-2 text-center">
-      <span className="text-[9px] uppercase tracking-wider text-stone-400 dark:text-stone-500 block">
+      <span className="text-[9px] uppercase tracking-wider text-stone-500 dark:text-stone-500 block">
         {label}
       </span>
       <span className={cn(

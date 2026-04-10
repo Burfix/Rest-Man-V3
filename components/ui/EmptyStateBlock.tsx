@@ -37,7 +37,7 @@ export default function EmptyStateBlock({
         {title}
       </p>
       {body && (
-        <p className={cn("mt-1 text-stone-400", compact ? "text-[11px]" : "text-xs")}>
+        <p className={cn("mt-1 text-stone-500 dark:text-stone-400", compact ? "text-[11px]" : "text-xs")}>
           {body}
         </p>
       )}

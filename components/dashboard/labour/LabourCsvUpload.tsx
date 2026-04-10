@@ -57,7 +57,7 @@ export default function LabourCsvUpload() {
         <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">
           Manual CSV Upload
         </span>
-        <span className="text-stone-400 text-xs">
+        <span className="text-stone-500 dark:text-stone-400 text-xs">
           {expanded ? "▲" : "▼"}
         </span>
       </button>

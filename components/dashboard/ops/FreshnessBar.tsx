@@ -63,10 +63,10 @@ export default function FreshnessBar({ freshness, microsIsLive = false }: Props)
       aria-label="Data freshness status"
       className="flex items-center gap-2 flex-wrap"
     >
-      <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 shrink-0">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 shrink-0">
         Freshness
       </span>
-      <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+      <span className="text-stone-700 dark:text-stone-700 text-xs shrink-0">·</span>
       {items.map((item) => (
         <FreshnessChip key={item.label} item={item} />
       ))}
@@ -74,7 +74,7 @@ export default function FreshnessBar({ freshness, microsIsLive = false }: Props)
       {/* Live POS chip — only when verified connected */}
       {showMicrosLive && (
         <>
-          <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+          <span className="text-stone-700 dark:text-stone-700 text-xs shrink-0">·</span>
           <FreshnessChip item={freshness.micros} minuteMode />
         </>
       )}
@@ -82,7 +82,7 @@ export default function FreshnessBar({ freshness, microsIsLive = false }: Props)
       {/* Offline POS chip — shown when MICROS is set up but not currently live */}
       {showMicrosOffline && (
         <>
-          <span className="text-stone-200 dark:text-stone-700 text-xs shrink-0">·</span>
+          <span className="text-stone-700 dark:text-stone-700 text-xs shrink-0">·</span>
           <a
             href="/dashboard/settings/integrations"
             title="POS feed not connected — check integration settings"

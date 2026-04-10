@@ -33,7 +33,7 @@ export default function SecondaryInsights({
       {/* Divider */}
       <div className="mb-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
           Secondary Intelligence
         </p>
         <div className="h-px flex-1 bg-stone-200 dark:bg-stone-800" />
@@ -42,7 +42,7 @@ export default function SecondaryInsights({
       <div className="space-y-8">
         {/* Reviews + Sales side-by-side on large screens */}
         <div>
-          <p className="mb-3 text-[11px] text-stone-400 dark:text-stone-600">
+          <p className="mb-3 text-[11px] text-stone-500 dark:text-stone-600">
             {hasReviews
               ? "Below: 7-day review snapshot. Flagged reviews require attention."
               : "Reviews not synced — connect a source to monitor guest sentiment."}

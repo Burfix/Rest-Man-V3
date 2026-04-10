@@ -29,7 +29,7 @@ const ARROW: Record<TrendDirection, string> = {
 const TONE_COLORS: Record<TrendTone, string> = {
   positive: "text-emerald-600",
   negative: "text-amber-600",
-  neutral:  "text-stone-400",
+  neutral:  "text-stone-500 dark:text-stone-400",
 };
 
 export default function TrendIndicator({ direction, tone, label, className }: Props) {

@@ -91,7 +91,7 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   blocked:     "BLOCKED",
 };
 const TASK_STATUS_COLOR: Record<string, string> = {
-  not_started: "text-stone-400 dark:text-stone-600",
+  not_started: "text-stone-500 dark:text-stone-600",
   in_progress: "text-amber-600 dark:text-amber-400",
   escalated:   "text-red-600 dark:text-red-400",
   blocked:     "text-red-600 dark:text-red-400",
@@ -524,7 +524,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                         const statusColor = TASK_STATUS_COLOR[task.status] ?? "text-stone-500";
                         return (
                           <div key={task.id} className="px-2.5 py-1.5 flex items-center gap-2 font-mono">
-                            <span className="text-stone-400 dark:text-stone-700 shrink-0">●</span>
+                            <span className="text-stone-500 dark:text-stone-700 shrink-0">●</span>
                             <span className="text-[11px] text-[#0a0a0a] dark:text-stone-300 flex-1 min-w-0 truncate">
                               {task.action_name}
                             </span>

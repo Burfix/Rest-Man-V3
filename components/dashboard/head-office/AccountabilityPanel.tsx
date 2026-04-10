@@ -21,7 +21,7 @@ import type { ScoreGrade } from "@/services/ops/operatingScore";
 // ── Score color ──────────────────────────────────────────────────────────────
 
 function scoreColor(score: number | null): string {
-  if (score === null) return "text-stone-400";
+  if (score === null) return "text-stone-500 dark:text-stone-400";
   if (score >= 70)    return "text-emerald-600 dark:text-emerald-400";
   if (score >= 45)    return "text-amber-600 dark:text-amber-400";
   return "text-red-600 dark:text-red-400";
@@ -38,7 +38,7 @@ const GRADE_BG: Record<ScoreGrade, string> = {
 // ── Mini completion bar ───────────────────────────────────────────────────────
 
 function MiniBar({ pct }: { pct: number | null }) {
-  if (pct === null) return <span className="text-stone-300 dark:text-stone-700 text-[11px]">—</span>;
+  if (pct === null) return <span className="text-stone-600 dark:text-stone-700 text-[11px]">—</span>;
   const color =
     pct >= 80 ? "bg-emerald-500" :
     pct >= 50 ? "bg-amber-400"   :
@@ -88,12 +88,12 @@ export default function AccountabilityPanel({ stores }: Props) {
               {underperformers.length} underperforming
             </span>
           )}
-          <span className="text-[10px] text-stone-400">{stores.length} stores</span>
+          <span className="text-[10px] text-stone-500 dark:text-stone-400">{stores.length} stores</span>
         </div>
       </div>
 
       {/* Column headers */}
-      <div className="hidden sm:grid grid-cols-[1fr_64px_80px_100px_56px] gap-2 px-5 py-2 border-b border-stone-100 dark:border-stone-800 text-[9px] font-bold uppercase tracking-widest text-stone-400">
+      <div className="hidden sm:grid grid-cols-[1fr_64px_80px_100px_56px] gap-2 px-5 py-2 border-b border-stone-100 dark:border-stone-800 text-[9px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
         <span>Store</span>
         <span className="text-center">Score</span>
         <span className="text-center">Actions</span>
@@ -133,7 +133,7 @@ export default function AccountabilityPanel({ stores }: Props) {
                   <p className="text-xs font-semibold text-stone-900 dark:text-stone-100 truncate leading-tight">
                     {store.name}
                   </p>
-                  <p className="text-[10px] text-stone-400 dark:text-stone-500">{store.city}</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-500">{store.city}</p>
                 </div>
                 {/* Mobile: overdue badge */}
                 {overdueBad && (
@@ -158,7 +158,7 @@ export default function AccountabilityPanel({ stores }: Props) {
               {/* Actions count — hidden on mobile */}
               <div className="hidden sm:block text-center">
                 <span className="text-[11px] font-semibold text-stone-600 dark:text-stone-400 tabular-nums">
-                  {store.actions_completed}<span className="text-stone-300 dark:text-stone-700">/</span>{store.actions_total}
+                  {store.actions_completed}<span className="text-stone-600 dark:text-stone-700">/</span>{store.actions_total}
                 </span>
               </div>
 
@@ -174,7 +174,7 @@ export default function AccountabilityPanel({ stores }: Props) {
                     {store.actions_overdue}
                   </span>
                 ) : (
-                  <span className="text-[11px] text-stone-300 dark:text-stone-700">—</span>
+                  <span className="text-[11px] text-stone-600 dark:text-stone-700">—</span>
                 )}
               </div>
             </div>

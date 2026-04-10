@@ -47,7 +47,7 @@ export default function InventoryPageTabs({ stockOnHand, inventoryClient }: Prop
               "flex items-center gap-1.5 px-4 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 transition-colors",
               tab === t.key
                 ? "border-stone-900 dark:border-stone-100 text-stone-900 dark:text-stone-100"
-                : "border-transparent text-stone-400 dark:text-stone-600 hover:text-stone-600 dark:hover:text-stone-400",
+                : "border-transparent text-stone-500 dark:text-stone-600 hover:text-stone-600 dark:hover:text-stone-400",
             )}
           >
             <span className="text-sm">{t.icon}</span>

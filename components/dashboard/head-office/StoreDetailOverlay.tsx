@@ -115,7 +115,7 @@ function statusBadge(status: string) {
     case "blocked": case "delayed": return "bg-red-950/60 text-red-300 border-red-800/40 print:bg-red-100 print:text-red-800";
     case "escalated": return "bg-amber-950/60 text-amber-300 border-amber-800/40 print:bg-amber-100 print:text-amber-800";
     case "missed": return "bg-red-950/80 text-red-200 border-red-800/50 print:bg-red-100 print:text-red-800";
-    default: return "bg-stone-800 text-stone-400 border-stone-700 print:bg-stone-200 print:text-stone-700";
+    default: return "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border-stone-300 dark:border-stone-700 print:bg-stone-200 print:text-stone-700";
   }
 }
 
@@ -159,20 +159,20 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
       onClick={onClose}
     >
       <div
-        className="w-full max-w-5xl my-6 mx-4 rounded-xl bg-stone-950 border border-stone-800 shadow-2xl print:my-0 print:mx-0 print:shadow-none print:border-none print:rounded-none print:max-w-none print:bg-white"
+        className="w-full max-w-5xl my-6 mx-4 rounded-xl bg-stone-950 border border-stone-200 dark:border-stone-800 shadow-2xl print:my-0 print:mx-0 print:shadow-none print:border-none print:rounded-none print:max-w-none print:bg-white"
         onClick={(e) => e.stopPropagation()}
         id="store-detail-print"
       >
         {/* ── Header ────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 print:border-stone-300">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-stone-200 dark:border-stone-800 print:border-stone-300">
           <div>
             <h2 className="text-lg font-bold text-stone-100 print:text-stone-900">{store.store}</h2>
-            <p className="text-xs text-stone-400 print:text-stone-600">{store.city} · Daily Report · {reportDate}</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400 print:text-stone-600">{store.city} · Daily Report · {reportDate}</p>
           </div>
           <div className="flex items-center gap-3">
             <span className={cn("text-[10px] font-bold uppercase px-2 py-1 rounded border", risk.bg)}>{risk.label}</span>
-            <button onClick={() => window.print()} className="text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg print:hidden">Print</button>
-            <button onClick={onClose} className="text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg print:hidden">Close</button>
+            <button onClick={() => window.print()} className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg print:hidden">Print</button>
+            <button onClick={onClose} className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg print:hidden">Close</button>
           </div>
         </div>
 
@@ -189,13 +189,13 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
 
           {/* ── Duties Table ────────────────────────────────────────────── */}
           <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400 print:text-stone-600 mb-2">
               Daily Duties {incompleteTasks.length < store.tasks.length && `(${incompleteTasks.length} incomplete of ${store.tasks.length})`}
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-[11px] print:text-[9px]">
                 <thead>
-                  <tr className="border-b border-stone-800 print:border-stone-300 text-stone-500 print:text-stone-600">
+                  <tr className="border-b border-stone-200 dark:border-stone-800 print:border-stone-300 text-stone-500 print:text-stone-600">
                     <th className="px-2 py-1.5 text-left font-semibold">Task</th>
                     <th className="px-2 py-1.5 text-center font-semibold">Status</th>
                     <th className="px-2 py-1.5 text-left font-semibold">By</th>
@@ -209,16 +209,16 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
                 <tbody>
                   {store.tasks.map((t, i) => (
                     <tr key={i} className={cn("border-b border-stone-800/30 print:border-stone-200", t.status === "blocked" || t.status === "missed" ? "bg-red-950/10 print:bg-red-50" : "")}>
-                      <td className="px-2 py-1.5 text-stone-200 print:text-stone-800 font-medium">{t.action}</td>
+                      <td className="px-2 py-1.5 text-stone-700 dark:text-stone-200 print:text-stone-800 font-medium">{t.action}</td>
                       <td className="px-2 py-1.5 text-center">
                         <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", statusBadge(t.status))}>
                           {t.status.replace(/_/g, " ")}
                         </span>
                       </td>
-                      <td className="px-2 py-1.5 text-stone-400 print:text-stone-600">{t.started_by ?? "—"}</td>
-                      <td className="px-2 py-1.5 text-stone-400 print:text-stone-600">{fmtTime(t.started_at)}</td>
-                      <td className="px-2 py-1.5 text-stone-400 print:text-stone-600">{fmtTime(t.completed_at)}</td>
-                      <td className="px-2 py-1.5 text-right text-stone-400 print:text-stone-600">{t.duration_minutes ?? "—"}</td>
+                      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400 print:text-stone-600">{t.started_by ?? "—"}</td>
+                      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400 print:text-stone-600">{fmtTime(t.started_at)}</td>
+                      <td className="px-2 py-1.5 text-stone-500 dark:text-stone-400 print:text-stone-600">{fmtTime(t.completed_at)}</td>
+                      <td className="px-2 py-1.5 text-right text-stone-500 dark:text-stone-400 print:text-stone-600">{t.duration_minutes ?? "—"}</td>
                       <td className="px-2 py-1.5 text-center">
                         {t.sla_met === true ? <span className="text-emerald-400 print:text-emerald-700 font-bold">Met</span> :
                          t.sla_met === false ? <span className="text-red-400 print:text-red-700 font-bold">Missed</span> :
@@ -236,7 +236,7 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
 
           {/* ── Maintenance ─────────────────────────────────────────────────── */}
           <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400 print:text-stone-600 mb-2">
               Maintenance ({store.maintenance.open_count} open)
             </h3>
             {store.maintenance.issues.length === 0 ? (
@@ -244,23 +244,23 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
             ) : (
               <div className="space-y-2">
                 {store.maintenance.issues.map((issue, i) => (
-                  <div key={i} className="rounded-lg border border-stone-800 print:border-stone-300 px-3 py-2.5 text-[11px] print:text-[9px]">
+                  <div key={i} className="rounded-lg border border-stone-200 dark:border-stone-800 print:border-stone-300 px-3 py-2.5 text-[11px] print:text-[9px]">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <span className="font-semibold text-stone-200 print:text-stone-800 flex-1">{issue.title}</span>
+                      <span className="font-semibold text-stone-700 dark:text-stone-200 print:text-stone-800 flex-1">{issue.title}</span>
                       <div className="flex items-center gap-2 shrink-0">
                         <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border",
                           issue.priority === "urgent" || issue.priority === "critical"
                             ? "bg-red-950/60 text-red-300 border-red-800/40 print:bg-red-100 print:text-red-800"
                             : issue.priority === "high"
                             ? "bg-amber-950/60 text-amber-300 border-amber-800/40 print:bg-amber-100 print:text-amber-800"
-                            : "bg-stone-800 text-stone-400 border-stone-700 print:bg-stone-200 print:text-stone-700"
+                            : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border-stone-300 dark:border-stone-700 print:bg-stone-200 print:text-stone-700"
                         )}>{issue.priority}</span>
                         <span className="text-stone-500 print:text-stone-500 text-[9px]">{issue.reported}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-[10px] text-stone-500 print:text-stone-600">
                       {issue.assigned_to && (
-                        <span>Reported by: <span className="text-stone-400 print:text-stone-700">{issue.assigned_to}</span></span>
+                        <span>Reported by: <span className="text-stone-500 dark:text-stone-400 print:text-stone-700">{issue.assigned_to}</span></span>
                       )}
                       <span className={cn("font-semibold",
                         issue.status === "open" ? "text-amber-400 print:text-amber-700" :
@@ -281,20 +281,20 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2">
             {/* Reviews */}
             <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400 print:text-stone-600 mb-2">
                 Guest Reviews (7d)
               </h3>
               <div className="flex items-center gap-4 text-xs mb-2">
-                <span className="text-stone-400 print:text-stone-600">Total: <strong className="text-stone-200 print:text-stone-800">{store.reviews.total_7d}</strong></span>
-                <span className="text-stone-400 print:text-stone-600">Avg: <strong className={cn(store.reviews.avg_rating != null ? (store.reviews.avg_rating >= 4 ? "text-emerald-400 print:text-emerald-700" : "text-red-400 print:text-red-700") : "text-stone-600")}>{store.reviews.avg_rating ?? "—"}</strong></span>
-                <span className="text-stone-400 print:text-stone-600">Negative: <strong className={cn(store.reviews.negative_count > 0 ? "text-red-400 print:text-red-700" : "text-stone-600")}>{store.reviews.negative_count}</strong></span>
+                <span className="text-stone-500 print:text-stone-600">Total: <strong className="text-stone-700 dark:text-stone-200 print:text-stone-800">{store.reviews.total_7d}</strong></span>
+                <span className="text-stone-500 dark:text-stone-400 print:text-stone-600">Avg: <strong className={cn(store.reviews.avg_rating != null ? (store.reviews.avg_rating >= 4 ? "text-emerald-400 print:text-emerald-700" : "text-red-400 print:text-red-700") : "text-stone-600")}>{store.reviews.avg_rating ?? "—"}</strong></span>
+                <span className="text-stone-500 dark:text-stone-400 print:text-stone-600">Negative: <strong className={cn(store.reviews.negative_count > 0 ? "text-red-400 print:text-red-700" : "text-stone-600")}>{store.reviews.negative_count}</strong></span>
               </div>
               {store.reviews.negative_unanswered.length > 0 && (
                 <div className="space-y-1.5">
                   {store.reviews.negative_unanswered.slice(0, 3).map((rev, i) => (
-                    <div key={i} className="rounded-lg border border-stone-800 print:border-stone-300 px-3 py-2 bg-red-950/10 print:bg-red-50">
+                    <div key={i} className="rounded-lg border border-stone-200 dark:border-stone-800 print:border-stone-300 px-3 py-2 bg-red-950/10 print:bg-red-50">
                       <div className="flex items-center justify-between text-[10px] mb-1">
-                        <span className="text-stone-400 print:text-stone-600">{rev.reviewer} · {rev.platform}</span>
+                        <span className="text-stone-500 dark:text-stone-400 print:text-stone-600">{rev.reviewer} · {rev.platform}</span>
                         <span className="text-red-400 print:text-red-700 font-bold">{rev.rating}/5</span>
                       </div>
                       <p className="text-[10px] text-stone-500 print:text-stone-600 line-clamp-2">{rev.text}</p>
@@ -306,16 +306,16 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
 
             {/* Actions */}
             <div>
-              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+              <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400 print:text-stone-600 mb-2">
                 Actions
               </h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2.5">
-                  <div className="text-[10px] text-stone-400 print:text-stone-600">Open</div>
+                  <div className="text-[10px] text-stone-500 dark:text-stone-400 print:text-stone-600">Open</div>
                   <div className={cn("text-lg font-bold mt-0.5", store.actions.open_count > 0 ? "text-amber-400 print:text-amber-700" : "text-stone-600")}>{store.actions.open_count}</div>
                 </div>
                 <div className="bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2.5">
-                  <div className="text-[10px] text-stone-400 print:text-stone-600">Overdue</div>
+                  <div className="text-[10px] text-stone-500 dark:text-stone-400 print:text-stone-600">Overdue</div>
                   <div className={cn("text-lg font-bold mt-0.5", store.actions.overdue_count > 0 ? "text-red-400 print:text-red-700" : "text-stone-600")}>{store.actions.overdue_count}</div>
                 </div>
               </div>
@@ -324,7 +324,7 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
 
           {/* ── Compliance ───────────────────────────────────────────────────── */}
           <div>
-            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 print:text-stone-600 mb-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400 print:text-stone-600 mb-2">
               Compliance ({store.compliance.expired} overdue)
             </h3>
             {store.compliance.overdue_items.length === 0 ? (
@@ -332,8 +332,8 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5 print:grid-cols-2">
                 {store.compliance.overdue_items.map((item, i) => (
-                  <div key={i} className={cn("flex items-center justify-between text-[11px] print:text-[9px] rounded-lg border px-3 py-1.5", item.critical ? "border-red-800/50 bg-red-950/10 print:border-red-300 print:bg-red-50" : "border-stone-800 print:border-stone-300")}>
-                    <span className="text-stone-300 print:text-stone-700">{item.name}</span>
+                  <div key={i} className={cn("flex items-center justify-between text-[11px] print:text-[9px] rounded-lg border px-3 py-1.5", item.critical ? "border-red-800/50 bg-red-950/10 print:border-red-300 print:bg-red-50" : "border-stone-200 dark:border-stone-800 print:border-stone-300")}>
+                    <span className="text-stone-600 dark:text-stone-300 print:text-stone-700">{item.name}</span>
                     <div className="flex items-center gap-2">
                       <span className="text-stone-500 text-[9px]">{item.category}</span>
                       <span className="text-red-400 print:text-red-700 text-[9px]">Due: {item.due}</span>
@@ -354,7 +354,7 @@ export default function StoreDetailOverlay({ store, reportDate, onClose }: Props
 function KPI({ label, value, sub, cls }: { label: string; value: string; sub?: string; cls?: string }) {
   return (
     <div className="bg-stone-800/60 print:bg-stone-100 rounded-lg px-3 py-2">
-      <div className="text-[10px] text-stone-400 print:text-stone-600">{label}</div>
+      <div className="text-[10px] text-stone-500 dark:text-stone-400 print:text-stone-600">{label}</div>
       <div className={cn("text-base font-bold text-stone-100 print:text-stone-900 mt-0.5 leading-tight", cls)}>{value}</div>
       {sub && <div className="text-[9px] text-stone-500 print:text-stone-500 mt-0.5">{sub}</div>}
     </div>

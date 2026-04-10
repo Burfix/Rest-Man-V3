@@ -41,7 +41,7 @@ export default function TopDecisions({ decisions }: Props) {
                 <h3 className="text-sm font-semibold text-stone-100">
                   {d.title}
                 </h3>
-                <p className="text-xs text-stone-400 mt-1 leading-relaxed">
+                <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 leading-relaxed">
                   {d.explanation}
                 </p>
                 {d.impact && (

@@ -94,7 +94,7 @@ export default function InventoryClient() {
         {(["inventory", "orders"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={cn(
             "px-4 py-2 text-xs font-semibold uppercase tracking-wide border-b-2 transition-colors",
-            tab === t ? "border-stone-900 dark:border-stone-100 text-stone-900 dark:text-stone-100" : "border-transparent text-stone-400 dark:text-stone-600 hover:text-stone-600 dark:hover:text-stone-400"
+            tab === t ? "border-stone-900 dark:border-stone-100 text-stone-900 dark:text-stone-100" : "border-transparent text-stone-500 dark:text-stone-600 hover:text-stone-600 dark:hover:text-stone-400"
           )}>
             {t === "inventory" ? "Stock Items" : `Orders (${orders.length})`}
           </button>
@@ -177,7 +177,7 @@ export default function InventoryClient() {
               <div className="flex items-center justify-between mb-2">
                 <div>
                   <p className="text-sm font-semibold text-stone-800 dark:text-stone-200">{po.supplier_name}</p>
-                  <p className="text-[10px] text-stone-400">{new Date(po.created_at).toLocaleDateString()}</p>
+                  <p className="text-[10px] text-stone-500 dark:text-stone-400">{new Date(po.created_at).toLocaleDateString()}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className={cn(
@@ -202,7 +202,7 @@ export default function InventoryClient() {
                 </div>
               </div>
               {po.items && po.items.length > 0 && (
-                <div className="text-[10px] text-stone-400 dark:text-stone-600">
+                <div className="text-[10px] text-stone-500 dark:text-stone-600">
                   {po.items.length} item{po.items.length !== 1 ? "s" : ""}
                 </div>
               )}
@@ -217,9 +217,9 @@ export default function InventoryClient() {
 function KpiTile({ label, value, subtext, color }: { label: string; value: string; subtext?: string; color?: string }) {
   return (
     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-4 py-3">
-      <p className="text-[10px] uppercase tracking-wide text-stone-400 dark:text-stone-600 font-semibold">{label}</p>
+      <p className="text-[10px] uppercase tracking-wide text-stone-500 dark:text-stone-600 font-semibold">{label}</p>
       <p className={cn("text-xl font-bold tabular-nums mt-0.5", color ?? "text-stone-900 dark:text-stone-100")}>{value}</p>
-      {subtext && <p className="text-[10px] text-stone-400">{subtext}</p>}
+      {subtext && <p className="text-[10px] text-stone-500 dark:text-stone-400">{subtext}</p>}
     </div>
   );
 }

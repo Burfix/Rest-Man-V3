@@ -16,7 +16,7 @@ export default function EventsTable({ events }: Props) {
               (h) => (
                 <th
                   key={h}
-                  className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-400"
+                  className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400"
                 >
                   {h}
                 </th>
@@ -38,7 +38,7 @@ export default function EventsTable({ events }: Props) {
                   ? `${e.start_time} – ${e.end_time}`
                   : e.start_time ?? "—"}
               </td>
-              <td className="max-w-[280px] truncate px-4 py-3 text-stone-400">
+              <td className="max-w-[280px] truncate px-4 py-3 text-stone-500 dark:text-stone-400">
                 {e.description ?? "—"}
               </td>
               <td className="whitespace-nowrap px-4 py-3">

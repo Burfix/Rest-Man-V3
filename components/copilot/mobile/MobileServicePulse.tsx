@@ -61,13 +61,13 @@ export default function MobileServicePulse({ serviceState, serviceImpact, servic
           <div className="flex items-center gap-2">
             <span className={cn(
               "text-2xl font-bold font-mono",
-              GRADE_COLOR[serviceScore.serviceGrade] ?? "text-stone-300",
+              GRADE_COLOR[serviceScore.serviceGrade] ?? "text-stone-600 dark:text-stone-300",
             )}>
               {serviceScore.totalScore}
             </span>
             <span className={cn(
               "text-xs font-bold uppercase",
-              GRADE_COLOR[serviceScore.serviceGrade] ?? "text-stone-400",
+              GRADE_COLOR[serviceScore.serviceGrade] ?? "text-stone-500 dark:text-stone-400",
             )}>
               {serviceScore.serviceGrade}
             </span>
@@ -126,7 +126,7 @@ export default function MobileServicePulse({ serviceState, serviceImpact, servic
         {/* Service risk bar */}
         <div className="flex items-center gap-2 border-t border-stone-800/30 pt-3">
           <div className={cn("h-2 w-2 rounded-full", RISK_BG[serviceState.serviceRiskLevel] ?? RISK_BG.moderate)} />
-          <span className="text-xs text-stone-400 capitalize">
+          <span className="text-xs text-stone-500 dark:text-stone-400 capitalize">
             Service risk: {serviceState.serviceRiskLevel}
           </span>
         </div>
@@ -162,7 +162,7 @@ function SignalRow({
   return (
     <div className="flex items-center justify-between">
       <span className="text-xs text-stone-500">{label}</span>
-      <span className={cn("text-xs font-medium", LEVEL_COLOR[level] ?? "text-stone-400")}>
+      <span className={cn("text-xs font-medium", LEVEL_COLOR[level] ?? "text-stone-500 dark:text-stone-400")}>
         {value}
       </span>
     </div>

@@ -62,7 +62,7 @@ function HealthScoreCard({ health }: { health: RestaurantHealthScore }) {
         <span className={cn("text-4xl font-bold tabular-nums", scoreColor)}>
           {health.total}
         </span>
-        <span className="text-sm text-stone-400">/ 100</span>
+        <span className="text-sm text-stone-500 dark:text-stone-400">/ 100</span>
       </div>
       <p className={cn("mt-0.5 text-sm font-semibold", scoreColor)}>{health.status}</p>
 
@@ -101,7 +101,7 @@ function ComplianceCard({ compliance }: { compliance: ComplianceSummary }) {
     <Card urgency={isRed ? "red" : isAmber ? "amber" : "none"}>
       <div className="flex items-start justify-between">
         <CardTitle icon="📋">Compliance</CardTitle>
-        <Link href="/dashboard/compliance" className="text-xs text-stone-400 hover:text-stone-700 shrink-0">
+        <Link href="/dashboard/compliance" className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-700 shrink-0">
           Hub →
         </Link>
       </div>
@@ -116,7 +116,7 @@ function ComplianceCard({ compliance }: { compliance: ComplianceSummary }) {
         )}>
           {compliance.compliance_pct}%
         </span>
-        <span className="text-xs text-stone-400">compliant</span>
+        <span className="text-xs text-stone-500 dark:text-stone-400">compliant</span>
       </div>
 
       {/* Status line */}
@@ -184,7 +184,7 @@ function MaintenanceCard({ maintenance }: { maintenance: MaintenanceSummary }) {
     <Card urgency={isRed ? "red" : isAmber ? "amber" : "none"}>
       <div className="flex items-start justify-between">
         <CardTitle icon="🔧">Maintenance</CardTitle>
-        <Link href="/dashboard/maintenance" className="text-xs text-stone-400 hover:text-stone-700 shrink-0">
+        <Link href="/dashboard/maintenance" className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-700 shrink-0">
           Log →
         </Link>
       </div>
@@ -196,7 +196,7 @@ function MaintenanceCard({ maintenance }: { maintenance: MaintenanceSummary }) {
         )}>
           {maintenance.totalEquipment}
         </span>
-        <span className="text-xs text-stone-400">units</span>
+        <span className="text-xs text-stone-500 dark:text-stone-400">units</span>
       </div>
 
       {isRed && (
@@ -245,13 +245,13 @@ function RevenueCard({ forecast }: { forecast: RevenueForecast | null }) {
     <Card urgency={isRed ? "red" : isAmber ? "amber" : "none"}>
       <div className="flex items-start justify-between">
         <CardTitle icon="📈">Revenue</CardTitle>
-        <Link href="/dashboard/settings/targets" className="text-xs text-stone-400 hover:text-stone-700 shrink-0">
+        <Link href="/dashboard/settings/targets" className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-700 shrink-0">
           Targets →
         </Link>
       </div>
 
       {!forecast ? (
-        <p className="mt-3 text-xs text-stone-400">No forecast data</p>
+        <p className="mt-3 text-xs text-stone-500 dark:text-stone-400">No forecast data</p>
       ) : (
         <>
           <div className="mt-3 flex items-baseline gap-2">
@@ -259,7 +259,7 @@ function RevenueCard({ forecast }: { forecast: RevenueForecast | null }) {
               {formatCurrency(forecast.forecast_sales)}
             </span>
           </div>
-          <p className="mt-0.5 text-xs text-stone-400">forecast sales</p>
+          <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">forecast sales</p>
 
           {hasTarget && (
             <p className={cn(
@@ -275,7 +275,7 @@ function RevenueCard({ forecast }: { forecast: RevenueForecast | null }) {
           )}
 
           {!hasTarget && (
-            <p className="mt-2 text-xs text-stone-400">No target set for today</p>
+            <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">No target set for today</p>
           )}
 
           <div className="mt-3 flex gap-2">
@@ -308,7 +308,7 @@ function RevenueCard({ forecast }: { forecast: RevenueForecast | null }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-stone-400">
+    <p className="mb-3 text-[11px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
       {children}
     </p>
   );
@@ -366,7 +366,7 @@ function MiniStatChip({
       )}>
         {value}
       </p>
-      <p className="text-[10px] text-stone-400">{label}</p>
+      <p className="text-[10px] text-stone-500 dark:text-stone-400">{label}</p>
     </div>
   );
 }

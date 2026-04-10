@@ -23,7 +23,7 @@ const SEV_LABEL_COLOR: Record<string, string> = {
   critical: "text-red-400",
   high:     "text-amber-400",
   medium:   "text-yellow-400",
-  low:      "text-stone-400",
+  low:      "text-stone-500 dark:text-stone-400",
 };
 
 function fmt(n: number): string {
@@ -43,7 +43,7 @@ function MetricCell({
     positive: "text-emerald-400",
     warning:  "text-amber-400",
     critical: "text-red-400",
-    neutral:  "text-stone-400",
+    neutral:  "text-stone-500 dark:text-stone-400",
   };
   return (
     <div className="bg-[#0f0f0f] px-3 py-2.5">
@@ -71,7 +71,7 @@ export default function BrainCopilotHero({ brain }: Props) {
             {sev}
           </span>
           <span className="text-stone-500">·</span>
-          <span className="text-stone-300">
+          <span className="text-stone-600 dark:text-stone-300">
             {issueCount > 0 ? `${issueCount} issue${issueCount > 1 ? "s" : ""} active` : "no active issues"}
           </span>
           {primaryThreat.title !== "All Systems Nominal" && (
@@ -79,7 +79,7 @@ export default function BrainCopilotHero({ brain }: Props) {
               <span className="text-stone-600">·</span>
               <span className="text-stone-500">
                 Top risk:{" "}
-                <span className="text-stone-300">{primaryThreat.title}</span>
+                <span className="text-stone-600 dark:text-stone-300">{primaryThreat.title}</span>
               </span>
             </>
           )}
@@ -139,7 +139,7 @@ export default function BrainCopilotHero({ brain }: Props) {
       {/* Voice briefing line */}
       {voiceLine && (
         <div className="px-4 py-2.5 border border-[#1a1a1a] bg-[#0f0f0f]">
-          <p className="text-[11px] font-mono text-stone-400 leading-relaxed">{voiceLine}</p>
+          <p className="text-[11px] font-mono text-stone-500 dark:text-stone-400 leading-relaxed">{voiceLine}</p>
         </div>
       )}
 

@@ -250,7 +250,7 @@ export default async function ActionsPage() {
             <span className="text-xs uppercase tracking-widest text-stone-500 font-medium">
               Logged from Co-Pilot Today
             </span>
-            <span className="rounded-full bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400 font-mono">
+            <span className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-[10px] text-stone-500 dark:text-stone-400 font-mono">
               {copilotToday.length}
             </span>
           </div>
@@ -260,14 +260,14 @@ export default async function ActionsPage() {
                 key={a.id}
                 className="flex items-center justify-between gap-3 rounded-lg border border-stone-800/40 bg-stone-900/60 px-3 py-2"
               >
-                <span className={`text-sm leading-snug ${a.status === "completed" ? "line-through text-stone-500" : "text-stone-200"}`}>
+                <span className={`text-sm leading-snug ${a.status === "completed" ? "line-through text-stone-500" : "text-stone-700 dark:text-stone-200"}`}>
                   {a.title}
                 </span>
                 <span className={`shrink-0 text-[10px] font-semibold uppercase px-2 py-0.5 rounded ${
                   a.status === "completed"   ? "bg-emerald-900/40 text-emerald-400" :
                   a.status === "in_progress" ? "bg-amber-900/30 text-amber-400" :
                   (a.status as string) === "escalated" ? "bg-red-900/30 text-red-400" :
-                                               "bg-stone-800 text-stone-400"
+                                               "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400"
                 }`}>
                   {a.status === "in_progress" ? "In Progress" :
                    a.status === "completed"   ? "Done" :

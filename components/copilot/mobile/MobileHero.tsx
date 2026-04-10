@@ -54,12 +54,12 @@ export default function MobileHero({ brief, serviceScore }: Props) {
     <div className={cn("rounded-xl border p-4 space-y-3", u.bg, u.border)}>
       {/* Top bar: window + urgency */}
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest text-stone-400 font-medium">
+        <span className="text-[10px] uppercase tracking-widest text-stone-500 dark:text-stone-400 font-medium">
           {WINDOW_LABEL[brief.serviceWindow]}
         </span>
         <div className="flex items-center gap-1.5">
           <div className={cn("h-2 w-2 rounded-full", u.dot)} />
-          <span className="text-[10px] uppercase tracking-widest font-bold text-stone-300">
+          <span className="text-[10px] uppercase tracking-widest font-bold text-stone-600 dark:text-stone-300">
             {u.label}
           </span>
         </div>
@@ -91,7 +91,7 @@ export default function MobileHero({ brief, serviceScore }: Props) {
           "rounded-lg border px-3 py-2 flex items-center justify-between",
           GRADE_COLOR[serviceScore.serviceGrade] ?? GRADE_COLOR.C,
         )}>
-          <span className="text-[10px] uppercase tracking-wider text-stone-400">Service</span>
+          <span className="text-[10px] uppercase tracking-wider text-stone-500 dark:text-stone-400">Service</span>
           <span className="text-base font-bold font-mono">{serviceScore.totalScore}</span>
         </div>
       </div>

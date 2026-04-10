@@ -179,7 +179,7 @@ function TrendChart({
     <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-4">
 
       {/* Title */}
-      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 mb-3 flex items-center gap-1.5">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-500 mb-3 flex items-center gap-1.5">
         <span>{icon}</span> {title}
       </p>
 

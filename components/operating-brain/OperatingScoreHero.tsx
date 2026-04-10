@@ -68,7 +68,7 @@ export default function OperatingScoreHero({
             <span className={cn("font-black text-xl", grade.color)}>{score}</span>
             <span className="text-stone-700 text-xs">/100</span>
           </span>
-          <div className="w-24 h-1 bg-stone-800 rounded-sm overflow-hidden">
+          <div className="w-24 h-1 bg-stone-100 dark:bg-stone-800 rounded-sm overflow-hidden">
             <div
               className={cn("h-full transition-all duration-1000", barColor)}
               style={{ width: `${pct}%` }}
@@ -90,7 +90,7 @@ export default function OperatingScoreHero({
           <div className="flex items-center px-4 py-2.5 flex-1 min-w-0">
             <span className="font-mono text-[11px] text-stone-600 uppercase tracking-wider truncate">
               TOP RISK:{" "}
-              <span className="text-stone-400">{topRisk.toUpperCase()}</span>
+              <span className="text-stone-500 dark:text-stone-400">{topRisk.toUpperCase()}</span>
             </span>
           </div>
         )}

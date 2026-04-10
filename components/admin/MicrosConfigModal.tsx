@@ -137,7 +137,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
   };
 
   const inputClass =
-    "w-full rounded-lg border border-stone-700 bg-stone-800 px-3 py-2 text-sm text-stone-200 placeholder-stone-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+    "w-full rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-3 py-2 text-sm text-stone-700 dark:text-stone-200 placeholder-stone-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" role="dialog" aria-modal="true" aria-label={`Configure Micros for ${storeName}`}>
@@ -145,16 +145,16 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto rounded-2xl border border-stone-700 bg-stone-900 shadow-2xl">
+      <div className="relative z-10 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto rounded-2xl border border-stone-300 dark:border-stone-700 bg-white dark:bg-stone-900 shadow-2xl">
         {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-800 bg-stone-900 px-6 py-4 rounded-t-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-6 py-4 rounded-t-2xl">
           <div>
             <h2 className="text-base font-semibold text-stone-100">Configure Micros</h2>
             <p className="text-xs text-stone-500 mt-0.5">{storeName}</p>
           </div>
           <button
             onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-800 hover:text-stone-200 transition-colors"
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-stone-500 dark:text-stone-400 hover:bg-stone-800 hover:text-stone-200 transition-colors"
             aria-label="Close"
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -175,7 +175,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
 
                 <div className="grid grid-cols-1 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-stone-400 mb-1">Auth Server URL</label>
+                    <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">Auth Server URL</label>
                     <input
                       className={inputClass}
                       placeholder="https://idcs-xxxx.identity.oraclecloud.com"
@@ -184,7 +184,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-stone-400 mb-1">BI App Server URL</label>
+                    <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">BI App Server URL</label>
                     <input
                       className={inputClass}
                       placeholder="https://xxxx.oracleindustry.com"
@@ -194,7 +194,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[11px] font-medium text-stone-400 mb-1">Client ID</label>
+                      <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">Client ID</label>
                       <input
                         className={inputClass}
                         placeholder="OAuth Client ID"
@@ -203,7 +203,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-medium text-stone-400 mb-1">Org Identifier</label>
+                      <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">Org Identifier</label>
                       <input
                         className={inputClass}
                         placeholder="e.g. SCS"
@@ -213,7 +213,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-stone-400 mb-1">Location Ref</label>
+                    <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">Location Ref</label>
                     <input
                       className={inputClass}
                       placeholder="e.g. 2000002"
@@ -229,7 +229,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500">API Account</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-medium text-stone-400 mb-1">Username</label>
+                    <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">Username</label>
                     <input
                       className={inputClass}
                       placeholder="API account username"
@@ -239,7 +239,7 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-stone-400 mb-1">Password</label>
+                    <label className="block text-[11px] font-medium text-stone-500 dark:text-stone-400 mb-1">Password</label>
                     <input
                       type="password"
                       className={inputClass}
@@ -282,18 +282,18 @@ export default function MicrosConfigModal({ storeId, storeName, open, onClose, o
 
         {/* Footer */}
         {!loading && (
-          <div className="flex items-center justify-between border-t border-stone-800 px-6 py-4">
+          <div className="flex items-center justify-between border-t border-stone-200 dark:border-stone-800 px-6 py-4">
             <button
               onClick={handleTestConnection}
               disabled={testing || !form.auth_server_url || !form.client_id || !form.username || !form.password}
-              className="rounded-lg border border-stone-700 px-4 py-2 text-xs font-semibold text-stone-300 hover:bg-stone-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-lg border border-stone-300 dark:border-stone-700 px-4 py-2 text-xs font-semibold text-stone-600 dark:text-stone-300 hover:bg-stone-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {testing ? "Testing…" : "Test Connection"}
             </button>
             <div className="flex gap-2">
               <button
                 onClick={onClose}
-                className="rounded-lg border border-stone-700 px-4 py-2 text-xs font-medium text-stone-400 hover:bg-stone-800 transition-colors"
+                className="rounded-lg border border-stone-300 dark:border-stone-700 px-4 py-2 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-800 transition-colors"
               >
                 Cancel
               </button>

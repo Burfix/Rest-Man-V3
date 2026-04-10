@@ -188,7 +188,7 @@ export default function DataHealthWarning({ health }: Props) {
       {/* Per-source breakdown */}
       <div className="space-y-1">
         {health.details.map((d) => {
-          const tone = TONE_STYLES[d.tone] ?? { dot: "bg-stone-600", text: "text-stone-400" };
+          const tone = TONE_STYLES[d.tone] ?? { dot: "bg-stone-600", text: "text-stone-500 dark:text-stone-400" };
           const remedy = SOURCE_REMEDIATION[d.source];
           const isIssue = d.tone === "critical" || d.tone === "warning";
 
@@ -203,7 +203,7 @@ export default function DataHealthWarning({ health }: Props) {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", tone.dot)} />
-                  <span className="text-[11px] text-stone-400 font-medium">{d.source}</span>
+                  <span className="text-[11px] text-stone-500 dark:text-stone-400 font-medium">{d.source}</span>
                 </div>
                 <span className={cn("text-[10px] font-mono", tone.text)}>
                   {d.label}

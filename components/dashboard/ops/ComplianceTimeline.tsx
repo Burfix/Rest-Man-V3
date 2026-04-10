@@ -39,7 +39,7 @@ const STATUS_CONFIG: Record<ComplianceStatus, {
   scheduled:   { chip: "Scheduled",   variant: "ok",       daysCls: "text-emerald-600" },
   compliant:   { chip: "Current",     variant: "ok",       daysCls: "text-emerald-600" },
   blocked:     { chip: "Blocked",     variant: "critical", daysCls: "text-red-600" },
-  unknown:     { chip: "Unknown",     variant: "neutral",  daysCls: "text-stone-400" },
+  unknown:     { chip: "Unknown",     variant: "neutral",  daysCls: "text-stone-500 dark:text-stone-400" },
 };
 
 function daysLabel(item: ComplianceItem): string {
@@ -115,7 +115,7 @@ export default function ComplianceTimeline({ compliance }: Props) {
                 : `${compliance.due_soon} due soon`}
             </StatusChip>
           )}
-          <Link href="/dashboard/compliance" className="text-xs text-stone-400 hover:text-stone-700">
+          <Link href="/dashboard/compliance" className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-700">
             Manage all →
           </Link>
         </div>
@@ -136,7 +136,7 @@ export default function ComplianceTimeline({ compliance }: Props) {
               <span className="text-xl">✅</span>
               <div>
                 <p className="text-sm font-semibold">All {compliance.total} item{compliance.total > 1 ? "s" : ""} are up-to-date</p>
-                <p className="text-xs text-stone-400">No expired or expiring certificates.</p>
+                <p className="text-xs text-stone-500 dark:text-stone-400">No expired or expiring certificates.</p>
               </div>
             </div>
           )}
@@ -148,11 +148,11 @@ export default function ComplianceTimeline({ compliance }: Props) {
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-stone-100">
-                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-400">Status</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-400">Certificate</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-400 hidden sm:table-cell">Due Date</th>
-                  <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-stone-400">Days</th>
-                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-400 hidden lg:table-cell">Responsible</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Status</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Certificate</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 hidden sm:table-cell">Due Date</th>
+                  <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Days</th>
+                  <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400 hidden lg:table-cell">Responsible</th>
                   <th className="px-4 py-2.5" />
                 </tr>
               </thead>
@@ -184,7 +184,7 @@ export default function ComplianceTimeline({ compliance }: Props) {
                           {item.display_name}
                         </p>
                         {item.description && (
-                          <p className="text-[10px] text-stone-400 mt-0.5">{item.description}</p>
+                          <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-0.5">{item.description}</p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-stone-500 hidden sm:table-cell whitespace-nowrap">
@@ -193,7 +193,7 @@ export default function ComplianceTimeline({ compliance }: Props) {
                       <td className={cn("px-4 py-3 text-right whitespace-nowrap tabular-nums", cfg.daysCls)}>
                         {days}
                       </td>
-                      <td className="px-4 py-3 text-stone-400 hidden lg:table-cell whitespace-nowrap">
+                      <td className="px-4 py-3 text-stone-500 dark:text-stone-400 hidden lg:table-cell whitespace-nowrap">
                         {item.responsible_party ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -221,10 +221,10 @@ export default function ComplianceTimeline({ compliance }: Props) {
           {/* Compliant summary row */}
           {compliance.compliant > 0 && (
             <div className="border-t border-stone-100 px-4 py-2.5 bg-stone-50 flex items-center justify-between">
-              <p className="text-xs text-stone-400">
+              <p className="text-xs text-stone-500 dark:text-stone-400">
                 <span className="font-semibold text-emerald-600">{compliance.compliant}</span> certificate{compliance.compliant > 1 ? "s" : ""} fully up-to-date
               </p>
-              <Link href="/dashboard/compliance" className="text-[11px] text-stone-400 hover:underline">
+              <Link href="/dashboard/compliance" className="text-[11px] text-stone-500 dark:text-stone-400 hover:underline">
                 View all {compliance.total} →
               </Link>
             </div>

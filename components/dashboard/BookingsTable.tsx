@@ -35,7 +35,7 @@ export default function BookingsTable({ reservations, showDateGroups = true }: P
 
   if (filtered.length === 0) {
     return (
-      <div className="rounded-lg border border-stone-200 bg-white px-6 py-10 text-center text-sm text-stone-400">
+      <div className="rounded-lg border border-stone-200 bg-white px-6 py-10 text-center text-sm text-stone-500 dark:text-stone-400">
         No bookings to display.
       </div>
     );
@@ -49,7 +49,7 @@ export default function BookingsTable({ reservations, showDateGroups = true }: P
             {COLUMNS.map((h) => (
               <th
                 key={h}
-                className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-400"
+                className="whitespace-nowrap px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400"
               >
                 {h}
               </th>
@@ -97,7 +97,7 @@ function BookingRow({ r }: { r: Reservation }) {
         {r.guest_count}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-stone-500">
-        {r.event_name ?? <span className="text-stone-300">—</span>}
+        {r.event_name ?? <span className="text-stone-600 dark:text-stone-300">—</span>}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         <StatusBadge status={r.status} />
@@ -112,7 +112,7 @@ function BookingRow({ r }: { r: Reservation }) {
           )}
         </div>
       </td>
-      <td className="max-w-[180px] truncate px-4 py-3 text-stone-400">
+      <td className="max-w-[180px] truncate px-4 py-3 text-stone-500 dark:text-stone-400">
         {r.special_notes ?? "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-3">

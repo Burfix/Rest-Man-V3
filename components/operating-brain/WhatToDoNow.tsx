@@ -63,14 +63,14 @@ export default function WhatToDoNow({ decisions }: Props) {
                 </h3>
 
                 {/* Action */}
-                <p className="mt-1.5 text-xs text-stone-300 font-medium">
+                <p className="mt-1.5 text-xs text-stone-600 dark:text-stone-300 font-medium">
                   → {d.action}
                 </p>
 
                 {/* Impact + Due */}
                 <div className="mt-2 flex items-center flex-wrap gap-3 text-[11px]">
                   {d.impact && (
-                    <span className={cn("font-medium", IMPACT_STYLES[d.impact.type] ?? "text-stone-400")}>
+                    <span className={cn("font-medium", IMPACT_STYLES[d.impact.type] ?? "text-stone-500 dark:text-stone-400")}>
                       {d.impact.label}
                     </span>
                   )}

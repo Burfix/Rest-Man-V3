@@ -92,7 +92,7 @@ function buildBars(
     (gapPct ?? 0) < 0   ? "bg-amber-400"  :
     "bg-emerald-500";
   const revText =
-    !forecast ? "text-stone-400" :
+    !forecast ? "text-stone-500 dark:text-stone-400" :
     (gapPct ?? 0) < -20 ? "text-red-600"   :
     (gapPct ?? 0) < 0   ? "text-amber-600" :
     "text-emerald-700";
@@ -112,7 +112,7 @@ function buildBars(
     avg >= 3.5                  ? "bg-amber-400"   :
     "bg-red-500";
   const repText =
-    reviews.totalReviews === 0 ? "text-stone-400" :
+    reviews.totalReviews === 0 ? "text-stone-500 dark:text-stone-400" :
     avg >= 4.0                  ? "text-emerald-700" :
     avg >= 3.5                  ? "text-amber-600"   :
     "text-red-600";

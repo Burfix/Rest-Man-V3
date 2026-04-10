@@ -36,16 +36,16 @@ export default function TwoHourOutlook({ outlook }: Props) {
         : "border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900",
     )}>
       {/* Label */}
-      <span className="shrink-0 mt-px text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 whitespace-nowrap">
+      <span className="shrink-0 mt-px text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 whitespace-nowrap">
         Next 2h
       </span>
-      <span className="shrink-0 mt-px text-stone-200 dark:text-stone-700">·</span>
+      <span className="shrink-0 mt-px text-stone-700 dark:text-stone-700">·</span>
 
       {/* Outlook text */}
       <p className={cn(
         "flex-1 text-xs leading-snug",
         outlook.confidence === "none"
-          ? "text-stone-400 dark:text-stone-600 italic"
+          ? "text-stone-500 dark:text-stone-600 italic"
           : "text-stone-700 dark:text-stone-300",
       )}>
         {outlook.text}
@@ -55,7 +55,7 @@ export default function TwoHourOutlook({ outlook }: Props) {
       <div className="shrink-0 flex items-center gap-1 mt-px">
         <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", CONFIDENCE_DOT[outlook.confidence])} />
         {CONFIDENCE_LABEL[outlook.confidence] && (
-          <span className="text-[9px] text-stone-400 dark:text-stone-600 font-medium leading-none whitespace-nowrap">
+          <span className="text-[9px] text-stone-500 dark:text-stone-600 font-medium leading-none whitespace-nowrap">
             {CONFIDENCE_LABEL[outlook.confidence].replace(" · ", "")}
           </span>
         )}

@@ -22,7 +22,7 @@ export default function ThemeToggle() {
 
   return (
     <div className="px-3 py-3 border-t border-stone-200 dark:border-stone-700">
-      <p className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+      <p className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
         Appearance
       </p>
       <div className="flex gap-0.5 rounded-lg bg-stone-100 dark:bg-stone-800 p-0.5">

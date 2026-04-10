@@ -61,7 +61,7 @@ export default function CommandHeader({
       {/* Top bar: venue + service period */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 bg-stone-50 px-5 py-3">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold uppercase tracking-widest text-stone-400">
+          <span className="text-xs font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400">
             Ops Engine
           </span>
           <span className="h-3 w-px bg-stone-300" />
@@ -160,12 +160,12 @@ function SnapStat({
 }) {
   return (
     <div className="rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-right min-w-[80px]">
-      <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400">{label}</p>
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">{label}</p>
       <p className={cn(
         "mt-0.5 truncate text-sm font-bold",
         highlight === "violet" ? "text-violet-700" : "text-stone-900"
       )}>{value}</p>
-      <p className="truncate text-[10px] text-stone-400">{sub}</p>
+      <p className="truncate text-[10px] text-stone-500 dark:text-stone-400">{sub}</p>
     </div>
   );
 }
@@ -181,7 +181,7 @@ function StatusBadge({
     good:    { bg: "bg-emerald-50 border-emerald-200 text-emerald-700", dot: "bg-emerald-500", sub: "Good" },
     warning: { bg: "bg-amber-50 border-amber-200 text-amber-700",       dot: "bg-amber-400",   sub: "Warning" },
     risk:    { bg: "bg-red-50 border-red-200 text-red-700",             dot: "bg-red-500",     sub: "At Risk" },
-    none:    { bg: "bg-stone-100 border-stone-200 text-stone-400",      dot: "bg-stone-300",   sub: "No Data" },
+    none:    { bg: "bg-stone-100 border-stone-200 text-stone-500 dark:text-stone-400",      dot: "bg-stone-300",   sub: "No Data" },
   }[status];
 
   return (

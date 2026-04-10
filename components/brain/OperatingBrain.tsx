@@ -38,7 +38,7 @@ const SEV_MONEY: Record<string, string> = {
   critical: "text-red-400",
   high:     "text-amber-400",
   medium:   "text-yellow-400",
-  low:      "text-stone-400",
+  low:      "text-stone-500 dark:text-stone-400",
 };
 
 const GRADE_COLOR: Record<string, string> = {

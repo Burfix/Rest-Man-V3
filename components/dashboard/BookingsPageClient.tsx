@@ -41,7 +41,7 @@ export default function BookingsPageClient({ reservations }: Props) {
 
       {/* Bookings list */}
       {reservations.length === 0 && !showForm ? (
-        <p className="text-sm text-stone-400">
+        <p className="text-sm text-stone-500 dark:text-stone-400">
           No upcoming bookings found.{" "}
           <button
             onClick={() => setShowForm(true)}

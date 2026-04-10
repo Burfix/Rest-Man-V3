@@ -70,7 +70,7 @@ export default async function IntegrationsPage() {
       {/* Future integration slots — placeholder style matches empty maintenance card */}
       <section className="rounded-lg border border-dashed border-stone-200 bg-stone-50 p-6">
         <h2 className="text-sm font-semibold text-stone-500">More integrations</h2>
-        <p className="mt-1 text-xs text-stone-400">
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
           Upcoming: Google Reviews sync, WhatsApp automation, compliance feed.
         </p>
       </section>

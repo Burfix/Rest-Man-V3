@@ -43,7 +43,7 @@ export default function BusinessStatusRail({ items }: Props) {
     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
       {/* Header */}
       <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-100 dark:border-stone-800">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
           Business Status
         </p>
       </div>
@@ -57,7 +57,7 @@ export default function BusinessStatusRail({ items }: Props) {
             className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4 px-4 sm:px-6 py-3 sm:py-3.5 hover:bg-stone-50 dark:hover:bg-stone-800/40 transition-colors group"
           >
             {/* Label */}
-            <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-400 dark:text-stone-600 w-16 sm:w-24 shrink-0 group-hover:text-stone-500 dark:group-hover:text-stone-400">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-stone-500 dark:text-stone-600 w-16 sm:w-24 shrink-0 group-hover:text-stone-500 dark:group-hover:text-stone-400">
               {item.label}
             </span>
 
@@ -67,7 +67,7 @@ export default function BusinessStatusRail({ items }: Props) {
                 {item.metric}
               </span>
               {item.metricSub && (
-                <span className="text-[10px] text-stone-400 dark:text-stone-600">
+                <span className="text-[10px] text-stone-500 dark:text-stone-600">
                   {item.metricSub}
                 </span>
               )}

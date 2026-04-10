@@ -20,7 +20,7 @@ export default function LabourByRoleTable({ roles }: Props) {
   if (roles.length === 0) {
     return (
       <div className="rounded-lg border border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900 p-6 text-center">
-        <p className="text-sm text-stone-400 dark:text-stone-500">No role data available</p>
+        <p className="text-sm text-stone-500 dark:text-stone-500">No role data available</p>
       </div>
     );
   }

@@ -13,7 +13,7 @@ export default function TodaySection({ summary }: Props) {
         <h2 className="text-base font-semibold text-stone-900">Today&apos;s Bookings</h2>
         <a
           href="/dashboard/bookings"
-          className="text-xs font-medium text-stone-400 hover:text-stone-700"
+          className="text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           All bookings →
         </a>
@@ -34,7 +34,7 @@ export default function TodaySection({ summary }: Props) {
 
       {/* Booking list */}
       {summary.bookings.length === 0 ? (
-        <p className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-6 text-center text-sm text-stone-400">
+        <p className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-6 text-center text-sm text-stone-500 dark:text-stone-400">
           No bookings confirmed for today.
         </p>
       ) : (
@@ -49,7 +49,7 @@ export default function TodaySection({ summary }: Props) {
           <div className="hidden sm:block overflow-x-auto rounded-lg border border-stone-200">
             <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   <th className="px-4 py-2">Time</th>
                   <th className="px-4 py-2">Name</th>
                   <th className="px-4 py-2">Guests</th>
@@ -107,7 +107,7 @@ function BookingCard({ r }: { r: Reservation }) {
             </span>
           )}
           {r.special_notes && (
-            <span className="text-xs text-stone-400">{r.special_notes}</span>
+            <span className="text-xs text-stone-500 dark:text-stone-400">{r.special_notes}</span>
           )}
         </div>
       )}
@@ -145,7 +145,7 @@ function BookingRow({ r }: { r: Reservation }) {
         </span>
       </td>
       <td className="whitespace-nowrap px-4 py-2.5 text-xs text-stone-500">
-        {r.event_name ?? <span className="text-stone-300">—</span>}
+        {r.event_name ?? <span className="text-stone-600 dark:text-stone-300">—</span>}
       </td>
       <td className="whitespace-nowrap px-4 py-2.5">
         <StatusBadge status={r.status} />
@@ -164,7 +164,7 @@ function BookingRow({ r }: { r: Reservation }) {
           )}
         </div>
       </td>
-      <td className="max-w-[180px] truncate px-4 py-2.5 text-xs text-stone-400">
+      <td className="max-w-[180px] truncate px-4 py-2.5 text-xs text-stone-500 dark:text-stone-400">
         {r.special_notes ?? "—"}
       </td>
     </tr>
@@ -189,7 +189,7 @@ function MiniStat({
           : "border-stone-200 bg-white"
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p

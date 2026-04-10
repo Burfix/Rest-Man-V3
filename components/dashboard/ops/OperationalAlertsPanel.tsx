@@ -202,15 +202,15 @@ function AlertRow({
             >
               {typeCfg.cta}
             </a>
-            <span className="text-stone-300 dark:text-stone-700">·</span>
+            <span className="text-stone-600 dark:text-stone-700">·</span>
             <button
               onClick={() => onResolve(alert.id)}
               disabled={resolving}
               className={cn(
                 "text-[11px] font-medium whitespace-nowrap transition-colors",
                 resolving
-                  ? "text-stone-300 dark:text-stone-600 cursor-not-allowed"
-                  : "text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300"
+                  ? "text-stone-600 dark:text-stone-600 cursor-not-allowed"
+                  : "text-stone-500 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300"
               )}
             >
               {resolving ? "Resolving…" : "Dismiss"}
@@ -219,7 +219,7 @@ function AlertRow({
         </div>
 
         {/* Timestamp */}
-          <time className="mt-1 block text-[10px] text-stone-400 dark:text-stone-600" dateTime={alert.created_at}>
+          <time className="mt-1 block text-[10px] text-stone-500 dark:text-stone-600" dateTime={alert.created_at}>
           {formatDistanceToNowStrict(parseISO(alert.created_at), { addSuffix: true })}
         </time>
       </div>

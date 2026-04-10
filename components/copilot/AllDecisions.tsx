@@ -116,7 +116,7 @@ function CompactDecision({ decision: d }: { decision: GMDecision }) {
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-[11px] text-stone-300 truncate">{d.title}</p>
+        <p className="text-[11px] text-stone-600 dark:text-stone-300 truncate">{d.title}</p>
         <p className="text-[10px] text-stone-600 truncate">{d.directInstruction}</p>
       </div>
 

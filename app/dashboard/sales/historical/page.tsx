@@ -85,7 +85,7 @@ export default async function HistoricalSalesPage() {
       <div className="flex gap-1 border-b border-stone-200">
         <Link
           href="/dashboard/sales"
-          className="px-4 py-2 text-sm font-medium text-stone-400 hover:text-stone-700"
+          className="px-4 py-2 text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           Weekly Items
         </Link>
@@ -117,7 +117,7 @@ export default async function HistoricalSalesPage() {
           <p className="text-sm font-semibold text-stone-600">
             No data for this week ({from} – {to})
           </p>
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
             Upload a CSV covering this date range to populate the comparison.
           </p>
         </div>
@@ -139,7 +139,7 @@ export default async function HistoricalSalesPage() {
           <div className="overflow-x-auto rounded-lg border border-stone-200">
             <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Day</th>
                   <th className="px-4 py-3 text-right">Gross Sales</th>
@@ -157,7 +157,7 @@ export default async function HistoricalSalesPage() {
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-stone-800">
                         {formatDisplayDate(r.sale_date)}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-400">
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-stone-500 dark:text-stone-400">
                         {dayOfWeek(r.sale_date)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-stone-900">
@@ -170,7 +170,7 @@ export default async function HistoricalSalesPage() {
                               ? "font-medium text-green-600"
                               : pct <= -10
                               ? "font-medium text-red-500"
-                              : "text-stone-400"
+                              : "text-stone-500 dark:text-stone-400"
                           }
                         >
                           {pct >= 0 ? "+" : ""}
@@ -200,7 +200,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-lg border border-stone-200 bg-white px-4 py-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p

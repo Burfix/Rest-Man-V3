@@ -43,9 +43,9 @@ export default function EscalationsTable({ reservations }: Props) {
                 {r.guest_count}
               </td>
               <td className="whitespace-nowrap px-4 py-3 text-stone-500">
-                {r.event_name ?? <span className="text-stone-300">—</span>}
+                {r.event_name ?? <span className="text-stone-600 dark:text-stone-300">—</span>}
               </td>
-              <td className="max-w-[200px] truncate px-4 py-3 text-stone-400">
+              <td className="max-w-[200px] truncate px-4 py-3 text-stone-500 dark:text-stone-400">
                 {r.special_notes ?? "—"}
               </td>
               <td className="whitespace-nowrap px-4 py-3">

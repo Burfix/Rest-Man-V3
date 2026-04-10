@@ -31,7 +31,7 @@ const TONE_STYLES: Record<BusinessStatusTone, { text: string; bar: string }> = {
   positive: { text: "text-emerald-400", bar: "bg-emerald-500/60" },
   warning:  { text: "text-amber-400",   bar: "bg-amber-500/60"   },
   critical: { text: "text-red-400",     bar: "bg-red-500/60"     },
-  neutral:  { text: "text-stone-400",   bar: "bg-stone-600"      },
+  neutral:  { text: "text-stone-500 dark:text-stone-400",   bar: "bg-stone-600"      },
 };
 
 // Approximate fill % from tone for the indicator bar
@@ -121,7 +121,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
               </div>
 
               {/* Fill bar */}
-              <div className="mt-1.5 h-0.5 bg-stone-800 overflow-hidden">
+              <div className="mt-1.5 h-0.5 bg-stone-100 dark:bg-stone-800 overflow-hidden">
                 <div
                   className={cn("h-full transition-all duration-700", tone.bar)}
                   style={{ width: `${fillPct}%` }}
@@ -157,7 +157,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
                   {predictive.dinnerRisk}
                 </span>
               </div>
-              <div className="mt-1.5 h-0.5 bg-stone-800 overflow-hidden">
+              <div className="mt-1.5 h-0.5 bg-stone-100 dark:bg-stone-800 overflow-hidden">
                 <div
                   className={cn("h-full transition-all duration-700", riskBarColor(predictive.dinnerRisk))}
                   style={{ width: `${riskFill(predictive.dinnerRisk)}%` }}
@@ -175,7 +175,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
                   {predictive.bookingPace}
                 </span>
               </div>
-              <div className="mt-1.5 h-0.5 bg-stone-800 overflow-hidden">
+              <div className="mt-1.5 h-0.5 bg-stone-100 dark:bg-stone-800 overflow-hidden">
                 <div
                   className={cn("h-full transition-all duration-700", riskBarColor(
                     predictive.bookingPace === "Slow" ? "High" :
@@ -193,7 +193,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
                   <span className="text-[9px] uppercase tracking-widest text-stone-600 font-medium w-[88px] shrink-0">
                     PEAK WINDOW
                   </span>
-                  <span className="text-sm font-bold text-stone-300">
+                  <span className="text-sm font-bold text-stone-600 dark:text-stone-300">
                     {predictive.peakWindow}
                   </span>
                 </div>
@@ -210,7 +210,7 @@ export default function BusinessStatusRail({ status, predictive }: Props) {
                   {predictive.staffingPressure}
                 </span>
               </div>
-              <div className="mt-1.5 h-0.5 bg-stone-800 overflow-hidden">
+              <div className="mt-1.5 h-0.5 bg-stone-100 dark:bg-stone-800 overflow-hidden">
                 <div
                   className={cn("h-full transition-all duration-700", riskBarColor(predictive.staffingPressure))}
                   style={{ width: `${riskFill(predictive.staffingPressure)}%` }}

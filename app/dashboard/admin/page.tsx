@@ -163,8 +163,8 @@ const ROLE_COLORS: Record<string, string> = {
   gm:           "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   supervisor:   "bg-amber-500/20 text-amber-300 border-amber-500/30",
   contractor:   "bg-orange-500/20 text-orange-300 border-orange-500/30",
-  auditor:      "bg-stone-500/20 text-stone-300 border-stone-500/30",
-  viewer:       "bg-stone-500/20 text-stone-400 border-stone-500/30",
+  auditor:      "bg-stone-500/20 text-stone-600 dark:text-stone-300 border-stone-500/30",
+  viewer:       "bg-stone-500/20 text-stone-500 dark:text-stone-400 border-stone-500/30",
 };
 
 const ROLE_DESCRIPTIONS: Record<string, string> = {
@@ -183,7 +183,7 @@ const HEALTH_STYLES: Record<string, string> = {
   healthy:  "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   warning:  "bg-amber-500/20 text-amber-300 border-amber-500/30",
   critical: "bg-red-500/20 text-red-300 border-red-500/30",
-  unknown:  "bg-stone-500/20 text-stone-400 border-stone-500/30",
+  unknown:  "bg-stone-500/20 text-stone-500 dark:text-stone-400 border-stone-500/30",
 };
 
 const INTEGRATION_STYLES: Record<string, string> = {
@@ -191,7 +191,7 @@ const INTEGRATION_STYLES: Record<string, string> = {
   disconnected: "bg-red-500/20 text-red-300",
   expired:      "bg-amber-500/20 text-amber-300",
   stale:        "bg-orange-500/20 text-orange-300",
-  none:         "bg-stone-500/20 text-stone-400",
+  none:         "bg-stone-500/20 text-stone-500 dark:text-stone-400",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -222,7 +222,7 @@ async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
 
 function StatCard({ icon, label, value, sub, accent }: { icon: string; label: string; value: string | number; sub?: string; accent?: string }) {
   return (
-    <div className={cn("rounded-xl border border-stone-800 bg-stone-900/60 p-4 transition-colors hover:border-stone-700", accent && `ring-1 ${accent}`)}>
+    <div className={cn("rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-4 transition-colors hover:border-stone-700", accent && `ring-1 ${accent}`)}>
       <div className="text-lg">{icon}</div>
       <div className="mt-1 text-2xl font-bold text-stone-100">{value}</div>
       <div className="mt-0.5 text-[11px] font-medium text-stone-500 uppercase tracking-wide">{label}</div>
@@ -233,7 +233,7 @@ function StatCard({ icon, label, value, sub, accent }: { icon: string; label: st
 
 function RoleBadge({ role }: { role: string }) {
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", ROLE_COLORS[role] ?? "bg-stone-700 text-stone-300 border-stone-600")}>
+    <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider", ROLE_COLORS[role] ?? "bg-stone-700 text-stone-600 dark:text-stone-300 border-stone-600")}>
       {ROLE_LABELS[role] ?? role}
     </span>
   );
@@ -257,9 +257,9 @@ function IntegrationBadge({ status }: { status: string }) {
 
 function SectionCard({ title, children, action }: { title: string; children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-3 border-b border-stone-800">
-        <h3 className="text-sm font-semibold text-stone-300">{title}</h3>
+    <div className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 border-b border-stone-200 dark:border-stone-800">
+        <h3 className="text-sm font-semibold text-stone-600 dark:text-stone-300">{title}</h3>
         {action}
       </div>
       <div className="p-5">{children}</div>
@@ -271,7 +271,7 @@ function LoadingSkeleton() {
   return (
     <div className="space-y-3">
       {[1, 2, 3].map((i) => (
-        <div key={i} className="rounded-xl border border-stone-800 bg-stone-900/60 h-16 animate-pulse" />
+        <div key={i} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 h-16 animate-pulse" />
       ))}
     </div>
   );
@@ -313,7 +313,7 @@ function OverviewPanel({ data }: { data: OverviewData | null }) {
             {Object.entries(data.roleCounts).map(([role, count]) => (
               <div key={role} className="flex items-center gap-2">
                 <RoleBadge role={role} />
-                <span className="text-xs text-stone-400">×{count}</span>
+                <span className="text-xs text-stone-500 dark:text-stone-400">×{count}</span>
               </div>
             ))}
             {Object.keys(data.roleCounts).length === 0 && (
@@ -330,7 +330,7 @@ function OverviewPanel({ data }: { data: OverviewData | null }) {
             <div className="space-y-2">
               {Object.entries(data.orgBreakdown).map(([id, org]) => (
                 <div key={id} className="flex items-center justify-between rounded-lg bg-stone-800/40 px-3 py-2">
-                  <span className="text-sm font-medium text-stone-200">{org.name}</span>
+                  <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{org.name}</span>
                   <div className="flex items-center gap-3 text-[11px] text-stone-500">
                     <span>{org.stores} store{org.stores !== 1 ? "s" : ""}</span>
                     <span>{org.users} user{org.users !== 1 ? "s" : ""}</span>
@@ -360,13 +360,13 @@ function OrganisationsPanel({ data }: { data: OverviewData | null }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {orgs.map(([id, org]) => (
-            <div key={id} className="rounded-xl border border-stone-800 bg-stone-900/60 p-5 space-y-3">
+            <div key={id} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-5 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300 text-lg font-bold">
                   {org.name.charAt(0)}
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-stone-200">{org.name}</h4>
+                  <h4 className="text-sm font-semibold text-stone-700 dark:text-stone-200">{org.name}</h4>
                   <p className="text-[10px] font-mono text-stone-500">{id.slice(0, 8)}…</p>
                 </div>
               </div>
@@ -448,7 +448,7 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
 
       {showNew && (
         <div className="rounded-xl border border-emerald-800/50 bg-stone-900/80 p-4 space-y-3">
-          <h4 className="text-sm font-semibold text-stone-200">New Store</h4>
+          <h4 className="text-sm font-semibold text-stone-700 dark:text-stone-200">New Store</h4>
           <div className="grid grid-cols-2 gap-3">
             <input placeholder="Store Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-field" />
             <input placeholder="Store Code" value={form.store_code} onChange={(e) => setForm({ ...form, store_code: e.target.value })} className="input-field" />
@@ -461,21 +461,21 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
             <button onClick={handleCreate} disabled={saving || !form.name || !form.store_code} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors">
               {saving ? "Creating…" : "Create"}
             </button>
-            <button onClick={() => setShowNew(false)} className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-400 hover:bg-stone-700 transition-colors">
+            <button onClick={() => setShowNew(false)} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
         {stores.map((store) => (
           <div key={store.id} className="flex items-center justify-between px-4 py-3 hover:bg-stone-800/40 transition-colors">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <span className={cn("h-2 w-2 rounded-full", store.is_active ? "bg-emerald-400" : "bg-red-400")} />
-                <span className="text-sm font-medium text-stone-200">{store.name}</span>
-                <span className="rounded bg-stone-800 px-1.5 py-0.5 text-[10px] font-mono text-stone-400">{store.store_code}</span>
+                <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{store.name}</span>
+                <span className="rounded bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 text-[10px] font-mono text-stone-500 dark:text-stone-400">{store.store_code}</span>
               </div>
               <div className="flex items-center gap-3 text-[11px] text-stone-500">
                 {store.city && <span>{store.city}</span>}
@@ -644,7 +644,7 @@ function TeamPanel({
 
       {showInvite && (
         <div className="rounded-xl border border-blue-800/50 bg-stone-900/80 p-4 space-y-3">
-          <h4 className="text-sm font-semibold text-stone-200">Invite Team Member</h4>
+          <h4 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Invite Team Member</h4>
           <div className="grid grid-cols-2 gap-3">
             <input placeholder="Email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="input-field" />
             <input placeholder="Full Name" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} className="input-field" />
@@ -660,14 +660,14 @@ function TeamPanel({
             <button onClick={handleInvite} disabled={saving || !form.email || !form.full_name} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors">
               {saving ? "Inviting…" : "Send Invite"}
             </button>
-            <button onClick={() => setShowInvite(false)} className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-400 hover:bg-stone-700 transition-colors">
+            <button onClick={() => setShowInvite(false)} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">
               Cancel
             </button>
           </div>
         </div>
       )}
 
-      <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
         {users.map((u) => {
           const primaryRole = u.roles.find((r) => r.is_active);
           const isEditing = editingUser === u.id;
@@ -677,7 +677,7 @@ function TeamPanel({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className={cn("h-2 w-2 rounded-full", u.status === "active" ? "bg-emerald-400" : u.status === "invited" ? "bg-amber-400" : "bg-red-400")} />
-                    <span className="text-sm font-medium text-stone-200">{u.full_name ?? u.email}</span>
+                    <span className="text-sm font-medium text-stone-700 dark:text-stone-200">{u.full_name ?? u.email}</span>
                     {u.full_name && <span className="text-[11px] text-stone-500">{u.email}</span>}
                   </div>
                   <div className="flex items-center gap-2">
@@ -742,17 +742,17 @@ function TeamPanel({
               {isEditing && (
                 <div className="mt-3 pt-3 border-t border-stone-700/50 space-y-3">
                   <div className="flex items-center gap-3">
-                    <label className="text-[10px] font-semibold text-stone-400 uppercase tracking-wide">Role:</label>
+                    <label className="text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide">Role:</label>
                     <select
                       value={editForm.role}
                       onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-                      className="rounded-md border border-stone-700 bg-stone-800 px-2 py-1 text-xs text-stone-200 focus:border-blue-500 focus:outline-none"
+                      className="rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-2 py-1 text-xs text-stone-700 dark:text-stone-200 focus:border-blue-500 focus:outline-none"
                     >
                       {Object.entries(ROLE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-[10px] font-semibold text-stone-400 uppercase tracking-wide mb-2">Assigned Stores:</label>
+                    <label className="block text-[10px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">Assigned Stores:</label>
                     <div className="flex flex-wrap gap-2">
                       {(stores ?? []).map((store) => (
                         <button
@@ -762,7 +762,7 @@ function TeamPanel({
                             "rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
                             editForm.site_ids.includes(store.id)
                               ? "bg-blue-600/30 border-blue-500/50 text-blue-300"
-                              : "bg-stone-800 border-stone-700 text-stone-400 hover:border-stone-600"
+                              : "bg-stone-100 dark:bg-stone-800 border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400 hover:border-stone-600"
                           )}
                         >
                           {store.name}
@@ -785,7 +785,7 @@ function TeamPanel({
                     </button>
                     <button
                       onClick={() => setEditingUser(null)}
-                      className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-400 hover:bg-stone-700 transition-colors"
+                      className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors"
                     >
                       Cancel
                     </button>
@@ -814,7 +814,7 @@ function RolesPanel({ users }: { users: UserEntry[] | null }) {
   return (
     <div className="space-y-3">
       {allRoles.map((role) => (
-        <div key={role} className="rounded-xl border border-stone-800 bg-stone-900/60 p-4 flex items-center justify-between">
+        <div key={role} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-4 flex items-center justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <RoleBadge role={role} />
@@ -850,7 +850,7 @@ function IntegrationsPanel({ data, onRefresh }: { data: IntegrationsData | null;
       </div>
 
       {/* Per-store list */}
-      <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
         {/* Header */}
         <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider bg-stone-800/40">
           <div className="col-span-3">Store</div>
@@ -866,7 +866,7 @@ function IntegrationsPanel({ data, onRefresh }: { data: IntegrationsData | null;
             className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-stone-800/40 transition-colors cursor-pointer"
           >
             <div className="col-span-3">
-              <div className="text-sm font-medium text-stone-200">{i.store_name}</div>
+              <div className="text-sm font-medium text-stone-700 dark:text-stone-200">{i.store_name}</div>
               <div className="text-[10px] font-mono text-stone-500">{i.store_code}</div>
             </div>
             <div className="col-span-2"><IntegrationBadge status={i.micros.status} /></div>
@@ -929,12 +929,12 @@ function DataHealthPanel({ data, onRefresh }: { data: DataHealthData | null; onR
       <SectionCard
         title="Store Health Matrix"
         action={
-          <button onClick={onRefresh} className="text-[10px] font-medium text-stone-400 hover:text-stone-200 transition-colors">
+          <button onClick={onRefresh} className="text-[10px] font-medium text-stone-500 dark:text-stone-400 hover:text-stone-200 transition-colors">
             ↻ Refresh
           </button>
         }
       >
-        <div className="divide-y divide-stone-800">
+        <div className="divide-y divide-stone-200 dark:divide-stone-800">
           {/* Header */}
           <div className="grid grid-cols-12 gap-2 pb-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider">
             <div className="col-span-3">Store</div>
@@ -947,7 +947,7 @@ function DataHealthPanel({ data, onRefresh }: { data: DataHealthData | null; onR
           {sorted.map((store) => (
             <div key={store.id} className="grid grid-cols-12 gap-2 py-3 items-center">
               <div className="col-span-3">
-                <div className="text-sm font-medium text-stone-200">{store.name}</div>
+                <div className="text-sm font-medium text-stone-700 dark:text-stone-200">{store.name}</div>
                 <div className="text-[10px] font-mono text-stone-500">{store.store_code}</div>
               </div>
               <div className="col-span-2"><HealthBadge health={store.health} /></div>
@@ -996,14 +996,14 @@ function SyncLogsPanel({ data, page, setPage }: { data: SyncLogsData | null; pag
       <div className="flex items-center justify-between">
         <p className="text-xs text-stone-500">{data.total} sync run{data.total !== 1 ? "s" : ""} total</p>
         <div className="flex items-center gap-2 text-xs text-stone-500">
-          <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded px-2 py-1 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 transition-colors">←</button>
+          <button disabled={page <= 1} onClick={() => setPage(page - 1)} className="rounded px-2 py-1 bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 disabled:opacity-30 transition-colors">←</button>
           <span>{page} / {totalPages || 1}</span>
-          <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="rounded px-2 py-1 bg-stone-800 hover:bg-stone-700 disabled:opacity-30 transition-colors">→</button>
+          <button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="rounded px-2 py-1 bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 disabled:opacity-30 transition-colors">→</button>
         </div>
       </div>
 
       {/* Runs table */}
-      <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+      <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
         <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-semibold text-stone-500 uppercase tracking-wider bg-stone-800/40">
           <div className="col-span-3">Store</div>
           <div className="col-span-2">Type</div>
@@ -1013,16 +1013,16 @@ function SyncLogsPanel({ data, page, setPage }: { data: SyncLogsData | null; pag
         </div>
         {data.runs.map((run) => (
           <div key={run.run_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-stone-800/40 transition-colors">
-            <div className="col-span-3 text-sm text-stone-200 truncate">{run.store_name}</div>
+            <div className="col-span-3 text-sm text-stone-700 dark:text-stone-200 truncate">{run.store_name}</div>
             <div className="col-span-2">
-              <span className="rounded bg-stone-800 px-1.5 py-0.5 text-[10px] font-mono text-stone-400">{run.sync_type}</span>
+              <span className="rounded bg-stone-100 dark:bg-stone-800 px-1.5 py-0.5 text-[10px] font-mono text-stone-500 dark:text-stone-400">{run.sync_type}</span>
             </div>
             <div className="col-span-2">
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", statusColors[run.status] ?? "bg-stone-700 text-stone-400")}>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", statusColors[run.status] ?? "bg-stone-700 text-stone-500 dark:text-stone-400")}>
                 {run.status}
               </span>
             </div>
-            <div className="col-span-2 text-[11px] text-stone-400">{run.records_fetched}</div>
+            <div className="col-span-2 text-[11px] text-stone-500 dark:text-stone-400">{run.records_fetched}</div>
             <div className="col-span-3 text-[11px] text-stone-500">{timeAgo(run.started_at)}</div>
           </div>
         ))}
@@ -1082,16 +1082,16 @@ function AuditPanel({ entries, users }: { entries: AuditEntry[] | null; users: U
       {entries.length === 0 ? (
         <EmptyState message="No audit events recorded yet" />
       ) : (
-        <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+        <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
           {entries.map((e) => (
             <div key={e.id} className="px-4 py-3 hover:bg-stone-800/40 transition-colors">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-mono", actionColors[e.action] ?? "bg-stone-800 text-stone-400")}>
+                  <span className={cn("rounded px-1.5 py-0.5 text-[10px] font-mono", actionColors[e.action] ?? "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400")}>
                     {formatAction(e.action)}
                   </span>
                   {e.actor_user_id && (
-                    <span className="text-[11px] text-stone-400">by {nameMap.get(e.actor_user_id) ?? e.actor_user_id.slice(0, 8)}</span>
+                    <span className="text-[11px] text-stone-500 dark:text-stone-400">by {nameMap.get(e.actor_user_id) ?? e.actor_user_id.slice(0, 8)}</span>
                   )}
                   {e.target_user_id && (
                     <span className="text-[11px] text-stone-500">→ {nameMap.get(e.target_user_id) ?? e.target_user_id.slice(0, 8)}</span>
@@ -1133,7 +1133,7 @@ function SettingsPanel() {
           {Object.entries(env).map(([k, v]) => (
             <div key={k} className="flex items-center justify-between py-1">
               <span className="text-[11px] text-stone-500">{k}</span>
-              <span className="text-[11px] font-mono text-stone-300">{v}</span>
+              <span className="text-[11px] font-mono text-stone-600 dark:text-stone-300">{v}</span>
             </div>
           ))}
         </div>
@@ -1144,10 +1144,10 @@ function SettingsPanel() {
           {flags.map((f) => (
             <div key={f.key} className="flex items-center justify-between py-1">
               <div>
-                <span className="text-[11px] font-mono text-stone-300">{f.key}</span>
+                <span className="text-[11px] font-mono text-stone-600 dark:text-stone-300">{f.key}</span>
                 <p className="text-[10px] text-stone-500">{f.label}</p>
               </div>
-              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", f.status ? "bg-emerald-500/20 text-emerald-300" : "bg-stone-700 text-stone-400")}>
+              <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-semibold", f.status ? "bg-emerald-500/20 text-emerald-300" : "bg-stone-700 text-stone-500 dark:text-stone-400")}>
                 {f.status ? "ON" : "OFF"}
               </span>
             </div>
@@ -1156,8 +1156,8 @@ function SettingsPanel() {
       </SectionCard>
 
       <SectionCard title="Super Admin">
-        <div className="space-y-2 text-[11px] text-stone-400">
-          <p>Primary admin: <span className="text-stone-200 font-medium">Thami Gumpo</span> (newburf@gmail.com)</p>
+        <div className="space-y-2 text-[11px] text-stone-500 dark:text-stone-400">
+          <p>Primary admin: <span className="text-stone-700 dark:text-stone-200 font-medium">Thami Gumpo</span> (newburf@gmail.com)</p>
           <p>Super admin bypasses all RBAC restrictions and can impersonate any user.</p>
           <p>All impersonation events are logged in the Audit Log.</p>
         </div>
@@ -1265,7 +1265,7 @@ export default function AdminDashboard() {
         </div>
         <button
           onClick={handleRefresh}
-          className="rounded-lg border border-stone-700 bg-stone-800/60 px-3 py-1.5 text-xs font-medium text-stone-400 hover:bg-stone-700 hover:text-stone-200 transition-colors"
+          className="rounded-lg border border-stone-300 dark:border-stone-700 bg-stone-800/60 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 hover:text-stone-200 transition-colors"
         >
           ↻ Refresh
         </button>
@@ -1280,7 +1280,7 @@ export default function AdminDashboard() {
       )}
 
       {/* Tab bar – scrollable, professional */}
-      <div className="flex gap-1 overflow-x-auto rounded-xl border border-stone-800 bg-stone-900/60 p-1 scrollbar-none">
+      <div className="flex gap-1 overflow-x-auto rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 p-1 scrollbar-none">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -1288,7 +1288,7 @@ export default function AdminDashboard() {
             className={cn(
               "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap",
               tab === t.id
-                ? "bg-stone-800 text-stone-100 shadow-sm"
+                ? "bg-stone-100 dark:bg-stone-800 text-stone-100 shadow-sm"
                 : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/40",
             )}
           >

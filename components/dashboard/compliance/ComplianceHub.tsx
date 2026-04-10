@@ -143,7 +143,7 @@ function SummaryHeader({ summary }: { summary: ComplianceSummary }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         {/* Score */}
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+          <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
             Overall Compliance
           </p>
           <div className="mt-1 flex items-baseline gap-2">
@@ -153,7 +153,7 @@ function SummaryHeader({ summary }: { summary: ComplianceSummary }) {
             )}>
               {pct}%
             </span>
-            <span className="text-sm text-stone-400">
+            <span className="text-sm text-stone-500 dark:text-stone-400">
               {summary.compliant + (summary.scheduled ?? 0)}/{summary.total - summary.unknown} managed
             </span>
           </div>
@@ -509,7 +509,7 @@ function UploadPanel({
           <p className="text-sm font-medium text-stone-700">
             {fileName ?? "Click to choose a file"}
           </p>
-          <p className="text-xs text-stone-400">PDF, images, Word — max 10 MB</p>
+          <p className="text-xs text-stone-500 dark:text-stone-400">PDF, images, Word — max 10 MB</p>
         </div>
         <input
           ref={fileRef}
@@ -586,7 +586,7 @@ function ComplianceCard({
             <div className="min-w-0">
               <p className="font-semibold text-stone-900 text-sm leading-snug">{item.display_name}</p>
               {item.description && (
-                <p className="mt-0.5 text-xs text-stone-400 line-clamp-2">{item.description}</p>
+                <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400 line-clamp-2">{item.description}</p>
               )}
             </div>
           </div>
@@ -603,13 +603,13 @@ function ComplianceCard({
         {/* Date fields */}
         <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
           <div>
-            <p className="text-stone-400">Last Inspection</p>
+            <p className="text-stone-500 dark:text-stone-400">Last Inspection</p>
             <p className="font-medium text-stone-700">
               {item.last_inspection_date ? formatShortDate(item.last_inspection_date) : "—"}
             </p>
           </div>
           <div>
-            <p className="text-stone-400">Next Due</p>
+            <p className="text-stone-500 dark:text-stone-400">Next Due</p>
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="font-medium text-stone-700">
                 {item.next_due_date ? formatShortDate(item.next_due_date) : "—"}
@@ -622,7 +622,7 @@ function ComplianceCard({
         {/* Responsible party */}
         {item.responsible_party && (
           <p className="mt-2 text-xs text-stone-500">
-            <span className="text-stone-400">Responsible: </span>{item.responsible_party}
+            <span className="text-stone-500 dark:text-stone-400">Responsible: </span>{item.responsible_party}
           </p>
         )}
 
@@ -661,7 +661,7 @@ function ComplianceCard({
                 <button
                   onClick={() => handleDeleteDoc(doc.id)}
                   disabled={deletingDoc === doc.id}
-                  className="shrink-0 text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                  className="shrink-0 text-stone-500 dark:text-stone-400 hover:text-red-500 transition-colors disabled:opacity-50"
                   title="Remove document"
                 >
                   {deletingDoc === doc.id ? "…" : "✕"}
@@ -713,7 +713,7 @@ function ComplianceCard({
           {!item.is_default && (
             <button
               onClick={() => onDelete(item.id)}
-              className="ml-auto text-xs text-stone-400 hover:text-red-500 transition-colors"
+              className="ml-auto text-xs text-stone-500 dark:text-stone-400 hover:text-red-500 transition-colors"
               title="Remove this compliance item"
             >
               Remove

@@ -185,7 +185,7 @@ export default function TargetsClient({ targets: initialTargets }: Props) {
         {targets.length === 0 ? (
           <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center">
             <p className="text-sm text-stone-500">No targets set yet.</p>
-            <p className="mt-1 text-xs text-stone-400">
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
               Set a target above to enable gap analysis on the dashboard.
             </p>
           </div>
@@ -193,7 +193,7 @@ export default function TargetsClient({ targets: initialTargets }: Props) {
           <div className="overflow-x-auto rounded-lg border border-stone-200">
             <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3 text-right">Target Sales</th>
                   <th className="px-4 py-3 text-right">Target Covers</th>
@@ -213,7 +213,7 @@ export default function TargetsClient({ targets: initialTargets }: Props) {
                     <td className="whitespace-nowrap px-4 py-3 text-right text-stone-700">
                       {t.target_covers != null ? Math.round(t.target_covers) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-xs text-stone-400">{t.notes ?? "—"}</td>
+                    <td className="px-4 py-3 text-xs text-stone-500 dark:text-stone-400">{t.notes ?? "—"}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => handleDelete(t.id, t.target_date)}

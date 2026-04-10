@@ -58,7 +58,7 @@ function KpiTile({
         ? "border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-950/20"
         : "border-stone-200 dark:border-stone-700 bg-white dark:bg-stone-900"
     )}>
-      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500 flex items-center gap-1">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-500 flex items-center gap-1">
         <span>{icon}</span> {label}
       </p>
       <p className={cn(
@@ -68,7 +68,7 @@ function KpiTile({
         {value}
       </p>
       {sub && (
-        <p className="text-[11px] text-stone-400 dark:text-stone-500 leading-none">{sub}</p>
+        <p className="text-[11px] text-stone-500 dark:text-stone-500 leading-none">{sub}</p>
       )}
     </div>
   );
@@ -151,7 +151,7 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
 
           {/* Label + store count */}
           <div className="flex flex-col gap-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-500">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-500">
               Group Score
             </p>
             <p className={cn("text-base font-bold leading-tight", palette.number)}>
@@ -165,19 +165,19 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
             <div className="flex items-center gap-2 mt-1">
               <span className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
-                metrics.red_stores > 0 ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" : "bg-stone-100 dark:bg-stone-800 text-stone-400"
+                metrics.red_stores > 0 ? "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300" : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400"
               )}>
                 🔴 {metrics.red_stores}
               </span>
               <span className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
-                metrics.yellow_stores > 0 ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300" : "bg-stone-100 dark:bg-stone-800 text-stone-400"
+                metrics.yellow_stores > 0 ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300" : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400"
               )}>
                 🟡 {metrics.yellow_stores}
               </span>
               <span className={cn(
                 "flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
-                metrics.green_stores > 0 ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-stone-100 dark:bg-stone-800 text-stone-400"
+                metrics.green_stores > 0 ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300" : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400"
               )}>
                 🟢 {metrics.green_stores}
               </span>

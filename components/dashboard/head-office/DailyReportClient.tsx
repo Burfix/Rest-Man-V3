@@ -201,7 +201,7 @@ function statusBadgeClass(status: string): string {
     case "blocked": case "delayed": return "bg-red-950/60 text-red-300 border-red-800/40";
     case "escalated": return "bg-amber-950/60 text-amber-300 border-amber-800/40";
     case "missed": return "bg-red-950/80 text-red-200 border-red-800/50";
-    default: return "bg-stone-800 text-stone-400 border-stone-700";
+    default: return "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400 border-stone-300 dark:border-stone-700";
   }
 }
 
@@ -256,7 +256,7 @@ export default function DailyReportClient() {
     return (
       <div className="flex items-center justify-center py-32">
         <div className="animate-spin h-8 w-8 border-2 border-stone-400 border-t-transparent rounded-full" />
-        <p className="ml-3 text-sm text-stone-400">Generating daily accountability report…</p>
+        <p className="ml-3 text-sm text-stone-500 dark:text-stone-400">Generating daily accountability report…</p>
       </div>
     );
   }
@@ -280,16 +280,16 @@ export default function DailyReportClient() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-bold text-stone-100">Head Office Daily Report — {report.date}</h1>
-          <p className="text-xs text-stone-400 mt-0.5">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
             {g.stores_reporting} store{g.stores_reporting !== 1 ? "s" : ""} ·
             Generated {new Date(report.generatedAt).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={fetchReport} className="text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
+          <button onClick={fetchReport} className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
             Refresh
           </button>
-          <button onClick={handleExportJSON} className="text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
+          <button onClick={handleExportJSON} className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
             Export
           </button>
         </div>
@@ -299,7 +299,7 @@ export default function DailyReportClient() {
       <ExecutiveCards g={g} />
 
       {/* Tab Navigation */}
-      <div className="flex items-center gap-1 overflow-x-auto border-b border-stone-800 pb-px">
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-stone-200 dark:border-stone-800 pb-px">
         {TABS.map((tab) => (
           <button
             key={tab.id}
@@ -307,7 +307,7 @@ export default function DailyReportClient() {
             className={cn(
               "whitespace-nowrap px-3 py-2 text-xs font-semibold transition-colors rounded-t-lg",
               activeTab === tab.id
-                ? "bg-stone-800 text-stone-100 border-b-2 border-stone-100"
+                ? "bg-stone-100 dark:bg-stone-800 text-stone-100 border-b-2 border-stone-100"
                 : "text-stone-500 hover:text-stone-300 hover:bg-stone-800/40"
             )}
           >
@@ -386,7 +386,7 @@ function ExecutiveTab({ report, onSelectStore }: { report: DailyReport; onSelect
       {/* AI Narrative */}
       {report.narrative && (
         <Section title="Operations Director Summary">
-          <div className="prose prose-invert prose-sm max-w-none text-stone-300 leading-relaxed whitespace-pre-wrap">
+          <div className="prose prose-invert prose-sm max-w-none text-stone-600 dark:text-stone-300 leading-relaxed whitespace-pre-wrap">
             {report.narrative}
           </div>
         </Section>
@@ -402,7 +402,7 @@ function StoreStatusCard({ store, onClick }: { store: StoreData; onClick?: () =>
 
   return (
     <div
-      className={cn("rounded-lg border overflow-hidden cursor-pointer hover:ring-1 hover:ring-stone-600 transition-shadow", store.riskLevel === "red" ? "border-red-700" : store.riskLevel === "yellow" ? "border-amber-800" : "border-stone-800")}
+      className={cn("rounded-lg border overflow-hidden cursor-pointer hover:ring-1 hover:ring-stone-600 transition-shadow", store.riskLevel === "red" ? "border-red-700" : store.riskLevel === "yellow" ? "border-amber-800" : "border-stone-200 dark:border-stone-800")}
       onClick={onClick}
       role="button"
       tabIndex={0}
@@ -420,10 +420,10 @@ function StoreStatusCard({ store, onClick }: { store: StoreData; onClick?: () =>
       <div className="p-3 space-y-2 bg-stone-900/50">
         {/* Completion bar */}
         <div className="flex items-center justify-between text-[11px]">
-          <span className="text-stone-400">Duties</span>
+          <span className="text-stone-500 dark:text-stone-400">Duties</span>
           <span className={cn("font-bold", pctColor(s.completion_pct))}>{s.completion_pct}% ({s.completed}/{s.total})</span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-stone-800 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
           <div className={cn("h-1.5 rounded-full transition-all", s.completion_pct >= 90 ? "bg-emerald-500" : s.completion_pct >= 70 ? "bg-amber-400" : "bg-red-500")} style={{ width: `${s.completion_pct}%` }} />
         </div>
         {/* Quick metrics */}
@@ -442,10 +442,10 @@ function StoreStatusCard({ store, onClick }: { store: StoreData; onClick?: () =>
           </div>
         </div>
         {/* Financial row */}
-        <div className="flex items-center justify-between text-[10px] border-t border-stone-800 pt-2">
+        <div className="flex items-center justify-between text-[10px] border-t border-stone-200 dark:border-stone-800 pt-2">
           <div>
             <span className="text-stone-500">Revenue</span>
-            <div className="text-stone-300 font-medium">{fmtZAR(f.sales_net_vat)}</div>
+            <div className="text-stone-600 dark:text-stone-300 font-medium">{fmtZAR(f.sales_net_vat)}</div>
           </div>
           <div className="text-right">
             <span className="text-stone-500">Labour</span>
@@ -455,7 +455,7 @@ function StoreStatusCard({ store, onClick }: { store: StoreData; onClick?: () =>
           </div>
           <div className="text-right">
             <span className="text-stone-500">Score</span>
-            <div className="text-stone-200 font-bold">{f.operating_score ?? "—"}{f.score_grade ? ` ${f.score_grade}` : ""}</div>
+            <div className="text-stone-700 dark:text-stone-200 font-bold">{f.operating_score ?? "—"}{f.score_grade ? ` ${f.score_grade}` : ""}</div>
           </div>
         </div>
         {/* Issue flags */}
@@ -527,22 +527,22 @@ function StoreComparisonTab({ stores, onSelectStore }: { stores: StoreData[]; on
               const f = store.financials;
               return (
                 <tr key={store.siteId} className={cn("border-b border-stone-800/30", store.riskLevel === "red" ? "bg-red-950/10" : "")}>
-                  <td className="px-3 py-2.5 font-medium text-stone-200">
+                  <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">
                     <button onClick={() => onSelectStore(store)} className="hover:text-amber-400 hover:underline transition-colors text-left">{store.store}</button>
                   </td>
                   <td className="px-3 py-2.5 text-center"><span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", risk.bg)}>{risk.label}</span></td>
                   <td className={cn("px-3 py-2.5 text-right font-bold", pctColor(store.summary.completion_pct))}>{store.summary.completion_pct}%</td>
-                  <td className="px-3 py-2.5 text-right text-stone-400">{store.summary.completed}/{store.summary.total}</td>
+                  <td className="px-3 py-2.5 text-right text-stone-500 dark:text-stone-400">{store.summary.completed}/{store.summary.total}</td>
                   <td className={cn("px-3 py-2.5 text-right font-medium", store.summary.blocked > 0 ? "text-red-400" : "text-stone-600")}>{store.summary.blocked}</td>
                   <td className={cn("px-3 py-2.5 text-right font-medium", store.summary.overdue > 0 ? "text-red-400" : "text-stone-600")}>{store.summary.overdue}</td>
-                  <td className="px-3 py-2.5 text-right text-stone-300">{fmtZAR(f.sales_net_vat)}</td>
+                  <td className="px-3 py-2.5 text-right text-stone-600 dark:text-stone-300">{fmtZAR(f.sales_net_vat)}</td>
                   <td className={cn("px-3 py-2.5 text-right font-medium", f.revenue_gap_pct != null ? (f.revenue_gap_pct <= 0 ? "text-emerald-400" : f.revenue_gap_pct <= 10 ? "text-amber-400" : "text-red-400") : "text-stone-600")}>
                     {f.revenue_gap_pct != null ? (f.revenue_gap_pct <= 0 ? `+${Math.abs(f.revenue_gap_pct).toFixed(1)}%` : `-${f.revenue_gap_pct.toFixed(1)}%`) : "—"}
                   </td>
                   <td className={cn("px-3 py-2.5 text-right font-medium", f.labour_pct != null ? (f.labour_pct <= f.target_labour_pct ? "text-emerald-400" : f.labour_pct <= f.target_labour_pct + 5 ? "text-amber-400" : "text-red-400") : "text-stone-600")}>
                     {f.labour_pct != null ? `${f.labour_pct}%` : "—"}
                   </td>
-                  <td className="px-3 py-2.5 text-right text-stone-300 font-bold">{f.operating_score ?? "—"}</td>
+                  <td className="px-3 py-2.5 text-right text-stone-600 dark:text-stone-300 font-bold">{f.operating_score ?? "—"}</td>
                   <td className={cn("px-3 py-2.5 text-right font-medium", store.maintenance.open_count > 0 ? "text-amber-400" : "text-stone-600")}>{store.maintenance.open_count}</td>
                   <td className={cn("px-3 py-2.5 text-right font-medium", store.compliance.expired > 0 ? "text-red-400" : "text-stone-600")}>{store.compliance.expired}</td>
                 </tr>
@@ -640,17 +640,17 @@ function DailyDutiesTab({ stores }: { stores: StoreData[] }) {
           <tbody>
             {filtered.map((row, i) => (
               <tr key={`${row.siteId}-${row.action}-${i}`} className={cn("border-b border-stone-800/30", row.status === "blocked" || row.status === "missed" ? "bg-red-950/10" : "")}>
-                <td className="px-3 py-2 text-stone-300 font-medium">{row.storeName}</td>
-                <td className="px-3 py-2 text-stone-200">{row.action}</td>
-                <td className="px-3 py-2 text-stone-400">{row.started_by ?? "—"}</td>
+                <td className="px-3 py-2 text-stone-600 dark:text-stone-300 font-medium">{row.storeName}</td>
+                <td className="px-3 py-2 text-stone-700 dark:text-stone-200">{row.action}</td>
+                <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{row.started_by ?? "—"}</td>
                 <td className="px-3 py-2 text-center">
                   <span className={cn("text-[9px] font-bold uppercase px-1.5 py-0.5 rounded border", statusBadgeClass(row.status))}>
                     {row.status.replace(/_/g, " ")}
                   </span>
                 </td>
-                <td className="px-3 py-2 text-stone-400">{fmtTime(row.started_at)}</td>
-                <td className="px-3 py-2 text-stone-400">{fmtTime(row.completed_at)}</td>
-                <td className="px-3 py-2 text-right text-stone-400">{row.duration_minutes != null ? `${row.duration_minutes}m` : "—"}</td>
+                <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{fmtTime(row.started_at)}</td>
+                <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{fmtTime(row.completed_at)}</td>
+                <td className="px-3 py-2 text-right text-stone-500 dark:text-stone-400">{row.duration_minutes != null ? `${row.duration_minutes}m` : "—"}</td>
                 <td className="px-3 py-2 text-stone-500 max-w-[160px] truncate">{row.start_comment || row.completion_comment || "—"}</td>
                 <td className="px-3 py-2 text-red-400 max-w-[140px] truncate">{row.blocker_reason || "—"}</td>
                 <td className="px-3 py-2 text-amber-400">{row.escalated_to || "—"}</td>
@@ -713,8 +713,8 @@ function LabourTurnoverTab({ stores, g }: { stores: StoreData[]; g: GroupSummary
                 const f = store.financials;
                 return (
                   <tr key={store.siteId} className="border-b border-stone-800/30">
-                    <td className="px-3 py-2.5 font-medium text-stone-200">{store.store}</td>
-                    <td className="px-3 py-2.5 text-right text-stone-300">{fmtZAR(f.sales_net_vat)}</td>
+                    <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">{store.store}</td>
+                    <td className="px-3 py-2.5 text-right text-stone-600 dark:text-stone-300">{fmtZAR(f.sales_net_vat)}</td>
                     <td className="px-3 py-2.5 text-right text-stone-500">{fmtZAR(f.revenue_target)}</td>
                     <td className={cn("px-3 py-2.5 text-right font-medium", f.revenue_gap_pct != null ? (f.revenue_gap_pct <= 0 ? "text-emerald-400" : "text-red-400") : "text-stone-600")}>
                       {f.revenue_gap_pct != null ? (f.revenue_gap_pct <= 0 ? `+${Math.abs(f.revenue_gap_pct).toFixed(1)}%` : `-${f.revenue_gap_pct.toFixed(1)}%`) : "—"}
@@ -723,7 +723,7 @@ function LabourTurnoverTab({ stores, g }: { stores: StoreData[]; g: GroupSummary
                       {f.labour_pct != null ? `${f.labour_pct}%` : "—"}
                     </td>
                     <td className="px-3 py-2.5 text-right text-stone-500">{f.target_labour_pct}%</td>
-                    <td className="px-3 py-2.5 text-right text-stone-200 font-bold">{f.operating_score ?? "—"}</td>
+                    <td className="px-3 py-2.5 text-right text-stone-700 dark:text-stone-200 font-bold">{f.operating_score ?? "—"}</td>
                     <td className={cn("px-3 py-2.5 text-center font-black", f.score_grade ? {
                       "text-emerald-400": f.score_grade === "A",
                       "text-lime-400": f.score_grade === "B",
@@ -768,17 +768,17 @@ function MaintenanceComplianceTab({ stores }: { stores: StoreData[] }) {
         ) : (
           <div className="space-y-3">
             {stores.filter((s) => s.maintenance.open_count > 0).map((store) => (
-              <div key={store.siteId} className="rounded-lg border border-stone-800 overflow-hidden">
+              <div key={store.siteId} className="rounded-lg border border-stone-200 dark:border-stone-800 overflow-hidden">
                 <div className="px-3 py-2 bg-stone-800/40 flex items-center justify-between">
-                  <span className="text-xs font-bold text-stone-200">{store.store}</span>
-                  <span className="text-[10px] text-stone-400">{store.maintenance.open_count} issue{store.maintenance.open_count !== 1 ? "s" : ""}</span>
+                  <span className="text-xs font-bold text-stone-700 dark:text-stone-200">{store.store}</span>
+                  <span className="text-[10px] text-stone-500 dark:text-stone-400">{store.maintenance.open_count} issue{store.maintenance.open_count !== 1 ? "s" : ""}</span>
                 </div>
                 <div className="divide-y divide-stone-800/30">
                   {store.maintenance.issues.map((issue, i) => (
                     <div key={i} className="px-3 py-2 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
                         <span className={cn("h-2 w-2 rounded-full", issue.priority === "urgent" ? "bg-red-500" : issue.priority === "high" ? "bg-amber-400" : "bg-stone-500")} />
-                        <span className="text-stone-300">{issue.title}</span>
+                        <span className="text-stone-600 dark:text-stone-300">{issue.title}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[10px]">
                         <span className={cn("uppercase font-bold", issue.priority === "urgent" ? "text-red-400" : issue.priority === "high" ? "text-amber-400" : "text-stone-500")}>{issue.priority}</span>
@@ -814,9 +814,9 @@ function MaintenanceComplianceTab({ stores }: { stores: StoreData[] }) {
                 {stores.flatMap((store) =>
                   store.compliance.overdue_items.map((item, i) => (
                     <tr key={`${store.siteId}-${i}`} className={cn("border-b border-stone-800/30", item.critical ? "bg-red-950/10" : "")}>
-                      <td className="px-3 py-2 text-stone-300 font-medium">{store.store}</td>
-                      <td className="px-3 py-2 text-stone-200">{item.name}</td>
-                      <td className="px-3 py-2 text-stone-400">{item.category}</td>
+                      <td className="px-3 py-2 text-stone-600 dark:text-stone-300 font-medium">{store.store}</td>
+                      <td className="px-3 py-2 text-stone-700 dark:text-stone-200">{item.name}</td>
+                      <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{item.category}</td>
                       <td className="px-3 py-2 text-red-400">{item.due}</td>
                       <td className="px-3 py-2 text-center">{item.critical ? <span className="text-red-400 font-bold">Yes</span> : <span className="text-stone-600">No</span>}</td>
                     </tr>
@@ -866,8 +866,8 @@ function GuestExperienceTab({ stores }: { stores: StoreData[] }) {
             <tbody>
               {stores.map((store) => (
                 <tr key={store.siteId} className="border-b border-stone-800/30">
-                  <td className="px-3 py-2.5 font-medium text-stone-200">{store.store}</td>
-                  <td className="px-3 py-2.5 text-right text-stone-400">{store.reviews.total_7d}</td>
+                  <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">{store.store}</td>
+                  <td className="px-3 py-2.5 text-right text-stone-500 dark:text-stone-400">{store.reviews.total_7d}</td>
                   <td className={cn("px-3 py-2.5 text-right font-bold", store.reviews.avg_rating != null ? (store.reviews.avg_rating >= 4 ? "text-emerald-400" : store.reviews.avg_rating >= 3 ? "text-amber-400" : "text-red-400") : "text-stone-600")}>
                     {store.reviews.avg_rating ?? "—"}
                   </td>
@@ -888,19 +888,19 @@ function GuestExperienceTab({ stores }: { stores: StoreData[] }) {
           <div className="space-y-3">
             {stores.filter((s) => s.reviews.negative_unanswered.length > 0).map((store) => (
               <div key={store.siteId}>
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-2">{store.store}</h3>
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-400 mb-2">{store.store}</h3>
                 <div className="space-y-2">
                   {store.reviews.negative_unanswered.map((rev, i) => (
-                    <div key={i} className="rounded-lg border border-stone-800 p-3 bg-red-950/10">
+                    <div key={i} className="rounded-lg border border-stone-200 dark:border-stone-800 p-3 bg-red-950/10">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-stone-300 font-medium">{rev.reviewer}</span>
+                        <span className="text-xs text-stone-600 dark:text-stone-300 font-medium">{rev.reviewer}</span>
                         <div className="flex items-center gap-2 text-[10px]">
                           <span className="text-stone-500">{rev.platform}</span>
                           <span className="text-red-400 font-bold">{rev.rating}/5</span>
                           <span className="text-stone-600">{rev.date}</span>
                         </div>
                       </div>
-                      <p className="text-xs text-stone-400 line-clamp-2">{rev.text}</p>
+                      <p className="text-xs text-stone-500 dark:text-stone-400 line-clamp-2">{rev.text}</p>
                     </div>
                   ))}
                 </div>
@@ -940,7 +940,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <h3 className="text-sm font-bold text-red-300">{store.store}</h3>
-                    <p className="text-[10px] text-stone-400">{store.city}</p>
+                    <p className="text-[10px] text-stone-500 dark:text-stone-400">{store.city}</p>
                   </div>
                   <span className="text-[9px] font-bold uppercase px-2 py-0.5 rounded border bg-red-950/60 text-red-300 border-red-800/40">At Risk</span>
                 </div>
@@ -964,12 +964,12 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
                 </div>
                 {/* Incomplete tasks */}
                 <div className="space-y-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Incomplete Duties:</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Incomplete Duties:</span>
                   {store.tasks.filter((t) => t.status !== "completed").map((t, i) => (
                     <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-stone-800/20">
                       <div className="flex items-center gap-2">
                         <span className={cn("text-[9px] font-bold uppercase px-1 py-0.5 rounded border", statusBadgeClass(t.status))}>{t.status.replace(/_/g, " ")}</span>
-                        <span className="text-stone-300">{t.action}</span>
+                        <span className="text-stone-600 dark:text-stone-300">{t.action}</span>
                       </div>
                       <div className="text-[10px] text-stone-500">
                         {t.blocker_reason && <span className="text-red-400 mr-2">Blocked: {t.blocker_reason}</span>}
@@ -981,7 +981,7 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
                 {/* Blocker themes */}
                 {store.summary.blocker_reasons.length > 0 && (
                   <div className="mt-3 pt-2 border-t border-stone-800/30">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400">Blocker Themes:</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 dark:text-stone-400">Blocker Themes:</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {store.summary.blocker_reasons.map((reason, i) => (
                         <span key={i} className="text-[9px] bg-red-950/40 text-red-300 border border-red-800/30 px-1.5 py-0.5 rounded">{reason}</span>
@@ -1012,11 +1012,11 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
               <tbody>
                 {yellowStores.map((store) => (
                   <tr key={store.siteId} className="border-b border-stone-800/30 bg-amber-950/5">
-                    <td className="px-3 py-2.5 font-medium text-stone-200">{store.store}</td>
+                    <td className="px-3 py-2.5 font-medium text-stone-700 dark:text-stone-200">{store.store}</td>
                     <td className={cn("px-3 py-2.5 text-right font-bold", pctColor(store.summary.completion_pct))}>{store.summary.completion_pct}%</td>
                     <td className={cn("px-3 py-2.5 text-right", store.summary.blocked > 0 ? "text-red-400" : "text-stone-600")}>{store.summary.blocked}</td>
                     <td className={cn("px-3 py-2.5 text-right", store.summary.overdue > 0 ? "text-red-400" : "text-stone-600")}>{store.summary.overdue}</td>
-                    <td className="px-3 py-2.5 text-stone-400 text-[10px]">
+                    <td className="px-3 py-2.5 text-stone-500 dark:text-stone-400 text-[10px]">
                       {[
                         store.maintenance.open_count > 0 && `${store.maintenance.open_count} maint.`,
                         store.compliance.expired > 0 && `${store.compliance.expired} compliance`,
@@ -1048,10 +1048,10 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
               <tbody>
                 {escalatedTasks.map((t, i) => (
                   <tr key={i} className="border-b border-stone-800/30">
-                    <td className="px-3 py-2 text-stone-300 font-medium">{t.storeName}</td>
-                    <td className="px-3 py-2 text-stone-200">{t.action}</td>
+                    <td className="px-3 py-2 text-stone-600 dark:text-stone-300 font-medium">{t.storeName}</td>
+                    <td className="px-3 py-2 text-stone-700 dark:text-stone-200">{t.action}</td>
                     <td className="px-3 py-2 text-amber-400">{t.escalated_to || "—"}</td>
-                    <td className="px-3 py-2 text-stone-400">{t.started_by || "—"}</td>
+                    <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{t.started_by || "—"}</td>
                     <td className="px-3 py-2 text-stone-500 max-w-[200px] truncate">{t.blocker_reason || t.start_comment || "—"}</td>
                   </tr>
                 ))}
@@ -1078,9 +1078,9 @@ function RisksEscalationsTab({ stores }: { stores: StoreData[] }) {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-stone-800 bg-stone-900 overflow-hidden">
-      <div className="border-b border-stone-800 px-5 py-3">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-300">{title}</h2>
+    <section className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
+      <div className="border-b border-stone-200 dark:border-stone-800 px-5 py-3">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-600 dark:text-stone-300">{title}</h2>
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -1090,7 +1090,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Tile({ label, value, valueClass, sub }: { label: string; value: string; valueClass?: string; sub?: string }) {
   return (
     <div className="bg-stone-800/60 rounded-lg px-3 py-2.5">
-      <div className="text-[10px] text-stone-400">{label}</div>
+      <div className="text-[10px] text-stone-500 dark:text-stone-400">{label}</div>
       <div className={cn("text-lg font-bold text-stone-100 mt-0.5 leading-tight", valueClass)}>{value}</div>
       {sub && <div className="text-[9px] text-stone-500 mt-0.5">{sub}</div>}
     </div>
@@ -1104,7 +1104,7 @@ function FilterSelect({ label, value, onChange, options }: { label: string; valu
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="text-[11px] bg-stone-800 text-stone-300 border border-stone-700 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-stone-600"
+        className="text-[11px] bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 border border-stone-300 dark:border-stone-700 rounded-md px-2 py-1 focus:outline-none focus:ring-1 focus:ring-stone-600"
       >
         {options.map((opt) => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>

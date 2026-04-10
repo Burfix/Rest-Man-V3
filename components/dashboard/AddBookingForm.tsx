@@ -66,7 +66,7 @@ export default function AddBookingForm({ onClose, onAdded }: Props) {
         <h2 className="text-sm font-semibold text-stone-900">New Booking</h2>
         <button
           onClick={onClose}
-          className="text-stone-400 hover:text-stone-700 text-lg leading-none"
+          className="text-stone-500 dark:text-stone-400 hover:text-stone-700 text-lg leading-none"
         >
           ✕
         </button>
@@ -143,7 +143,7 @@ export default function AddBookingForm({ onClose, onAdded }: Props) {
         {/* Row 3: Event name */}
         <div>
           <label className="block text-xs font-medium text-stone-600 mb-1">
-            Event / Occasion <span className="text-stone-400 font-normal">(optional)</span>
+            Event / Occasion <span className="text-stone-500 dark:text-stone-400 font-normal">(optional)</span>
           </label>
           <input
             type="text"
@@ -157,7 +157,7 @@ export default function AddBookingForm({ onClose, onAdded }: Props) {
         {/* Row 4: Notes */}
         <div>
           <label className="block text-xs font-medium text-stone-600 mb-1">
-            Special Requests <span className="text-stone-400 font-normal">(optional)</span>
+            Special Requests <span className="text-stone-500 dark:text-stone-400 font-normal">(optional)</span>
           </label>
           <textarea
             rows={2}

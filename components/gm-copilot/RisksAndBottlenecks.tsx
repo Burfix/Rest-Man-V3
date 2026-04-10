@@ -17,7 +17,7 @@ const TONE_STYLES: Record<BusinessStatusTone, string> = {
   positive: "text-emerald-400",
   warning: "text-amber-400",
   critical: "text-red-400",
-  neutral: "text-stone-400",
+  neutral: "text-stone-500 dark:text-stone-400",
 };
 
 const RISK_ICON: Record<string, string> = {

@@ -141,25 +141,25 @@ export default function UpcomingEventsManager({ siteId }: { siteId: string }) {
 
       {/* Existing events list */}
       {loading ? (
-        <p className="text-sm text-stone-400">Loading events…</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">Loading events…</p>
       ) : error ? (
         <p className="text-sm text-red-500">{error}</p>
       ) : events.length === 0 ? (
-        <p className="mb-4 text-sm text-stone-400">No upcoming events added. Use the form below to add one.</p>
+        <p className="mb-4 text-sm text-stone-500 dark:text-stone-400">No upcoming events added. Use the form below to add one.</p>
       ) : (
         <div className="mb-6 divide-y divide-stone-100 rounded border border-stone-100">
           {events.map((e) => (
             <div key={e.id} className="flex items-center justify-between px-4 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-stone-800">{e.event_name}</p>
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-stone-500 dark:text-stone-400">
                   {e.event_date} &middot; {CATEGORY_LABELS[e.category] ?? e.category} &middot;{" "}
                   <span className="font-mono text-green-700">
                     +{Math.round((e.uplift_multiplier - 1) * 100)}%
                   </span>
                 </p>
                 {e.notes && (
-                  <p className="mt-0.5 truncate text-xs text-stone-400">{e.notes}</p>
+                  <p className="mt-0.5 truncate text-xs text-stone-500 dark:text-stone-400">{e.notes}</p>
                 )}
               </div>
               <button
@@ -176,7 +176,7 @@ export default function UpcomingEventsManager({ siteId }: { siteId: string }) {
 
       {/* Add event form */}
       <div className="space-y-3 rounded border border-stone-100 bg-stone-50 p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-stone-400">Add Event</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">Add Event</p>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
@@ -213,7 +213,7 @@ export default function UpcomingEventsManager({ siteId }: { siteId: string }) {
           <div>
             <label className="block text-xs text-stone-500">
               Expected Revenue Uplift %
-              <span className="ml-1 text-stone-400">(vs normal day)</span>
+              <span className="ml-1 text-stone-500 dark:text-stone-400">(vs normal day)</span>
             </label>
             <input
               type="number"

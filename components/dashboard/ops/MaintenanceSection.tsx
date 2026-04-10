@@ -66,7 +66,7 @@ export default function MaintenanceSection({ summary }: Props) {
         <h2 className="text-base font-semibold text-stone-900">Maintenance Risk</h2>
         <a
           href="/dashboard/maintenance"
-          className="text-xs font-medium text-stone-400 hover:text-stone-700"
+          className="text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           Full log →
         </a>
@@ -120,7 +120,7 @@ export default function MaintenanceSection({ summary }: Props) {
           <p className="text-sm font-medium text-stone-500">
             No equipment registered yet
           </p>
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
             Add your kitchen and bar equipment to start tracking maintenance.
           </p>
           <a
@@ -138,7 +138,7 @@ export default function MaintenanceSection({ summary }: Props) {
         <>
           {summary.urgentIssues.length > 0 && (
             <div>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-400">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                 Urgent / High Priority
               </p>
               {/* Mobile: card list */}
@@ -151,7 +151,7 @@ export default function MaintenanceSection({ summary }: Props) {
               <div className="hidden sm:block overflow-x-auto rounded-lg border border-stone-200">
                 <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
                   <thead>
-                    <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                    <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                       <th className="px-4 py-2">Unit</th>
                       <th className="px-4 py-2">Issue</th>
                       <th className="px-4 py-2">Priority</th>
@@ -184,7 +184,7 @@ function IssueCard({ log }: { log: MaintenanceLog }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-medium text-stone-800">{log.unit_name}</p>
-          <p className="text-xs capitalize text-stone-400">{log.category}</p>
+          <p className="text-xs capitalize text-stone-500 dark:text-stone-400">{log.category}</p>
         </div>
         <span className={cn("rounded px-1.5 py-0.5 text-xs font-semibold", pri.badge)}>
           {pri.label}
@@ -195,7 +195,7 @@ function IssueCard({ log }: { log: MaintenanceLog }) {
         <span className={cn("rounded-md px-2 py-0.5 text-xs font-medium ring-1 ring-inset", sts.badge)}>
           {sts.label}
         </span>
-        <span className="text-xs text-stone-400">{formatShortDate(log.date_reported)}</span>
+        <span className="text-xs text-stone-500 dark:text-stone-400">{formatShortDate(log.date_reported)}</span>
       </div>
     </div>
   );
@@ -211,7 +211,7 @@ function IssueRow({ log }: { log: MaintenanceLog }) {
     <tr className="hover:bg-stone-50">
       <td className="whitespace-nowrap px-4 py-2.5">
         <p className="font-medium text-stone-800">{log.unit_name}</p>
-        <p className="text-xs capitalize text-stone-400">{log.category}</p>
+        <p className="text-xs capitalize text-stone-500 dark:text-stone-400">{log.category}</p>
       </td>
       <td className="px-4 py-2.5 max-w-[220px]">
         <p className="truncate font-medium text-stone-700">{log.issue_title}</p>
@@ -236,7 +236,7 @@ function IssueRow({ log }: { log: MaintenanceLog }) {
           {sts.label}
         </span>
       </td>
-      <td className="whitespace-nowrap px-4 py-2.5 text-xs text-stone-400">
+      <td className="whitespace-nowrap px-4 py-2.5 text-xs text-stone-500 dark:text-stone-400">
         {formatShortDate(log.date_reported)}
       </td>
     </tr>
@@ -270,7 +270,7 @@ function MiniStat({
         isHighlighted ? colorMap[highlight] : "border-stone-200 bg-white"
       )}
     >
-      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p

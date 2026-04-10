@@ -57,7 +57,7 @@ export default function ShiftSummaryBanner({
         <div className="flex items-center gap-4 text-xs text-stone-500">
           <span>{totalActions} total actions</span>
           {commandBar.timeToPeakLabel && (
-            <span className="text-stone-400 font-medium">{commandBar.timeToPeakLabel}</span>
+            <span className="text-stone-500 dark:text-stone-400 font-medium">{commandBar.timeToPeakLabel}</span>
           )}
         </div>
       </div>

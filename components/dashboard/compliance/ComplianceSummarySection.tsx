@@ -65,7 +65,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
         <h2 className="text-base font-semibold text-stone-900">Compliance Risk</h2>
         <Link
           href="/dashboard/compliance"
-          className="text-xs font-medium text-stone-400 hover:text-stone-700"
+          className="text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           Full hub →
         </Link>
@@ -98,7 +98,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
             )}>
               {pct}%
             </p>
-            <p className="text-xs text-stone-400">managed</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400">managed</p>
           </div>
           <div className="flex-1 space-y-1">
             <div className="h-2 w-full rounded-full bg-stone-100">
@@ -138,7 +138,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
             </span>
           )}
           {summary.unknown > 0 && (
-            <span className="flex items-center gap-1 text-stone-400">
+            <span className="flex items-center gap-1 text-stone-500 dark:text-stone-400">
               <span className="h-2 w-2 rounded-full bg-stone-300 inline-block" />
               {summary.unknown} not set up
             </span>
@@ -223,7 +223,7 @@ export default function ComplianceSummarySection({ summary }: Props) {
 
         {/* Empty state */}
         {summary.total === 0 && (
-          <p className="mt-3 text-xs text-stone-400 text-center py-2">
+          <p className="mt-3 text-xs text-stone-500 dark:text-stone-400 text-center py-2">
             No compliance data yet.{" "}
             <Link href="/dashboard/compliance" className="text-blue-600 hover:underline">
               Set up the Compliance Hub

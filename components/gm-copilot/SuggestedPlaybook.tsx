@@ -26,7 +26,7 @@ export default function SuggestedPlaybook({ playbook }: Props) {
               <span className="text-stone-600 font-mono text-xs mt-0.5 shrink-0">
                 {i + 1}.
               </span>
-              <span className="text-stone-200 leading-snug">{item}</span>
+              <span className="text-stone-700 dark:text-stone-200 leading-snug">{item}</span>
             </li>
           ))}
         </ol>

@@ -94,7 +94,7 @@ export default function LabourDashboardClient({
 
       {/* Sync controls */}
       <div className="flex items-center justify-between">
-        <p className="text-xs text-stone-400 dark:text-stone-500">
+        <p className="text-xs text-stone-500 dark:text-stone-500">
           {summary.lastSyncAt
             ? `Last synced: ${new Date(summary.lastSyncAt).toLocaleString()}`
             : "Not yet synced"}

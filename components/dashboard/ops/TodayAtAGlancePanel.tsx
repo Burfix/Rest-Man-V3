@@ -43,7 +43,7 @@ export default function TodayAtAGlancePanel({ score, riskLevel, servicePeriod, l
   return (
     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-4 sm:p-6 flex flex-col gap-4 sm:gap-5">
       {/* Section label */}
-      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
         Today at a Glance
       </p>
 
@@ -56,7 +56,7 @@ export default function TodayAtAGlancePanel({ score, riskLevel, servicePeriod, l
           <span className={cn("text-xl sm:text-2xl font-black tabular-nums leading-none", gs.text)}>
             {score?.total ?? "—"}
           </span>
-          <span className="text-[9px] font-semibold text-stone-400 dark:text-stone-600 mt-0.5">/100</span>
+          <span className="text-[9px] font-semibold text-stone-500 dark:text-stone-600 mt-0.5">/100</span>
         </div>
         <div>
           <p className={cn("text-sm font-bold", gs.text)}>
@@ -84,7 +84,7 @@ export default function TodayAtAGlancePanel({ score, riskLevel, servicePeriod, l
         </div>
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full shrink-0 bg-stone-300 dark:bg-stone-600" />
-          <span className="text-[11px] text-stone-400 dark:text-stone-500">
+          <span className="text-[11px] text-stone-500 dark:text-stone-500">
             Last sync {lastSync}
           </span>
         </div>

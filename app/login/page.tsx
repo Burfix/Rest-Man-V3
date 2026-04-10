@@ -67,7 +67,7 @@ export default async function LoginPage({ searchParams }: Props) {
           ))}
         </ul>
 
-        <p className="text-xs text-stone-600">V&A Waterfront · Cape Town</p>
+        <p className="text-xs text-stone-500">V&A Waterfront · Cape Town</p>
       </div>
 
       {/* ── Right panel: form ──────────────────────────────────────── */}
@@ -93,7 +93,7 @@ export default async function LoginPage({ searchParams }: Props) {
             <LoginForm next={next} />
           </div>
 
-          <p className="mt-5 text-center text-xs text-stone-400">
+          <p className="mt-5 text-center text-xs text-stone-500 dark:text-stone-400">
             Ops Engine · Operations Platform
           </p>
         </div>

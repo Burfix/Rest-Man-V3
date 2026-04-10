@@ -50,11 +50,11 @@ function arrow(t: TrendDirection): string {
 function trendCls(t: TrendDirection, inverseIsGood = false): string {
   if (t === "up") return inverseIsGood ? "text-red-500" : "text-emerald-500";
   if (t === "down") return inverseIsGood ? "text-emerald-500" : "text-red-500";
-  return "text-stone-400";
+  return "text-stone-500 dark:text-stone-400";
 }
 
 function gradeCls(grade: string | null): string {
-  if (!grade) return "text-stone-400";
+  if (!grade) return "text-stone-500 dark:text-stone-400";
   if (grade === "A") return "text-emerald-500";
   if (grade === "B") return "text-blue-500";
   if (grade === "C") return "text-amber-500";
@@ -138,7 +138,7 @@ export default function WeeklyReportClient() {
     return (
       <div className="flex items-center justify-center py-32">
         <div className="animate-spin h-8 w-8 border-2 border-stone-400 border-t-transparent rounded-full" />
-        <p className="ml-3 text-sm text-stone-400">Generating weekly report…</p>
+        <p className="ml-3 text-sm text-stone-500 dark:text-stone-400">Generating weekly report…</p>
       </div>
     );
   }
@@ -168,15 +168,15 @@ export default function WeeklyReportClient() {
           <h1 className="text-lg font-bold text-stone-100">
             📊 Weekly Report — W{report.weekRange.weekNumber}/{report.weekRange.year}
           </h1>
-          <p className="text-xs text-stone-400 mt-0.5">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
             {report.weekRange.start} → {report.weekRange.end}
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={fetchReport} className="text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
+          <button onClick={fetchReport} className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
             ↻ Refresh
           </button>
-          <button onClick={handleExportJSON} className="text-xs bg-stone-800 hover:bg-stone-700 text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
+          <button onClick={handleExportJSON} className="text-xs bg-stone-100 dark:bg-stone-800 hover:bg-stone-700 text-stone-700 dark:text-stone-200 px-3 py-1.5 rounded-lg transition-colors">
             ⬇ Export JSON
           </button>
         </div>
@@ -197,15 +197,15 @@ export default function WeeklyReportClient() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-stone-700/50 text-stone-400">
+              <tr className="border-b border-stone-700/50 text-stone-500 dark:text-stone-400">
                 <Th>#</Th><Th>Store</Th><Th right>Score</Th><Th right>Revenue</Th><Th right>Gap%</Th><Th right>Done%</Th><Th center>Trend</Th>
               </tr>
             </thead>
             <tbody>
               {storeRanking.map((store) => (
                 <tr key={store.siteId} className={cn("border-b border-stone-800/50", store.rank <= 3 && "bg-emerald-950/20", store.avgExecutionScore != null && store.avgExecutionScore < 45 && "bg-red-950/20")}>
-                  <Td className="font-bold text-stone-400">{store.rank}</Td>
-                  <Td className="font-medium text-stone-200">{store.storeName}</Td>
+                  <Td className="font-bold text-stone-500 dark:text-stone-400">{store.rank}</Td>
+                  <Td className="font-medium text-stone-700 dark:text-stone-200">{store.storeName}</Td>
                   <Td right className={cn("font-bold", gradeCls(gradeFromScore(store.avgExecutionScore)))}>{store.avgExecutionScore ?? "—"}</Td>
                   <Td right>{money(store.totalRevenue)}</Td>
                   <Td right className={(store.revenueGapPct ?? 0) > 15 ? "text-red-400" : ""}>{pct(store.revenueGapPct)}</Td>
@@ -223,17 +223,17 @@ export default function WeeklyReportClient() {
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="border-b border-stone-700/50 text-stone-400">
+              <tr className="border-b border-stone-700/50 text-stone-500 dark:text-stone-400">
                 <Th>GM</Th><Th>Store</Th><Th right>Score</Th><Th right>Δ</Th><Th right>Done%</Th><Th right>Overdue</Th><Th right>Escalations</Th><Th right>Impact</Th>
               </tr>
             </thead>
             <tbody>
               {gmPerformance.map((gm) => (
                 <tr key={gm.siteId} className="border-b border-stone-800/50">
-                  <Td className="text-stone-200">{gm.gmName ?? "—"}</Td>
-                  <Td className="text-stone-400">{gm.storeName}</Td>
+                  <Td className="text-stone-700 dark:text-stone-200">{gm.gmName ?? "—"}</Td>
+                  <Td className="text-stone-500 dark:text-stone-400">{gm.storeName}</Td>
                   <Td right className={cn("font-bold", gradeCls(gradeFromScore(gm.executionScore)))}>{gm.executionScore ?? "—"}</Td>
-                  <Td right className={cn((gm.scoreDelta ?? 0) > 0 ? "text-emerald-500" : (gm.scoreDelta ?? 0) < 0 ? "text-red-500" : "text-stone-400")}>
+                  <Td right className={cn((gm.scoreDelta ?? 0) > 0 ? "text-emerald-500" : (gm.scoreDelta ?? 0) < 0 ? "text-red-500" : "text-stone-500 dark:text-stone-400")}>
                     {gm.scoreDelta != null ? `${gm.scoreDelta > 0 ? "+" : ""}${gm.scoreDelta}` : "—"}
                   </Td>
                   <Td right>{pct(gm.completionRate)}</Td>
@@ -252,12 +252,12 @@ export default function WeeklyReportClient() {
         <Section title="Impact Generated">
           <div className="flex items-baseline gap-3 mb-4">
             <span className="text-2xl font-extrabold text-emerald-400">{money(impactSummary.totalImpact)}</span>
-            <span className="text-xs text-stone-400">from {impactSummary.actionsWithImpact} measured action{impactSummary.actionsWithImpact !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-stone-500 dark:text-stone-400">from {impactSummary.actionsWithImpact} measured action{impactSummary.actionsWithImpact !== 1 ? "s" : ""}</span>
           </div>
           {impactSummary.byCategory.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-4">
               {impactSummary.byCategory.map((c) => (
-                <span key={c.category} className="bg-stone-800 text-stone-300 text-[11px] px-2.5 py-1 rounded-md">
+                <span key={c.category} className="bg-stone-100 dark:bg-stone-800 text-stone-600 dark:text-stone-300 text-[11px] px-2.5 py-1 rounded-md">
                   {c.category}: {money(c.totalImpact)} ({c.count})
                 </span>
               ))}
@@ -265,11 +265,11 @@ export default function WeeklyReportClient() {
           )}
           {impactSummary.byStore.length > 0 && (
             <div className="mt-3">
-              <h4 className="text-[11px] font-semibold text-stone-400 uppercase tracking-wide mb-2">By Store</h4>
+              <h4 className="text-[11px] font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wide mb-2">By Store</h4>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
                 {impactSummary.byStore.map((s) => (
                   <div key={s.siteId} className="bg-stone-800/50 rounded-lg px-3 py-2">
-                    <div className="text-xs font-medium text-stone-200">{s.storeName}</div>
+                    <div className="text-xs font-medium text-stone-700 dark:text-stone-200">{s.storeName}</div>
                     <div className="text-sm font-bold text-emerald-400">{money(s.totalImpact)}</div>
                   </div>
                 ))}
@@ -299,17 +299,17 @@ export default function WeeklyReportClient() {
               <div key={i} className={cn("rounded-lg border px-4 py-3", severityCls(item.severity))}>
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className="text-xs font-semibold text-stone-200">{item.store}</span>
+                    <span className="text-xs font-semibold text-stone-700 dark:text-stone-200">{item.store}</span>
                     <span className="mx-1.5 text-stone-600">—</span>
-                    <span className="text-xs text-stone-300">{item.issue}</span>
+                    <span className="text-xs text-stone-600 dark:text-stone-300">{item.issue}</span>
                   </div>
                   <span className={cn("text-[10px] font-bold uppercase px-1.5 py-0.5 rounded",
                     item.severity === "critical" ? "bg-red-900/60 text-red-300" :
                     item.severity === "high" ? "bg-amber-900/50 text-amber-300" :
-                    "bg-stone-700 text-stone-300"
+                    "bg-stone-700 text-stone-600 dark:text-stone-300"
                   )}>{item.severity}</span>
                 </div>
-                <p className="text-[11px] text-stone-400 mt-1">→ {item.recommendation}</p>
+                <p className="text-[11px] text-stone-500 dark:text-stone-400 mt-1">→ {item.recommendation}</p>
               </div>
             ))}
           </div>
@@ -322,8 +322,8 @@ export default function WeeklyReportClient() {
           <div className="space-y-2">
             {nextWeekFocus.map((f, i) => (
               <div key={i} className="flex items-start gap-3 py-2 border-b border-stone-800/50 last:border-0">
-                <span className="text-xs font-semibold text-stone-200 min-w-[100px]">{f.area}</span>
-                <span className="text-xs text-stone-400">{f.description}</span>
+                <span className="text-xs font-semibold text-stone-700 dark:text-stone-200 min-w-[100px]">{f.area}</span>
+                <span className="text-xs text-stone-500 dark:text-stone-400">{f.description}</span>
               </div>
             ))}
           </div>
@@ -334,13 +334,13 @@ export default function WeeklyReportClient() {
       <Section title="Deliver Report">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
           <div className="flex-1 w-full">
-            <label className="text-[11px] text-stone-400 mb-1 block">Recipients (comma-separated emails)</label>
+            <label className="text-[11px] text-stone-500 dark:text-stone-400 mb-1 block">Recipients (comma-separated emails)</label>
             <input
               type="text"
               value={emailField}
               onChange={(e) => setEmailField(e.target.value)}
               placeholder="exec@restaurant.com, gm@restaurant.com"
-              className="w-full bg-stone-800 border border-stone-700 rounded-lg px-3 py-2 text-xs text-stone-200 placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-600"
+              className="w-full bg-stone-100 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 rounded-lg px-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-500 focus:outline-none focus:ring-1 focus:ring-stone-600"
             />
           </div>
           <button
@@ -361,9 +361,9 @@ export default function WeeklyReportClient() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-stone-800 bg-stone-900 overflow-hidden">
-      <div className="border-b border-stone-800 px-5 py-3">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-300">{title}</h2>
+    <section className="rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
+      <div className="border-b border-stone-200 dark:border-stone-800 px-5 py-3">
+        <h2 className="text-xs font-bold uppercase tracking-widest text-stone-600 dark:text-stone-300">{title}</h2>
       </div>
       <div className="p-5">{children}</div>
     </section>
@@ -373,7 +373,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Tile({ label, value, sub, trend, valueClass }: { label: string; value: string; sub?: string; trend?: TrendDirection; valueClass?: string }) {
   return (
     <div className="bg-stone-800/60 rounded-lg px-3.5 py-3">
-      <div className="text-[11px] text-stone-400">{label}</div>
+      <div className="text-[11px] text-stone-500 dark:text-stone-400">{label}</div>
       <div className={cn("text-lg font-bold text-stone-100 mt-0.5", valueClass)}>{value}</div>
       {(sub || trend) && (
         <div className="flex items-center gap-1 mt-0.5">

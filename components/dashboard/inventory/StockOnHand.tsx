@@ -166,7 +166,7 @@ export default function StockOnHand() {
             placeholder="Search items..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-lg border border-stone-800/60 bg-stone-900/50 pl-9 pr-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
+            className="w-full rounded-lg border border-stone-800/60 bg-stone-900/50 pl-9 pr-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:outline-none focus:border-stone-600 transition-colors"
           />
         </div>
 
@@ -209,7 +209,7 @@ export default function StockOnHand() {
               )}
             />
           </button>
-          <span className="text-[11px] text-stone-400">Low stock only</span>
+          <span className="text-[11px] text-stone-500 dark:text-stone-400">Low stock only</span>
         </label>
 
         {/* Refresh + MICROS sync + timestamp */}
@@ -227,7 +227,7 @@ export default function StockOnHand() {
               "flex items-center gap-1.5 rounded-lg border border-stone-800/60 px-3 py-1.5 text-xs font-medium transition-colors",
               refreshing
                 ? "text-stone-600 cursor-wait"
-                : "text-stone-400 hover:bg-stone-800 hover:text-stone-200",
+                : "text-stone-500 dark:text-stone-400 hover:bg-stone-800 hover:text-stone-200",
             )}
           >
             <svg
@@ -308,7 +308,7 @@ export default function StockOnHand() {
                         item.status === "critical" && "bg-red-950/10",
                       )}
                     >
-                      <td className="px-4 py-3 font-medium text-stone-200">
+                      <td className="px-4 py-3 font-medium text-stone-700 dark:text-stone-200">
                         {item.item_name}
                         <span className="ml-2 text-[10px] text-stone-600 capitalize">{item.category}</span>
                       </td>
@@ -316,7 +316,7 @@ export default function StockOnHand() {
                         "px-4 py-3 text-right font-semibold tabular-nums",
                         item.status === "critical" ? "text-red-400"
                           : item.status === "running_low" ? "text-amber-400"
-                          : "text-stone-300"
+                          : "text-stone-600 dark:text-stone-300"
                       )}>
                         {item.stock_on_hand}
                       </td>

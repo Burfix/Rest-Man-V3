@@ -45,7 +45,7 @@ export default function BrainTopDecisions({ brain }: Props) {
               {action.priority}.
             </span>
             <div className="min-w-0 space-y-0.5">
-              <p className="text-[12px] font-semibold text-stone-200 leading-snug">
+              <p className="text-[12px] font-semibold text-stone-700 dark:text-stone-200 leading-snug">
                 {action.title}
               </p>
               <p className="text-[10px] text-stone-500 leading-relaxed">{action.why}</p>

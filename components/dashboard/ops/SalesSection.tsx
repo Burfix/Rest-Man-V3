@@ -25,7 +25,7 @@ export default function SalesSection({ summary }: Props) {
         </h2>
         <a
           href="/dashboard/sales"
-          className="text-xs font-medium text-stone-400 hover:text-stone-700"
+          className="text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           Sales history →
         </a>
@@ -36,7 +36,7 @@ export default function SalesSection({ summary }: Props) {
           <p className="text-sm font-semibold text-stone-600 dark:text-stone-300">
             No sales data — weekly performance tracking inactive
           </p>
-          <p className="mt-1 text-xs text-stone-400 dark:text-stone-500">
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-500">
             Upload a weekly POS export to track top items, revenue trends and
             category performance.
           </p>
@@ -56,14 +56,14 @@ export default function SalesSection({ summary }: Props) {
                 <p className="text-sm font-semibold text-stone-800">
                   {summary.upload.week_label}
                 </p>
-                <p className="text-xs text-stone-400">
+                <p className="text-xs text-stone-500 dark:text-stone-400">
                   {formatShortDate(summary.upload.week_start)} –{" "}
                   {formatShortDate(summary.upload.week_end)}
                 </p>
                 {(() => {
                   const { label, stale } = uploadAgeLabel(summary.upload.uploaded_at);
                   return (
-                    <p className={`mt-1 text-xs font-medium ${stale ? "text-amber-600" : "text-stone-400"}`}>
+                    <p className={`mt-1 text-xs font-medium ${stale ? "text-amber-600" : "text-stone-500 dark:text-stone-400"}`}>
                       {stale ? "⚠ " : ""}{label}
                     </p>
                   );
@@ -71,7 +71,7 @@ export default function SalesSection({ summary }: Props) {
               </div>
               <div className="flex gap-4 text-right">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
                     Items Sold
                   </p>
                   <p className="text-xl font-bold text-stone-900">
@@ -79,7 +79,7 @@ export default function SalesSection({ summary }: Props) {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
                     Sales Value
                   </p>
                   <p className="text-xl font-bold text-stone-900">
@@ -137,7 +137,7 @@ function ItemsTable({
                     className={
                       variant === "top"
                         ? "text-xs font-bold text-green-600"
-                        : "text-xs font-bold text-stone-400"
+                        : "text-xs font-bold text-stone-500 dark:text-stone-400"
                     }
                   >
                     {i + 1}
@@ -147,14 +147,14 @@ function ItemsTable({
                   </span>
                 </div>
                 {item.category && (
-                  <p className="ml-5 text-xs text-stone-400">{item.category}</p>
+                  <p className="ml-5 text-xs text-stone-500 dark:text-stone-400">{item.category}</p>
                 )}
               </td>
               <td className="whitespace-nowrap px-4 py-2.5 text-right">
                 <span className="font-semibold text-stone-900">
                   {item.quantity_sold.toLocaleString()}
                 </span>
-                <span className="ml-1 text-xs text-stone-400">units</span>
+                <span className="ml-1 text-xs text-stone-500 dark:text-stone-400">units</span>
               </td>
               <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs text-stone-500">
                 {formatCurrency(item.total_value)}

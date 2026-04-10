@@ -18,14 +18,14 @@ type Props = {
 const SEV_STYLE: Record<GMDecisionSeverity, { bg: string; text: string; border: string }> = {
   critical: { bg: "bg-red-950/30",    text: "text-red-400",    border: "border-red-800/40" },
   high:     { bg: "bg-amber-950/20",  text: "text-amber-400",  border: "border-amber-800/30" },
-  medium:   { bg: "bg-stone-900/50",  text: "text-stone-400",  border: "border-stone-700/40" },
+  medium:   { bg: "bg-stone-900/50",  text: "text-stone-500 dark:text-stone-400",  border: "border-stone-700/40" },
   low:      { bg: "bg-stone-900/30",  text: "text-stone-500",  border: "border-stone-800/30" },
 };
 
 const RANK_STYLE = [
   "bg-red-500/20 text-red-400 border-red-500/30",
   "bg-amber-500/20 text-amber-400 border-amber-500/30",
-  "bg-stone-500/20 text-stone-300 border-stone-500/30",
+  "bg-stone-500/20 text-stone-600 dark:text-stone-300 border-stone-500/30",
 ];
 
 export default function MobileDecisions({ decisions }: Props) {
@@ -122,7 +122,7 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
               {d.severity}
             </span>
           </div>
-          <p className="text-xs text-stone-400 mt-1 leading-snug">
+          <p className="text-xs text-stone-500 dark:text-stone-400 mt-1 leading-snug">
             {d.directInstruction}
           </p>
         </div>
@@ -142,7 +142,7 @@ function MobileDecisionCard({ decision: d, rank }: { decision: GMDecision; rank:
           <button
             onClick={() => handleAction("in_progress")}
             disabled={loading}
-            className="flex-1 h-10 rounded-lg bg-stone-800 border border-stone-700 text-sm font-medium text-stone-200 active:bg-stone-700 transition disabled:opacity-50"
+            className="flex-1 h-10 rounded-lg bg-stone-100 dark:bg-stone-800 border border-stone-300 dark:border-stone-700 text-sm font-medium text-stone-700 dark:text-stone-200 active:bg-stone-700 transition disabled:opacity-50"
           >
             Start
           </button>

@@ -90,7 +90,7 @@ export default async function HeadOfficePage() {
           <h1 className="text-xl font-black text-stone-900 dark:text-stone-100 leading-tight">
             Head Office Control Tower
           </h1>
-          <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">
+          <p className="text-xs text-stone-500 dark:text-stone-500 mt-0.5">
             Group performance across {metrics.store_count} store{metrics.store_count !== 1 ? "s" : ""}
             {" "}· Real-time
           </p>

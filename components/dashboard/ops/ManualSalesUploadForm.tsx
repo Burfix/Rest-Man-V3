@@ -108,7 +108,7 @@ export default function ManualSalesUploadForm({ businessDate, onSuccess }: Props
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-[11px] text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
+          className="text-[11px] text-stone-500 dark:text-stone-400 hover:text-stone-600 dark:hover:text-stone-300"
         >
           Cancel
         </button>

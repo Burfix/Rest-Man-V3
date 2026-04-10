@@ -42,7 +42,7 @@ interface Props {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; dot: string }> = {
-  not_started: { label: "Not Started", color: "text-stone-400", bg: "bg-stone-500/10 border-stone-500/20", dot: "bg-stone-400" },
+  not_started: { label: "Not Started", color: "text-stone-500 dark:text-stone-400", bg: "bg-stone-500/10 border-stone-500/20", dot: "bg-stone-400" },
   started:     { label: "Started", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", dot: "bg-blue-400" },
   in_progress: { label: "In Progress", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", dot: "bg-blue-400 animate-pulse" },
   blocked:     { label: "Blocked", color: "text-red-400", bg: "bg-red-500/10 border-red-500/30", dot: "bg-red-500" },
@@ -56,14 +56,14 @@ const PRIORITY_CONFIG: Record<string, { label: string; color: string }> = {
   critical: { label: "Critical", color: "bg-red-500/20 text-red-300 border-red-500/30" },
   high:     { label: "High", color: "bg-orange-500/20 text-orange-300 border-orange-500/30" },
   medium:   { label: "Medium", color: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-  low:      { label: "Low", color: "bg-stone-500/20 text-stone-400 border-stone-500/30" },
+  low:      { label: "Low", color: "bg-stone-500/20 text-stone-500 dark:text-stone-400 border-stone-500/30" },
 };
 
 const DEPT_CONFIG: Record<string, string> = {
   FOH: "bg-purple-500/20 text-purple-300",
   Kitchen: "bg-orange-500/20 text-orange-300",
   Admin: "bg-blue-500/20 text-blue-300",
-  General: "bg-stone-500/20 text-stone-400",
+  General: "bg-stone-500/20 text-stone-500 dark:text-stone-400",
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -255,7 +255,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
           <h1 className="text-xl font-bold text-stone-100">Daily Operations Tracker</h1>
           <p className="text-xs text-stone-500">{new Date(date).toLocaleDateString("en-ZA", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</p>
         </div>
-        <button onClick={() => { refresh(); router.refresh(); }} className="rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-300 hover:bg-stone-700 transition-colors">
+        <button onClick={() => { refresh(); router.refresh(); }} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-600 dark:text-stone-300 hover:bg-stone-700 transition-colors">
           Refresh
         </button>
       </div>
@@ -267,9 +267,9 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
           { label: "In Progress", value: summary.inProgress, color: "text-blue-400" },
           { label: "Overdue", value: summary.overdue, color: summary.overdue > 0 ? "text-red-400" : "text-stone-500" },
           { label: "Blocked", value: summary.blocked, color: summary.blocked > 0 ? "text-red-400" : "text-stone-500" },
-          { label: "Avg Duration", value: summary.avgDuration ? `${summary.avgDuration}m` : "—", color: "text-stone-400" },
+          { label: "Avg Duration", value: summary.avgDuration ? `${summary.avgDuration}m` : "—", color: "text-stone-500 dark:text-stone-400" },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-stone-800 bg-stone-900/60 px-4 py-3">
+          <div key={s.label} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 px-4 py-3">
             <p className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{s.label}</p>
             <p className={cn("text-2xl font-bold", s.color)}>{s.value}</p>
           </div>
@@ -311,7 +311,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   overdue || task.status === "blocked" || task.status === "missed" ? "border-red-500/30" :
                   task.status === "delayed" ? "border-amber-500/30" :
                   ["started", "in_progress"].includes(task.status) ? "border-blue-500/20" :
-                  "border-stone-800"
+                  "border-stone-200 dark:border-stone-800"
                 )}
               >
                 {/* Top accent bar */}
@@ -355,7 +355,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                     </div>
                     {/* Executed by */}
                     {task.assigned_to && (
-                      <span className="rounded-md border border-stone-700 bg-stone-800 px-2 py-1 text-[10px] text-stone-400">
+                      <span className="rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-2 py-1 text-[10px] text-stone-500 dark:text-stone-400">
                         {teamMap.get(task.assigned_to) ?? "Unknown"}
                       </span>
                     )}
@@ -378,24 +378,24 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                     <div className="rounded-lg border border-red-500/20 bg-red-500/5 p-2.5 space-y-1">
                       <p className="text-[10px] font-semibold text-red-400 uppercase">Blocker</p>
                       <p className="text-xs text-red-300">{task.blocker_reason}</p>
-                      {task.escalated_to && <p className="text-[10px] text-stone-500">Escalated to: <span className="text-stone-300">{task.escalated_to}</span></p>}
+                      {task.escalated_to && <p className="text-[10px] text-stone-500">Escalated to: <span className="text-stone-600 dark:text-stone-300">{task.escalated_to}</span></p>}
                       {task.started_at && <p className="text-[10px] text-red-500">Blocked for {minutesSince(task.updated_at)}m</p>}
                     </div>
                   )}
 
                   {/* Comments */}
                   {(task.comments_start || task.comments_end) && (
-                    <div className="space-y-1.5 rounded-lg border border-stone-800 bg-stone-800/30 p-2.5">
+                    <div className="space-y-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-800/30 p-2.5">
                       {task.comments_start && (
                         <div>
                           <p className="text-[10px] font-medium text-blue-400">Start Note</p>
-                          <p className="text-xs text-stone-300">{task.comments_start}</p>
+                          <p className="text-xs text-stone-600 dark:text-stone-300">{task.comments_start}</p>
                         </div>
                       )}
                       {task.comments_end && (
                         <div>
                           <p className="text-[10px] font-medium text-emerald-400">Completion Note</p>
-                          <p className="text-xs text-stone-300">{task.comments_end}</p>
+                          <p className="text-xs text-stone-600 dark:text-stone-300">{task.comments_end}</p>
                         </div>
                       )}
                     </div>
@@ -405,7 +405,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   {task.evidence_urls.length > 0 && (
                     <div className="flex gap-2 flex-wrap">
                       {task.evidence_urls.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="rounded-md border border-stone-700 bg-stone-800 px-2 py-1 text-[10px] text-stone-400 hover:text-stone-200 transition-colors">
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-2 py-1 text-[10px] text-stone-500 dark:text-stone-400 hover:text-stone-200 transition-colors">
                           Evidence {i + 1}
                         </a>
                       ))}
@@ -413,7 +413,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-2 flex-wrap border-t border-stone-800 pt-3">
+                  <div className="flex items-center gap-2 flex-wrap border-t border-stone-200 dark:border-stone-800 pt-3">
                     {task.status === "not_started" && (
                       <button
                         onClick={() => { setActiveForm({ id: task.id, type: "start" }); setFormData({ ...formData, comment: "" }); }}
@@ -438,7 +438,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         >
                           Block / Delay
                         </button>
-                        <label className="cursor-pointer rounded-lg bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-400 hover:bg-stone-700 transition-colors">
+                        <label className="cursor-pointer rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1.5 text-xs font-medium text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">
                           Upload
                           <input type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleUpload(task.id, e.target.files[0]); }} />
                         </label>
@@ -454,7 +454,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         value={formData.comment}
                         onChange={(e) => { setFormData({ ...formData, comment: e.target.value }); setFormError(null); }}
                         placeholder="e.g. FOH briefing started late because two staff members arrived late."
-                        className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:border-blue-500 focus:outline-none"
                         rows={2}
                       />
                       {formError && <p className="text-xs text-red-400">{formError}</p>}
@@ -462,7 +462,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         <button onClick={() => handleStart(task.id)} disabled={!formData.comment.trim() || isSaving} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors">
                           {isSaving ? "Saving…" : "Confirm Start"}
                         </button>
-                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
+                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
@@ -474,7 +474,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         value={formData.comment}
                         onChange={(e) => { setFormData({ ...formData, comment: e.target.value }); setFormError(null); }}
                         placeholder="e.g. Deep clean completed but kitchen extractor still needs maintenance."
-                        className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-emerald-500 focus:outline-none"
+                        className="w-full rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:border-emerald-500 focus:outline-none"
                         rows={2}
                       />
                       {formError && <p className="text-xs text-red-400">{formError}</p>}
@@ -482,7 +482,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         <button onClick={() => handleComplete(task.id)} disabled={!formData.comment.trim() || isSaving} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors">
                           {isSaving ? "Saving…" : "Confirm Complete"}
                         </button>
-                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
+                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
@@ -508,14 +508,14 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         value={formData.blocker_reason}
                         onChange={(e) => setFormData({ ...formData, blocker_reason: e.target.value })}
                         placeholder="What is blocking this task?"
-                        className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-red-500 focus:outline-none"
+                        className="w-full rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:border-red-500 focus:outline-none"
                         rows={2}
                       />
                       <input
                         value={formData.escalated_to}
                         onChange={(e) => setFormData({ ...formData, escalated_to: e.target.value })}
                         placeholder="Escalation contact (e.g. Head Chef, GM)"
-                        className="w-full rounded-md border border-stone-700 bg-stone-800 px-3 py-2 text-xs text-stone-200 placeholder:text-stone-600 focus:border-red-500 focus:outline-none"
+                        className="w-full rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:border-red-500 focus:outline-none"
                       />
                       {formError && <p className="text-xs text-red-400">{formError}</p>}
                       <div className="flex gap-2 flex-wrap">
@@ -528,7 +528,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         <button onClick={() => handleBlock(task.id, "escalated")} disabled={!formData.blocker_reason.trim() || !formData.escalated_to.trim() || isSaving} className="rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-40 transition-colors">
                           Escalate
                         </button>
-                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-800 px-3 py-1 text-xs text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
+                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
                       </div>
                     </div>
                   )}
@@ -538,7 +538,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
           })}
 
           {tasks.length === 0 && (
-            <div className="rounded-xl border border-dashed border-stone-700 py-12 text-center">
+            <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 py-12 text-center">
               <p className="text-sm text-stone-500">No tasks for today. Tasks are auto-generated from templates.</p>
             </div>
           )}
@@ -548,13 +548,13 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
       {/* Manager Notes Tab */}
       {tab === "notes" && (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-stone-200">Manager Notes & Comment History</h2>
+          <h2 className="text-sm font-semibold text-stone-700 dark:text-stone-200">Manager Notes & Comment History</h2>
           {notesEntries.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-700 py-12 text-center">
+            <div className="rounded-xl border border-dashed border-stone-300 dark:border-stone-700 py-12 text-center">
               <p className="text-sm text-stone-500">No notes yet. Comments will appear here as tasks are started and completed.</p>
             </div>
           ) : (
-            <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+            <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
               {notesEntries.map((entry, i) => (
                 <div key={i} className="px-4 py-3 space-y-1">
                   <div className="flex items-center gap-2">
@@ -566,10 +566,10 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                     )}>
                       {entry.type}
                     </span>
-                    <span className="text-xs font-medium text-stone-200">{entry.task}</span>
+                    <span className="text-xs font-medium text-stone-700 dark:text-stone-200">{entry.task}</span>
                     <span className="text-[10px] text-stone-600">{formatTimestamp(entry.time)}</span>
                   </div>
-                  <p className="text-xs text-stone-400 pl-1">{entry.comment}</p>
+                  <p className="text-xs text-stone-500 dark:text-stone-400 pl-1">{entry.comment}</p>
                 </div>
               ))}
             </div>
@@ -589,16 +589,16 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Today</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    { label: "Not Started", value: stats.today.not_started, color: "text-stone-400" },
+                    { label: "Not Started", value: stats.today.not_started, color: "text-stone-500 dark:text-stone-400" },
                     { label: "In Progress", value: stats.today.started, color: "text-blue-400" },
                     { label: "Completed", value: stats.today.completed, color: "text-emerald-400" },
                     { label: "Blocked", value: stats.today.blocked, color: stats.today.blocked > 0 ? "text-red-400" : "text-stone-500" },
                     { label: "Overdue", value: stats.today.overdue, color: stats.today.overdue > 0 ? "text-red-400" : "text-stone-500" },
                     { label: "Escalated", value: stats.today.escalated, color: stats.today.escalated > 0 ? "text-orange-400" : "text-stone-500" },
                     { label: "Missed", value: stats.today.missed, color: stats.today.missed > 0 ? "text-red-500" : "text-stone-500" },
-                    { label: "Total", value: stats.today.total, color: "text-stone-300" },
+                    { label: "Total", value: stats.today.total, color: "text-stone-600 dark:text-stone-300" },
                   ].map((s) => (
-                    <div key={s.label} className="rounded-xl border border-stone-800 bg-stone-900/60 px-3 py-2">
+                    <div key={s.label} className="rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 px-3 py-2">
                       <p className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{s.label}</p>
                       <p className={cn("text-xl font-bold", s.color)}>{s.value}</p>
                     </div>
@@ -610,12 +610,12 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               {stats.avgCompletionTimes.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Avg Completion Time (30d)</h3>
-                  <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
                     {stats.avgCompletionTimes.map((a: any) => (
                       <div key={a.action_name} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-xs text-stone-200">{a.action_name}</span>
+                        <span className="text-xs text-stone-700 dark:text-stone-200">{a.action_name}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-stone-300">{a.avg_minutes}m</span>
+                          <span className="text-xs font-bold text-stone-600 dark:text-stone-300">{a.avg_minutes}m</span>
                           <span className="text-[10px] text-stone-600">{a.sample_size} samples</span>
                         </div>
                       </div>
@@ -628,7 +628,7 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               {stats.recurringBlockers.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Recurring Blockers (30d)</h3>
-                  <div className="divide-y divide-stone-800 rounded-xl border border-red-500/20 bg-stone-900/60 overflow-hidden">
+                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-red-500/20 bg-stone-900/60 overflow-hidden">
                     {stats.recurringBlockers.map((b: any, i: number) => (
                       <div key={i} className="flex items-center justify-between px-4 py-2.5">
                         <span className="text-xs text-red-300">{b.reason}</span>
@@ -643,15 +643,15 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
               {stats.teamRates.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3">Team Completion Rates (30d)</h3>
-                  <div className="divide-y divide-stone-800 rounded-xl border border-stone-800 bg-stone-900/60 overflow-hidden">
+                  <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-900/60 overflow-hidden">
                     {stats.teamRates.map((t: any) => (
                       <div key={t.user_id} className="flex items-center justify-between px-4 py-2.5">
-                        <span className="text-xs text-stone-200">{t.name}</span>
+                        <span className="text-xs text-stone-700 dark:text-stone-200">{t.name}</span>
                         <div className="flex items-center gap-3">
-                          <div className="w-24 h-1.5 rounded-full bg-stone-800 overflow-hidden">
+                          <div className="w-24 h-1.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
                             <div className="h-full rounded-full bg-emerald-500" style={{ width: `${t.rate}%` }} />
                           </div>
-                          <span className="text-xs font-bold text-stone-300">{t.rate}%</span>
+                          <span className="text-xs font-bold text-stone-600 dark:text-stone-300">{t.rate}%</span>
                           <span className="text-[10px] text-stone-600">{t.completed}/{t.total}</span>
                         </div>
                       </div>

@@ -111,12 +111,12 @@ function MetricBox({
       </span>
       <p className={cn(
         "text-sm font-semibold mt-0.5",
-        muted ? "text-stone-400 dark:text-stone-500" : "text-stone-900 dark:text-stone-100",
+        muted ? "text-stone-500 dark:text-stone-500" : "text-stone-900 dark:text-stone-100",
       )}>
         {value}
       </p>
       {sub && (
-        <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-0.5">{sub}</p>
+        <p className="text-[10px] text-stone-500 dark:text-stone-500 mt-0.5">{sub}</p>
       )}
       {variance != null && (
         <span className={cn(

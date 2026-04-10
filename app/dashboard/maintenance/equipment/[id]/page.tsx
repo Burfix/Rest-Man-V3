@@ -55,7 +55,7 @@ export default async function EquipmentDetailPage({ params }: PageProps) {
   return (
     <div className="space-y-8">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-stone-400">
+      <div className="flex items-center gap-2 text-sm text-stone-500 dark:text-stone-400">
         <Link href="/dashboard/maintenance" className="hover:text-stone-700 transition-colors">
           Maintenance
         </Link>
@@ -111,7 +111,7 @@ export default async function EquipmentDetailPage({ params }: PageProps) {
 function InfoCell({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-stone-400 uppercase tracking-wide">{label}</dt>
+      <dt className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">{label}</dt>
       <dd className="mt-0.5 text-sm font-semibold text-stone-800">{value || "—"}</dd>
     </div>
   );
@@ -120,7 +120,7 @@ function InfoCell({ label, value }: { label: string; value: string | null | unde
 function StatCell({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-stone-400 uppercase tracking-wide">{label}</dt>
+      <dt className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wide">{label}</dt>
       <dd className="mt-0.5 text-base font-bold text-stone-900">{value}</dd>
     </div>
   );

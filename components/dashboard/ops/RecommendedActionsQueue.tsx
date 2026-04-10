@@ -76,13 +76,13 @@ export default function RecommendedActionsQueue({ actions }: Props) {
   if (actions.length === 0) {
     return (
       <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 p-6 sm:p-8 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600 mb-3">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-3">
           Recommended Actions
         </p>
         <p className="text-emerald-600 dark:text-emerald-400 text-sm font-semibold">
           ✓ No actions pending
         </p>
-        <p className="text-xs text-stone-400 dark:text-stone-500 mt-1">
+        <p className="text-xs text-stone-500 dark:text-stone-500 mt-1">
           All operational areas are within acceptable ranges
         </p>
       </div>
@@ -93,7 +93,7 @@ export default function RecommendedActionsQueue({ actions }: Props) {
     <div className="rounded-2xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-stone-100 dark:border-stone-800">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
           Recommended Actions
         </p>
         {completedIds.size > 0 && (
@@ -115,10 +115,10 @@ export default function RecommendedActionsQueue({ actions }: Props) {
               <span className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-500">
                 {BUCKET_CONFIG[bucket].label}
               </span>
-              <span className="text-[10px] text-stone-400 dark:text-stone-600">
+              <span className="text-[10px] text-stone-500 dark:text-stone-600">
                 — {BUCKET_CONFIG[bucket].sublabel}
               </span>
-              <span className="ml-auto text-[10px] font-semibold text-stone-400 dark:text-stone-600">
+              <span className="ml-auto text-[10px] font-semibold text-stone-500 dark:text-stone-600">
                 {items.length}
               </span>
             </div>
@@ -181,7 +181,7 @@ export default function RecommendedActionsQueue({ actions }: Props) {
                         → {action.recommendation}
                       </p>
                       {action.recoveryMetric && (
-                        <p className="text-[10px] text-stone-400 dark:text-stone-500 mt-1 italic">
+                        <p className="text-[10px] text-stone-500 dark:text-stone-500 mt-1 italic">
                           {action.recoveryMetric}
                         </p>
                       )}

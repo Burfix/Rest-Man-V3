@@ -73,13 +73,13 @@ export default async function HeatmapPage() {
             icon="🔴"
             label="At Risk"
             value={redCount}
-            color={redCount > 0 ? "text-red-700" : "text-stone-400"}
+            color={redCount > 0 ? "text-red-700" : "text-stone-500 dark:text-stone-400"}
           />
           <QuickStat
             icon="🟡"
             label="Attention"
             value={amberCount}
-            color={amberCount > 0 ? "text-amber-700" : "text-stone-400"}
+            color={amberCount > 0 ? "text-amber-700" : "text-stone-500 dark:text-stone-400"}
           />
           <QuickStat
             icon="🟢"
@@ -130,7 +130,7 @@ function QuickStat({
       <span className="text-sm">{icon}</span>
       <div>
         <p className={`text-sm font-bold leading-none ${color}`}>{value}</p>
-        <p className="text-[10px] text-stone-400 uppercase tracking-wide">{label}</p>
+        <p className="text-[10px] text-stone-500 dark:text-stone-400 uppercase tracking-wide">{label}</p>
       </div>
     </div>
   );

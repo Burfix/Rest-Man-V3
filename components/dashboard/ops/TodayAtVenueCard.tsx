@@ -66,7 +66,7 @@ function DataRow({
           <span className={cn("text-xs font-semibold", valueColor)}>{value}</span>
         </div>
         {sub && (
-          <p className="text-[10px] text-stone-400 dark:text-stone-600 leading-none mt-px">
+          <p className="text-[10px] text-stone-500 dark:text-stone-600 leading-none mt-px">
             {sub}
           </p>
         )}
@@ -99,7 +99,7 @@ export default function TodayAtVenueCard({
 
   const laborPct = null as number | null;
   const laborColor =
-    laborPct == null ? "text-stone-400 dark:text-stone-600"       :
+    laborPct == null ? "text-stone-500 dark:text-stone-600"       :
     laborPct > 45    ? "text-red-600 dark:text-red-400"           :
     laborPct > 35    ? "text-amber-600 dark:text-amber-400"       :
     "text-emerald-600 dark:text-emerald-500";
@@ -159,7 +159,7 @@ export default function TodayAtVenueCard({
         </div>
         <Link
           href="/dashboard/bookings"
-          className="text-[11px] text-stone-400 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
+          className="text-[11px] text-stone-500 dark:text-stone-600 hover:text-stone-700 dark:hover:text-stone-300 transition-colors"
         >
           All bookings →
         </Link>
@@ -187,7 +187,7 @@ export default function TodayAtVenueCard({
               : "None scheduled"
           }
           sub={todayEvent?.start_time ? `Starts ${fmtTime(todayEvent.start_time)}` : undefined}
-          valueColor={todayEvent ? "text-stone-800 dark:text-stone-200" : "text-stone-400 dark:text-stone-600"}
+          valueColor={todayEvent ? "text-stone-800 dark:text-stone-200" : "text-stone-500 dark:text-stone-600"}
         />
         <DataRow
           label="Labour cost"
@@ -206,7 +206,7 @@ export default function TodayAtVenueCard({
             <p className="text-[10px] text-amber-700 dark:text-amber-400 leading-snug">
               {labourInsight.recommendation}
               {labourInsight.projectedClose && (
-                <span className="ml-1 text-stone-400 dark:text-stone-600">
+                <span className="ml-1 text-stone-500 dark:text-stone-600">
                   — projected close {labourInsight.projectedClose.toFixed(1)}%
                 </span>
               )}

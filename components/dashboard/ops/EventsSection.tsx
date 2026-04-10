@@ -14,14 +14,14 @@ export default function EventsSection({ events }: Props) {
         </h2>
         <a
           href="/dashboard/events"
-          className="text-xs font-medium text-stone-400 hover:text-stone-700"
+          className="text-xs font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           All events →
         </a>
       </div>
 
       {events.length === 0 ? (
-        <p className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-6 text-center text-sm text-stone-400">
+        <p className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-6 text-center text-sm text-stone-500 dark:text-stone-400">
           No upcoming events scheduled.
         </p>
       ) : (
@@ -45,7 +45,7 @@ function EventCard({ event }: { event: VenueEvent }) {
             "shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium ring-1 ring-inset",
             event.booking_enabled
               ? "bg-green-50 text-green-700 ring-green-200"
-              : "bg-stone-100 text-stone-400 ring-stone-200"
+              : "bg-stone-100 text-stone-500 dark:text-stone-400 ring-stone-200"
           )}
         >
           {event.booking_enabled ? "Bookings on" : "No bookings"}
@@ -68,7 +68,7 @@ function EventCard({ event }: { event: VenueEvent }) {
       </div>
 
       {event.description && (
-        <p className="mt-2 line-clamp-2 text-xs text-stone-400">
+        <p className="mt-2 line-clamp-2 text-xs text-stone-500 dark:text-stone-400">
           {event.description}
         </p>
       )}

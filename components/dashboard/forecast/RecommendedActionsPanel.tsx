@@ -107,7 +107,7 @@ function ActionCard({ rec, index }: { rec: GMActionRecommendation; index: number
       {/* Why + Impact */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-stone-100 dark:border-stone-700/50">
         <div>
-          <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">
+          <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500">
             Why this matters
           </span>
           <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-0.5">
@@ -115,7 +115,7 @@ function ActionCard({ rec, index }: { rec: GMActionRecommendation; index: number
           </p>
         </div>
         <div>
-          <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-400 dark:text-stone-500">
+          <span className="text-[9px] uppercase tracking-wider font-semibold text-stone-500 dark:text-stone-500">
             Expected impact
           </span>
           <p className="text-[11px] text-stone-600 dark:text-stone-400 mt-0.5">

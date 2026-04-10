@@ -69,7 +69,7 @@ export default async function ReviewsPage() {
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-base font-semibold text-stone-900">Live Platform Reviews</h2>
           {googleData && (
-            <span className="text-xs text-stone-400">Google refreshes hourly</span>
+            <span className="text-xs text-stone-500 dark:text-stone-400">Google refreshes hourly</span>
           )}
         </div>
 
@@ -128,7 +128,7 @@ export default async function ReviewsPage() {
         {reviews.length === 0 ? (
           <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center">
             <p className="text-sm font-medium text-stone-500">No reviews recorded yet</p>
-            <p className="mt-1 text-xs text-stone-400">
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
               Use the &ldquo;Add Review&rdquo; button above to log a customer review manually.
             </p>
           </div>
@@ -136,7 +136,7 @@ export default async function ReviewsPage() {
           <div className="overflow-x-auto rounded-lg border border-stone-200">
             <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
               <thead>
-                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                   <th className="px-4 py-3">Date</th>
                   <th className="px-4 py-3">Platform</th>
                   <th className="px-4 py-3">Rating</th>
@@ -186,13 +186,13 @@ function GoogleReviewsCard({ data }: { data: GoogleLiveReviews }) {
             <span className="text-[#34A853]">l</span>
             <span className="text-[#EA4335]">e</span>
           </span>
-          <span className="text-xs text-stone-400">Reviews</span>
+          <span className="text-xs text-stone-500 dark:text-stone-400">Reviews</span>
         </div>
         <div className="text-right">
           <span className={cn("text-xl font-bold", ratingColor)}>
             {data.overallRating.toFixed(1)} ★
           </span>
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-stone-500 dark:text-stone-400">
             {data.totalReviews.toLocaleString()} total
           </p>
         </div>
@@ -200,7 +200,7 @@ function GoogleReviewsCard({ data }: { data: GoogleLiveReviews }) {
 
       {/* Review list */}
       {data.reviews.length === 0 ? (
-        <p className="px-4 py-6 text-center text-sm text-stone-400">
+        <p className="px-4 py-6 text-center text-sm text-stone-500 dark:text-stone-400">
           No review text available from Google.
         </p>
       ) : (
@@ -259,7 +259,7 @@ function GoogleReviewItem({ review }: { review: GoogleReview }) {
             >
               {review.author_name}
             </a>
-            <p className="text-xs text-stone-400">{review.relative_time_description}</p>
+            <p className="text-xs text-stone-500 dark:text-stone-400">{review.relative_time_description}</p>
           </div>
         </div>
         <span className={cn("shrink-0 text-sm font-bold", ratingColor)}>
@@ -279,7 +279,7 @@ function GoogleConnectNudge() {
   return (
     <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center">
       <p className="text-sm font-semibold text-stone-600">Google Reviews</p>
-      <p className="mt-1 max-w-xs text-xs text-stone-400">
+      <p className="mt-1 max-w-xs text-xs text-stone-500 dark:text-stone-400">
         Live Google reviews are not yet configured for this installation.
         Contact your system administrator to enable this feature.
       </p>
@@ -314,7 +314,7 @@ function ReviewRow({ review }: { review: Review }) {
         </span>
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-stone-600">
-        {review.reviewer_name ?? <span className="text-stone-300">—</span>}
+        {review.reviewer_name ?? <span className="text-stone-600 dark:text-stone-300">—</span>}
       </td>
       <td className="whitespace-nowrap px-4 py-3">
         {review.sentiment ? (
@@ -327,7 +327,7 @@ function ReviewRow({ review }: { review: Review }) {
             {review.sentiment}
           </span>
         ) : (
-          <span className="text-stone-300">—</span>
+          <span className="text-stone-600 dark:text-stone-300">—</span>
         )}
       </td>
       <td className="px-4 py-3 max-w-[280px]">
@@ -353,7 +353,7 @@ function ReviewRow({ review }: { review: Review }) {
             Flagged
           </span>
         ) : (
-          <span className="text-stone-300">—</span>
+          <span className="text-stone-600 dark:text-stone-300">—</span>
         )}
       </td>
     </tr>
@@ -384,7 +384,7 @@ function SummaryCard({
 
   return (
     <div className={cn("rounded-lg border px-4 py-4", colorMap[color])}>
-      <p className="text-xs font-semibold uppercase tracking-wide text-stone-400">
+      <p className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </p>
       <p className={cn("mt-1 text-2xl font-bold", textMap[color])}>{value}</p>

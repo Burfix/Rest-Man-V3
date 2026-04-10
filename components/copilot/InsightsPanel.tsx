@@ -67,7 +67,7 @@ export default function InsightsPanel({ insights }: Props) {
             </div>
 
             {/* Pattern */}
-            <p className="text-[11px] text-stone-200 leading-snug font-medium">
+            <p className="text-[11px] text-stone-700 dark:text-stone-200 leading-snug font-medium">
               {insight.detectedPattern}
             </p>
 
@@ -79,7 +79,7 @@ export default function InsightsPanel({ insights }: Props) {
 
             {/* Action + Impact */}
             <div className="flex items-center justify-between pt-0.5 border-t border-[#1a1a1a]">
-              <p className="text-[10px] text-stone-400 leading-snug">
+              <p className="text-[10px] text-stone-500 dark:text-stone-400 leading-snug">
                 <span className="text-stone-600 uppercase tracking-wider text-[9px]">Do </span>
                 {insight.recommendedAction}
               </p>

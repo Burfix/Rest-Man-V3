@@ -52,12 +52,12 @@ export default function InventoryStatusWidget({ inventory }: Props) {
       <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-stone-800">
         <div className="flex items-center gap-2">
           <span className="text-sm">📦</span>
-          <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-400 dark:text-stone-600">
+          <h3 className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
             Inventory Status
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-stone-400 dark:text-stone-600">{syncLabel}</span>
+          <span className="text-[10px] text-stone-500 dark:text-stone-600">{syncLabel}</span>
           <span className={cn("text-sm font-bold tabular-nums", scoreColor)}>
             {inventory.riskScore}/10
           </span>
@@ -68,22 +68,22 @@ export default function InventoryStatusWidget({ inventory }: Props) {
       <div className="grid grid-cols-3 divide-x divide-stone-100 dark:divide-stone-800 border-b border-stone-100 dark:border-stone-800">
         <div className="flex flex-col items-center py-3">
           <span className="text-lg font-bold tabular-nums text-red-600 dark:text-red-400">{critCount}</span>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Stockout</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600">Stockout</span>
         </div>
         <div className="flex flex-col items-center py-3">
           <span className="text-lg font-bold tabular-nums text-amber-600 dark:text-amber-400">{lowCount}</span>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Low Stock</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600">Low Stock</span>
         </div>
         <div className="flex flex-col items-center py-3">
           <span className="text-lg font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{healthy}</span>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Healthy</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600">Healthy</span>
         </div>
       </div>
 
       {/* Top risk items */}
       {topRisks.length > 0 && (
         <div className="px-5 py-3 border-b border-stone-100 dark:border-stone-800">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600 mb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600 mb-2">
             Top Risk Items
           </p>
           <div className="space-y-1.5">
@@ -122,7 +122,7 @@ export default function InventoryStatusWidget({ inventory }: Props) {
       {/* Menu impact */}
       {menuImpacts.length > 0 && (
         <div className="px-5 py-3 border-b border-stone-100 dark:border-stone-800">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600 mb-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600 mb-2">
             Menu Impact
           </p>
           <div className="space-y-1.5">
@@ -133,7 +133,7 @@ export default function InventoryStatusWidget({ inventory }: Props) {
                     {m.ingredientName}
                   </span>
                   {m.affectedDishes.length > 0 && (
-                    <span className="text-[10px] text-stone-400 dark:text-stone-600 ml-1">
+                    <span className="text-[10px] text-stone-500 dark:text-stone-600 ml-1">
                       → {m.affectedDishes.slice(0, 2).join(", ")}
                     </span>
                   )}
@@ -149,7 +149,7 @@ export default function InventoryStatusWidget({ inventory }: Props) {
 
       {/* Footer — totals + no-PO warning */}
       <div className="px-5 py-3 flex items-center justify-between">
-        <span className="text-[10px] text-stone-400 dark:text-stone-600">
+        <span className="text-[10px] text-stone-500 dark:text-stone-600">
           {total} item{total !== 1 ? "s" : ""} tracked
         </span>
         <div className="flex items-center gap-3">

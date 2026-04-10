@@ -305,7 +305,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       {!editing && !connection && (
         <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-8 text-center">
           <p className="text-sm font-medium text-stone-500">Not configured</p>
-          <p className="mt-1 text-xs text-stone-400">Enter your Oracle MICROS credentials to enable live POS sync.</p>
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">Enter your Oracle MICROS credentials to enable live POS sync.</p>
           <button
             type="button"
             onClick={() => setEditing(true)}
@@ -336,7 +336,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
               defaultValue={connection?.org_identifier ?? ""} required />
           </div>
 
-          <p className="text-xs text-stone-400">
+          <p className="text-xs text-stone-500 dark:text-stone-400">
             The API account username and password are configured via the{" "}
             <code className="font-mono bg-stone-100 px-1 rounded">MICROS_USERNAME</code> and{" "}
             <code className="font-mono bg-stone-100 px-1 rounded">MICROS_PASSWORD</code> server environment variables.
@@ -379,7 +379,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       {!editing && connection && (
         <>
           <div className="mt-6 border-t border-stone-100 pt-5">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-stone-400">
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
               Sync Status
             </h3>
 
@@ -392,7 +392,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
                   <p className="mt-0.5 text-xs text-stone-500">{microsHealth.userMessage}</p>
                   {connection?.last_sync_error && microsHealth.health !== "credentials_present" && microsHealth.health !== "awaiting_verification" && microsHealth.health !== "awaiting_setup" && (
                     <details className="mt-2">
-                      <summary className="cursor-pointer text-xs text-stone-400 hover:text-stone-600">
+                      <summary className="cursor-pointer text-xs text-stone-500 dark:text-stone-400 hover:text-stone-600">
                         Technical details
                       </summary>
                       <p className="mt-1 rounded-md border border-stone-100 bg-white px-2 py-1.5 font-mono text-xs text-stone-600 break-all">

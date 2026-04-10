@@ -222,7 +222,7 @@ export default function OperationalHealthCard({
             <span className={cn("text-4xl font-black tabular-nums leading-none", cfg.color)}>
               {total}
             </span>
-            <span className="text-sm text-stone-400 dark:text-stone-600 font-medium">/100</span>
+            <span className="text-sm text-stone-500 dark:text-stone-600 font-medium">/100</span>
           </div>
           <p className={cn("text-sm font-semibold mt-1", cfg.color)}>{status}</p>
         </div>
@@ -233,7 +233,7 @@ export default function OperationalHealthCard({
               style={{ width: `${total}%` }}
             />
           </div>
-          <p className="mt-1.5 text-[10px] text-stone-400 dark:text-stone-600 leading-tight">
+          <p className="mt-1.5 text-[10px] text-stone-500 dark:text-stone-600 leading-tight">
             Compliance · maintenance · revenue · service data
           </p>
         </div>
@@ -243,15 +243,15 @@ export default function OperationalHealthCard({
       <div className="flex-1 divide-y divide-stone-100 dark:divide-stone-800">
         {bars.map((bar) => {
           const labelColor =
-            bar.dimmed              ? "text-stone-400 dark:text-stone-600" :
+            bar.dimmed              ? "text-stone-500 dark:text-stone-600" :
             "text-stone-600 dark:text-stone-400";
 
           const statusColor =
-            bar.dimmed                            ? "text-stone-400 dark:text-stone-600"   :
+            bar.dimmed                            ? "text-stone-500 dark:text-stone-600"   :
             bar.barColor.includes("red-5")        ? "text-red-600 dark:text-red-400"       :
             bar.barColor.includes("amber")        ? "text-amber-600 dark:text-amber-400"   :
             bar.barColor.includes("stone-2") ||
-            bar.barColor.includes("stone-7")      ? "text-stone-400 dark:text-stone-600"   :
+            bar.barColor.includes("stone-7")      ? "text-stone-500 dark:text-stone-600"   :
             "text-emerald-600 dark:text-emerald-500";
 
           return (
@@ -266,7 +266,7 @@ export default function OperationalHealthCard({
                   </span>
                   <span className={cn(
                     "text-[11px] font-bold tabular-nums",
-                    bar.dimmed ? "text-stone-400 dark:text-stone-600" : "text-stone-700 dark:text-stone-300"
+                    bar.dimmed ? "text-stone-500 dark:text-stone-600" : "text-stone-700 dark:text-stone-300"
                   )}>
                     {bar.value}
                   </span>
@@ -290,7 +290,7 @@ export default function OperationalHealthCard({
             <div className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-amber-400 shrink-0" />
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Top risk driver</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600">Top risk driver</p>
                 <p className="text-[11px] text-stone-700 dark:text-stone-300 font-medium leading-snug mt-px">{topRiskDriver}</p>
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function OperationalHealthCard({
             <div className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-400 shrink-0" />
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Fastest fix</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600">Fastest fix</p>
                 <p className="text-[11px] text-stone-600 dark:text-stone-400 leading-snug mt-px">{fastestFix}</p>
               </div>
             </div>
@@ -308,7 +308,7 @@ export default function OperationalHealthCard({
             <div className="flex items-start gap-2">
               <span className="mt-1 h-1.5 w-1.5 rounded-full bg-sky-400 shrink-0" />
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-600">Confidence</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-600">Confidence</p>
                 <p className="text-[11px] text-stone-500 dark:text-stone-500 leading-snug mt-px">
                   {freshnessNotes.join(" · ")}
                 </p>

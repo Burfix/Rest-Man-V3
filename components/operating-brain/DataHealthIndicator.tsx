@@ -133,10 +133,10 @@ export default function DataHealthIndicator({ health }: Props) {
           <div className="border-t border-stone-800/40 px-4 py-2 space-y-1.5">
             {health.details.map((d) => (
               <div key={d.source} className="flex items-center justify-between text-xs">
-                <span className="text-stone-400">{d.source}</span>
+                <span className="text-stone-500 dark:text-stone-400">{d.source}</span>
                 <div className="flex items-center gap-1.5">
                   <span className={cn("h-1.5 w-1.5 rounded-full", TONE_DOT[d.tone] ?? "bg-stone-600")} />
-                  <span className="text-stone-300 font-mono text-[11px]">{d.label}</span>
+                  <span className="text-stone-600 dark:text-stone-300 font-mono text-[11px]">{d.label}</span>
                 </div>
               </div>
             ))}
@@ -150,8 +150,8 @@ export default function DataHealthIndicator({ health }: Props) {
                   "w-full rounded-lg px-3 py-2 text-xs font-medium transition-colors",
                   "flex items-center justify-center gap-2",
                   syncing
-                    ? "bg-stone-800 text-stone-500 cursor-wait"
-                    : "bg-stone-800 text-stone-200 hover:bg-stone-700 active:bg-stone-600",
+                    ? "bg-stone-100 dark:bg-stone-800 text-stone-500 cursor-wait"
+                    : "bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 hover:bg-stone-700 active:bg-stone-600",
                 )}
               >
                 <svg

@@ -54,7 +54,7 @@ export default async function SalesPage() {
         </span>
         <Link
           href="/dashboard/sales/historical"
-          className="px-4 py-2 text-sm font-medium text-stone-400 hover:text-stone-700"
+          className="px-4 py-2 text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-700"
         >
           Historical Daily
         </Link>
@@ -74,7 +74,7 @@ export default async function SalesPage() {
           <p className="text-sm font-semibold text-stone-600">
             No sales data uploaded yet
           </p>
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
             Use the upload form above to import your first weekly POS export.
           </p>
         </div>
@@ -89,14 +89,14 @@ export default async function SalesPage() {
                     <p className="font-semibold text-stone-900">
                       {latest.week_label}
                     </p>
-                    <p className="mt-0.5 text-xs text-stone-400">
+                    <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
                       {formatShortDate(latest.week_start)} –{" "}
                       {formatShortDate(latest.week_end)}
                     </p>
                   </div>
                   <div className="flex gap-6">
                     <div className="text-right">
-                      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
                         Items Sold
                       </p>
                       <p className="text-2xl font-bold text-stone-900">
@@ -104,7 +104,7 @@ export default async function SalesPage() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                      <p className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
                         Sales Value
                       </p>
                       <p className="text-2xl font-bold text-stone-900">
@@ -120,7 +120,7 @@ export default async function SalesPage() {
                 <div className="overflow-x-auto rounded-lg border border-stone-200">
                   <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
                     <thead>
-                      <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                      <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                         <th className="px-4 py-3">#</th>
                         <th className="px-4 py-3">Item</th>
                         <th className="px-4 py-3">Category</th>
@@ -149,7 +149,7 @@ export default async function SalesPage() {
               <div className="overflow-x-auto rounded-lg border border-stone-200">
                 <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
                   <thead>
-                    <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-400">
+                    <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
                       <th className="px-4 py-3">Week</th>
                       <th className="px-4 py-3">Date Range</th>
                       <th className="px-4 py-3 text-right">Items Sold</th>
@@ -173,7 +173,7 @@ export default async function SalesPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-stone-900">
                           {formatCurrency(u.total_sales_value)}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-stone-400">
+                        <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-stone-500 dark:text-stone-400">
                           {formatShortDate(u.uploaded_at.slice(0, 10))}
                         </td>
                       </tr>
@@ -192,7 +192,7 @@ export default async function SalesPage() {
 function SalesItemRow({ item, rank }: { item: SalesItem; rank: number }) {
   return (
     <tr className="hover:bg-stone-50">
-      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-stone-400">
+      <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-stone-500 dark:text-stone-400">
         {rank}
       </td>
       <td className="px-4 py-3 font-medium text-stone-800">{item.item_name}</td>
@@ -202,7 +202,7 @@ function SalesItemRow({ item, rank }: { item: SalesItem; rank: number }) {
       <td className="whitespace-nowrap px-4 py-3 text-right font-semibold text-stone-900">
         {item.quantity_sold.toLocaleString()}
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-stone-400">
+      <td className="whitespace-nowrap px-4 py-3 text-right text-xs text-stone-500 dark:text-stone-400">
         {formatCurrency(item.unit_price)}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right font-medium text-stone-700">

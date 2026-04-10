@@ -32,7 +32,7 @@ export default async function EventsPage() {
         </div>
       )}
       {events.length === 0 ? (
-        <p className="text-sm text-stone-400">No upcoming events found.</p>
+        <p className="text-sm text-stone-500 dark:text-stone-400">No upcoming events found.</p>
       ) : (
         <EventsTable events={events} />
       )}

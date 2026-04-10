@@ -111,7 +111,7 @@ export default async function SettingsPage() {
 function SettingRow({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-stone-400">
+      <dt className="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">
         {label}
       </dt>
       <dd className="mt-1 text-sm font-semibold text-stone-800">{value}</dd>

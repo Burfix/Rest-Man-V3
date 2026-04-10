@@ -132,7 +132,7 @@ function ZoneCard({
           <span className={cn("text-2xl font-bold tabular-nums", STATUS_TEXT[status])}>
             {Math.round(composite_score)}
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-400">
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500 dark:text-stone-400">
             Risk Score / 100
           </span>
         </div>
@@ -166,7 +166,7 @@ function ZoneCard({
 
         {/* Expand indicator */}
         <div className="mt-2 flex justify-end">
-          <span className="text-[10px] text-stone-400 font-medium">
+          <span className="text-[10px] text-stone-500 dark:text-stone-400 font-medium">
             {isExpanded ? "▲ Hide details" : "▼ Details"}
           </span>
         </div>
@@ -210,7 +210,7 @@ function ZoneCard({
             </p>
           )}
           {summary.last_computed_at && (
-            <p className="text-[10px] text-stone-400">
+            <p className="text-[10px] text-stone-500 dark:text-stone-400">
               Last computed:{" "}
               {new Date(summary.last_computed_at).toLocaleTimeString("en-ZA", {
                 hour: "2-digit",
@@ -243,7 +243,7 @@ function Metric({
       <p
         className={cn(
           "text-lg font-bold tabular-nums leading-none",
-          alert && value > 0 ? "text-stone-800" : "text-stone-400"
+          alert && value > 0 ? "text-stone-800" : "text-stone-500 dark:text-stone-400"
         )}
       >
         {value}
@@ -274,13 +274,13 @@ function DrillDownRow({
         <span className="text-sm">{icon}</span>
         <div>
           <p className="text-xs font-medium text-stone-700">{label}</p>
-          {sub && <p className="text-[10px] text-stone-400">{sub}</p>}
+          {sub && <p className="text-[10px] text-stone-500 dark:text-stone-400">{sub}</p>}
         </div>
       </div>
       <span
         className={cn(
           "text-sm font-bold tabular-nums",
-          alert && value > 0 ? "text-red-600" : "text-stone-400"
+          alert && value > 0 ? "text-red-600" : "text-stone-500 dark:text-stone-400"
         )}
       >
         {value}
@@ -326,7 +326,7 @@ function SiteSummaryBar({
         <Pill count={green} label="Clear"     color="text-emerald-700 bg-emerald-100" />
       </div>
       {computedAt && (
-        <p className="ml-auto text-[11px] text-stone-400 hidden sm:block">
+        <p className="ml-auto text-[11px] text-stone-500 dark:text-stone-400 hidden sm:block">
           Updated{" "}
           {new Date(computedAt).toLocaleTimeString("en-ZA", {
             hour: "2-digit",
@@ -530,7 +530,7 @@ function RiskLegend() {
             <div>
               <p className="text-[11px] font-bold text-stone-700">{b.label}</p>
               <p className="text-[10px] text-stone-500 leading-relaxed">{b.desc}</p>
-              <p className="text-[10px] font-mono text-stone-400">Score {b.range}</p>
+              <p className="text-[10px] font-mono text-stone-500 dark:text-stone-400">Score {b.range}</p>
             </div>
           </div>
         ))}

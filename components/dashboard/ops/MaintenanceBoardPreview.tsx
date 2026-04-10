@@ -65,7 +65,7 @@ export default function MaintenanceBoardPreview({ maintenance }: Props) {
               {totalOpen} open
             </StatusChip>
           )}
-          <Link href="/dashboard/maintenance" className="text-xs text-stone-400 hover:text-stone-700">
+          <Link href="/dashboard/maintenance" className="text-xs text-stone-500 dark:text-stone-400 hover:text-stone-700">
             Full board →
           </Link>
         </div>
@@ -105,7 +105,7 @@ export default function MaintenanceBoardPreview({ maintenance }: Props) {
                     "rounded-full px-1.5 py-px text-[10px] font-bold",
                     count > 0
                       ? col.id === "resolved" ? "bg-emerald-100 text-emerald-700" : "bg-stone-200 text-stone-600"
-                      : "bg-stone-100 text-stone-400"
+                      : "bg-stone-100 text-stone-500 dark:text-stone-400"
                   )}>
                     {count}
                   </span>
@@ -126,24 +126,24 @@ export default function MaintenanceBoardPreview({ maintenance }: Props) {
                       <p className="text-xs font-semibold text-stone-600">
                         {count} issue{count > 1 ? "s" : ""}
                       </p>
-                      <Link href="/dashboard/maintenance" className="text-[10px] text-stone-400 hover:underline">
+                      <Link href="/dashboard/maintenance" className="text-[10px] text-stone-500 dark:text-stone-400 hover:underline">
                         View in maintenance
                       </Link>
                     </div>
                   )}
 
                   {issues.length === 0 && count === 0 && col.id !== "resolved" && (
-                    <p className="text-[11px] text-stone-300 italic text-center pt-4">None</p>
+                    <p className="text-[11px] text-stone-600 dark:text-stone-300 italic text-center pt-4">None</p>
                   )}
                   {issues.length === 0 && col.id === "resolved" && (
-                    <p className="text-[11px] text-stone-300 italic text-center pt-4">No recent repairs</p>
+                    <p className="text-[11px] text-stone-600 dark:text-stone-300 italic text-center pt-4">No recent repairs</p>
                   )}
                 </div>
 
                 {issues.length > 3 && (
                   <Link
                     href="/dashboard/maintenance"
-                    className="mt-2 text-center text-[10px] text-stone-400 hover:text-stone-600 hover:underline"
+                    className="mt-2 text-center text-[10px] text-stone-500 dark:text-stone-400 hover:text-stone-600 hover:underline"
                   >
                     +{issues.length - 3} more
                   </Link>
@@ -178,11 +178,11 @@ function IssueCard({ issue }: { issue: MaintenanceLog }) {
         <span className={cn("rounded-md px-1.5 py-px text-[9px] font-bold uppercase", pCfg.cls)}>
           {pCfg.label}
         </span>
-        <span className="text-[10px] text-stone-400">{ageDays}d ago</span>
+        <span className="text-[10px] text-stone-500 dark:text-stone-400">{ageDays}d ago</span>
       </div>
 
       {issue.resolved_by && (
-        <p className="mt-1 text-[10px] text-stone-400 truncate">
+        <p className="mt-1 text-[10px] text-stone-500 dark:text-stone-400 truncate">
           ↳ {issue.resolved_by}
         </p>
       )}
