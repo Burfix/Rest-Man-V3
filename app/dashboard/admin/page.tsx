@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import MicrosConfigModal from "@/components/admin/MicrosConfigModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -508,7 +508,6 @@ function TeamPanel({
   const [deleting, setDeleting] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [form, setForm] = useState({ email: "", full_name: "", role: "gm", site_id: "" });
-  const router = useRouter();
 
   const startEditing = (user: UserEntry) => {
     const primaryRole = user.roles.find((r) => r.is_active);
@@ -605,8 +604,8 @@ function TeamPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ target_user_id: userId }),
       });
-      router.push("/dashboard");
-      router.refresh();
+      // Hard reload to fully reset client-side state for impersonated user
+      window.location.href = "/dashboard";
     } catch {
       setImpersonating(null);
     }
@@ -811,7 +810,9 @@ function RolesPanel({ users }: { users: UserEntry[] | null }) {
 
 // ── 6. Integrations ───────────────────────────────────────────────────────────
 
-function IntegrationsPanel({ data }: { data: IntegrationsData | null }) {
+function IntegrationsPanel({ data, onRefresh }: { data: IntegrationsData | null; onRefresh: () => void }) {
+  const [selectedStore, setSelectedStore] = useState<{ id: string; name: string } | null>(null);
+
   if (!data) return <LoadingSkeleton />;
 
   const { integrations, summary } = data;
@@ -839,7 +840,11 @@ function IntegrationsPanel({ data }: { data: IntegrationsData | null }) {
           <div className="col-span-3">Last Sync</div>
         </div>
         {integrations.map((i) => (
-          <div key={i.store_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-stone-800/40 transition-colors">
+          <div
+            key={i.store_id}
+            onClick={() => setSelectedStore({ id: i.store_id, name: i.store_name })}
+            className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-stone-800/40 transition-colors cursor-pointer"
+          >
             <div className="col-span-3">
               <div className="text-sm font-medium text-stone-200">{i.store_name}</div>
               <div className="text-[10px] font-mono text-stone-500">{i.store_code}</div>
@@ -857,6 +862,22 @@ function IntegrationsPanel({ data }: { data: IntegrationsData | null }) {
         ))}
         {integrations.length === 0 && <EmptyState message="No stores to show" />}
       </div>
+
+      <p className="text-[10px] text-stone-600 text-center">Click a store row to configure Micros credentials</p>
+
+      {/* Micros configuration modal */}
+      {selectedStore && (
+        <MicrosConfigModal
+          storeId={selectedStore.id}
+          storeName={selectedStore.name}
+          open={!!selectedStore}
+          onClose={() => setSelectedStore(null)}
+          onSaved={() => {
+            setSelectedStore(null);
+            onRefresh();
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1263,7 +1284,7 @@ export default function AdminDashboard() {
       {tab === "stores"         && <StoresPanel stores={stores} onRefresh={handleRefresh} />}
       {tab === "team"           && <TeamPanel users={users} stores={stores} onRefresh={handleRefresh} />}
       {tab === "roles"          && <RolesPanel users={users} />}
-      {tab === "integrations"   && <IntegrationsPanel data={integrations} />}
+      {tab === "integrations"   && <IntegrationsPanel data={integrations} onRefresh={() => { setIntegrations(null); loadIntegrations(); }} />}
       {tab === "data-health"    && <DataHealthPanel data={dataHealth} onRefresh={() => { setDataHealth(null); loadDataHealth(); }} />}
       {tab === "sync-logs"      && <SyncLogsPanel data={syncLogs} page={syncPage} setPage={setSyncPage} />}
       {tab === "audit"          && <AuditPanel entries={audit} users={users} />}

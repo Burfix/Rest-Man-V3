@@ -31,6 +31,7 @@ const DEFAULTS: Omit<SiteConfig, "site_id" | "site_name"> = {
   seating_capacity: 200,
   currency_symbol: "R",
   timezone: "Africa/Johannesburg",
+  allowed_routes: null,
 };
 
 const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";

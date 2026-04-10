@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface ImpersonationState {
   impersonating: boolean;
@@ -14,7 +13,6 @@ interface ImpersonationState {
 export default function ImpersonationBanner() {
   const [state, setState] = useState<ImpersonationState | null>(null);
   const [ending, setEnding] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/admin/impersonate/status")
@@ -29,9 +27,9 @@ export default function ImpersonationBanner() {
     setEnding(true);
     try {
       await fetch("/api/admin/impersonate", { method: "DELETE" });
-      router.push("/dashboard/admin");
-      router.refresh();
-    } finally {
+      // Hard reload to fully clear client-side state and caches
+      window.location.href = "/dashboard/admin";
+    } catch {
       setEnding(false);
     }
   }

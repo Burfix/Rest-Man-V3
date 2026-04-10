@@ -6,6 +6,7 @@
  */
 
 import { createSessionClient } from "@/lib/supabase/session";
+import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -24,7 +25,7 @@ export async function signIn(
   const cookieStore = cookies();
   const supabase = createSessionClient(cookieStore);
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { error, data } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
     // Never expose Supabase internals to the UI
@@ -35,6 +36,23 @@ export async function signIn(
       return { error: "Invalid email or password." };
     }
     return { error: "Sign in failed. Please try again." };
+  }
+
+  // Activate profile on first login (invited → active) & track last_seen_at
+  if (data.user) {
+    try {
+      const db = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false } },
+      );
+      await db
+        .from("profiles")
+        .update({ status: "active", last_seen_at: new Date().toISOString() })
+        .eq("id", data.user.id);
+    } catch {
+      // Non-blocking — don't prevent login if profile update fails
+    }
   }
 
   redirect(next.startsWith("/") ? next : "/dashboard");
