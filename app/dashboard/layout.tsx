@@ -5,6 +5,7 @@ import AutoRefresh from "@/components/dashboard/AutoRefresh";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import RoleGuard from "@/components/dashboard/RoleGuard";
 import { getUserContext } from "@/lib/auth/get-user-context";
+import { getSiteConfig } from "@/lib/config/site";
 import type { UserRole } from "@/lib/ontology/entities";
 
 export const metadata = {
@@ -17,9 +18,12 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   let role: UserRole = "viewer"; // most restrictive fallback
+  let siteAllowedRoutes: string[] | null = null;
   try {
     const ctx = await getUserContext();
     role = ctx.role;
+    const siteConfig = await getSiteConfig(ctx.siteId);
+    siteAllowedRoutes = siteConfig.allowed_routes;
   } catch {
     // Middleware handles auth redirects; default to most restrictive role
   }
@@ -27,7 +31,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex h-screen bg-[#f8f8f6] dark:bg-[#0f0f0e]">
       <ImpersonationBanner />
-      <Sidebar role={role} footer={
+      <Sidebar role={role} siteAllowedRoutes={siteAllowedRoutes} footer={
         <div>
           <ThemeToggle />
           <UserProfile />
@@ -36,7 +40,7 @@ export default async function DashboardLayout({
       {/* pt-14 reserves space for the fixed mobile top bar; lg:pt-0 removes it on desktop */}
       <main className="flex-1 overflow-y-auto p-4 pt-[72px] lg:p-8 lg:pt-8 bg-[#f8f8f6] dark:bg-[#0f0f0e]">
         <AutoRefresh />
-        <RoleGuard role={role}>
+        <RoleGuard role={role} siteAllowedRoutes={siteAllowedRoutes}>
           {children}
         </RoleGuard>
       </main>

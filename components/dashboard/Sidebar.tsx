@@ -78,16 +78,18 @@ function NavList({
   pathname,
   onNavClick,
   role,
+  siteAllowedRoutes,
 }: {
   pathname: string;
   onNavClick?: () => void;
   role?: UserRole;
+  siteAllowedRoutes?: string[] | null;
 }) {
-  // Filter nav groups based on role
+  // Filter nav groups based on role + site-level restrictions
   const filteredNav = role
     ? NAV.map((group) => ({
         ...group,
-        items: group.items.filter((item) => isNavItemAllowed(role, item.href)),
+        items: group.items.filter((item) => isNavItemAllowed(role, item.href, siteAllowedRoutes)),
       })).filter((group) => group.items.length > 0)
     : NAV;
 
@@ -146,9 +148,10 @@ function NavList({
 interface Props {
   footer?: React.ReactNode;
   role?: UserRole;
+  siteAllowedRoutes?: string[] | null;
 }
 
-export default function Sidebar({ footer, role }: Props) {
+export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -175,7 +178,7 @@ export default function Sidebar({ footer, role }: Props) {
           </div>
         </div>
 
-        <NavList pathname={pathname} role={role} />
+        <NavList pathname={pathname} role={role} siteAllowedRoutes={siteAllowedRoutes} />
         {footer}
       </aside>
 
@@ -229,7 +232,7 @@ export default function Sidebar({ footer, role }: Props) {
               </button>
             </div>
 
-            <NavList pathname={pathname} onNavClick={() => setOpen(false)} role={role} />
+            <NavList pathname={pathname} onNavClick={() => setOpen(false)} role={role} siteAllowedRoutes={siteAllowedRoutes} />
             {footer}
           </div>
         </div>

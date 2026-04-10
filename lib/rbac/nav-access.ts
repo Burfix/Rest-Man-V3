@@ -46,24 +46,54 @@ export const ROLE_ALLOWED_ROUTES: Partial<Record<UserRole, string[]>> = {
   ],
 };
 
-/** Check if a given pathname is allowed for the role */
-export function isRouteAllowed(role: UserRole, pathname: string): boolean {
-  const allowed = ROLE_ALLOWED_ROUTES[role];
-  if (!allowed) return true; // unrestricted role
-  return allowed.some((route) =>
-    route === "/dashboard"
-      ? pathname === "/dashboard"
-      : pathname === route || pathname.startsWith(route + "/")
-  );
+/** Check if a given pathname is allowed for the role (and optionally the site) */
+export function isRouteAllowed(role: UserRole, pathname: string, siteAllowedRoutes?: string[] | null): boolean {
+  const roleRoutes = ROLE_ALLOWED_ROUTES[role];
+  // Step 1: Check role permission
+  const roleAllowed = roleRoutes
+    ? roleRoutes.some((route) =>
+        route === "/dashboard"
+          ? pathname === "/dashboard"
+          : pathname === route || pathname.startsWith(route + "/")
+      )
+    : true; // unrestricted role
+
+  if (!roleAllowed) return false;
+
+  // Step 2: Check site-level restriction (if set)
+  if (siteAllowedRoutes && siteAllowedRoutes.length > 0) {
+    return siteAllowedRoutes.some((route) =>
+      route === "/dashboard"
+        ? pathname === "/dashboard"
+        : pathname === route || pathname.startsWith(route + "/")
+    );
+  }
+
+  return true;
 }
 
-/** Check if a nav item href should be visible for the role */
-export function isNavItemAllowed(role: UserRole, href: string): boolean {
-  const allowed = ROLE_ALLOWED_ROUTES[role];
-  if (!allowed) return true; // unrestricted role
-  return allowed.some((route) =>
-    route === "/dashboard"
-      ? href === "/dashboard"
-      : href === route || href.startsWith(route + "/")
-  );
+/** Check if a nav item href should be visible for the role (and optionally the site) */
+export function isNavItemAllowed(role: UserRole, href: string, siteAllowedRoutes?: string[] | null): boolean {
+  const roleRoutes = ROLE_ALLOWED_ROUTES[role];
+  // Step 1: Check role permission
+  const roleAllowed = roleRoutes
+    ? roleRoutes.some((route) =>
+        route === "/dashboard"
+          ? href === "/dashboard"
+          : href === route || href.startsWith(route + "/")
+      )
+    : true; // unrestricted role
+
+  if (!roleAllowed) return false;
+
+  // Step 2: Check site-level restriction (if set)
+  if (siteAllowedRoutes && siteAllowedRoutes.length > 0) {
+    return siteAllowedRoutes.some((route) =>
+      route === "/dashboard"
+        ? href === "/dashboard"
+        : href === route || href.startsWith(route + "/")
+    );
+  }
+
+  return true;
 }

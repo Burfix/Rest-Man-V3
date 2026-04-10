@@ -12,15 +12,17 @@ import { isRouteAllowed } from "@/lib/rbac/nav-access";
  */
 export default function RoleGuard({
   role,
+  siteAllowedRoutes,
   children,
 }: {
   role: UserRole;
+  siteAllowedRoutes?: string[] | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const allowed = isRouteAllowed(role, pathname);
+  const allowed = isRouteAllowed(role, pathname, siteAllowedRoutes);
 
   useEffect(() => {
     if (!allowed) {

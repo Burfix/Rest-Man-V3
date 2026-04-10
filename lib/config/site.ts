@@ -20,6 +20,8 @@ export interface SiteConfig {
   seating_capacity: number;
   currency_symbol: string;
   timezone: string;
+  /** Optional route restrictions for this site. NULL = all routes visible. */
+  allowed_routes: string[] | null;
 }
 
 const DEFAULTS: Omit<SiteConfig, "site_id" | "site_name"> = {
@@ -48,7 +50,7 @@ export async function getSiteConfig(
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("sites")
-    .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone")
+    .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone, allowed_routes")
     .eq("id", siteId)
     .maybeSingle();
 
@@ -62,6 +64,7 @@ export async function getSiteConfig(
     seating_capacity: Number(row?.seating_capacity) || DEFAULTS.seating_capacity,
     currency_symbol: (row?.currency_symbol as string) ?? DEFAULTS.currency_symbol,
     timezone: (row?.timezone as string) ?? DEFAULTS.timezone,
+    allowed_routes: (row?.allowed_routes as string[] | null) ?? null,
   };
 
   _cache = { config, ts: Date.now() };
