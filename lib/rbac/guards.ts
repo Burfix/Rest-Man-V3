@@ -165,6 +165,45 @@ export async function getAccessibleSiteIds(userId: string): Promise<string[]> {
   return ((data ?? []) as { site_id: string }[]).map((r) => r.site_id);
 }
 
+// ── Site access guard (Phase 1 multi-tenant) ──────────────────────────────────
+
+/**
+ * Throws 403 if the user cannot access the given site.
+ * Uses the user_accessible_sites RPC to resolve access.
+ */
+export async function requireSiteAccess(
+  userId: string,
+  siteId: string,
+): Promise<void> {
+  const accessible = await getAccessibleSiteIds(userId);
+  if (!accessible.includes(siteId)) {
+    throw new AuthError(
+      `User does not have access to site '${siteId}'`,
+      403,
+    );
+  }
+}
+
+/**
+ * Throws 403 if the user does not hold the required role (or higher).
+ * Uses role ranking to allow higher roles to pass.
+ */
+export async function requireRole(
+  userId: string,
+  minimumRole: UserRole,
+): Promise<UserRole> {
+  const role = await getUserRole(userId);
+  if (!role) throw new AuthError("No role assigned", 403);
+  const { isRoleAtLeast } = await import("./roles");
+  if (!isRoleAtLeast(role, minimumRole)) {
+    throw new AuthError(
+      `Role '${role}' does not meet minimum required role '${minimumRole}'`,
+      403,
+    );
+  }
+  return role;
+}
+
 // ── AuthError ─────────────────────────────────────────────────────────────────
 
 export class AuthError extends Error {
