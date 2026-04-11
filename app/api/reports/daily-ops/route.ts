@@ -9,6 +9,7 @@
 import { NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
+import { isSuperAdmin } from "@/lib/admin/helpers";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -26,11 +27,14 @@ export async function POST() {
     const today = new Date().toLocaleDateString("en-CA");
 
     // ── 1. Sites ───────────────────────────────────────────────────────────────
-    const { data: sites } = await supabase
+    // Super admins see all active sites across all orgs (matches admin dashboard)
+    const unrestricted = isSuperAdmin(ctx);
+    const siteQuery = supabase
       .from("sites")
       .select("id, name, city, target_labour_pct")
-      .eq("is_active", true)
-      .in("id", ctx.siteIds);
+      .eq("is_active", true);
+    if (!unrestricted) siteQuery.in("id", ctx.siteIds);
+    const { data: sites } = await siteQuery;
 
     const siteList = (sites ?? []) as { id: string; name: string; city: string; target_labour_pct: number | null }[];
     const siteIds = siteList.map((s) => s.id);

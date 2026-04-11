@@ -25,6 +25,7 @@ import {
 } from "@/services/ops/headOffice";
 
 import { getUserContext } from "@/lib/auth/get-user-context";
+import { isSuperAdmin } from "@/lib/admin/helpers";
 import { redirect } from "next/navigation";
 
 import GlobalAlertBar        from "@/components/dashboard/head-office/GlobalAlertBar";
@@ -54,7 +55,8 @@ export default async function HeadOfficePage() {
     redirect("/login");
   }
 
-  const ids = ctx.siteIds;
+  // Super admins see all active sites across all orgs (matches admin dashboard)
+  const ids = isSuperAdmin(ctx) ? undefined : ctx.siteIds;
 
   const [summariesResult, trendsResult, actionStatsResult, foodCostResult] = await Promise.allSettled([
     getStoreSummaries(ids),
