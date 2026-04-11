@@ -278,35 +278,42 @@ function scoreSignal(
 
 // ── System health computation ──────────────────────────────────────────────────
 
+function scoreRevenue(actual: number, target: number): number {
+  if (!target || target <= 0) return 15; // no target = neutral
+  const pct = actual / target;
+  if (pct >= 1.00) return 30;
+  if (pct >= 0.95) return 27;
+  if (pct >= 0.90) return 24;
+  if (pct >= 0.85) return 20;
+  if (pct >= 0.80) return 16;
+  if (pct >= 0.75) return 12;
+  if (pct >= 0.70) return 8;
+  if (pct >= 0.60) return 4;
+  return 0;
+}
+
+function scoreLabour(actual: number, target: number): number {
+  if (!target || target <= 0) return 10; // no target = neutral
+  const over = actual - target;
+  if (over <= 0)  return 20;
+  if (over <= 2)  return 17;
+  if (over <= 5)  return 14;
+  if (over <= 8)  return 10;
+  if (over <= 12) return 6;
+  if (over <= 20) return 2;
+  return 0;
+}
+
 function computeSystemHealth(
   ctx: OperationsContext,
   signals: CrossModuleSignal[],
   minutesElapsed: number,
 ): BrainOutput["systemHealth"] {
-  // ── Revenue: 30 pts ─────────────────────────────────────────────────────
-  // Early service (first 3 hours): use prorated target so the score reflects
-  // progress relative to elapsed trading time, not the full day.
-  const SERVICE_DURATION_MINUTES = 720; // 10:00–22:00
-  let revenueVarianceForScore = ctx.revenue.variance;
-  if (
-    minutesElapsed > 0 &&
-    minutesElapsed < 360 &&
-    ctx.revenue.target > 0
-  ) {
-    const proratedTarget = ctx.revenue.target * (minutesElapsed / SERVICE_DURATION_MINUTES);
-    revenueVarianceForScore = +(
-      (ctx.revenue.actual - proratedTarget) / proratedTarget * 100
-    ).toFixed(1);
-  }
-  const revPts = Math.max(0, Math.min(30, 30 * (1 + revenueVarianceForScore / 100)));
+  // ── Revenue: 30 pts (band-based) ────────────────────────────────────────
+  const revPts = scoreRevenue(ctx.revenue.actual ?? 0, ctx.revenue.target ?? 0);
 
-  // Labour: 20 pts (over-target reduces score).
-  // "On target" allows a +2pp tolerance above configured target.
-  const labourOnTarget = ctx.labour.actualPercent <= (ctx.labour.targetPercent + 2);
-  const labExcess = labourOnTarget
-    ? 0
-    : Math.max(0, ctx.labour.actualPercent - (ctx.labour.targetPercent + 2));
-  const labPts = Math.max(0, 20 * (1 - labExcess / 20));
+  // Labour: 20 pts (band-based)
+  const labPts = scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0);
 
   // Duty completion: 20 pts
   // Duties are not expected to start in the first 2 hours of the day (before noon).
@@ -374,15 +381,18 @@ function computeSystemHealth(
       direction: revPts >= 25 ? "up" : "down",
       reason:    revPts >= 28
         ? `On or above target (+${Math.round(revPts)}/30 pts)`
-        : `${Math.abs(revenueVarianceForScore).toFixed(0)}% below target — -${Math.round(MAX.REVENUE - revPts)} pts`,
+        : ctx.revenue.target > 0
+          ? `${(100 - (ctx.revenue.actual / ctx.revenue.target) * 100).toFixed(0)}% below target — -${Math.round(MAX.REVENUE - revPts)} pts`
+          : `No revenue target set — ${Math.round(revPts)}/30 pts`,
     },
     {
       module:    "LABOUR",
       pts:       Math.round(labPts),
-      direction: labourOnTarget ? "up" : "down",
-      reason:    labourOnTarget
+      direction: labPts >= 20 ? "up" : "down",
+      reason:    labPts >= 20
         ? `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target ✓`
         : `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target — ${ctx.labour.variance.toFixed(1)}% over${ctx.labour.note ? ` · ${ctx.labour.note}` : ""}`,
+
     },
     {
       module:    "DUTIES",
