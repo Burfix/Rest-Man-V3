@@ -1,20 +1,33 @@
 /**
  * Accountability Layer — Score Calculator
  *
- * Computes daily manager performance scores from daily_ops_tasks
- * and task_accountability_log.
+ * Computes daily manager performance scores from daily_ops_tasks.
  *
- * Formula (0–100):
- *   Completion rate  × 40 pts
- *   On-time rate     × 35 pts
- *   No blocks        × 15 pts  (−5 per block caused,  min 0)
- *   No escalations   × 10 pts  (−3 per escalation,    min 0)
+ * For each (user_id, site_id, date):
+ *   tasks_assigned  = tasks where started_by OR completed_by = user_id on date
+ *   tasks_completed = completed_by = user_id AND status = 'completed'
+ *   tasks_on_time   = completed AND completed_at::time <= due_time
+ *   tasks_late      = tasks_completed − tasks_on_time
+ *   tasks_blocked   = blocked_by = user_id
+ *   tasks_escalated = escalated_by = user_id
+ *   completion_rate = tasks_completed / tasks_assigned
+ *   on_time_rate    = tasks_on_time / tasks_completed
+ *   avg_completion_minutes = AVG(time_to_complete_minutes) for completed
  *
- * Run via: POST /api/accountability/compute-scores?date=YYYY-MM-DD
- * Or daily cron at 23:55 SAST
+ *   score (0–100):
+ *     base    = completion_rate × 60
+ *     time    = on_time_rate × 30
+ *     penalty = tasks_escalated × 5
+ *     score   = clamp(0, 100, base + time − penalty)
+ *
+ * Run via: POST /api/accountability/calculate
+ * Daily cron at 01:00 UTC (03:00 SAST)
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/logger";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,35 +41,23 @@ export type ScoreInputMetrics = {
 
 export type PerformanceTier = "Elite" | "Strong" | "Average" | "At Risk";
 
-export type DailyScoreResult = {
-  userId: string;
-  siteId: string;
-  periodDate: string;
-  tasksAssigned: number;
-  tasksCompleted: number;
-  tasksOnTime: number;
-  tasksLate: number;
-  tasksBlocked: number;
-  tasksEscalated: number;
-  completionRate: number;
-  onTimeRate: number;
-  avgCompletionMinutes: number | null;
-  score: number;
-  tier: PerformanceTier;
-};
-
 // ── Pure score computation ────────────────────────────────────────────────────
 
+/**
+ * Score 0–100:
+ *   completion_rate × 60  (60 pts max)
+ *   on_time_rate   × 30  (30 pts max)
+ *   −5 per escalation
+ */
 export function computeScore(m: ScoreInputMetrics): number {
   const completionRate = m.tasksAssigned > 0 ? m.tasksCompleted / m.tasksAssigned : 0;
-  const onTimeRate     = m.tasksCompleted > 0 ? m.tasksOnTime    / m.tasksCompleted : 0;
+  const onTimeRate     = m.tasksCompleted > 0 ? m.tasksOnTime / m.tasksCompleted : 0;
 
-  const completionPts  = completionRate * 40;
-  const onTimePts      = onTimeRate     * 35;
-  const blockPts       = Math.max(0, 15 - m.tasksBlocked    * 5);
-  const escalationPts  = Math.max(0, 10 - m.tasksEscalated  * 3);
+  const base    = completionRate * 60;
+  const time    = onTimeRate * 30;
+  const penalty = m.tasksEscalated * 5;
 
-  return Math.min(100, Math.round(completionPts + onTimePts + blockPts + escalationPts));
+  return Math.min(100, Math.max(0, Math.round(base + time - penalty)));
 }
 
 export function getPerformanceTier(score: number): PerformanceTier {
@@ -68,14 +69,10 @@ export function getPerformanceTier(score: number): PerformanceTier {
 
 // ── SLA helper ────────────────────────────────────────────────────────────────
 
-/**
- * Returns { sla_met, minutes_from_sla } for a completed task.
- * minutes_from_sla: negative = completed early, positive = completed late.
- */
 export function computeSla(
-  taskDate: string,    // "YYYY-MM-DD"
-  dueTime: string,     // "HH:MM"
-  completedAt: string, // ISO timestamptz
+  taskDate: string,
+  dueTime: string,
+  completedAt: string,
 ): { sla_met: boolean; minutes_from_sla: number } {
   const [h, m] = dueTime.split(":").map(Number);
   const deadline = new Date(taskDate + "T00:00:00");
@@ -85,128 +82,128 @@ export function computeSla(
   return { sla_met: diffMinutes <= 0, minutes_from_sla: diffMinutes };
 }
 
-// ── Daily score batch computation ─────────────────────────────────────────────
+// ── Per-site daily score computation ──────────────────────────────────────────
 
 /**
- * Computes and stores daily scores for all managers who had tasks on `date`.
- * Called by the 23:55 cron job.
+ * Computes and upserts daily scores for every user active at `siteId` on `date`.
+ * Returns the number of score rows written.
  */
-export async function computeAndStoreDailyScores(date: string): Promise<{
-  processed: number;
-  errors: string[];
-}> {
+export async function calculateDailyScores(
+  siteId: string,
+  date: string,
+): Promise<number> {
   const supabase = createServerClient() as any;
 
-  // Fetch all tasks for the day
+  // 1. Fetch all tasks for this site+date
   const { data: tasks, error: taskErr } = await supabase
     .from("daily_ops_tasks")
-    .select("id, site_id, assigned_to, status, started_at, completed_at, due_time, task_date, duration_minutes, time_to_complete_minutes")
-    .eq("task_date", date)
-    .not("assigned_to", "is", null);
+    .select(
+      "id, site_id, started_by, completed_by, blocked_by, escalated_by, " +
+      "status, completed_at, due_time, task_date, time_to_complete_minutes",
+    )
+    .eq("site_id", siteId)
+    .eq("task_date", date);
 
-  if (taskErr) return { processed: 0, errors: [taskErr.message] };
+  if (taskErr) throw new Error(`Tasks query failed: ${taskErr.message}`);
 
   const taskList = (tasks ?? []) as any[];
-  if (taskList.length === 0) return { processed: 0, errors: [] };
+  if (taskList.length === 0) return 0;
 
-  // Fetch accountability log events for today (blocks + escalations per actor)
-  const taskIds = taskList.map((t: any) => t.id);
-  const { data: logEntries } = await supabase
-    .from("task_accountability_log")
-    .select("actor_id, site_id, action, sla_met, minutes_from_sla, task_id")
-    .in("task_id", taskIds)
-    .in("action", ["blocked", "escalated", "completed"]);
-
-  const logList = (logEntries ?? []) as any[];
-
-  // Group tasks by (user_id, site_id)
-  const groups = new Map<string, any[]>();
+  // 2. Discover all user IDs that touched tasks this day
+  const userIds = new Set<string>();
   for (const t of taskList) {
-    const key = `${t.assigned_to}::${t.site_id}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(t);
+    if (t.started_by)   userIds.add(t.started_by);
+    if (t.completed_by) userIds.add(t.completed_by);
+    if (t.blocked_by)   userIds.add(t.blocked_by);
+    if (t.escalated_by) userIds.add(t.escalated_by);
   }
+  if (userIds.size === 0) return 0;
 
-  // Get org_id per site
-  const siteIds = Array.from(new Set(taskList.map((t: any) => t.site_id)));
-  const { data: siteRows } = await supabase
+  // 3. Get organisation_id for this site
+  const { data: siteRow } = await supabase
     .from("sites")
-    .select("id, organisation_id")
-    .in("id", siteIds);
-  const orgBySite = new Map((siteRows ?? []).map((s: any) => [s.id, s.organisation_id]));
+    .select("organisation_id")
+    .eq("id", siteId)
+    .single();
+  const orgId = siteRow?.organisation_id ?? null;
 
-  const errors: string[] = [];
+  // 4. Compute per-user metrics
   const upserts: any[] = [];
+  const userIdArray = Array.from(userIds);
 
-  for (const [key, userTasks] of Array.from(groups.entries())) {
-    const [userId, siteId] = key.split("::");
-    const orgId = orgBySite.get(siteId) ?? null;
+  for (const userId of userIdArray) {
+    // tasks_assigned: tasks where started_by OR completed_by = userId
+    const assigned = taskList.filter(
+      (t: any) => t.started_by === userId || t.completed_by === userId,
+    );
+    const tasksAssigned = assigned.length;
 
-    const tasksAssigned  = userTasks.length;
-    const completedTasks = userTasks.filter((t: any) => t.status === "completed");
-    const tasksCompleted = completedTasks.length;
+    // tasks_completed: completed_by = userId AND status = 'completed'
+    const completed = taskList.filter(
+      (t: any) => t.completed_by === userId && t.status === "completed",
+    );
+    const tasksCompleted = completed.length;
 
-    // On-time: use accountability_log completed entries with sla_met
-    // or fall back to computing from due_time + completed_at
-    const userTaskIds = new Set(userTasks.map((t: any) => t.id));
-
+    // tasks_on_time: completed AND completed_at::time <= due_time
     let tasksOnTime = 0;
-    let tasksLate   = 0;
     const completionMinutes: number[] = [];
 
-    for (const t of completedTasks) {
-      const logEntry = logList.find(
-        (l: any) => l.task_id === t.id && l.action === "completed" && l.actor_id === userId
-      );
-      let slaMet: boolean | null = logEntry?.sla_met ?? null;
-
-      // If log doesn't have it, compute inline
-      if (slaMet === null && t.due_time && t.completed_at) {
-        const computed = computeSla(t.task_date, t.due_time, t.completed_at);
-        slaMet = computed.sla_met;
+    for (const t of completed) {
+      if (t.due_time && t.completed_at) {
+        const { sla_met } = computeSla(t.task_date, t.due_time, t.completed_at);
+        if (sla_met) tasksOnTime++;
       }
-
-      if (slaMet === true)  tasksOnTime++;
-      if (slaMet === false) tasksLate++;
-
-      const mins = t.time_to_complete_minutes ?? t.duration_minutes;
-      if (mins != null && mins > 0) completionMinutes.push(mins);
+      if (t.time_to_complete_minutes != null && t.time_to_complete_minutes > 0) {
+        completionMinutes.push(t.time_to_complete_minutes);
+      }
     }
 
-    // Blocks caused by this user across all their tasks
-    const tasksBlocked = logList.filter(
-      (l: any) => l.action === "blocked" && l.actor_id === userId && userTaskIds.has(l.task_id)
+    const tasksLate = tasksCompleted - tasksOnTime;
+
+    // tasks_blocked: blocked_by = userId
+    const tasksBlocked = taskList.filter(
+      (t: any) => t.blocked_by === userId,
     ).length;
 
-    // Escalations caused by this user
-    const tasksEscalated = logList.filter(
-      (l: any) => l.action === "escalated" && l.actor_id === userId && userTaskIds.has(l.task_id)
+    // tasks_escalated: escalated_by = userId
+    const tasksEscalated = taskList.filter(
+      (t: any) => t.escalated_by === userId,
     ).length;
 
-    const completionRate = tasksAssigned > 0 ? +((tasksCompleted / tasksAssigned) * 100).toFixed(2) : 0;
-    const onTimeRate     = tasksCompleted > 0 ? +((tasksOnTime / tasksCompleted) * 100).toFixed(2)  : 0;
-    const avgMinutes     = completionMinutes.length > 0
+    const completionRate = tasksAssigned > 0
+      ? +((tasksCompleted / tasksAssigned) * 100).toFixed(2)
+      : 0;
+    const onTimeRate = tasksCompleted > 0
+      ? +((tasksOnTime / tasksCompleted) * 100).toFixed(2)
+      : 0;
+    const avgMinutes = completionMinutes.length > 0
       ? +(completionMinutes.reduce((a, b) => a + b, 0) / completionMinutes.length).toFixed(2)
       : null;
 
-    const score = computeScore({ tasksAssigned, tasksCompleted, tasksOnTime, tasksBlocked, tasksEscalated });
+    const score = computeScore({
+      tasksAssigned,
+      tasksCompleted,
+      tasksOnTime,
+      tasksBlocked,
+      tasksEscalated,
+    });
 
     upserts.push({
-      user_id:               userId,
-      site_id:               siteId,
-      organisation_id:       orgId,
-      period_date:           date,
-      tasks_assigned:        tasksAssigned,
-      tasks_completed:       tasksCompleted,
-      tasks_on_time:         tasksOnTime,
-      tasks_late:            tasksLate,
-      tasks_blocked:         tasksBlocked,
-      tasks_escalated:       tasksEscalated,
-      completion_rate:       completionRate,
-      on_time_rate:          onTimeRate,
+      user_id:                userId,
+      site_id:                siteId,
+      organisation_id:        orgId,
+      period_date:            date,
+      tasks_assigned:         tasksAssigned,
+      tasks_completed:        tasksCompleted,
+      tasks_on_time:          tasksOnTime,
+      tasks_late:             tasksLate,
+      tasks_blocked:          tasksBlocked,
+      tasks_escalated:        tasksEscalated,
+      completion_rate:        completionRate,
+      on_time_rate:           onTimeRate,
       avg_completion_minutes: avgMinutes,
       score,
-      updated_at:            new Date().toISOString(),
+      updated_at:             new Date().toISOString(),
     });
   }
 
@@ -214,8 +211,72 @@ export async function computeAndStoreDailyScores(date: string): Promise<{
     const { error: upsertErr } = await supabase
       .from("manager_performance_scores")
       .upsert(upserts, { onConflict: "user_id,site_id,period_date" });
-    if (upsertErr) errors.push(upsertErr.message);
+    if (upsertErr) throw new Error(`Upsert failed: ${upsertErr.message}`);
   }
 
-  return { processed: upserts.length, errors };
+  return upserts.length;
+}
+
+// ── All-sites daily scores ────────────────────────────────────────────────────
+
+/**
+ * Runs calculateDailyScores for every active site.
+ * `date` defaults to yesterday (SAST).
+ * Never throws — collects errors per site.
+ */
+export async function calculateAllSitesScores(date?: string): Promise<{
+  sitesProcessed: number;
+  scoresWritten: number;
+  errors: string[];
+}> {
+  const resolvedDate = date ?? yesterdaySAST();
+  const supabase = createServerClient() as any;
+
+  const { data: sites, error: siteErr } = await supabase
+    .from("sites")
+    .select("id")
+    .eq("is_active", true);
+
+  if (siteErr) {
+    return { sitesProcessed: 0, scoresWritten: 0, errors: [siteErr.message] };
+  }
+
+  const siteList = (sites ?? []) as { id: string }[];
+  let sitesProcessed = 0;
+  let scoresWritten = 0;
+  const errors: string[] = [];
+
+  for (const site of siteList) {
+    try {
+      const written = await calculateDailyScores(site.id, resolvedDate);
+      scoresWritten += written;
+      sitesProcessed++;
+    } catch (err: any) {
+      const msg = `Site ${site.id}: ${err.message ?? String(err)}`;
+      logger.error(msg);
+      errors.push(msg);
+    }
+  }
+
+  return { sitesProcessed, scoresWritten, errors };
+}
+
+// ── Legacy wrapper (used by /api/accountability/compute-scores) ───────────────
+
+export async function computeAndStoreDailyScores(date: string): Promise<{
+  processed: number;
+  errors: string[];
+}> {
+  const result = await calculateAllSitesScores(date);
+  return { processed: result.scoresWritten, errors: result.errors };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function yesterdaySAST(): string {
+  const now = new Date();
+  // SAST = UTC+2
+  const sast = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+  sast.setDate(sast.getDate() - 1);
+  return sast.toISOString().slice(0, 10);
 }

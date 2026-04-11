@@ -26,8 +26,8 @@
       "schedule": "0 0 * * *"
     },
     {
-      "path": "/api/accountability/compute-scores",
-      "schedule": "55 21 * * *"
+      "path": "/api/accountability/calculate",
+      "schedule": "0 1 * * *"
     }
   ]
 }
