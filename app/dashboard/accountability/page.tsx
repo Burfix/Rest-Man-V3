@@ -10,6 +10,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { getPerformanceTier } from "@/services/accountability/score-calculator";
 import type { PerformanceTier } from "@/services/accountability/score-calculator";
+import DailyScoreChart from "@/components/accountability/DailyScoreChart";
 
 export const dynamic  = "force-dynamic";
 export const revalidate = 0;
@@ -252,6 +253,18 @@ export default async function AccountabilityPage({
                 <p className="text-[9px] text-stone-500 mt-0.5 font-mono">{myAggregate.worst.period_date}</p>
               </div>
             </div>
+
+            {/* Score Chart */}
+            <DailyScoreChart
+              data={myScores.map((r: any) => ({
+                date: r.period_date,
+                score: r.score,
+                completionRate: Number(r.completion_rate),
+                onTimeRate: Number(r.on_time_rate),
+                tasksAssigned: r.tasks_assigned,
+                tasksCompleted: r.tasks_completed,
+              }))}
+            />
 
             {/* Score History Table */}
             <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-sm overflow-hidden">
