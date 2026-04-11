@@ -11,6 +11,7 @@ import { getUserContext } from "@/lib/auth/get-user-context";
 import { getPerformanceTier } from "@/services/accountability/score-calculator";
 import type { PerformanceTier } from "@/services/accountability/score-calculator";
 import DailyScoreChart from "@/components/accountability/DailyScoreChart";
+import LeaderboardTable from "@/components/dashboard/accountability/LeaderboardTable";
 
 export const dynamic  = "force-dynamic";
 export const revalidate = 0;
@@ -158,6 +159,7 @@ export default async function AccountabilityPage({
         userId,
         name:           nameMap.get(userId) ?? "Unknown",
         site:           siteMap.get(site) ?? "—",
+        siteId:         site ?? "",
         avgScore:       Math.round(avgScore),
         tier:           getPerformanceTier(Math.round(avgScore)),
         daysActive:     rows.length,
@@ -350,52 +352,7 @@ export default async function AccountabilityPage({
               <p className="text-sm text-stone-500">No score data for this period.</p>
             </div>
           ) : (
-            <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-sm overflow-hidden">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-[#1a1a1a]">
-                    <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500 w-8">#</th>
-                    <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">GM</th>
-                    <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Site</th>
-                    <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Avg Score</th>
-                    <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Tier</th>
-                    <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Completion</th>
-                    <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Days</th>
-                    <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Blocks</th>
-                    <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Escalations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((entry: any, i: number) => (
-                    <tr
-                      key={entry.userId}
-                      className={`border-b border-[#141414] hover:bg-[#141414] ${
-                        entry.tier === "At Risk" ? "border-l-[3px] border-l-red-800" : ""
-                      }`}
-                    >
-                      <td className="px-3 py-2 font-mono text-stone-500 text-center">{i + 1}</td>
-                      <td className="px-3 py-2">
-                        <span className={`font-medium ${entry.userId === ctx.userId ? "text-amber-400" : "text-stone-700 dark:text-stone-200"}`}>
-                          {entry.name}
-                          {entry.userId === ctx.userId && (
-                            <span className="ml-1.5 text-[9px] text-amber-600 font-mono">(you)</span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-stone-500 dark:text-stone-400">{entry.site}</td>
-                      <td className={`px-3 py-2 text-right font-mono font-bold ${scoreColor(entry.avgScore)}`}>{entry.avgScore}</td>
-                      <td className="px-3 py-2 text-right">
-                        <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-sm ${tierBg(entry.tier)}`}>{entry.tier}</span>
-                      </td>
-                      <td className="px-3 py-2 text-right font-mono text-stone-600 dark:text-stone-300">{pct(entry.completionRate)}</td>
-                      <td className="px-3 py-2 text-right font-mono text-stone-500 dark:text-stone-400">{entry.daysActive}</td>
-                      <td className={`px-3 py-2 text-right font-mono ${entry.totalBlocked > 0 ? "text-red-400" : "text-stone-500"}`}>{entry.totalBlocked}</td>
-                      <td className={`px-3 py-2 text-right font-mono ${entry.totalEscalated > 0 ? "text-amber-400" : "text-stone-500"}`}>{entry.totalEscalated}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <LeaderboardTable entries={leaderboard} currentUserId={ctx.userId} />
           )}
         </section>
       )}
