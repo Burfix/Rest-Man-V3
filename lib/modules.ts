@@ -54,7 +54,7 @@ export async function hasModule(
   const supabase = createServerClient();
 
   // 1. Check for site-specific override
-  // tenant_modules table is created in migration 058 — types not yet regenerated
+  // tenant_modules not in hand-written types — cast needed until types are regenerated
   const { data: siteRow } = await (supabase as any)
     .from("tenant_modules")
     .select("enabled")
