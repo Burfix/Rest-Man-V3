@@ -4,9 +4,28 @@
  * Defines which dashboard routes each role can access.
  * Roles not listed here (super_admin, executive, head_office, auditor,
  * area_manager) have unrestricted access to all routes.
+ *
+ * Site-level route restrictions (siteAllowedRoutes) are applied only to
+ * site-scoped roles (gm, supervisor, contractor, viewer). Org-level roles
+ * (head_office, area_manager, executive, super_admin, auditor) bypass them
+ * so that a head_office user assigned to a specific site still sees all
+ * org-wide routes (e.g. /dashboard/head-office).
  */
 
 import type { UserRole } from "@/lib/ontology/entities";
+
+/**
+ * Roles that bypass site-level route restrictions.
+ * These users operate at the org level and must not be constrained by the
+ * allowed_routes list of any individual site.
+ */
+const ORG_LEVEL_ROLES: ReadonlySet<UserRole> = new Set([
+  "super_admin",
+  "executive",
+  "head_office",
+  "area_manager",
+  "auditor",
+]);
 
 /**
  * Allowed dashboard route prefixes per restricted role.
@@ -60,7 +79,11 @@ export function isRouteAllowed(role: UserRole, pathname: string, siteAllowedRout
 
   if (!roleAllowed) return false;
 
-  // Step 2: Check site-level restriction (if set)
+  // Step 2: Site-level restriction — skipped for org-level roles so that a
+  // head_office (or area_manager/executive) user assigned to a specific site
+  // is not blocked by that site's allowed_routes list.
+  if (ORG_LEVEL_ROLES.has(role)) return true;
+
   if (siteAllowedRoutes && siteAllowedRoutes.length > 0) {
     return siteAllowedRoutes.some((route) =>
       route === "/dashboard"
@@ -86,7 +109,9 @@ export function isNavItemAllowed(role: UserRole, href: string, siteAllowedRoutes
 
   if (!roleAllowed) return false;
 
-  // Step 2: Check site-level restriction (if set)
+  // Step 2: Site-level restriction — skipped for org-level roles (same reason as above).
+  if (ORG_LEVEL_ROLES.has(role)) return true;
+
   if (siteAllowedRoutes && siteAllowedRoutes.length > 0) {
     return siteAllowedRoutes.some((route) =>
       route === "/dashboard"
