@@ -37,6 +37,34 @@ type TrendData = {
   };
 };
 
+type DutyAvg = {
+  action_name: string;
+  department: string;
+  priority: string;
+  avg_minutes: number;
+  min_minutes: number;
+  max_minutes: number;
+  total_completions: number;
+  late_start_count: number;
+  avg_minutes_late: number;
+};
+
+type LateDuty = {
+  task_date: string;
+  action_name: string;
+  department: string;
+  due_time: string;
+  started_at: string;
+  minutes_late: number;
+  time_to_complete: number;
+  site_name: string;
+};
+
+type DutyReport = {
+  avgByDuty: DutyAvg[];
+  lateDuties: LateDuty[];
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function gradeColor(grade: string): string {
@@ -72,6 +100,15 @@ function shortDate(iso: string): string {
   return d.toLocaleDateString("en-ZA", { day: "2-digit", month: "short" });
 }
 
+function formatLate(mins: number): string {
+  if (mins >= 60) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  }
+  return `${mins}m`;
+}
+
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
 function Skeleton() {
@@ -87,20 +124,37 @@ function Skeleton() {
   );
 }
 
+function DutySkeleton() {
+  return (
+    <div className="space-y-2 animate-pulse">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className="h-8 bg-[#1a1a1a] rounded-sm" />
+      ))}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function SiteTrendPanel({
   siteId,
   siteName,
+  userId,
+  userName,
   onClose,
 }: {
   siteId: string;
   siteName: string;
+  userId: string;
+  userName: string;
   onClose: () => void;
 }) {
-  const [data, setData]     = useState<TrendData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [data, setData]         = useState<TrendData | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [dutyReport, setDutyReport]       = useState<DutyReport | null>(null);
+  const [dutyLoading, setDutyLoading]     = useState(true);
+  const [dutyError, setDutyError]         = useState<string | null>(null);
 
   // Fetch trend data
   useEffect(() => {
@@ -116,6 +170,22 @@ export default function SiteTrendPanel({
       .then((d) => { setData(d); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [siteId]);
+
+  // Fetch duty report
+  useEffect(() => {
+    if (!userId) return;
+    setDutyLoading(true);
+    setDutyError(null);
+    setDutyReport(null);
+
+    fetch(`/api/accountability/duty-report?userId=${encodeURIComponent(userId)}&siteId=${encodeURIComponent(siteId)}&days=30`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => { setDutyReport(d); setDutyLoading(false); })
+      .catch((e) => { setDutyError(e.message); setDutyLoading(false); });
+  }, [userId, siteId]);
 
   // Escape key to close
   const handleKey = useCallback(
@@ -146,12 +216,12 @@ export default function SiteTrendPanel({
         <div className="flex items-start justify-between p-4 border-b border-[#1a1a1a] shrink-0">
           <div>
             <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-stone-500 mb-0.5">
-              Store Drill-Down
+              GM Drill-Down
             </p>
             <h2 className="text-sm font-semibold text-stone-100 leading-tight">
-              {siteName}
+              {userName}
             </h2>
-            <p className="text-[10px] text-stone-500 mt-0.5 font-mono">30 Day Score Trend</p>
+            <p className="text-[10px] text-stone-500 mt-0.5 font-mono">{siteName} · 30-day performance</p>
           </div>
           <button
             onClick={onClose}
@@ -349,6 +419,118 @@ export default function SiteTrendPanel({
                   </div>
                 </div>
               )}
+
+              {/* ── Duty Performance ─────────────────────────────────── */}
+              <div className="border-t border-[#1a1a1a] pt-4 space-y-4">
+                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-stone-500">
+                  Duty Performance — Last 30 Days
+                </p>
+
+                {dutyLoading && <DutySkeleton />}
+
+                {dutyError && (
+                  <div className="bg-red-950/30 border border-red-900 rounded-sm p-3">
+                    <p className="text-xs text-red-400 font-mono">Error: {dutyError}</p>
+                  </div>
+                )}
+
+                {!dutyLoading && !dutyError && dutyReport && (
+                  <>
+                    {/* Section 1: Avg Time Per Duty */}
+                    {dutyReport.avgByDuty.length === 0 ? (
+                      <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-sm p-4 text-center">
+                        <p className="text-xs text-stone-500">No duty data for this period.</p>
+                      </div>
+                    ) : (
+                      <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-sm overflow-hidden">
+                        <p className="text-[9px] font-mono uppercase tracking-widest text-stone-500 px-3 pt-3 pb-2 border-b border-[#1a1a1a]">
+                          Avg Time Per Duty
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-[#141414]">
+                                <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Duty</th>
+                                <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Dept</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Avg</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Best</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Worst</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Late</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dutyReport.avgByDuty.map((row, i) => (
+                                <tr key={i} className="border-b border-[#141414] hover:bg-[#141414]">
+                                  <td className="px-3 py-2 text-stone-300 max-w-[120px] truncate">{row.action_name}</td>
+                                  <td className="px-3 py-2 text-stone-500">{row.department}</td>
+                                  <td className={`px-3 py-2 text-right font-mono font-semibold ${
+                                    row.avg_minutes > 120 ? "text-red-400" :
+                                    row.avg_minutes > 60  ? "text-orange-400" :
+                                    "text-stone-300"
+                                  }`}>
+                                    {row.avg_minutes}m
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-mono text-green-400">{row.min_minutes}m</td>
+                                  <td className="px-3 py-2 text-right font-mono text-stone-500">{row.max_minutes}m</td>
+                                  <td className="px-3 py-2 text-right">
+                                    {row.late_start_count > 0 ? (
+                                      <span className="inline-block bg-red-950/60 border border-red-900 text-red-400 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-sm">
+                                        {row.late_start_count}×
+                                      </span>
+                                    ) : (
+                                      <span className="text-stone-600 font-mono">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Section 2: Late Starts */}
+                    {dutyReport.lateDuties.length > 0 && (
+                      <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-sm overflow-hidden">
+                        <p className="text-[9px] font-mono uppercase tracking-widest text-stone-500 px-3 pt-3 pb-2 border-b border-[#1a1a1a]">
+                          ⚠ {dutyReport.lateDuties.length} {dutyReport.lateDuties.length === 1 ? "duty" : "duties"} started after due time
+                        </p>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-[#141414]">
+                                <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Date</th>
+                                <th className="text-left px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Duty</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Due</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Started</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Late By</th>
+                                <th className="text-right px-3 py-2 text-[9px] font-mono uppercase tracking-widest text-stone-500">Took</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dutyReport.lateDuties.map((row, i) => {
+                                const rowColor = row.minutes_late > 120 ? "text-red-400" :
+                                                 row.minutes_late >= 30  ? "text-orange-400" :
+                                                 "text-stone-300";
+                                return (
+                                  <tr key={i} className="border-b border-[#141414] hover:bg-[#141414]">
+                                    <td className={`px-3 py-2 font-mono ${rowColor}`}>{shortDate(row.task_date)}</td>
+                                    <td className={`px-3 py-2 max-w-[110px] truncate ${rowColor}`}>{row.action_name}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-stone-500">{row.due_time}</td>
+                                    <td className={`px-3 py-2 text-right font-mono ${rowColor}`}>{row.started_at}</td>
+                                    <td className={`px-3 py-2 text-right font-mono font-bold ${rowColor}`}>{formatLate(row.minutes_late)}</td>
+                                    <td className="px-3 py-2 text-right font-mono text-stone-500">{row.time_to_complete}m</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </>
           )}
         </div>

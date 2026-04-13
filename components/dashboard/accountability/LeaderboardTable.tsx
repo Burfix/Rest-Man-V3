@@ -53,11 +53,15 @@ export default function LeaderboardTable({
 }) {
   const [selectedSiteId, setSelectedSiteId]     = useState<string | null>(null);
   const [selectedSiteName, setSelectedSiteName] = useState("");
+  const [selectedUserId, setSelectedUserId]     = useState<string | null>(null);
+  const [selectedUserName, setSelectedUserName] = useState("");
 
   function handleRowClick(entry: LeaderboardEntry) {
     if (!entry.siteId) return;
     setSelectedSiteId(entry.siteId);
     setSelectedSiteName(entry.site);
+    setSelectedUserId(entry.userId);
+    setSelectedUserName(entry.name);
   }
 
   return (
@@ -151,11 +155,13 @@ export default function LeaderboardTable({
         </table>
       </div>
 
-      {selectedSiteId && (
+      {selectedSiteId && selectedUserId && (
         <SiteTrendPanel
           siteId={selectedSiteId}
           siteName={selectedSiteName}
-          onClose={() => setSelectedSiteId(null)}
+          userId={selectedUserId}
+          userName={selectedUserName}
+          onClose={() => { setSelectedSiteId(null); setSelectedUserId(null); }}
         />
       )}
     </>
