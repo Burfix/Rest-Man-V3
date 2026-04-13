@@ -28,6 +28,10 @@
     {
       "path": "/api/accountability/calculate",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/reviews/google-sync?siteId=ALL",
+      "schedule": "0 6 * * *"
     }
   ]
 }

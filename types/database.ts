@@ -320,6 +320,7 @@ export interface Database {
       reviews: {
         Row: {
           id: string;
+          site_id: string | null;
           review_date: string;
           platform: string;
           rating: number;
@@ -328,11 +329,17 @@ export interface Database {
           sentiment: string | null;
           tags: Json;
           flagged: boolean;
+          google_review_id: string | null;
+          reviewer_photo: string | null;
+          reply_text: string | null;
+          reply_time: string | null;
+          source: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id?: string;
+          site_id?: string | null;
           review_date: string;
           platform: string;
           rating: number;
@@ -341,11 +348,17 @@ export interface Database {
           sentiment?: string | null;
           tags?: Json;
           flagged?: boolean;
+          google_review_id?: string | null;
+          reviewer_photo?: string | null;
+          reply_text?: string | null;
+          reply_time?: string | null;
+          source?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
+          site_id?: string | null;
           review_date?: string;
           platform?: string;
           rating?: number;
@@ -354,6 +367,11 @@ export interface Database {
           sentiment?: string | null;
           tags?: Json;
           flagged?: boolean;
+          google_review_id?: string | null;
+          reviewer_photo?: string | null;
+          reply_text?: string | null;
+          reply_time?: string | null;
+          source?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -774,6 +792,8 @@ export interface Database {
           target_avg_spend: number | null;
           seating_capacity: number | null;
           settings: Record<string, unknown>;
+          google_place_id: string | null;
+          allowed_routes: string[] | null;
           created_at: string;
           updated_at: string;
         };
@@ -796,6 +816,8 @@ export interface Database {
           target_avg_spend?: number | null;
           seating_capacity?: number | null;
           settings?: Record<string, unknown>;
+          google_place_id?: string | null;
+          allowed_routes?: string[] | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -818,6 +840,8 @@ export interface Database {
           target_avg_spend?: number | null;
           seating_capacity?: number | null;
           settings?: Record<string, unknown>;
+          google_place_id?: string | null;
+          allowed_routes?: string[] | null;
           updated_at?: string;
         };
         Relationships: [];
