@@ -433,6 +433,7 @@ export default async function OperationsDashboard() {
 
           {/* Primary Column */}
           <div className="lg:col-span-8 space-y-4">
+            <CommandFeed decisions={engineOutput.commandFeed} />
             <ServicePulse
               actual={salesSnapshot.netSales}
               target={salesSnapshot.targetSales ?? 0}
@@ -447,7 +448,6 @@ export default async function OperationsDashboard() {
               source={salesSnapshot.source}
               sourceNote={salesSnapshot.notes?.[0]}
             />
-            <CommandFeed decisions={engineOutput.commandFeed} />
           </div>
 
           {/* Secondary Column */}
