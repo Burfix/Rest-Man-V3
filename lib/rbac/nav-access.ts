@@ -19,7 +19,7 @@ import type { UserRole } from "@/lib/ontology/entities";
  * These users operate at the org level and must not be constrained by the
  * allowed_routes list of any individual site.
  */
-const ORG_LEVEL_ROLES: ReadonlySet<UserRole> = new Set([
+const ORG_LEVEL_ROLES: ReadonlySet<UserRole> = new Set<UserRole>([
   "super_admin",
   "executive",
   "head_office",
