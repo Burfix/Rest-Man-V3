@@ -17,6 +17,8 @@ export type EvaluateOperationsInput = {
     covers: number;
     avgSpend: number;
     sameDayLastYear?: number;
+    /** false = site has no POS connection → show "Not connected" in Business Status */
+    connected?: boolean;
   };
   labour: {
     labourPercent: number;
@@ -24,6 +26,8 @@ export type EvaluateOperationsInput = {
     activeStaff?: number;
     overtimeCost?: number;
     syncAgeMinutes?: number;
+    /** false = site has no POS connection → show "Not connected" in Business Status */
+    connected?: boolean;
   };
   inventory: {
     criticalCount: number;
@@ -538,32 +542,44 @@ export function evaluateOperations(
 
   // ── Business Status ───────────────────────────────────────────────────
   const businessStatus: EvaluateOperationsOutput["businessStatus"] = {
-    revenue: {
-      label:
-        input.revenue.variancePercent >= 0
-          ? `${pct(input.revenue.variancePercent)} ahead`
-          : `${pct(input.revenue.variancePercent)} behind`,
-      tone:
-        input.revenue.variancePercent >= 0
-          ? "positive"
-          : input.revenue.variancePercent > -10
-            ? "warning"
-            : "critical",
-      supportingText: `${rands(input.revenue.actual)} of ${rands(input.revenue.target)} target • ${input.revenue.covers} covers`,
-    },
-    labour: {
-      label:
-        input.labour.labourPercent <= input.labour.targetPercent
-          ? "On target"
-          : `${pct(input.labour.labourPercent - input.labour.targetPercent)} over`,
-      tone:
-        input.labour.labourPercent <= input.labour.targetPercent
-          ? "positive"
-          : input.labour.labourPercent > input.labour.targetPercent + 10
-            ? "critical"
-            : "warning",
-      supportingText: `${input.labour.labourPercent.toFixed(1)}% of sales${input.labour.activeStaff ? ` • ${input.labour.activeStaff} active staff` : ""}`,
-    },
+    revenue: input.revenue.connected === false
+      ? {
+          label: "Not connected",
+          tone: "neutral",
+          supportingText: "No POS system linked to this site",
+        }
+      : {
+          label:
+            input.revenue.variancePercent >= 0
+              ? `${pct(input.revenue.variancePercent)} ahead`
+              : `${pct(input.revenue.variancePercent)} behind`,
+          tone:
+            input.revenue.variancePercent >= 0
+              ? "positive"
+              : input.revenue.variancePercent > -10
+                ? "warning"
+                : "critical",
+          supportingText: `${rands(input.revenue.actual)} of ${rands(input.revenue.target)} target • ${input.revenue.covers} covers`,
+        },
+    labour: input.labour.connected === false
+      ? {
+          label: "Not connected",
+          tone: "neutral",
+          supportingText: "No POS system linked to this site",
+        }
+      : {
+          label:
+            input.labour.labourPercent <= input.labour.targetPercent
+              ? "On target"
+              : `${pct(input.labour.labourPercent - input.labour.targetPercent)} over`,
+          tone:
+            input.labour.labourPercent <= input.labour.targetPercent
+              ? "positive"
+              : input.labour.labourPercent > input.labour.targetPercent + 10
+                ? "critical"
+                : "warning",
+          supportingText: `${input.labour.labourPercent.toFixed(1)}% of sales${input.labour.activeStaff ? ` • ${input.labour.activeStaff} active staff` : ""}`,
+        },
     inventory: {
       label:
         input.inventory.criticalCount > 0

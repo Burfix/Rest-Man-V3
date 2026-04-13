@@ -399,14 +399,17 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
   // ── Score bars ─────────────────────────────────────────────────────────────
   const scoreBars = systemHealth.allScoreDrivers.map((driver) => {
     const max = MODULE_MAX[driver.module] ?? 20;
-    const pct = Math.round((driver.pts / max) * 100);
-    const barColor =
-      pct >= 80 ? "bg-emerald-500" :
-      pct >= 50 ? "bg-amber-500"   : "bg-red-500";
-    const textColor =
-      pct >= 80 ? "text-emerald-700 dark:text-emerald-500" :
-      pct >= 50 ? "text-amber-600 dark:text-amber-400"     : "text-red-600 dark:text-red-400";
-    return { driver, max, pct, barColor, textColor };
+    const isNotConnected = driver.connected === false;
+    const pct = isNotConnected ? 0 : Math.round((driver.pts / max) * 100);
+    const barColor = isNotConnected
+      ? "bg-stone-200 dark:bg-stone-700"
+      : pct >= 80 ? "bg-emerald-500"
+      : pct >= 50 ? "bg-amber-500"   : "bg-red-500";
+    const textColor = isNotConnected
+      ? "text-stone-400 dark:text-stone-600"
+      : pct >= 80 ? "text-emerald-700 dark:text-emerald-500"
+      : pct >= 50 ? "text-amber-600 dark:text-amber-400"     : "text-red-600 dark:text-red-400";
+    return { driver, max, pct, barColor, textColor, isNotConnected };
   });
 
   // ── Brain recommendation ───────────────────────────────────────────────────
@@ -641,7 +644,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
           {/* Score breakdown bars */}
           <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-2.5 font-mono">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE BREAKDOWN</span>
-            {scoreBars.map(({ driver, max, pct, barColor, textColor }) => {
+            {scoreBars.map(({ driver, max, pct, barColor, textColor, isNotConnected }) => {
               // Duties-specific sub-line
               const dutiesSubLine = driver.module === "DUTIES" && dutiesData
                 ? `${dutiesData.completedCount} of ${dutiesData.totalCount} duties complete (${pct}%) · Full 20 pts at 100%`
@@ -658,21 +661,26 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                       {driver.module}
                     </span>
                     <span className={cn("text-[9px] font-bold", textColor)}>
-                      {driver.pts}/{max}
+                      {isNotConnected ? "—" : `${driver.pts}/${max}`}
                     </span>
                   </div>
                   <div className="h-1.5 bg-[#e5e5e5] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
                     <div
                       className={cn("h-full rounded-full", barColor)}
-                      style={{ width: `${pct}%` }}
+                      style={{ width: isNotConnected ? "0%" : `${pct}%` }}
                     />
                   </div>
-                  {dutiesSubLine && (
+                  {isNotConnected && (
+                    <p className="text-[9px] font-mono text-stone-400 dark:text-stone-600 mt-0.5 leading-tight">
+                      No POS connection
+                    </p>
+                  )}
+                  {!isNotConnected && dutiesSubLine && (
                     <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
                       {dutiesSubLine}
                     </p>
                   )}
-                  {complianceDebugLine && (
+                  {!isNotConnected && complianceDebugLine && (
                     <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
                       {complianceDebugLine}
                     </p>

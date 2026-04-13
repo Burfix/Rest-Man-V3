@@ -18,6 +18,8 @@ export type RevenueContext = {
   target: number;
   variance: number;        // % behind (negative) / ahead (positive)
   trend: "recovering" | "declining" | "stable";
+  /** false = this site has no POS/MICROS connection — show "Not connected" in UI */
+  connected: boolean;
 };
 
 export type LabourContext = {
@@ -26,6 +28,8 @@ export type LabourContext = {
   variance: number;        // % over target (positive = over)
   staffOnFloor: number;
   note: string | null;
+  /** false = this site has no POS/MICROS connection — show "Not connected" in UI */
+  connected: boolean;
 };
 
 export type DailyOpsContext = {
@@ -98,19 +102,21 @@ export async function buildOperationsContext(
   const supabase = createServerClient();
   const now = Date.now();
 
-  // ── Step 1: Resolve MICROS connection ID (needed for daily sales query) ──
-  // micros_connections has no site_id FK — convention-based single-site lookup.
+  // ── Step 1: Resolve MICROS connection ID (site-specific) ──────────────────
+  // micros_connections.site_id links a connection to a site.
+  // Sites with no connection (e.g. Primi Camps Bay) must not inherit another
+  // site's MICROS data — they should show "Not connected" for all POS-derived fields.
   const connRes = await (supabase as any)
     .from("micros_connections")
     .select("id, loc_ref")
+    .eq("site_id", siteId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   const microsConnectionId = (connRes.data as { id: string } | null)?.id ?? null;
-  const microsLocRef = (connRes.data as { id: string; loc_ref?: string | null } | null)?.loc_ref
-    ?? process.env.MICROS_LOCATION_REF
-    ?? process.env.MICROS_LOC_REF
-    ?? null;
+  const microsLocRef = (connRes.data as { id: string; loc_ref?: string | null } | null)?.loc_ref ?? null;
+  /** True when this site has a linked MICROS/POS connection */
+  const posConnected = microsConnectionId !== null;
 
   // ── Step 2: Parallel fetch everything ──────────────────────────────────────
   const [revRes, manualRes, microsRes, snapRes, labSummaryRes, labFallbackRes, siteRes, actRes, maintRes, compRes] =
@@ -317,8 +323,8 @@ export async function buildOperationsContext(
   const sessionPressure = computeSessionPressure(timeOfDay, variance, overdue, urgentCount);
 
   return {
-    revenue:     { actual, target, variance, trend },
-    labour:      { actualPercent, targetPercent: targetLabourPct, variance: labourVariance, staffOnFloor: 0, note: labourNote },
+    revenue:     { actual, target, variance, trend, connected: posConnected },
+    labour:      { actualPercent, targetPercent: targetLabourPct, variance: labourVariance, staffOnFloor: 0, note: labourNote, connected: posConnected },
     dailyOps:    { totalTasks, completed, overdue, blocked, completionRate },
     maintenance: { openCount: maintRows.length, urgentCount, highCount, mediumCount, serviceBlocking, oldestOpenDays },
     compliance:  { overdueCount, atRiskCount },

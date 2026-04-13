@@ -41,6 +41,8 @@ export type ScoreDriver = {
   reason: string;
   pts: number;
   direction: "up" | "down";
+  /** false = this site has no POS connection; score is neutral, not penalised */
+  connected?: boolean;
 };
 
 export type RecoveryMeter = {
@@ -310,10 +312,16 @@ function computeSystemHealth(
   minutesElapsed: number,
 ): BrainOutput["systemHealth"] {
   // ── Revenue: 30 pts (band-based) ────────────────────────────────────────
-  const revPts = scoreRevenue(ctx.revenue.actual ?? 0, ctx.revenue.target ?? 0);
+  // If this site has no POS connection, award neutral 15 pts (same as scoreRevenue with no target).
+  const revPts = ctx.revenue.connected
+    ? scoreRevenue(ctx.revenue.actual ?? 0, ctx.revenue.target ?? 0)
+    : 15;
 
   // Labour: 20 pts (band-based)
-  const labPts = scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0);
+  // If this site has no POS connection, award neutral 10 pts.
+  const labPts = ctx.labour.connected
+    ? scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0)
+    : 10;
 
   // Duty completion: 20 pts
   // Duties are not expected to start in the first 2 hours of the day (before noon).
@@ -379,7 +387,10 @@ function computeSystemHealth(
       module:    "REVENUE",
       pts:       Math.round(revPts),
       direction: revPts >= 25 ? "up" : "down",
-      reason:    revPts >= 28
+      connected: ctx.revenue.connected,
+      reason:    !ctx.revenue.connected
+        ? "No POS connection — neutral 15/30 pts"
+        : revPts >= 28
         ? `On or above target (+${Math.round(revPts)}/30 pts)`
         : ctx.revenue.target > 0
           ? `${(100 - (ctx.revenue.actual / ctx.revenue.target) * 100).toFixed(0)}% below target — -${Math.round(MAX.REVENUE - revPts)} pts`
@@ -389,10 +400,12 @@ function computeSystemHealth(
       module:    "LABOUR",
       pts:       Math.round(labPts),
       direction: labPts >= 20 ? "up" : "down",
-      reason:    labPts >= 20
+      connected: ctx.labour.connected,
+      reason:    !ctx.labour.connected
+        ? "No POS connection — neutral 10/20 pts"
+        : labPts >= 20
         ? `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target ✓`
         : `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target — ${ctx.labour.variance.toFixed(1)}% over${ctx.labour.note ? ` · ${ctx.labour.note}` : ""}`,
-
     },
     {
       module:    "DUTIES",

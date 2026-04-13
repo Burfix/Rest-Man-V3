@@ -255,6 +255,17 @@ export default async function OperationsDashboard() {
       : null;
   const labourPct = labourSummary?.labourPercentOfSales ?? derivedLabourPct ?? 0;
 
+  // Await brain early so we can use its connection flags in the decision engine below.
+  // Brain was started in parallel at the top of the function, so this doesn't add latency.
+  const brain = await brainPromise.catch(() => null);
+
+  // ─── POS connection flags (from brain's context-builder, which is now site-specific) ──
+  // Used to show "Not connected" in Revenue/Labour panels for sites without MICROS.
+  const revDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "REVENUE");
+  const labDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "LABOUR");
+  const revenueConnected = revDriver?.connected !== false;   // true when connected or brain unavailable
+  const labourConnected  = labDriver?.connected  !== false;
+
   // ─── Decision Engine — single evaluation pass ───────────────────────────
   const engineOutput = evaluateOperations({
     revenue: {
@@ -265,12 +276,14 @@ export default async function OperationsDashboard() {
         : 0,
       covers: salesSnapshot.covers,
       avgSpend: salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0,
+      connected: revenueConnected,
     },
     labour: {
       labourPercent: labourPct,
       targetPercent: siteConfig.target_labour_pct,
       activeStaff: labourSummary?.activeStaffCount ?? undefined,
       syncAgeMinutes: labourAgeMinutes,
+      connected: labourConnected,
     },
     inventory: {
       criticalCount: inventoryIntel?.criticalItems.length ?? 0,
@@ -325,8 +338,7 @@ export default async function OperationsDashboard() {
     ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
     : 0;
 
-  // Await brain (was started in parallel above)
-  const brain = await brainPromise.catch(() => null);
+  // brain was already awaited above (before evaluateOperations)
 
   // ─── Duty tasks — inline drilldown for PriorityActionBoard ──────────────
   let dutiesData: DutiesData | undefined;
