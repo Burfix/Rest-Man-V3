@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import type { Equipment } from "@/types";
 
 type State =
@@ -19,6 +20,29 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
   const router = useRouter();
   const [state, setState] = useState<State>({ status: "idle" });
   const [selectedEquipId, setSelectedEquipId] = useState<string>("");
+  const [reportedBy, setReportedBy] = useState("");
+  const [dateReported, setDateReported] = useState("");
+
+  // Auto-fill reporter name and today's date when form opens
+  useEffect(() => {
+    setDateReported(new Date().toISOString().split("T")[0]);
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      supabase
+        .from("profiles")
+        .select("full_name, email")
+        .eq("id", user.id)
+        .single()
+        .then(({ data: profile }) => {
+          if (profile) {
+            setReportedBy(
+              profile.full_name ?? profile.email?.split("@")[0] ?? ""
+            );
+          }
+        });
+    });
+  }, []);
 
   // When an existing piece of equipment is selected, pre-fill unit_name + category
   const selectedEquip = equipment.find((e) => e.id === selectedEquipId) ?? null;
@@ -200,6 +224,8 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
             name="reported_by"
             type="text"
             placeholder="e.g. Marco, FOH Manager"
+            value={reportedBy}
+            onChange={(e) => setReportedBy(e.target.value)}
             disabled={isSubmitting}
             className="form-input"
           />
@@ -232,6 +258,8 @@ export default function AddIssueForm({ equipment, onClose }: Props) {
           <input
             name="date_reported"
             type="date"
+            value={dateReported}
+            onChange={(e) => setDateReported(e.target.value)}
             disabled={isSubmitting}
             className="form-input"
           />

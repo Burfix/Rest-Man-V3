@@ -52,17 +52,17 @@ export async function GET(req: NextRequest) {
       groups.get(key)!.push(r);
     }
 
-    // Resolve user names from profiles / user_roles
+    // Resolve user names from profiles
     const userIds = Array.from(new Set(scoreRows.map((r) => r.user_id)));
     const { data: profileRows } = await supabase
-      .from("user_roles")
-      .select("user_id, full_name, role, site_id")
-      .in("user_id", userIds)
-      .eq("is_active", true);
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", userIds);
 
     const profileMap = new Map<string, { name: string; role: string }>();
     for (const p of (profileRows ?? []) as any[]) {
-      profileMap.set(p.user_id, { name: p.full_name ?? "Unknown", role: p.role ?? "" });
+      const name = p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown";
+      profileMap.set(p.id, { name, role: "" });
     }
 
     // Build leaderboard entries

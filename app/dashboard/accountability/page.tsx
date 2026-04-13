@@ -121,13 +121,15 @@ export default async function AccountabilityPage({
     // Resolve names
     const userIds = Array.from(new Set(lbList.map((r) => r.user_id as string)));
     const { data: profileRows } = await supabase
-      .from("user_roles")
-      .select("user_id,full_name,site_id")
-      .in("user_id", userIds)
-      .eq("is_active", true);
+      .from("profiles")
+      .select("id,full_name,email")
+      .in("id", userIds);
 
     const nameMap = new Map<string, string>(
-      (profileRows ?? []).map((p: any) => [p.user_id, p.full_name ?? "Unknown"])
+      (profileRows ?? []).map((p: any) => [
+        p.id,
+        p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown",
+      ])
     );
 
     // Site names
