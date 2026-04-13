@@ -204,10 +204,20 @@ export default async function OperationsDashboard() {
     ? { netSales: salesSnapshot.netSales, targetSales: salesSnapshot.targetSales, dataDate: salesSnapshot.businessDate }
     : null;
 
+  // Build labour override from labour_daily_summary (primary source)
+  const labourScoreOverride = labourSummary?.labourPercentOfSales != null
+    ? {
+        labourPct:   labourSummary.labourPercentOfSales,
+        totalPay:    labourSummary.totalLabourCost,
+        totalHours:  labourSummary.totalLabourHours,
+        activeStaff: labourSummary.activeStaffCount,
+      }
+    : null;
+
   const operatingScore = await getOperatingScore(
     siteId,
     salesOverride,
-    null,
+    labourScoreOverride,
     null,
     orgId ?? undefined,
   ).catch(() => null);
@@ -235,10 +245,15 @@ export default async function OperationsDashboard() {
     ? Math.round((now - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
     : undefined;
 
-  // ─── Labour % ────────────────────────────────────────────────────────────────────
-  const labourPct = labourSummary?.labourPercentOfSales
-    ?? salesSnapshot.labourCostPercent
-    ?? 0;
+  // ─── Labour % ─────────────────────────────────────────────────────────────────
+  // Primary source: labour_daily_summary.labour_pct (via getStoredDailySummary)
+  // Derived fallback: totalLabourCost / netSales when labour_pct is null but cost is known
+  // We do NOT fall back to micros_sales_daily.labor_pct — that field is often 0 or unreliable.
+  const derivedLabourPct =
+    labourSummary && labourSummary.totalLabourCost > 0 && salesSnapshot.netSales > 0
+      ? +(labourSummary.totalLabourCost / salesSnapshot.netSales * 100).toFixed(1)
+      : null;
+  const labourPct = labourSummary?.labourPercentOfSales ?? derivedLabourPct ?? 0;
 
   // ─── Decision Engine — single evaluation pass ───────────────────────────
   const engineOutput = evaluateOperations({
