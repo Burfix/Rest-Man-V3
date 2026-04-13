@@ -52,9 +52,6 @@ export async function PATCH(
 
     // ── Start flow ────────────────────────────────────────────────────────────
     if (status === "started" || status === "in_progress") {
-      if (!comments_start && !(task as any).comments_start) {
-        return NextResponse.json({ error: "Start comment is required" }, { status: 400 });
-      }
       if (!(task as any).started_at) {
         updates.started_at  = now;
         updates.started_by  = ctx.userId;

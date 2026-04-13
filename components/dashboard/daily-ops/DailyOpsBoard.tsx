@@ -140,22 +140,19 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
   // ── Actions ─────────────────────────────────────────────────────────────────
 
   const handleStart = async (taskId: string) => {
-    if (!formData.comment.trim()) return;
     setSaving(taskId);
     setFormError(null);
     try {
       const data = await apiFetch(`/api/daily-ops/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "started", comments_start: formData.comment }),
+        body: JSON.stringify({ status: "started" }),
       });
       // Optimistically update local state from API response so the task shows
       // as started immediately, even if the background refresh fails.
       if (data?.task) {
         setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...data.task } : t));
       }
-      setActiveForm(null);
-      setFormData({ comment: "", blocker_reason: "", escalated_to: "", assigned_to: "" });
       refresh(); // background refresh — don't await so a slow fetch can't re-hide the update
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to start task. Please try again.");
@@ -231,9 +228,6 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
     return tasks
       .flatMap((t) => {
         const entries: { task: string; type: string; comment: string; time: string }[] = [];
-        if (t.comments_start && t.started_at) {
-          entries.push({ task: t.action_name, type: "Start", comment: t.comments_start, time: t.started_at });
-        }
         if (t.comments_end && t.completed_at) {
           entries.push({ task: t.action_name, type: "Complete", comment: t.comments_end, time: t.completed_at });
         }
@@ -384,20 +378,12 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   )}
 
                   {/* Comments */}
-                  {(task.comments_start || task.comments_end) && (
+                  {task.comments_end && (
                     <div className="space-y-1.5 rounded-lg border border-stone-200 dark:border-stone-800 bg-stone-100 dark:bg-stone-800/30 p-2.5">
-                      {task.comments_start && (
-                        <div>
-                          <p className="text-[10px] font-medium text-blue-400">Start Note</p>
-                          <p className="text-xs text-stone-600 dark:text-stone-300">{task.comments_start}</p>
-                        </div>
-                      )}
-                      {task.comments_end && (
-                        <div>
-                          <p className="text-[10px] font-medium text-emerald-400">Completion Note</p>
-                          <p className="text-xs text-stone-600 dark:text-stone-300">{task.comments_end}</p>
-                        </div>
-                      )}
+                      <div>
+                        <p className="text-[10px] font-medium text-emerald-400">Completion Note</p>
+                        <p className="text-xs text-stone-600 dark:text-stone-300">{task.comments_end}</p>
+                      </div>
                     </div>
                   )}
 
@@ -416,10 +402,11 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   <div className="flex items-center gap-2 flex-wrap border-t border-stone-200 dark:border-stone-800 pt-3">
                     {task.status === "not_started" && (
                       <button
-                        onClick={() => { setActiveForm({ id: task.id, type: "start" }); setFormData({ ...formData, comment: "" }); }}
-                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 transition-colors"
+                        onClick={() => handleStart(task.id)}
+                        disabled={saving === task.id}
+                        className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors"
                       >
-                        Start
+                        {saving === task.id ? "Starting…" : "Start"}
                       </button>
                     )}
                     {["started", "in_progress"].includes(task.status) && (
@@ -447,29 +434,9 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                   </div>
 
                   {/* Inline Forms */}
-                  {isActive && activeForm.type === "start" && (
-                    <div className="rounded-lg border border-blue-800/50 bg-stone-50 dark:bg-stone-900/80 p-3 space-y-2">
-                      <p className="text-xs font-semibold text-blue-400">Start Comment <span className="text-red-400">*</span></p>
-                      <textarea
-                        value={formData.comment}
-                        onChange={(e) => { setFormData({ ...formData, comment: e.target.value }); setFormError(null); }}
-                        placeholder="e.g. FOH briefing started late because two staff members arrived late."
-                        className="w-full rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-3 py-2 text-xs text-stone-700 dark:text-stone-200 placeholder:text-stone-600 focus:border-blue-500 focus:outline-none"
-                        rows={2}
-                      />
-                      {formError && <p className="text-xs text-red-400">{formError}</p>}
-                      <div className="flex gap-2">
-                        <button onClick={() => handleStart(task.id)} disabled={!formData.comment.trim() || isSaving} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 disabled:opacity-40 transition-colors">
-                          {isSaving ? "Saving…" : "Confirm Start"}
-                        </button>
-                        <button onClick={() => { setActiveForm(null); setFormError(null); }} className="rounded-lg bg-stone-100 dark:bg-stone-800 px-3 py-1 text-xs text-stone-500 dark:text-stone-400 hover:bg-stone-700 transition-colors">Cancel</button>
-                      </div>
-                    </div>
-                  )}
-
                   {isActive && activeForm.type === "complete" && (
                     <div className="rounded-lg border border-emerald-800/50 bg-stone-50 dark:bg-stone-900/80 p-3 space-y-2">
-                      <p className="text-xs font-semibold text-emerald-400">Completion Comment <span className="text-red-400">*</span></p>
+                      <p className="text-xs font-semibold text-emerald-400">Completion note — what did you find or do? <span className="text-red-400">*</span></p>
                       <textarea
                         value={formData.comment}
                         onChange={(e) => { setFormData({ ...formData, comment: e.target.value }); setFormError(null); }}
