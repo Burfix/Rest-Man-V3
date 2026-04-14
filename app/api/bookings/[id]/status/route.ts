@@ -7,7 +7,13 @@ import { getReservationById, updateReservationStatus } from "@/services/bookings
 import { sendBookingConfirmedNotice, sendBookingCancellationNotice } from "@/services/notifications/whatsappBookings";
 import type { ReservationStatus } from "@/types";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  if (!UUID_RE.test(params.id)) {
+    return NextResponse.json({ error: "Invalid reservation ID" }, { status: 400 });
+  }
+
   const guard = await apiGuard(PERMISSIONS.CREATE_ACTION, "PATCH /api/bookings/[id]/status");
   if (guard.error) return guard.error;
 
