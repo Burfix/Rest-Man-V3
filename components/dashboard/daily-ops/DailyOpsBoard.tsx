@@ -347,11 +347,31 @@ export function DailyOpsBoard({ initialTasks, team, date }: Props) {
                         )}
                       </div>
                     </div>
-                    {/* Executed by */}
-                    {task.assigned_to && (
+                    {/* Assigned-to badge / dropdown */}
+                    {task.assigned_to ? (
                       <span className="rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-2 py-1 text-[10px] text-stone-500 dark:text-stone-400">
                         {teamMap.get(task.assigned_to) ?? "Unknown"}
                       </span>
+                    ) : team.length > 0 && !["completed", "missed"].includes(task.status) && (
+                      <select
+                        defaultValue=""
+                        onChange={async (e) => {
+                          const uid = e.target.value;
+                          if (!uid) return;
+                          try {
+                            const data = await apiFetch(`/api/daily-ops/${task.id}`, {
+                              method: "PATCH",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ status: task.status, assigned_to: uid }),
+                            });
+                            if (data?.task) setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, ...data.task } : t));
+                          } catch { /* ignore */ }
+                        }}
+                        className="rounded-md border border-stone-300 dark:border-stone-700 bg-stone-100 dark:bg-stone-800 px-2 py-1 text-[10px] text-stone-500 dark:text-stone-400 cursor-pointer"
+                      >
+                        <option value="">Assign…</option>
+                        {team.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
                     )}
                   </div>
 

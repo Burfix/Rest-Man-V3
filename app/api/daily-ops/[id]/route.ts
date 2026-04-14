@@ -21,7 +21,7 @@ export async function PATCH(
 
   try {
     const body = await req.json();
-    const { status, comments_start, comments_end, blocker_reason, escalated_to, actor_name } = body;
+    const { status, comments_start, comments_end, blocker_reason, escalated_to, actor_name, assigned_to: assignedToOverride } = body;
 
     if (!status) {
       return NextResponse.json({ error: "status is required" }, { status: 400 });
@@ -110,8 +110,16 @@ export async function PATCH(
       }
     }
 
-    // Auto-assign to the signed-in user performing the action
-    updates.assigned_to = ctx.userId;
+    // Assignment rules:
+    //  1. Explicit assigned_to in request body always wins (manager reassigning a task).
+    //  2. If the task already has an owner, preserve them — the person interacting
+    //     with the task is not necessarily its owner (e.g. Thami completing Mike's task).
+    //  3. Only auto-assign the current user when the task has no owner yet.
+    if (typeof assignedToOverride === "string" && assignedToOverride) {
+      updates.assigned_to = assignedToOverride;
+    } else if (!(task as any).assigned_to) {
+      updates.assigned_to = ctx.userId;
+    }
 
     // Accountability columns (added in migration 051) — extract them so that if
     // the migration hasn't been applied yet we can fall back to a core-only update.
