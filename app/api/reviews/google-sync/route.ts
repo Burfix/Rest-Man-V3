@@ -42,7 +42,7 @@ export interface GoogleSyncResult {
 
 // ── Core sync logic (shared with Reviews page server component) ────────────────
 
-export async function syncSiteReviews(
+async function syncSiteReviews(
   supabase: ReturnType<typeof createServerClient>,
   siteId: string,
 ): Promise<GoogleSyncResult> {
