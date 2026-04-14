@@ -99,6 +99,15 @@ export async function GET() {
         });
       }
       sitesQ = sitesQ.in("organisation_id", orgIds);
+
+      // Belt-and-braces: if the user has explicit site_id grants, restrict to
+      // those sites only — prevents org-level leakage across sites they don't own.
+      const explicitSiteIds = ((roleRows ?? []) as any[])
+        .map((r: any) => r.site_id as string | null)
+        .filter((id): id is string => !!id);
+      if (explicitSiteIds.length > 0) {
+        sitesQ = sitesQ.in("id", explicitSiteIds);
+      }
     }
 
     const { data: sitesData, error: sitesErr } = await sitesQ;

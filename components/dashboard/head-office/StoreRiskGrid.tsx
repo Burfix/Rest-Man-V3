@@ -225,7 +225,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
       {/* Footer CTA */}
       <div className="border-t border-stone-100 dark:border-stone-800 px-4 py-2 bg-white dark:bg-stone-900">
         <Link
-          href={`/dashboard?site=${store.site_id}`}
+          href={`/dashboard/head-office/site/${store.site_id}`}
           className={cn(
             "block text-center text-[11px] font-bold uppercase tracking-wider py-0.5 transition-colors rounded",
             store.risk_level === "red"
