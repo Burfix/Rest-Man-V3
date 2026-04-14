@@ -108,7 +108,7 @@ export async function calculateDailyScores(
   const { data: tasks, error: taskErr } = await supabase
     .from("daily_ops_tasks")
     .select(
-      "id, site_id, started_by, completed_by, blocked_by, escalated_by, " +
+      "id, site_id, assigned_to, started_by, completed_by, blocked_by, escalated_by, " +
       "status, completed_at, due_time, task_date, time_to_complete_minutes",
     )
     .eq("site_id", siteId)
@@ -119,13 +119,16 @@ export async function calculateDailyScores(
   const taskList = (tasks ?? []) as any[];
   if (taskList.length === 0) return 0;
 
-  // 2. Discover all user IDs that touched tasks this day
+  // 2. Discover all user IDs with ownership or involvement in tasks this day.
+  // assigned_to is the canonical owner; completed_by gives credit to whoever
+  // actually finished the task even if it was reassigned.
   const userIds = new Set<string>();
   for (const t of taskList) {
-    if (t.started_by)   userIds.add(t.started_by);
-    if (t.completed_by) userIds.add(t.completed_by);
+    if (t.assigned_to)  userIds.add(t.assigned_to);
+    if (t.completed_by) userIds.add(t.completed_by); // credit completer even if unassigned
     if (t.blocked_by)   userIds.add(t.blocked_by);
     if (t.escalated_by) userIds.add(t.escalated_by);
+    // started_by intentionally excluded: initiating a task ≠ owning it
   }
   if (userIds.size === 0) return 0;
 
@@ -142,11 +145,19 @@ export async function calculateDailyScores(
   const userIdArray = Array.from(userIds);
 
   for (const userId of userIdArray) {
-    // tasks_assigned: tasks where started_by OR completed_by = userId
-    const assigned = taskList.filter(
-      (t: any) => t.started_by === userId || t.completed_by === userId,
-    );
+    // tasks_assigned: canonical owner is assigned_to.
+    // Fallback: if no assigned_to exists on a task, the user who started it owns it.
+    // This prevents Mike (started_by) from being penalised for tasks assigned to Thami.
+    const assigned = taskList.filter((t: any) => {
+      if (t.assigned_to === userId) return true;
+      if (!t.assigned_to && t.started_by === userId) return true;
+      return false;
+    });
     const tasksAssigned = assigned.length;
+
+    // No tasks assigned to this user today — day off or nothing assigned to them.
+    // Do not write a score row; a missing row is semantically different from a 0.
+    if (tasksAssigned === 0) continue;
 
     // tasks_completed: completed_by = userId AND status = 'completed'
     const completed = taskList.filter(
@@ -197,10 +208,6 @@ export async function calculateDailyScores(
       tasksBlocked,
       tasksEscalated,
     });
-
-    // No tasks assigned today — manager had a day off or was unassigned.
-    // Skip this user entirely; do not write a 0 score row.
-    if (score === SCORE_NO_DATA) continue;
 
     upserts.push({
       user_id:                userId,
