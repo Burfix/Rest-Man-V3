@@ -314,16 +314,24 @@ function computeSystemHealth(
   minutesElapsed: number,
 ): BrainOutput["systemHealth"] {
   // ── Revenue: 30 pts (band-based) ────────────────────────────────────────
-  // If this site has no POS connection, award neutral 15 pts (same as scoreRevenue with no target).
-  const revPts = ctx.revenue.connected
-    ? scoreRevenue(ctx.revenue.actual ?? 0, ctx.revenue.target ?? 0)
-    : 15;
+  // If this site has no POS connection, award neutral 15 pts.
+  // If connected but no revenue data yet today, also award neutral 15 pts (not penalised).
+  const hasRevenueData = ctx.revenue.actual > 0;
+  const revPts = !ctx.revenue.connected
+    ? 15 // no POS connection — neutral
+    : !hasRevenueData
+    ? 15 // connected but no data yet today — neutral, not penalised
+    : scoreRevenue(ctx.revenue.actual ?? 0, ctx.revenue.target ?? 0);
 
   // Labour: 20 pts (band-based)
   // If this site has no POS connection, award neutral 10 pts.
-  const labPts = ctx.labour.connected
-    ? scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0)
-    : 10;
+  // If connected but no labour data yet today, also award neutral 10 pts.
+  const hasLabourData = ctx.labour.actualPercent > 0;
+  const labPts = !ctx.labour.connected
+    ? 10 // no POS connection — neutral
+    : !hasLabourData
+    ? 10 // connected but no data yet today — neutral, not penalised
+    : scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0);
 
   // Duty completion: 20 pts
   // Duties are not expected to start in the first 2 hours of the day (before noon).
