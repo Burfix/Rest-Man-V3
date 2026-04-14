@@ -95,7 +95,7 @@ export async function updateReservationStatus(
 
   const { error } = await supabase
     .from("reservations")
-    .update({ status })
+    .update({ status, updated_at: new Date().toISOString() })
     .eq("id", id);
 
   if (error) {

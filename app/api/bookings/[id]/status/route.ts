@@ -33,7 +33,8 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
     return NextResponse.json({ reservation: { ...reservation, status }, waSent });
   } catch (err) {
-    logger.error("Failed to update booking status", { route: "PATCH /api/bookings/[id]/status", err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("Failed to update booking status", { route: "PATCH /api/bookings/[id]/status", err, msg });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
