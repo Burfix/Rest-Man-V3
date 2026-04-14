@@ -65,14 +65,30 @@ export async function GET(
       ),
     );
 
-    const { data: siteRow } = await db
-      .from("sites")
-      .select("id, organisation_id")
-      .eq("id", siteId)
-      .single();
+    const explicitSiteIds: string[] = Array.from(
+      new Set(
+        ((roleRows ?? []) as any[])
+          .map((r: any) => r.site_id as string | null)
+          .filter((id): id is string => !!id),
+      ),
+    );
 
-    if (!siteRow || !orgIds.includes(siteRow.organisation_id)) {
-      return NextResponse.json({ error: "Site not found" }, { status: 404 });
+    // If the user has explicit site grants, they can only access those sites.
+    // Otherwise fall back to org-level check.
+    if (explicitSiteIds.length > 0) {
+      if (!explicitSiteIds.includes(siteId)) {
+        return NextResponse.json({ error: "Site not found" }, { status: 404 });
+      }
+    } else {
+      const { data: siteRow } = await db
+        .from("sites")
+        .select("id, organisation_id")
+        .eq("id", siteId)
+        .single();
+
+      if (!siteRow || !orgIds.includes(siteRow.organisation_id)) {
+        return NextResponse.json({ error: "Site not found" }, { status: 404 });
+      }
     }
   }
 

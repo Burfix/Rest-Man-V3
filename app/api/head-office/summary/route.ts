@@ -66,7 +66,7 @@ export async function GET() {
     // ── 2. Resolve org IDs from user_roles ──────────────────────────────────
     const { data: roleRows } = await db
       .from("user_roles")
-      .select("organisation_id, role")
+      .select("organisation_id, site_id, role")
       .eq("user_id", ctx.userId)
       .eq("is_active", true)
       .in("role", ELEVATED);
@@ -82,6 +82,16 @@ export async function GET() {
       ),
     );
 
+    // If ANY active role row carries an explicit site_id, restrict to those sites only.
+    // This ensures Portia (site_id = Primi Camps Bay) can't see other sites in the org.
+    const explicitSiteIds: string[] = Array.from(
+      new Set(
+        ((roleRows ?? []) as any[])
+          .map((r: any) => r.site_id as string | null)
+          .filter((id: string | null): id is string => !!id),
+      ),
+    );
+
     // ── 3. Fetch sites scoped to user's orgs ────────────────────────────────
     let sitesQ = db
       .from("sites")
@@ -90,7 +100,7 @@ export async function GET() {
       .neq("store_code", "TEST-01");
 
     if (!isSuperAdmin) {
-      if (orgIds.length === 0) {
+      if (orgIds.length === 0 && explicitSiteIds.length === 0) {
         return NextResponse.json({
           stores: [],
           accountability: [],
@@ -98,15 +108,11 @@ export async function GET() {
           opsTrend: [],
         });
       }
-      sitesQ = sitesQ.in("organisation_id", orgIds);
-
-      // Belt-and-braces: if the user has explicit site_id grants, restrict to
-      // those sites only — prevents org-level leakage across sites they don't own.
-      const explicitSiteIds = ((roleRows ?? []) as any[])
-        .map((r: any) => r.site_id as string | null)
-        .filter((id): id is string => !!id);
+      // Explicit site_id grants take priority over org-level scoping.
       if (explicitSiteIds.length > 0) {
         sitesQ = sitesQ.in("id", explicitSiteIds);
+      } else {
+        sitesQ = sitesQ.in("organisation_id", orgIds);
       }
     }
 
