@@ -132,6 +132,8 @@ export type BrainOutput = {
     tier: string;
     alertNeeded: boolean;
     alertReason: string | null;
+    /** false = no score row exists (day off / no tasks assigned today) */
+    hasScoreData: boolean;
   };
 
   recoveryMeter: RecoveryMeter | null;
@@ -187,6 +189,7 @@ export const BRAIN_FALLBACK: BrainOutput = {
     tier: "Unknown",
     alertNeeded: false,
     alertReason: null,
+    hasScoreData: false,
   },
   recoveryMeter: null,
   voiceLine: "Operational data is loading. Check back shortly.",
@@ -947,12 +950,13 @@ async function fetchGmSituation(
   // Accountability score lookup
   let score = 0;
   let tier  = "Unknown";
+  let hasScoreData = false; // true only when a real, recent score row exists
 
   if (gmUserId) {
     try {
       const { data: scoreRows } = await (supabase as any)
         .from("manager_performance_scores")
-        .select("score")
+        .select("score, period_date")
         .eq("user_id", gmUserId)
         .eq("site_id", siteId)
         .order("period_date", { ascending: false })
@@ -961,13 +965,22 @@ async function fetchGmSituation(
       if (scoreRows?.[0]?.score != null) {
         score = scoreRows[0].score as number;
         tier  = getPerformanceTier(score);
+        hasScoreData = true;
+
+        // If the most recent score row is more than 3 days old treat as
+        // "no recent data" — manager may be on extended leave or unassigned.
+        const rowDate = new Date(scoreRows[0].period_date as string);
+        const daysSince = (Date.now() - rowDate.getTime()) / 86_400_000;
+        if (daysSince > 3) hasScoreData = false;
       }
     } catch {
       // fall through to defaults
     }
   }
 
-  const alertNeeded = score > 0 && score < 60;
+  // Only alert when we have real, recent data showing genuine underperformance.
+  // Never alert when: no score row, manager had a day off, or stale data (> 3 days).
+  const alertNeeded = hasScoreData && score > 0 && score < 60;
 
   return {
     userId:      gmUserId,
@@ -978,6 +991,7 @@ async function fetchGmSituation(
     alertReason: alertNeeded
       ? `GM performance at ${score}/100 — below 60-point minimum threshold.`
       : null,
+    hasScoreData,
   };
 }
 

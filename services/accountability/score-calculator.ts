@@ -43,14 +43,24 @@ export type PerformanceTier = "Elite" | "Strong" | "Average" | "At Risk";
 
 // ── Pure score computation ────────────────────────────────────────────────────
 
+/** Sentinel returned by computeScore when no tasks were assigned (day off / unassigned). */
+export const SCORE_NO_DATA = -1;
+
 /**
  * Score 0–100:
  *   completion_rate × 60  (60 pts max)
  *   on_time_rate   × 30  (30 pts max)
  *   −5 per escalation
+ *
+ * Returns SCORE_NO_DATA (-1) when tasksAssigned === 0 so callers can
+ * distinguish "no tasks today" from a genuine zero score.
  */
 export function computeScore(m: ScoreInputMetrics): number {
-  const completionRate = m.tasksAssigned > 0 ? m.tasksCompleted / m.tasksAssigned : 0;
+  // No tasks assigned = no data for this day (day off or unassigned).
+  // Return sentinel so the caller can skip writing a misleading 0 row.
+  if (m.tasksAssigned === 0) return SCORE_NO_DATA;
+
+  const completionRate = m.tasksCompleted / m.tasksAssigned;
   const onTimeRate     = m.tasksCompleted > 0 ? m.tasksOnTime / m.tasksCompleted : 0;
 
   const base    = completionRate * 60;
@@ -187,6 +197,10 @@ export async function calculateDailyScores(
       tasksBlocked,
       tasksEscalated,
     });
+
+    // No tasks assigned today — manager had a day off or was unassigned.
+    // Skip this user entirely; do not write a 0 score row.
+    if (score === SCORE_NO_DATA) continue;
 
     upserts.push({
       user_id:                userId,
