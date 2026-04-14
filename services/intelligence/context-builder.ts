@@ -155,6 +155,8 @@ export async function buildOperationsContext(
         .maybeSingle(),
 
       // MICROS daily sales (primary — same source as Business Status panel)
+      // Prefer connection_id lookup; fall back to loc_ref when micros_connections
+      // returned null due to RLS but effectiveLocRef is still known.
       microsConnectionId
         ? (supabase as any)
             .from("micros_sales_daily")
@@ -162,7 +164,16 @@ export async function buildOperationsContext(
             .eq("connection_id", microsConnectionId)
             .eq("business_date", date)
             .maybeSingle()
-        : Promise.resolve({ data: null }),
+        : effectiveLocRef
+          ? (supabase as any)
+              .from("micros_sales_daily")
+              .select("net_sales, gross_sales")
+              .eq("loc_ref", effectiveLocRef)
+              .eq("business_date", date)
+              .order("synced_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
 
       // Target from snapshot
       supabase
