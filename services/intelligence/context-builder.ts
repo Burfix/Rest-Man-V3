@@ -106,17 +106,33 @@ export async function buildOperationsContext(
   // micros_connections.site_id links a connection to a site.
   // Sites with no connection (e.g. Primi Camps Bay) must not inherit another
   // site's MICROS data — they should show "Not connected" for all POS-derived fields.
-  const connRes = await (supabase as any)
-    .from("micros_connections")
-    .select("id, loc_ref")
-    .eq("site_id", siteId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  //
+  // We ALSO read sites.micros_location_ref as the authoritative source of truth for
+  // whether a site is POS-connected.  The micros_connections query can return null
+  // due to RLS policies even when a connection exists; the sites column is always
+  // readable and is set explicitly for every connected site.
+  const [connRes, siteConnRes] = await Promise.all([
+    (supabase as any)
+      .from("micros_connections")
+      .select("id, loc_ref")
+      .eq("site_id", siteId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    (supabase as any)
+      .from("sites")
+      .select("micros_location_ref")
+      .eq("id", siteId)
+      .maybeSingle(),
+  ]);
   const microsConnectionId = (connRes.data as { id: string } | null)?.id ?? null;
   const microsLocRef = (connRes.data as { id: string; loc_ref?: string | null } | null)?.loc_ref ?? null;
-  /** True when this site has a linked MICROS/POS connection */
-  const posConnected = microsConnectionId !== null;
+  /** loc_ref from the sites table — authoritative fallback when micros_connections is unavailable */
+  const siteLocRef = (siteConnRes.data as { micros_location_ref?: string | null } | null)?.micros_location_ref ?? null;
+  /** Effective loc_ref: prefer connection table (live), fall back to sites column (configured) */
+  const effectiveLocRef = microsLocRef ?? siteLocRef;
+  /** True when this site has a configured POS/MICROS loc_ref — based on sites table, not connection query */
+  const posConnected = effectiveLocRef !== null && effectiveLocRef !== "";
 
   // ── Step 2: Parallel fetch everything ──────────────────────────────────────
   const [revRes, manualRes, microsRes, snapRes, labSummaryRes, labFallbackRes, siteRes, actRes, maintRes, compRes] =
@@ -158,11 +174,13 @@ export async function buildOperationsContext(
         .limit(1),
 
       // Labour (primary): MICROS labour_daily_summary
-      microsLocRef
+      // Uses effectiveLocRef (sites.micros_location_ref as fallback) so the query
+      // succeeds even when micros_connections returns null for the session.
+      effectiveLocRef
         ? (supabase as any)
             .from("labour_daily_summary")
             .select("total_pay, labour_pct, net_sales")
-            .eq("loc_ref", microsLocRef)
+            .eq("loc_ref", effectiveLocRef)
             .eq("business_date", date)
             .maybeSingle()
         : Promise.resolve({ data: null }),

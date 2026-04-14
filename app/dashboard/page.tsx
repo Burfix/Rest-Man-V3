@@ -214,12 +214,29 @@ export default async function OperationsDashboard() {
       }
     : null;
 
+  // Await brain early so we can use its connection flags in BOTH the score engine
+  // AND the decision engine — single source of truth for POS connection state.
+  // Brain was started in parallel at the top of the function, so this adds no latency.
+  const brain = await brainPromise.catch(() => null);
+
+  // POS connection flags (from brain's context-builder, which is site-specific).
+  // Used to show "Not connected" in the HeroStrip top bar AND the score breakdown.
+  const revDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "REVENUE");
+  const labDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "LABOUR");
+  const revenueConnected = revDriver?.connected !== false;   // true when connected or brain unavailable
+  const labourConnected  = labDriver?.connected  !== false;
+  // posConnected = true whenever micros_connections has a row for this site.
+  // Passed to getOperatingScore so null overrides (forecast mode, late labour sync)
+  // never trigger "No POS connection" — the two panels share one source of truth.
+  const posConnected = revenueConnected || labourConnected;
+
   const operatingScore = await getOperatingScore(
     siteId,
     salesOverride,
     labourScoreOverride,
     null,
     orgId ?? undefined,
+    posConnected,
   ).catch(() => null);
 
   // ─── Integration health ──────────────────────────────────────────────────
@@ -255,16 +272,9 @@ export default async function OperationsDashboard() {
       : null;
   const labourPct = labourSummary?.labourPercentOfSales ?? derivedLabourPct ?? 0;
 
-  // Await brain early so we can use its connection flags in the decision engine below.
-  // Brain was started in parallel at the top of the function, so this doesn't add latency.
-  const brain = await brainPromise.catch(() => null);
-
-  // ─── POS connection flags (from brain's context-builder, which is now site-specific) ──
-  // Used to show "Not connected" in Revenue/Labour panels for sites without MICROS.
-  const revDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "REVENUE");
-  const labDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "LABOUR");
-  const revenueConnected = revDriver?.connected !== false;   // true when connected or brain unavailable
-  const labourConnected  = labDriver?.connected  !== false;
+  // brain, revDriver, labDriver, revenueConnected, labourConnected and posConnected
+  // are declared above (before getOperatingScore) so the score breakdown and
+  // HeroStrip top bar share exactly the same flag and cannot diverge.
 
   // ─── Decision Engine — single evaluation pass ───────────────────────────
   const engineOutput = evaluateOperations({
@@ -491,7 +501,6 @@ export default async function OperationsDashboard() {
         <SecondaryInsights
           reviews={reviews}
           maintenance={maintenance}
-          hasEquipment={maintenance.totalEquipment > 0}
           hasReviews={reviews.totalReviews > 0}
         />
       </div>

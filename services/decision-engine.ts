@@ -221,7 +221,10 @@ export function evaluateOperations(
   const confidence = effectiveConfidence(input.forecast.confidence, input.freshness);
 
   // ── Rule 1: Labour cost vs revenue gap ─────────────────────────────────
+  // Guard: labour % is derived from POS revenue data — unreliable without a connection.
   if (
+    input.revenue.connected !== false &&
+    input.labour.connected !== false &&
     input.labour.labourPercent > input.labour.targetPercent &&
     input.revenue.variancePercent < 0
   ) {
@@ -245,7 +248,7 @@ export function evaluateOperations(
       },
       confidence,
     });
-  } else if (input.labour.labourPercent > input.labour.targetPercent) {
+  } else if (input.revenue.connected !== false && input.labour.connected !== false && input.labour.labourPercent > input.labour.targetPercent) {
     decisions.push({
       id: nextId(),
       severity: "medium",
@@ -381,7 +384,8 @@ export function evaluateOperations(
   }
 
   // ── Additional: Revenue gap ───────────────────────────────────────────
-  if (input.revenue.variancePercent < -10) {
+  // Guard: skip for sites with no POS connection — variance is not real POS data.
+  if (input.revenue.connected !== false && input.revenue.variancePercent < -10) {
     const gap = input.revenue.target - input.revenue.actual;
     const coversNeeded =
       input.revenue.avgSpend > 0

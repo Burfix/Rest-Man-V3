@@ -7,7 +7,6 @@
 
 import ReviewsSection    from "@/components/dashboard/ops/ReviewsSection";
 import MaintenanceSection from "@/components/dashboard/ops/MaintenanceSection";
-import SetupProgressSection from "@/components/dashboard/ops/SetupProgressSection";
 import type {
   SevenDayReviewSummary,
   MaintenanceSummary,
@@ -16,17 +15,14 @@ import type {
 interface Props {
   reviews:     SevenDayReviewSummary;
   maintenance: MaintenanceSummary;
-  hasEquipment: boolean;
   hasReviews:   boolean;
 }
 
 export default function SecondaryInsights({
   reviews,
   maintenance,
-  hasEquipment,
   hasReviews,
 }: Props) {
-  const allSetup = hasEquipment && hasReviews;
 
   return (
     <div>
@@ -52,15 +48,6 @@ export default function SecondaryInsights({
 
         {/* Maintenance full-width */}
         <MaintenanceSection summary={maintenance} />
-
-        {/* Setup progress — hidden once all areas configured */}
-        {!allSetup && (
-          <SetupProgressSection
-            hasEquipment={hasEquipment}
-            hasSales={false}
-            hasReviews={hasReviews}
-          />
-        )}
       </div>
     </div>
   );

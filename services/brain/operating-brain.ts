@@ -43,6 +43,8 @@ export type ScoreDriver = {
   direction: "up" | "down";
   /** false = this site has no POS connection; score is neutral, not penalised */
   connected?: boolean;
+  /** false = site is connected but has no POS data for today yet; score is neutral */
+  hasDataToday?: boolean;
 };
 
 export type RecoveryMeter = {
@@ -388,8 +390,11 @@ function computeSystemHealth(
       pts:       Math.round(revPts),
       direction: revPts >= 25 ? "up" : "down",
       connected: ctx.revenue.connected,
+      hasDataToday: ctx.revenue.connected ? hasRevenueData : undefined,
       reason:    !ctx.revenue.connected
         ? "No POS connection — neutral 15/30 pts"
+        : !hasRevenueData
+        ? "Connected — no data yet today"
         : revPts >= 28
         ? `On or above target (+${Math.round(revPts)}/30 pts)`
         : ctx.revenue.target > 0
@@ -401,8 +406,11 @@ function computeSystemHealth(
       pts:       Math.round(labPts),
       direction: labPts >= 20 ? "up" : "down",
       connected: ctx.labour.connected,
+      hasDataToday: ctx.labour.connected ? hasLabourData : undefined,
       reason:    !ctx.labour.connected
         ? "No POS connection — neutral 10/20 pts"
+        : !hasLabourData
+        ? "Connected — no data yet today"
         : labPts >= 20
         ? `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target ✓`
         : `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target — ${ctx.labour.variance.toFixed(1)}% over${ctx.labour.note ? ` · ${ctx.labour.note}` : ""}`,
@@ -589,7 +597,8 @@ function buildContextualThreat(
   // Revenue behind + ops lag — mirrors voice state 11 EXACTLY (no timeOfDay gate).
   // Voice state 11 fires on variance < -10 && ops < 70 regardless of service window.
   // primaryThreat must match — if voice says "compound risk", LEFT column must agree.
-  if (isActive && ctx.revenue.variance < -10 && ctx.dailyOps.completionRate < 70) {
+  // Guard: only fire when the site has a live POS connection — variance is meaningless otherwise.
+  if (isActive && ctx.revenue.connected && ctx.revenue.variance < -10 && ctx.dailyOps.completionRate < 70) {
     const sev: BrainThreatSeverity = ctx.revenue.variance < -20 ? "high" : "medium";
     return {
       title:             "Revenue Behind + Operational Lag",
@@ -636,7 +645,8 @@ function buildContextualThreat(
   }
 
   // Revenue behind (moderate) — no timeOfDay gate, matches voice state 14
-  if (isActive && ctx.revenue.variance < -10 && ctx.revenue.target > 0) {
+  // Guard: only fire when POS-connected — without real data, variance of -100% is an artefact.
+  if (isActive && ctx.revenue.connected && ctx.revenue.variance < -10 && ctx.revenue.target > 0) {
     return {
       title:             "Revenue Monitoring",
       description:       `Revenue ${ctx.revenue.variance.toFixed(1)}% vs target during service.`,
@@ -653,7 +663,11 @@ function buildContextualThreat(
   }
 
   // Worst score driver (catch-all for below-threshold scores)
-  const topLoss = systemHealth.scoreDrivers.find((d) => d.direction === "down");
+  // Guard: skip REVENUE / LABOUR drivers that are merely neutral (no POS connection),
+  // so unconnected sites don't surface misleading "REVENUE Below Threshold" threats.
+  const topLoss = systemHealth.scoreDrivers.find(
+    (d) => d.direction === "down" && d.connected !== false
+  );
   if (topLoss && systemHealth.score < 70) {
     return {
       title:             `${topLoss.module} Below Threshold`,

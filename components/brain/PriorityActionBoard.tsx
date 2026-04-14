@@ -400,16 +400,20 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
   const scoreBars = systemHealth.allScoreDrivers.map((driver) => {
     const max = MODULE_MAX[driver.module] ?? 20;
     const isNotConnected = driver.connected === false;
-    const pct = isNotConnected ? 0 : Math.round((driver.pts / max) * 100);
-    const barColor = isNotConnected
+    // Connected but no POS data received yet today (e.g. MICROS hasn't synced yet)
+    const noDataToday = !isNotConnected && driver.hasDataToday === false;
+    // Inactive = no bar, grey pts label, sub-label shown
+    const inactive = isNotConnected || noDataToday;
+    const pct = inactive ? 0 : Math.round((driver.pts / max) * 100);
+    const barColor = inactive
       ? "bg-stone-200 dark:bg-stone-700"
       : pct >= 80 ? "bg-emerald-500"
       : pct >= 50 ? "bg-amber-500"   : "bg-red-500";
-    const textColor = isNotConnected
+    const textColor = inactive
       ? "text-stone-400 dark:text-stone-600"
       : pct >= 80 ? "text-emerald-700 dark:text-emerald-500"
       : pct >= 50 ? "text-amber-600 dark:text-amber-400"     : "text-red-600 dark:text-red-400";
-    return { driver, max, pct, barColor, textColor, isNotConnected };
+    return { driver, max, pct, barColor, textColor, isNotConnected, noDataToday, inactive };
   });
 
   // ── Brain recommendation ───────────────────────────────────────────────────
@@ -644,7 +648,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
           {/* Score breakdown bars */}
           <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-2.5 font-mono">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE BREAKDOWN</span>
-            {scoreBars.map(({ driver, max, pct, barColor, textColor, isNotConnected }) => {
+            {scoreBars.map(({ driver, max, pct, barColor, textColor, isNotConnected, noDataToday, inactive }) => {
               // Duties-specific sub-line
               const dutiesSubLine = driver.module === "DUTIES" && dutiesData
                 ? `${dutiesData.completedCount} of ${dutiesData.totalCount} duties complete (${pct}%) · Full 20 pts at 100%`
@@ -661,13 +665,13 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                       {driver.module}
                     </span>
                     <span className={cn("text-[9px] font-bold", textColor)}>
-                      {isNotConnected ? "—" : `${driver.pts}/${max}`}
+                      {inactive ? "—" : `${driver.pts}/${max}`}
                     </span>
                   </div>
                   <div className="h-1.5 bg-[#e5e5e5] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
                     <div
                       className={cn("h-full rounded-full", barColor)}
-                      style={{ width: isNotConnected ? "0%" : `${pct}%` }}
+                      style={{ width: inactive ? "0%" : `${pct}%` }}
                     />
                   </div>
                   {isNotConnected && (
@@ -675,12 +679,17 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                       No POS connection
                     </p>
                   )}
-                  {!isNotConnected && dutiesSubLine && (
+                  {noDataToday && (
+                    <p className="text-[9px] font-mono text-stone-400 dark:text-stone-600 mt-0.5 leading-tight">
+                      No data yet today
+                    </p>
+                  )}
+                  {!inactive && dutiesSubLine && (
                     <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
                       {dutiesSubLine}
                     </p>
                   )}
-                  {!isNotConnected && complianceDebugLine && (
+                  {!inactive && complianceDebugLine && (
                     <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
                       {complianceDebugLine}
                     </p>

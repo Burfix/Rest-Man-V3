@@ -129,8 +129,8 @@ function scoreRevenue(actual: number | null, target: number | null): { score: nu
   return { score, gap_pct: Math.round(gap_pct * 10) / 10 };
 }
 
-function revenueDetail(score: number, gap_pct: number | null, actual: number | null, target: number | null): string {
-  if (actual === null)  return "No sales data available";
+function revenueDetail(score: number, gap_pct: number | null, actual: number | null, target: number | null, posConnected: boolean): string {
+  if (actual === null)  return posConnected ? "Awaiting live data" : "No POS connection";
   if (target === null)  return `Sales R${actual.toLocaleString()} — no target set`;
   if (gap_pct === null) return `Sales R${actual.toLocaleString()}`;
   if (gap_pct <= 0)     return `On target (R${actual.toLocaleString()} vs R${target.toLocaleString()})`;
@@ -152,8 +152,8 @@ function scoreLabour(pct: number | null): number {
   return 6;
 }
 
-function labourDetail(score: number, pct: number | null): string {
-  if (pct === null) return "No labour data available";
+function labourDetail(score: number, pct: number | null, posConnected: boolean): string {
+  if (pct === null) return posConnected ? "Awaiting live data" : "No POS connection";
   if (pct <= 30)    return `Labour at ${pct.toFixed(1)}% — healthy (≤30%)`;
   if (pct <= 35)    return `Labour at ${pct.toFixed(1)}% — above target (30–35%)`;
   return `Labour at ${pct.toFixed(1)}% — over budget (>35%)`;
@@ -313,7 +313,9 @@ export async function getOperatingScore(
   labourOverride?: LabourOverride | null,
   inventoryOverride?: InventoryOverride | null,
   orgId?: string,
+  posConnected?: boolean,
 ): Promise<OperatingScore> {
+  const isPosConnected = posConnected ?? true;
   const supabase = createServerClient();
   const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -369,26 +371,41 @@ export async function getOperatingScore(
     targetSales = (targetData?.target_sales as number | null) ?? null;
   }
 
-  // ── Score revenue (25 pts) ────────────────────────────────────────────────
-  const { score: revenueScore, gap_pct } = scoreRevenue(actualSales, targetSales);
+  // ── Score revenue (25 pts) ─────────────────────────────────────────────────
+  // When connected but override is null (e.g. source=forecast), award neutral 15 pts
+  // rather than 0 — same policy as the Brain scoring engine.
+  let revenueScore: number;
+  let gap_pct: number | null;
+  if (actualSales === null && isPosConnected) {
+    revenueScore = 15;
+    gap_pct = null;
+  } else {
+    ({ score: revenueScore, gap_pct } = scoreRevenue(actualSales, targetSales));
+  }
   const revenueComponent: RevenueComponent = {
     score:     revenueScore,
     max:       25,
     actual:    actualSales,
     target:    targetSales,
-    gap_pct,
+    gap_pct:   gap_pct ?? null,
     data_date: dataDate,
-    detail:    revenueDetail(revenueScore, gap_pct, actualSales, targetSales),
+    detail:    revenueDetail(revenueScore, gap_pct ?? null, actualSales, targetSales, isPosConnected),
   };
 
   // ── Score labour (25 pts) — prefer live MICROS ────────────────────────────
+  // When connected but override is null (late sync), award neutral 10 pts instead of 0.
   const liveLabourPct = labourOverride?.labourPct ?? null;
-  const labourScore = scoreLabour(liveLabourPct);
+  let labourScore: number;
+  if (liveLabourPct === null && isPosConnected) {
+    labourScore = 10;   // neutral — connected but not yet synced
+  } else {
+    labourScore = scoreLabour(liveLabourPct);
+  }
   const labourComponent: LabourComponent = {
     score:      labourScore,
     max:        25,
     labour_pct: liveLabourPct,
-    detail:     labourDetail(labourScore, liveLabourPct),
+    detail:     labourDetail(labourScore, liveLabourPct, isPosConnected),
   };
 
   // ── Score food cost (15 pts) ──────────────────────────────────────────────

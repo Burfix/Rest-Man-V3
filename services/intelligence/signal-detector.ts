@@ -71,7 +71,8 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   const revGapAbs = rev.target > 0 ? Math.abs(rev.actual - rev.target) : 0;
 
   // ── SIGNAL 1 — Revenue Recovery Window ─────────────────────────────────────
-  if (rev.variance < -20 && lab.variance > 5 && ops.completionRate < 60) {
+  // Guard: skip entirely when site has no POS connection — variance is meaningless.
+  if (rev.connected && lab.connected && rev.variance < -20 && lab.variance > 5 && ops.completionRate < 60) {
     const conditions: string[] = [
       `Revenue ${pct(rev.variance)} vs target`,
       `Labour ${pct(lab.variance)} over`,
@@ -94,7 +95,8 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   // Fires whenever any open item has impact_level = service_disruption.
   // Does NOT require ops.blocked > 1 — the maintenance event alone is the trigger.
   if (maint.serviceBlocking) {
-    const revenueCompound = rev.variance < -10;
+    // Only compound with revenue when the site actually has a POS connection.
+    const revenueCompound = rev.connected && rev.variance < -10;
     const conditions: string[] = [
       "Service-blocking maintenance active",
       ...(revenueCompound ? [`Revenue ${pct(rev.variance)} behind`] : []),
@@ -120,7 +122,8 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   }
 
   // ── SIGNAL 3 — Labour Efficiency Alert ─────────────────────────────────────
-  if (lab.variance > 8 && rev.variance < 0 && ops.completionRate > 80) {
+  // Guard: labour % is derived from POS revenue — unreliable without a connection.
+  if (rev.connected && lab.connected && lab.variance > 8 && rev.variance < 0 && ops.completionRate > 80) {
     const conditions: string[] = [
       `Labour ${pct(lab.variance)} over target`,
       `Revenue ${pct(rev.variance)} behind`,
@@ -182,7 +185,8 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   }
 
   // ── SIGNAL 6 — Pre-Service Labour Surge ────────────────────────────────────
-  if (meta.timeOfDay === "pre-service" && lab.variance > 10) {
+  // Guard: labour % is only meaningful when connected to POS.
+  if (lab.connected && meta.timeOfDay === "pre-service" && lab.variance > 10) {
     const conditions: string[] = [
       "Pre-service window active",
       `Labour already ${pct(lab.variance)} over target`,
@@ -218,7 +222,9 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   }
 
   // ── SIGNAL 8 — Unexplained Revenue Gap ─────────────────────────────────────
+  // Guard: revenue variance is meaningless without a POS connection.
   if (
+    rev.connected &&
     rev.variance < -15 &&
     !maint.serviceBlocking &&
     ops.completionRate > 80 &&
@@ -248,7 +254,9 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   // compound conditions (unlike S1 which also needs labour + ops triggers).
   // Guards against duplicate: suppressed when S1 is already active.
   // Threshold lowered to -15 to catch moderate gaps that voice generator flags.
+  // Guard: skip when site has no POS connection — variance is not real data.
   if (
+    rev.connected &&
     meta.timeOfDay === "service" &&
     rev.variance < -15 &&
     rev.target > 0 &&
@@ -272,7 +280,9 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   // Catches the scenario where S8 can't fire (ops too low) but there is a
   // genuine compound risk between revenue and duty completion.
   // Suppressed when S1 or S9 is already active (they cover revenue signals).
+  // Guard: skip when site has no POS connection — revenue variance is not real data.
   if (
+    rev.connected &&
     meta.timeOfDay === "service" &&
     rev.variance < -10 &&
     ops.completionRate < 70 &&
