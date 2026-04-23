@@ -10,14 +10,25 @@ import { sanitizeMicrosError }           from "@/lib/integrations/status";
 import { createServerClient }            from "@/lib/supabase/server";
 import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
 import MicrosDebugPanel                  from "@/components/dashboard/settings/MicrosDebugPanel";
+import SyncHealthPanel                   from "@/components/settings/SyncHealthPanel";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
 
+interface SyncHealthRow {
+  sync_type: string;
+  last_synced_at: string | null;
+  last_outcome: string | null;
+  consecutive_failures: number;
+  is_overdue: boolean;
+  total_runs_today: number;
+  next_run_eta: string | null;
+}
+
 export default async function IntegrationsPage() {
   const supabase = createServerClient();
 
-  const [microsResult, labourRes, userRes] = await Promise.all([
+  const [microsResult, labourRes, userRes, healthRes] = await Promise.all([
     getMicrosStatus().catch(() => null),
     supabase
       .from("labour_sync_state")
@@ -26,6 +37,12 @@ export default async function IntegrationsPage() {
       .limit(1)
       .maybeSingle(),
     supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+    supabase
+      .from("sync_health_monitor")
+      .select("sync_type, last_synced_at, last_outcome, consecutive_failures, is_overdue, total_runs_today, next_run_eta")
+      .order("is_overdue", { ascending: false })
+      .order("sync_type", { ascending: true })
+      .catch(() => ({ data: null })),
   ]);
 
   const connection      = microsResult?.connection ?? null;
@@ -39,6 +56,8 @@ export default async function IntegrationsPage() {
   const role    = (user?.user_metadata?.role as string | undefined) ??
                   (user?.app_metadata?.role  as string | undefined) ?? "";
   const isAdmin = role === "admin";
+
+  const syncHealthRows = (healthRes.data ?? []) as SyncHealthRow[];
 
   return (
     <div className="space-y-8">
@@ -54,6 +73,9 @@ export default async function IntegrationsPage() {
         microsHealth={microsHealth}
         labourLastSyncAt={labourLastSyncAt}
       />
+
+      {/* Live data health — is my data trustworthy right now? */}
+      <SyncHealthPanel rows={syncHealthRows} />
 
       {/* Admin-only: MICROS config diagnostics panel */}
       {isAdmin && (

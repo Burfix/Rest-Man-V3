@@ -6,20 +6,8 @@
   "regions": ["cpt1"],
   "crons": [
     {
-      "path": "/api/micros/sync",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/micros/labour-sync",
-      "schedule": "5 4 * * *"
-    },
-    {
-      "path": "/api/reports/weekly",
-      "schedule": "0 6 * * 1"
-    },
-    {
-      "path": "/api/sync/cron",
-      "schedule": "20 4 * * *"
+      "path": "/api/cron/sync-orchestrator",
+      "schedule": "*/5 * * * *"
     },
     {
       "path": "/api/cron/daily-sync",
@@ -28,6 +16,10 @@
     {
       "path": "/api/accountability/calculate",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/reports/weekly",
+      "schedule": "0 6 * * 1"
     },
     {
       "path": "/api/reviews/google-sync?siteId=ALL",

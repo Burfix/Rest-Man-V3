@@ -6,6 +6,8 @@ import { PERMISSIONS } from "@/lib/rbac/roles";
 import { MicrosSyncService } from "@/services/micros/MicrosSyncService";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { todayISO } from "@/lib/utils";
+import { SyncRequest as SyncRequestSchema } from "@/lib/sync/contract";
+import { dispatchSync } from "@/lib/sync/orchestrator";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,6 +16,7 @@ export const maxDuration = 30;
 export async function POST(req: NextRequest) {
   const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "POST /api/micros/sync");
   if (guard.error) return guard.error;
+  const { ctx } = guard;
 
   const cfgStatus = getMicrosConfigStatus();
   if (!cfgStatus.enabled || !cfgStatus.configured) {
@@ -25,17 +28,38 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  let date: string | undefined;
+  let rawBody: Record<string, unknown> = {};
   try {
-    const body = await req.json().catch(() => ({}));
-    date = body.date;
+    rawBody = await req.json().catch(() => ({})) as Record<string, unknown>;
   } catch { /* no body is fine */ }
 
+  const traceId = (rawBody.trace_id as string | undefined) ?? crypto.randomUUID();
+
+  // If the caller supplied sync_type, use the new orchestrator path
+  if (rawBody.sync_type) {
+    const parsed = SyncRequestSchema.safeParse({
+      loc_ref: rawBody.loc_ref ?? process.env.MICROS_LOCATION_REF ?? "",
+      sync_type: rawBody.sync_type,
+      mode: rawBody.mode ?? "delta",
+      business_date: rawBody.business_date ?? rawBody.date,
+      trace_id: traceId,
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, message: "Invalid request", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+
+    const result = await dispatchSync(parsed.data, ctx.siteId, traceId);
+    return NextResponse.json({ ...result, source: "manual", checkedAt: new Date().toISOString() });
+  }
+
+  // Legacy path — keep backward compat for callers that send {loc_ref, date}
+  const date = rawBody.date as string | undefined;
   try {
     const svc = new MicrosSyncService();
     const result = await svc.runFullSync(date ?? todayISO());
 
-    logger.info("MICROS sync completed", { route: "POST /api/micros/sync", success: result.success });
+    logger.info("MICROS sync completed", { route: "POST /api/micros/sync", success: result.success, trace_id: traceId });
     return NextResponse.json({
       ok: result.success,
       message: result.message,

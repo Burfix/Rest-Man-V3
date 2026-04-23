@@ -3,7 +3,8 @@
  * GET  /api/micros/labour-sync  (Vercel Cron)
  *
  * Triggers a labour data sync from Oracle BIAPI → Supabase.
- * Supports ?mode=full|delta (default: delta).
+ * Supports new SyncRequest contract when sync_type is present.
+ * Legacy {loc_ref, date, mode} shape kept for backward compat.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,6 +14,8 @@ import { PERMISSIONS } from "@/lib/rbac/roles";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { todayISO } from "@/lib/utils";
 import { runLabourFullSync, runLabourDeltaSync } from "@/services/micros/labour/sync";
+import { SyncRequest as SyncRequestSchema } from "@/lib/sync/contract";
+import { dispatchSync } from "@/lib/sync/orchestrator";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -22,6 +25,7 @@ export async function POST(req: NextRequest) {
   try {
   const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "POST /api/micros/labour-sync");
   if (guard.error) return guard.error;
+  const { ctx } = guard;
 
   const cfgStatus = getMicrosConfigStatus();
   if (!cfgStatus.enabled || !cfgStatus.configured) {
@@ -33,16 +37,34 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  let mode: "full" | "delta" = "delta";
-  let date: string | undefined;
-
+  let rawBody: Record<string, unknown> = {};
   try {
-    const body = await req.json().catch(() => ({}));
-    if (body.mode === "full") mode = "full";
-    if (body.date) date = body.date;
+    rawBody = await req.json().catch(() => ({})) as Record<string, unknown>;
   } catch {
     // no body is fine
   }
+
+  const traceId = (rawBody.trace_id as string | undefined) ?? crypto.randomUUID();
+
+  // New contract path
+  if (rawBody.sync_type === "labour") {
+    const parsed = SyncRequestSchema.safeParse({
+      loc_ref: rawBody.loc_ref ?? process.env.MICROS_LOCATION_REF ?? "",
+      sync_type: "labour",
+      mode: rawBody.mode ?? "delta",
+      business_date: rawBody.business_date ?? rawBody.date,
+      trace_id: traceId,
+    });
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, message: "Invalid request", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
+    }
+    const result = await dispatchSync(parsed.data, ctx.siteId, traceId);
+    return NextResponse.json({ ...result, source: "manual", checkedAt: new Date().toISOString() });
+  }
+
+  // Legacy path — preserve old response shape
+  const mode: "full" | "delta" = rawBody.mode === "full" ? "full" : "delta";
+  const date = rawBody.date as string | undefined;
 
   const result = mode === "full"
     ? await runLabourFullSync(date ?? todayISO())
