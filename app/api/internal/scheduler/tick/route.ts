@@ -69,7 +69,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const staleReleased = await releaseStaleLeases(supabase);
 
     // ── 2. Enqueue sync jobs from due schedules ───────────────────────────
-    const jobsEnqueued = await enqueueDueSyncJobs(supabase, {
+    const { schedulesDue, jobsEnqueued } = await enqueueDueSyncJobs(supabase, {
       dryRun:  ctx.dry_run,
       traceId: ctx.trace_id,
     });
@@ -84,21 +84,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // ── 5. Build + return summary ─────────────────────────────────────────
     const summary: SchedulerTickSummary = {
-      tick_id:              tickId,
-      worker_id:            ctx.worker_id,
-      started_at:           new Date(startedAt).toISOString(),
-      completed_at:         new Date().toISOString(),
-      duration_ms:          Date.now() - startedAt,
-      schedules_evaluated:  jobsEnqueued, // enqueueDueSyncJobs returns count enqueued (proxy for evaluated)
+      tick_id:               tickId,
+      worker_id:             ctx.worker_id,
+      started_at:            new Date(startedAt).toISOString(),
+      completed_at:          new Date().toISOString(),
+      duration_ms:           Date.now() - startedAt,
+      schedules_due:         schedulesDue,
       stale_leases_released: staleReleased,
-      sync_jobs_enqueued:   jobsEnqueued,
-      sync_jobs_claimed:    syncJobs.length,
-      sync_jobs_succeeded:  syncResult.succeeded,
-      sync_jobs_failed:     syncResult.failed,
-      async_jobs_claimed:   asyncJobs.length,
-      async_jobs_succeeded: asyncResult.succeeded,
-      async_jobs_failed:    asyncResult.failed,
-      bailed_early:         false,
+      sync_jobs_enqueued:    jobsEnqueued,
+      sync_jobs_claimed:     syncJobs.length,
+      sync_jobs_succeeded:   syncResult.succeeded,
+      sync_jobs_failed:      syncResult.failed,
+      async_jobs_claimed:    asyncJobs.length,
+      async_jobs_succeeded:  asyncResult.succeeded,
+      async_jobs_failed:     asyncResult.failed,
+      bailed_early:          false,
     };
 
     logger.info("scheduler.tick.complete", summary as unknown as Record<string, unknown>);

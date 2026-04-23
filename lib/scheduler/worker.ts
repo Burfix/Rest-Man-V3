@@ -17,7 +17,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { dispatchSync } from "@/lib/sync/orchestrator";
 import { SyncTypeEnum, SyncModeEnum } from "@/lib/sync/contract";
-import { markSyncJobSuccess, markSyncJobFailed } from "./claim";
+import { markSyncJobSuccess, markSyncJobFailed, markSyncJobRunning } from "./claim";
 import type { ClaimedSyncJob, SchedulerWorkerContext } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,6 +64,9 @@ export async function executeSyncJob(
   }
 
   logger.info("worker.sync_start", { ...logBase });
+
+  // Transition leased → running for accurate lifecycle tracking in DB
+  await markSyncJobRunning(supabase, job.id, ctx.worker_id);
 
   try {
     const result = await dispatchSync(

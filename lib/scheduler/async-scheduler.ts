@@ -9,7 +9,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
-import { markAsyncJobSuccess, markAsyncJobFailed } from "./claim";
+import { markAsyncJobSuccess, markAsyncJobFailed, markAsyncJobRunning } from "./claim";
 import type { ClaimedAsyncJob, SchedulerWorkerContext } from "./types";
 
 // ── Single-job executor ───────────────────────────────────────────────────────
@@ -34,6 +34,9 @@ export async function executeAsyncJob(
   }
 
   logger.info("async_worker.start", logBase);
+
+  // Transition leased → running for accurate lifecycle tracking in DB
+  await markAsyncJobRunning(supabase, job.id, ctx.worker_id);
 
   try {
     switch (job.job_type) {
@@ -148,18 +151,20 @@ async function handleSendWeeklyReport(job: ClaimedAsyncJob): Promise<void> {
 }
 
 async function handleGoogleReviewsSync(job: ClaimedAsyncJob): Promise<void> {
-  const site_id: string = job.payload?.site_id as string ?? "ALL";
+  const { syncSiteReviews, syncAllSiteReviews } =
+    await import("@/services/reviews/googleSync");
 
-  const cronSecret = process.env.CRON_SECRET;
-  const baseUrl    = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  const url        = `${baseUrl}/api/reviews/google-sync?siteId=${encodeURIComponent(site_id)}`;
+  const site_id: string | undefined = job.payload?.site_id as string | undefined;
 
-  const res = await fetch(url, {
-    headers: { authorization: `Bearer ${cronSecret}` },
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => "no body");
-    throw new Error(`google-sync fetch failed: ${res.status} — ${text}`);
+  if (site_id && site_id !== "ALL") {
+    const supabase = (await import("@/lib/supabase/server")).createServerClient();
+    await syncSiteReviews(supabase, site_id);
+  } else {
+    const supabase = (await import("@/lib/supabase/server")).createServerClient();
+    const { synced, total, errors } = await syncAllSiteReviews(supabase);
+    if (errors.length > 0) {
+      throw new Error(`google_reviews_sync: ${errors.length}/${total} sites failed`);
+    }
+    void synced; // used for logging by syncAllSiteReviews internally
   }
 }

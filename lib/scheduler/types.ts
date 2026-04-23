@@ -11,19 +11,21 @@
 
 export type SyncJobStatus =
   | "queued"
-  | "claimed"
+  | "leased"
   | "running"
-  | "success"
+  | "succeeded"
   | "failed"
-  | "abandoned";
+  | "dead_letter"
+  | "cancelled";
 
 export type AsyncJobStatus =
   | "queued"
-  | "claimed"
+  | "leased"
   | "running"
-  | "success"
+  | "succeeded"
   | "failed"
-  | "abandoned";
+  | "dead_letter"
+  | "cancelled";
 
 // ── Known async job types ─────────────────────────────────────────────────────
 
@@ -76,7 +78,9 @@ export interface SchedulerTickSummary {
   started_at: string;
   completed_at: string;
   duration_ms: number;
-  schedules_evaluated: number;
+  /** How many sync_schedules rows were evaluated as due this tick */
+  schedules_due: number;
+  /** How many sync_job_queue rows were actually inserted (may be less than schedules_due due to idempotency) */
   sync_jobs_enqueued: number;
   sync_jobs_claimed: number;
   sync_jobs_succeeded: number;

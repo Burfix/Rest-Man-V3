@@ -24,7 +24,9 @@ function dbAny(supabase: ReturnType<typeof createServerClient>): any {
 /**
  * Evaluate all due sync_schedules and enqueue a sync_job_queue item for each.
  *
- * Returns the number of jobs successfully enqueued.
+ * Returns:
+ *   schedulesDue  — how many schedule rows were evaluated as due
+ *   jobsEnqueued  — how many job rows were actually inserted (may be less due to idempotency)
  */
 export async function enqueueDueSyncJobs(
   supabase: ReturnType<typeof createServerClient>,
@@ -33,7 +35,7 @@ export async function enqueueDueSyncJobs(
     dryRun?: boolean;
     traceId: string;
   },
-): Promise<number> {
+): Promise<{ schedulesDue: number; jobsEnqueued: number }> {
   const { maxSchedules = 50, dryRun = false, traceId } = opts;
   const db = dbAny(supabase);
 
@@ -45,32 +47,33 @@ export async function enqueueDueSyncJobs(
 
   if (error) {
     logger.error("sync_scheduler.get_due_failed", { traceId, error: error.message });
-    return 0;
+    return { schedulesDue: 0, jobsEnqueued: 0 };
   }
 
   const schedules = parseScheduleRows((data as unknown[]) ?? []);
   if (schedules.length === 0) {
     logger.info("sync_scheduler.no_due_schedules", { traceId });
-    return 0;
+    return { schedulesDue: 0, jobsEnqueued: 0 };
   }
 
   logger.info("sync_scheduler.due_schedules_found", {
     traceId,
-    count: schedules.length,
+    count:  schedules.length,
     dryRun,
   });
 
-  let enqueued = 0;
+  const schedulesDue = schedules.length;
+  let jobsEnqueued = 0;
 
   for (const schedule of schedules) {
     if (dryRun) {
       logger.info("sync_scheduler.dry_run_enqueue", {
         traceId,
         schedule_id: schedule.id,
-        loc_ref: schedule.loc_ref,
-        sync_type: schedule.sync_type,
+        loc_ref:     schedule.loc_ref,
+        sync_type:   schedule.sync_type,
       });
-      enqueued++;
+      jobsEnqueued++;
       continue;
     }
 
@@ -80,11 +83,11 @@ export async function enqueueDueSyncJobs(
         logger.info("sync_scheduler.job_enqueued", {
           traceId,
           schedule_id: schedule.id,
-          job_id: jobId,
-          loc_ref: schedule.loc_ref,
-          sync_type: schedule.sync_type,
+          job_id:      jobId,
+          loc_ref:     schedule.loc_ref,
+          sync_type:   schedule.sync_type,
         });
-        enqueued++;
+        jobsEnqueued++;
 
         // Advance next_run_at on the schedule
         await db.rpc("bump_schedule_next_run", {
@@ -101,8 +104,8 @@ export async function enqueueDueSyncJobs(
     }
   }
 
-  logger.info("sync_scheduler.enqueue_complete", { traceId, enqueued, total: schedules.length });
-  return enqueued;
+  logger.info("sync_scheduler.enqueue_complete", { traceId, schedulesDue, jobsEnqueued });
+  return { schedulesDue, jobsEnqueued };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

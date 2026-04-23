@@ -48,6 +48,66 @@ Layer 3 — ServicePulse, CommandFeed, BusinessStatusRail, FeedbackLoop
 
 ---
 
+## Scheduler architecture
+
+ForgeStack uses a DB-backed scheduler and queue instead of route-level cron execution.
+
+### Tables (Supabase)
+
+| Table | Purpose |
+|---|---|
+| `sync_schedules` | Per-site, per-sync-type cadence config. Controls when jobs are enqueued. |
+| `sync_job_queue` | Claimable sync work items with leases, retry logic, and priority. |
+| `async_job_queue` | Non-sync background jobs: reports, score computes, Google reviews. |
+
+### Job lifecycle
+
+```
+queued → leased → running → succeeded
+                          ↘ failed → queued (retry with backoff)
+                                   → dead_letter (max_attempts reached)
+```
+
+- **queued**: Available to be claimed
+- **leased**: Claimed by a worker, lease held, not yet executing
+- **running**: Worker has started execution (marked explicitly via `mark_*_running`)
+- **succeeded**: Completed successfully
+- **failed → queued**: Transient failure, requeued with exponential backoff
+- **dead_letter**: Exhausted all retries; requires manual intervention
+
+**Attempt semantics**: `attempts` increments only at `mark_*_failed` — not at claim time. A worker crash before execution does not consume a retry.
+
+### Key files
+
+```
+lib/scheduler/types.ts          — SyncJobStatus, AsyncJobStatus, SchedulerTickSummary
+lib/scheduler/claim.ts          — claimSyncJobs, claimAsyncJobs, markRunning, markSuccess, markFailed
+lib/scheduler/sync-scheduler.ts — enqueueDueSyncJobs: reads sync_schedules → enqueues sync_job_queue
+lib/scheduler/worker.ts         — executeSyncJob: leased → running → dispatchSync → succeeded/failed
+lib/scheduler/async-scheduler.ts — executeAsyncJob: handles all AsyncJobType dispatches
+app/api/internal/scheduler/tick/route.ts — POST-only tick entrypoint
+app/api/cron/sync-orchestrator/route.ts  — Vercel cron shim that POSTs to the tick route
+```
+
+### Tick flow (POST /api/internal/scheduler/tick)
+
+1. `releaseStaleLeases` — recover jobs stuck in `leased` or `running` past their `leased_until`
+2. `enqueueDueSyncJobs` — for each due schedule, insert a `sync_job_queue` row (idempotent)
+3. `claimSyncJobs` — atomically claim up to N jobs using `SKIP LOCKED`
+4. `runSyncJobBatch` — for each claimed job: mark `running` → `dispatchSync` → mark `succeeded`/`failed`
+5. `claimAsyncJobs` → `runAsyncJobBatch` — same pattern for async jobs
+6. Return `SchedulerTickSummary` JSON with counters: `schedules_due`, `sync_jobs_enqueued`, `*_claimed`, `*_succeeded`, `*_failed`
+
+### Retry / backoff
+
+Failed jobs are requeued with exponential backoff: `base_delay_secs × 2^(attempts - 1)`, capped at 4 hours (sync) / 2 hours (async). After `max_attempts` failures the job moves to `dead_letter`.
+
+### Auth
+
+The tick route is protected by `Bearer $CRON_SECRET`. The Vercel cron sets this header automatically.
+
+---
+
 ## Operating score
 
 | Module      | Weight |

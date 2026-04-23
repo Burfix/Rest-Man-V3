@@ -134,6 +134,43 @@ export async function claimAsyncJobs(
   }
 }
 
+// ── Running transition ────────────────────────────────────────────────────────
+
+/**
+ * Transition a leased sync job to 'running'. Call immediately before dispatch
+ * so monitoring queries can distinguish "lease held" from "execution in progress".
+ */
+export async function markSyncJobRunning(
+  supabase: ReturnType<typeof createServerClient>,
+  jobId: string,
+  workerId: string,
+): Promise<void> {
+  const { error } = await dbAny(supabase).rpc("mark_sync_job_running", {
+    p_job_id:    jobId,
+    p_worker_id: workerId,
+  });
+  if (error) {
+    logger.warn("scheduler.claim.mark_sync_running_failed", { jobId, error: error.message });
+  }
+}
+
+/**
+ * Transition a leased async job to 'running'. Call immediately before handler execution.
+ */
+export async function markAsyncJobRunning(
+  supabase: ReturnType<typeof createServerClient>,
+  jobId: string,
+  workerId: string,
+): Promise<void> {
+  const { error } = await dbAny(supabase).rpc("mark_async_job_running", {
+    p_job_id:    jobId,
+    p_worker_id: workerId,
+  });
+  if (error) {
+    logger.warn("scheduler.claim.mark_async_running_failed", { jobId, error: error.message });
+  }
+}
+
 // ── Job outcome marking ───────────────────────────────────────────────────────
 
 export async function markSyncJobSuccess(
