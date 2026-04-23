@@ -30,22 +30,31 @@ function dbAny(supabase: ReturnType<typeof createServerClient>): any {
 
 /**
  * Release jobs whose lease expired but were never completed.
- * Safe to call at the start of every tick.
+ * Covers both queues.  Safe to call at the start of every tick.
  */
 export async function releaseStaleLeases(
   supabase: ReturnType<typeof createServerClient>,
 ): Promise<number> {
+  let total = 0;
   try {
-    const { data, error } = await dbAny(supabase).rpc("release_stale_sync_leases");
-    if (error) {
-      logger.warn("scheduler.claim.stale_release_failed", { error: error.message });
-      return 0;
+    const { data: syncData, error: syncErr } = await dbAny(supabase).rpc("release_stale_sync_leases");
+    if (syncErr) {
+      logger.warn("scheduler.claim.stale_sync_release_failed", { error: syncErr.message });
+    } else {
+      total += (syncData as number | null) ?? 0;
     }
-    const released = (data as number | null) ?? 0;
-    if (released > 0) {
-      logger.info("scheduler.claim.stale_leases_released", { released });
+
+    const { data: asyncData, error: asyncErr } = await dbAny(supabase).rpc("release_stale_async_leases");
+    if (asyncErr) {
+      logger.warn("scheduler.claim.stale_async_release_failed", { error: asyncErr.message });
+    } else {
+      total += (asyncData as number | null) ?? 0;
     }
-    return released;
+
+    if (total > 0) {
+      logger.info("scheduler.claim.stale_leases_released", { released: total });
+    }
+    return total;
   } catch (err) {
     logger.warn("scheduler.claim.stale_release_exception", { err: String(err) });
     return 0;
