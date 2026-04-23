@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
   if (guard.error) return guard.error;
   const { ctx } = guard;
 
-  if (ctx.role !== "super_admin" && ctx.role !== "admin") {
+  if (ctx.role !== "super_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
   if (guard.error) return guard.error;
   const { ctx } = guard;
 
-  if (ctx.role !== "super_admin" && ctx.role !== "admin") {
+  if (ctx.role !== "super_admin") {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -135,7 +135,8 @@ export async function POST(req: NextRequest) {
 
   try {
     if (payload.action === "enqueue_gaps") {
-      const { data, error } = await supabase.rpc("enqueue_sync_gaps", {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any).rpc("enqueue_sync_gaps", {
         p_lookback_days: payload.lookback_days,
       });
       if (error) throw error;
@@ -145,7 +146,8 @@ export async function POST(req: NextRequest) {
     }
 
     if (payload.action === "retry_failed") {
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from("sync_backfill_queue")
         .update({ status: "pending", attempts: 0, last_error: null })
         .in("id", payload.queue_ids)
@@ -167,7 +169,8 @@ export async function POST(req: NextRequest) {
         created_by: ctx.userId,
       }));
 
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any)
         .from("sync_backfill_queue")
         .upsert(rows, { onConflict: "connection_id,sync_type,business_date" });
 

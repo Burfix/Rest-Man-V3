@@ -152,7 +152,7 @@ export class SimphonyClient {
 
   /** POST /bi/v1/{org}/getGuestChecks — guest checks for a business date */
   async getGuestChecks(locRef: string, busDt: string): Promise<SimphonyGuestChecksResponse> {
-    logger.debug("simphony.getGuestChecks", scrubTokens({ locRef, busDt }));
+    logger.info("simphony.getGuestChecks", scrubTokens({ locRef, busDt }));
     return this.request<SimphonyGuestChecksResponse>("POST", "getGuestChecks", {
       locRef,
       busDt,
@@ -161,7 +161,7 @@ export class SimphonyClient {
 
   /** POST /bi/v1/{org}/getDailySalesSummary — aggregated daily totals */
   async getDailySalesSummary(locRef: string, busDt: string): Promise<SimphonyDailySalesResponse> {
-    logger.debug("simphony.getDailySalesSummary", scrubTokens({ locRef, busDt }));
+    logger.info("simphony.getDailySalesSummary", scrubTokens({ locRef, busDt }));
     return this.request<SimphonyDailySalesResponse>("POST", "getDailySalesSummary", {
       locRef,
       busDt,
@@ -170,7 +170,7 @@ export class SimphonyClient {
 
   /** POST /bi/v1/{org}/getTimecards — labour timecards for a business date */
   async getTimecards(locRef: string, busDt: string): Promise<SimphonyTimecardsResponse> {
-    logger.debug("simphony.getTimecards", scrubTokens({ locRef, busDt }));
+    logger.info("simphony.getTimecards", scrubTokens({ locRef, busDt }));
     return this.request<SimphonyTimecardsResponse>("POST", "getTimecards", {
       locRef,
       busDt,
@@ -183,7 +183,7 @@ export class SimphonyClient {
     busDt: string,
     intervalMinutes = 60,
   ): Promise<SimphonySalesIntervalsResponse> {
-    logger.debug("simphony.getSalesIntervals", scrubTokens({ locRef, busDt, intervalMinutes }));
+    logger.info("simphony.getSalesIntervals", scrubTokens({ locRef, busDt, intervalMinutes }));
     return this.request<SimphonySalesIntervalsResponse>("POST", "getSalesIntervals", {
       locRef,
       busDt,

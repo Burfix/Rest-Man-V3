@@ -23,8 +23,9 @@ interface GuestCheckRow {
   loc_ref: string;
   business_date: string;
   check_id: string;
-  check_num: string | null;
+  check_number: string;  // non-null in DB schema
   table_name: string | null;
+  opened_at: string | null;
   guest_count: number;
   sub_total: number;
   discounts: number;
@@ -189,8 +190,9 @@ function normalizeCheck(
     loc_ref: c.locRef ?? "",
     business_date,
     check_id: checkId,
-    check_num: c.checkNum != null ? String(c.checkNum) : null,
+    check_number: c.checkNum != null ? String(c.checkNum) : "",
     table_name: c.tableName ?? null,
+    opened_at: null, // opnUtc not available in SimphonyGuestCheck response
     guest_count: c.guestCnt ?? 0,
     sub_total: round2(c.subTtl ?? 0),
     discounts: round2(c.dscTtl ?? 0),

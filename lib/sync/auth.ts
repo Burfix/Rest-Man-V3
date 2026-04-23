@@ -47,7 +47,10 @@ export async function verifyCronAuth(req: NextRequest): Promise<CronAuthResult> 
   const suppliedHash = hashSecret(suppliedSecret);
   try {
     const supabase = createServerClient();
-    const { data, error } = await supabase
+    // scheduler_auth_keys table added in migration 062 — cast until types are regenerated
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as unknown as { from: (t: string) => any };
+    const { data, error } = await db
       .from("scheduler_auth_keys")
       .select("id, key_hash, expires_at, is_active")
       .eq("key_hash", suppliedHash)

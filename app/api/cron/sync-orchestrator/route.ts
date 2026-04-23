@@ -3,41 +3,39 @@
  *
  * POST /api/cron/sync-orchestrator
  *
- * 5-minute intraday sync scheduler — invoked by Vercel Cron.
- * Authenticates via HMAC, dispatches due intraday syncs and
- * backfill queue items through lib/sync/scheduler.ts.
+ * Thin Vercel Cron shim — delegates all work to the internal scheduler tick.
+ * Authentication: Bearer CRON_SECRET  (set via Vercel Dashboard)
  *
- * Safety:
- * - maxDuration: 60s (Vercel limit on hobby/pro)
- * - scheduler bails at 57s to avoid mid-write cold kill
- * - DRY_RUN=true env var skips all DB writes (shadow mode)
+ * The actual scheduling, enqueuing, and job execution lives in:
+ *   app/api/internal/scheduler/tick/route.ts
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { verifyCronAuth } from "@/lib/sync/auth";
-import { tick } from "@/lib/sync/scheduler";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const auth = await verifyCronAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, error: auth.error }, { status: 401 });
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret || req.headers.get("authorization") !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const traceId = req.headers.get("x-trace-id") ?? crypto.randomUUID();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const dryRun  = process.env.DRY_RUN === "true" ? "?dry_run=true" : "";
 
-  const result = await tick({
-    invocation_source: "vercel_cron",
-    trace_id: traceId,
-    max_jobs_per_tick: 10,
-    max_duration_ms: 57_000, // Vercel 60s limit minus 3s margin
-    dry_run: process.env.DRY_RUN === "true",
+  const res = await fetch(`${baseUrl}/api/internal/scheduler/tick${dryRun}`, {
+    method:  "POST",
+    headers: {
+      authorization:  `Bearer ${cronSecret}`,
+      "x-trace-id":   req.headers.get("x-trace-id") ?? crypto.randomUUID(),
+      "content-type": "application/json",
+    },
   });
 
-  return NextResponse.json(result);
+  const body = await res.json().catch(() => ({ error: "non-json response" }));
+  return NextResponse.json(body, { status: res.status });
 }
 
 // Allow GET for manual health-check pings (unauthenticated, returns nothing sensitive)

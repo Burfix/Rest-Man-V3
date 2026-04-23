@@ -34,6 +34,16 @@ import { todayISO } from "@/lib/utils";
 const WORKER_ID = `vercel-${process.env.VERCEL_REGION ?? "cpt1"}-${process.env.VERCEL_DEPLOYMENT_ID?.slice(0, 8) ?? "local"}`;
 const CLAIM_TTL_SECONDS = 120; // 2 minutes — orphaned claims self-release
 
+/**
+ * Cast a Supabase client to bypass generated-type checks for tables/RPCs
+ * that were added via migration but whose types haven't been regenerated yet.
+ * Remove this once `supabase gen types` is run after migrations 062+.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function dbAny(supabase: ReturnType<typeof createServerClient>): any {
+  return supabase;
+}
+
 export async function tick(config: TickConfig): Promise<TickResult> {
   const t0 = Date.now();
   const tickId = crypto.randomUUID();
@@ -152,7 +162,7 @@ export async function tick(config: TickConfig): Promise<TickResult> {
 // ── Supabase RPC wrappers ─────────────────────────────────────────────────────
 
 async function getDueSyncs(supabase: ReturnType<typeof createServerClient>): Promise<DueSync[]> {
-  const { data, error } = await supabase.rpc("get_due_intraday_syncs");
+  const { data, error } = await dbAny(supabase).rpc("get_due_intraday_syncs");
   if (error) {
     logger.warn("scheduler.get_due_syncs_failed", { error: error.message });
     return [];
@@ -174,7 +184,7 @@ async function claimWork(
   supabase: ReturnType<typeof createServerClient>,
   limit: number,
 ): Promise<ClaimedWork[]> {
-  const { data, error } = await supabase.rpc("claim_sync_work", {
+  const { data, error } = await dbAny(supabase).rpc("claim_sync_work", {
     worker_id: WORKER_ID,
     p_limit: limit,
     ttl_seconds: CLAIM_TTL_SECONDS,
@@ -203,7 +213,7 @@ async function recordScheduledRun(
   success: boolean,
   errorMsg?: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("record_scheduled_sync_run", {
+  const { error } = await dbAny(supabase).rpc("record_scheduled_sync_run", {
     p_connection_id: connectionId,
     p_sync_type: syncType,
     p_success: success,
@@ -220,7 +230,7 @@ async function completeWork(
   success: boolean,
   errorMsg?: string,
 ): Promise<void> {
-  const { error } = await supabase.rpc("complete_sync_work", {
+  const { error } = await dbAny(supabase).rpc("complete_sync_work", {
     p_queue_id: queueId,
     p_success: success,
     p_error: errorMsg ?? null,
@@ -237,7 +247,7 @@ async function openTickRow(
   tickId: string,
   config: TickConfig,
 ): Promise<void> {
-  const { error } = await supabase.from("sync_scheduler_ticks").insert({
+  const { error } = await dbAny(supabase).from("sync_scheduler_ticks").insert({
     id: tickId,
     trace_id: config.trace_id,
     invocation_source: config.invocation_source,
@@ -263,7 +273,7 @@ async function closeTickRow(
     bailed_early: boolean;
   },
 ): Promise<void> {
-  const { error } = await supabase
+  const { error } = await dbAny(supabase)
     .from("sync_scheduler_ticks")
     .update({
       status: "complete",

@@ -37,12 +37,17 @@ export default async function IntegrationsPage() {
       .limit(1)
       .maybeSingle(),
     supabase.auth.getUser().catch(() => ({ data: { user: null } })),
-    supabase
-      .from("sync_health_monitor")
-      .select("sync_type, last_synced_at, last_outcome, consecutive_failures, is_overdue, total_runs_today, next_run_eta")
-      .order("is_overdue", { ascending: false })
-      .order("sync_type", { ascending: true })
-      .catch(() => ({ data: null })),
+    (async () => {
+      try {
+        return await (supabase as never as { from: (t: string) => any })
+          .from("sync_health_monitor")
+          .select("sync_type, last_synced_at, last_outcome, consecutive_failures, is_overdue, total_runs_today, next_run_eta")
+          .order("is_overdue", { ascending: false })
+          .order("sync_type", { ascending: true });
+      } catch {
+        return { data: null };
+      }
+    })(),
   ]);
 
   const connection      = microsResult?.connection ?? null;

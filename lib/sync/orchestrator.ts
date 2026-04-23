@@ -67,15 +67,16 @@ export async function dispatchSync(
   const supabase = createServerClient();
 
   // ── Step 1: Resolve connection (tenant-scoped) ────────────────────────────
-  const { data: connection, error: connErr } = await supabase
-    .from("micros_connections")
+  // site_id added via migration — cast until Supabase types are regenerated
+  const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
+  const { data: connection, error: connErr } = await (db.from("micros_connections") as ReturnType<typeof supabase.from>)
     .select(
       "id, loc_ref, site_id, auth_server_url, app_server_url, client_id, org_identifier, status",
     )
     .eq("loc_ref", req.loc_ref)
     .eq("site_id", callerSiteId) // <-- multi-tenant isolation
     .eq("status", "connected")
-    .maybeSingle();
+    .maybeSingle() as unknown as { data: MicrosConnection | null; error: { message: string } | null };
 
   if (connErr || !connection) {
     const msg = connErr?.message ?? `No connected Micros connection for loc_ref=${req.loc_ref}`;
@@ -85,7 +86,7 @@ export async function dispatchSync(
     ]);
   }
 
-  const typedConn = connection as MicrosConnection;
+  const typedConn = connection;
 
   // ── Step 2: Start run row ─────────────────────────────────────────────────
   const runId = await startRunRow(supabase, typedConn.id, req, trace_id);

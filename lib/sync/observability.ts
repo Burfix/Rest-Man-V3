@@ -33,7 +33,7 @@ export function logSyncStart(line: Omit<SyncLogLine, "outcome" | "duration_ms">)
 }
 
 /** Emitted when a sync completes (success, empty, partial, or failed) */
-export function logSyncComplete(line: Required<SyncLogLine>): void {
+export function logSyncComplete(line: SyncLogLine & Required<Pick<SyncLogLine, "outcome" | "duration_ms">>): void {
   const level =
     line.outcome === "failed"
       ? "error"

@@ -125,7 +125,9 @@ async function checkDedup(
     const supabase = createServerClient();
     const windowStart = new Date(Date.now() - DEDUP_WINDOW_MS).toISOString();
 
-    const { data } = await supabase
+    // sent_alerts table added in migration 062 — cast until types are regenerated
+    const db = supabase as unknown as { from: (t: string) => any };
+    const { data } = await db
       .from("sent_alerts")
       .select("id")
       .eq("alert_class", alertClass)
@@ -150,7 +152,9 @@ async function recordSent(
 ): Promise<void> {
   try {
     const supabase = createServerClient();
-    await supabase.from("sent_alerts").insert({
+    // sent_alerts table added in migration 062 — cast until types are regenerated
+    const db = supabase as unknown as { from: (t: string) => any };
+    await db.from("sent_alerts").insert({
       alert_class: alertClass,
       connection_id: connectionId,
       sync_type: syncType,
