@@ -194,12 +194,16 @@ describe("tick sequence and summary accuracy", () => {
       outcome: "success",
       records_written: 5,
       records_fetched: 5,
+      records_skipped: 0,
       duration_ms: 50,
       errors: [],
       sync_type: "daily_sales",
       mode: "delta",
-      loc_ref: "LOC001",
       business_date: BIZ_DATE,
+      connection_id: "00000000-0000-0000-0000-000000000001",
+      started_at: "2026-04-23T10:00:00.000Z",
+      completed_at: "2026-04-23T10:00:01.000Z",
+      trace_id: "00000000-0000-0000-0000-000000000002",
     });
 
     // Seed: 1 stale leased job, 2 due schedules
@@ -264,14 +268,22 @@ describe("tick sequence and summary accuracy", () => {
     vi.mocked(dispatchSync)
       .mockResolvedValueOnce({
         ok: true, outcome: "success",
-        records_written: 5, records_fetched: 5, duration_ms: 50, errors: [],
-        sync_type: "daily_sales", mode: "delta", loc_ref: "LOC001", business_date: BIZ_DATE,
+        records_written: 5, records_fetched: 5, records_skipped: 0, duration_ms: 50, errors: [],
+        sync_type: "daily_sales", mode: "delta", business_date: BIZ_DATE,
+        connection_id: "00000000-0000-0000-0000-000000000001",
+        started_at: "2026-04-23T10:00:00.000Z",
+        completed_at: "2026-04-23T10:00:01.000Z",
+        trace_id: "00000000-0000-0000-0000-000000000002",
       })
       .mockResolvedValueOnce({
         ok: false, outcome: "failed",
-        records_written: 0, records_fetched: 0, duration_ms: 50,
-        errors: [{ message: "Timeout", retryable: true }],
-        sync_type: "daily_sales", mode: "delta", loc_ref: "LOC002", business_date: BIZ_DATE,
+        records_written: 0, records_fetched: 0, records_skipped: 0, duration_ms: 50,
+        errors: [{ code: "SYNC_ERROR", message: "Timeout", retryable: true }],
+        sync_type: "daily_sales", mode: "delta", business_date: BIZ_DATE,
+        connection_id: "00000000-0000-0000-0000-000000000001",
+        started_at: "2026-04-23T10:00:00.000Z",
+        completed_at: "2026-04-23T10:00:01.000Z",
+        trace_id: "00000000-0000-0000-0000-000000000002",
       });
 
     // Pre-queue 2 sync jobs as queued, then claim them
@@ -338,8 +350,12 @@ describe("tick: stale released jobs are immediately claimable in same tick", () 
     const { dispatchSync } = await import("@/lib/sync/orchestrator");
     vi.mocked(dispatchSync).mockResolvedValue({
       ok: true, outcome: "success",
-      records_written: 1, records_fetched: 1, duration_ms: 20, errors: [],
-      sync_type: "daily_sales", mode: "delta", loc_ref: "LOC001", business_date: BIZ_DATE,
+      records_written: 1, records_fetched: 1, records_skipped: 0, duration_ms: 20, errors: [],
+      sync_type: "daily_sales", mode: "delta", business_date: BIZ_DATE,
+      connection_id: "00000000-0000-0000-0000-000000000001",
+      started_at: "2026-04-23T10:00:00.000Z",
+      completed_at: "2026-04-23T10:00:01.000Z",
+      trace_id: "00000000-0000-0000-0000-000000000002",
     });
 
     const staleJob = q.insertSync(queuedJob({

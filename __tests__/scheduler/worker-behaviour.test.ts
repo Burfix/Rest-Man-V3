@@ -24,6 +24,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { MockQueue, createMockSupabase } from "./helpers/MockQueue";
 import { SITE_A, WORKER_1, BIZ_DATE, queuedJob, queuedAsyncJob, makeWorkerCtx } from "./helpers/factory";
+import type { SyncResult } from "@/lib/sync/contract";
 
 // ── Mock boundaries ──────────────────────────────────────────────────────────
 
@@ -79,33 +80,46 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function makeSuccessResult(): Record<string, unknown> {
+const MOCK_CONNECTION_ID = "00000000-0000-0000-0000-000000000001";
+const MOCK_TRACE_ID = "00000000-0000-0000-0000-000000000002";
+const MOCK_STARTED_AT = "2026-04-23T10:00:00.000Z";
+const MOCK_COMPLETED_AT = "2026-04-23T10:00:01.000Z";
+
+function makeSuccessResult(): SyncResult {
   return {
     ok: true,
     outcome: "success",
     records_written: 10,
     records_fetched: 10,
+    records_skipped: 0,
     duration_ms: 100,
     errors: [],
     sync_type: "daily_sales",
     mode: "delta",
-    loc_ref: "LOC001",
     business_date: BIZ_DATE,
+    connection_id: MOCK_CONNECTION_ID,
+    started_at: MOCK_STARTED_AT,
+    completed_at: MOCK_COMPLETED_AT,
+    trace_id: MOCK_TRACE_ID,
   };
 }
 
-function makeFailResult(retryable = true): Record<string, unknown> {
+function makeFailResult(retryable = true): SyncResult {
   return {
     ok: false,
     outcome: "failed",
     records_written: 0,
     records_fetched: 0,
+    records_skipped: 0,
     duration_ms: 100,
-    errors: [{ message: "Connection refused", retryable }],
+    errors: [{ code: "SYNC_ERROR", message: "Connection refused", retryable }],
     sync_type: "daily_sales",
     mode: "delta",
-    loc_ref: "LOC001",
     business_date: BIZ_DATE,
+    connection_id: MOCK_CONNECTION_ID,
+    started_at: MOCK_STARTED_AT,
+    completed_at: MOCK_COMPLETED_AT,
+    trace_id: MOCK_TRACE_ID,
   };
 }
 
@@ -508,7 +522,7 @@ describe("runAsyncJobBatch: batch execution", () => {
   it("returns accurate { succeeded, failed } counts for async jobs", async () => {
     const { calculateDailyScores } = await import("@/services/accountability/score-calculator");
     vi.mocked(calculateDailyScores)
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(0)
       .mockRejectedValueOnce(new Error("boom"));
 
     for (let i = 0; i < 2; i++) {

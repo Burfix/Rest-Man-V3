@@ -98,7 +98,7 @@ describe("two workers claiming concurrently — no duplicates", () => {
     const claimedIds = claims.map((c) => c.jobId);
     const uniqueIds = new Set(claimedIds);
     expect(uniqueIds.size).toBe(10); // no duplicates
-    expect([...uniqueIds].sort()).toEqual(ids.sort());
+    expect(Array.from(uniqueIds).sort()).toEqual(ids.sort());
   });
 
   it("2 workers × 10 limit on 8 jobs → 8 claims total (no over-claim)", async () => {
@@ -121,7 +121,7 @@ describe("two workers claiming concurrently — no duplicates", () => {
     const w2Ids = new Set(w2Jobs.map((j) => j.id));
 
     // Intersection must be empty
-    for (const id of w1Ids) {
+    for (const id of Array.from(w1Ids)) {
       expect(w2Ids.has(id)).toBe(false);
     }
   });
@@ -337,7 +337,7 @@ describe("claim/complete/claim cycle with multiple workers", () => {
 
     const w2Ids = new Set(w2Jobs.map((j) => j.id));
     const w1Ids = new Set(w1Jobs.map((j) => j.id));
-    for (const id of w2Ids) {
+    for (const id of Array.from(w2Ids)) {
       expect(w1Ids.has(id)).toBe(false); // no overlap
     }
   });

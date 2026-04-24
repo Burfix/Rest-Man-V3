@@ -313,7 +313,7 @@ export class MockQueue {
         : `${site_id}|${loc_ref}|${sync_type}|${business_date}|${mode}`;
 
     // ON CONFLICT (idempotency_key) DO NOTHING → return existing id
-    for (const row of this.syncJobs.values()) {
+    for (const row of Array.from(this.syncJobs.values())) {
       if (row.idempotency_key === key) return row.id;
     }
 
@@ -359,7 +359,7 @@ export class MockQueue {
         : `${job_type}|${this.clockMs}`;
 
     // ON CONFLICT DO NOTHING
-    for (const row of this.asyncJobs.values()) {
+    for (const row of Array.from(this.asyncJobs.values())) {
       if (row.idempotency_key === key) return row.id;
     }
 
@@ -633,7 +633,7 @@ export class MockQueue {
   private _releaseStaleSyncLeases(): number {
     const now = this.now();
     let count = 0;
-    for (const row of this.syncJobs.values()) {
+    for (const row of Array.from(this.syncJobs.values())) {
       if (
         (row.status === "leased" || row.status === "running") &&
         row.leased_until !== null &&
@@ -667,7 +667,7 @@ export class MockQueue {
   private _releaseStaleAsyncLeases(): number {
     const now = this.now();
     let count = 0;
-    for (const row of this.asyncJobs.values()) {
+    for (const row of Array.from(this.asyncJobs.values())) {
       if (
         (row.status === "leased" || row.status === "running") &&
         row.leased_until !== null &&
