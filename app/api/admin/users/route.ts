@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         const { ctx, supabase } = guard;
 
   const body = await validateBody(inviteUserSchema, req);
-        if (body.error) return body.error;
+        if (!body.success) return body.response;
         const { email, role, siteId, fullName } = body.data;
 
   try {
