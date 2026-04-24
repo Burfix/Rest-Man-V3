@@ -1,6 +1,6 @@
 /**
- * GET  /api/admin/users       — list org users + roles
- * POST /api/admin/users       — invite a new user
+ * GET  /api/admin/users      - list users (all orgs for super_admin, scoped for others)
+ * POST /api/admin/users      - invite a new user
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -10,220 +10,77 @@ import { inviteUserSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
 import { sendInviteEmail } from "@/services/notifications/inviteEmail";
 
-export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-export async function GET() {
-  const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "GET /api/admin/users");
-  if (guard.error) return guard.error;
-  const { ctx, supabase } = guard;
+export async function GET(req: NextRequest) {
+    const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "GET /api/admin/users");
+    if (guard.error) return guard.error;
+    const { ctx, supabase } = guard;
 
   try {
-    // Get all roles for this org
-    const { data: roles, error: rolesErr } = await supabase
-      .from("user_roles")
-      .select("user_id, role, site_id, region_id, is_active, granted_at")
-      .eq("organisation_id", ctx.orgId!)
-      .order("granted_at", { ascending: false });
+        // super_admin sees ALL users across ALL orgs via the team_members_all view
+      // everyone else is scoped to their own org
+      const isSuperAdmin = ctx.role === "super_admin";
 
-    if (rolesErr) {
-      logger.error("Failed to fetch user roles", { err: rolesErr });
-      return NextResponse.json({ error: rolesErr.message }, { status: 500 });
-    }
+      let query = supabase
+          .from("team_members_all")
+          .select("user_id, email, full_name, profile_status, last_seen_at, primary_role, primary_org_id, primary_org_name, role_is_active, all_org_names, all_site_names, all_site_ids, joined_at")
+          .order("joined_at", { ascending: false });
 
-    // Get profile data for these users
-    const rolesData = (roles ?? []) as any[];
-    const userIds = Array.from(new Set(rolesData.map((r: any) => r.user_id as string)));
-    const { data: profiles } = await supabase
-      .from("profiles")
-      .select("id, email, full_name, status, last_seen_at")
-      .in("id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+      if (!isSuperAdmin) {
+              query = query.eq("primary_org_id", ctx.orgId!);
+      }
 
-    // Get site access
-    const { data: siteAccess } = await supabase
-      .from("user_site_access")
-      .select("user_id, site_id")
-      .in("user_id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+      const { data: members, error: membersErr } = await query;
 
-    // Merge data
-    const profilesData = (profiles ?? []) as any[];
-    const siteAccessData = (siteAccess ?? []) as any[];
-    const profileMap = new Map(profilesData.map((p: any) => [p.id, p]));
-    const accessMap = new Map<string, string[]>();
-    for (const a of siteAccessData) {
-      const arr = accessMap.get(a.user_id) ?? [];
-      arr.push(a.site_id);
-      accessMap.set(a.user_id, arr);
-    }
+      if (membersErr) {
+              logger.error("Failed to fetch team members", { err: membersErr });
+              return NextResponse.json({ error: membersErr.message }, { status: 500 });
+      }
 
-    const users = userIds.map((uid) => {
-      const profile = profileMap.get(uid) as any;
-      const userRoles = rolesData.filter((r: any) => r.user_id === uid);
-      return {
-        id: uid,
-        email: profile?.email ?? "unknown",
-        full_name: profile?.full_name ?? null,
-        status: profile?.status ?? "unknown",
-        last_seen_at: profile?.last_seen_at ?? null,
-        roles: userRoles,
-        site_ids: accessMap.get(uid) ?? [],
-      };
-    });
-
-    return NextResponse.json({ users });
+      return NextResponse.json({ users: members ?? [], total: (members ?? []).length });
   } catch (err) {
-    logger.error("Admin users GET failed", { err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+        logger.error("Unexpected error in GET /api/admin/users", { err });
+        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "POST /api/admin/users");
-  if (guard.error) return guard.error;
-  const { ctx, supabase } = guard;
+    const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "POST /api/admin/users");
+    if (guard.error) return guard.error;
+    const { ctx, supabase } = guard;
+
+  const body = await validateBody(req, inviteUserSchema);
+    if (body.error) return body.error;
+    const { email, role, siteId, fullName } = body.data;
 
   try {
-    const body = await req.json();
-    const v = validateBody(inviteUserSchema, body);
-    if (!v.success) return v.response;
-    const d = v.data;
+        // Resolve organisation_id from the site — never hardcode org UUIDs
+      const { data: site, error: siteErr } = await supabase
+          .from("sites")
+          .select("id, name, organisation_id")
+          .eq("id", siteId)
+          .single();
 
-    // Check if profile already exists
-    const { data: existing } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", d.email)
-      .maybeSingle();
-
-    let userId: string;
-
-    if (existing) {
-      userId = (existing as any).id;
-    } else {
-      // Create user directly (no email sent) to avoid SMTP hangs
-      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
-        email: d.email,
-        email_confirm: true,
-        user_metadata: { full_name: d.full_name },
-      });
-
-      if (createErr || !newUser?.user) {
-        logger.error("Failed to create user", { err: createErr });
-        return NextResponse.json({ error: createErr?.message ?? "Failed to create user" }, { status: 500 });
+      if (siteErr || !site) {
+              return NextResponse.json({ error: `Site not found: ${siteId}` }, { status: 404 });
       }
 
-      userId = newUser.user.id;
+      const organisationId = site.organisation_id;
 
-      // Generate a password-reset link the admin can share
-      const siteUrl = "https://si-cantina-concierge.vercel.app";
-      const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
-        type: "recovery",
-        email: d.email,
-        options: { redirectTo: `${siteUrl}/reset-password` },
-      });
-
-      const inviteLink = linkErr ? undefined : linkData?.properties?.action_link;
-      if (linkErr) {
-        logger.warn("Could not generate recovery link, user still created", { err: linkErr });
+      // Callers can only invite into their own org unless super_admin
+      if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
+              return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
       }
 
-      // Auto-send invite email via Resend (non-blocking — doesn't hang)
-      let emailSent = false;
-      if (inviteLink) {
-        emailSent = await sendInviteEmail({
-          to: d.email,
-          name: d.full_name,
-          role: d.role,
-          inviteLink,
-        });
-      }
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
 
-      // Upsert profile row to match the auth user
-      await supabase.from("profiles").upsert({
-        id: userId,
-        email: d.email,
-        full_name: d.full_name,
-        status: "invited",
-      } as any, { onConflict: "id" });
+      // Use admin client for invite (requires service role key)
+      const { createClient } = await import("@supabase/supabase-js");
+        const adminClient = createClient(
+                process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+              );
 
-      // Create role assignment
-      const { error: roleErr } = await supabase.from("user_roles").insert({
-        user_id: userId,
-        organisation_id: ctx.orgId,
-        role: d.role,
-        site_id: d.site_id ?? null,
-        region_id: d.region_id ?? null,
-        granted_by: ctx.userId,
-      } as any);
-
-      if (roleErr) {
-        logger.error("Failed to assign role", { err: roleErr });
-        return NextResponse.json({ error: roleErr.message }, { status: 500 });
-      }
-
-      // Grant site access if a site was specified
-      if (d.site_id) {
-        await supabase.from("user_site_access").insert({
-          user_id: userId,
-          site_id: d.site_id,
-          granted_by: ctx.userId,
-        } as any).then(() => {}); // ignore duplicate
-      }
-
-      // Audit log
-      await supabase.from("access_audit_log").insert({
-        actor_user_id: ctx.userId,
-        target_user_id: userId,
-        action: "user.invited",
-        metadata: { email: d.email, role: d.role, site_id: d.site_id },
-      } as any);
-
-      logger.info("User invited", { email: d.email, userId });
-
-      return NextResponse.json({
-        userId,
-        email: d.email,
-        role: d.role,
-        inviteLink,
-        emailSent,
-      }, { status: 201 });
-    }
-
-    // User already exists - just add the role
-    const { error: roleErr } = await supabase.from("user_roles").insert({
-      user_id: userId,
-      organisation_id: ctx.orgId,
-      role: d.role,
-      site_id: d.site_id ?? null,
-      region_id: d.region_id ?? null,
-      granted_by: ctx.userId,
-    } as any);
-
-    if (roleErr) {
-      logger.error("Failed to assign role", { err: roleErr });
-      return NextResponse.json({ error: roleErr.message }, { status: 500 });
-    }
-
-    // Grant site access if a site was specified
-    if (d.site_id) {
-      await supabase.from("user_site_access").insert({
-        user_id: userId,
-        site_id: d.site_id,
-        granted_by: ctx.userId,
-      } as any).then(() => {}); // ignore duplicate
-    }
-
-    // Audit log
-    await supabase.from("access_audit_log").insert({
-      actor_user_id: ctx.userId,
-      target_user_id: userId,
-      action: "user.role_added",
-      metadata: { email: d.email, role: d.role, site_id: d.site_id },
-    } as any);
-
-    return NextResponse.json({ userId, email: d.email, role: d.role }, { status: 201 });
-  } catch (err) {
-    logger.error("Admin users POST failed", { err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
-  }
-}
+      const { 
