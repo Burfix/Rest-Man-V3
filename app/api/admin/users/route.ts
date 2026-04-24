@@ -50,9 +50,16 @@ export async function POST(req: NextRequest) {
 
   const body = await validateBody(inviteUserSchema, req);
         if (!body.success) return body.response;
-        const { email, role, siteId, fullName } = body.data;
+        const { email, role, site_id, full_name, region_id } = body.data;
+        const siteId = site_id ?? null;
+        const fullName = full_name;
+        const regionId = region_id ?? null;
 
   try {
+            if (!siteId) {
+                      return NextResponse.json({ error: "site_id is required" }, { status: 400 });
+            }
+
             const { data: site, error: siteErr } = await supabase
               .from("sites")
               .select("id, name, organisation_id")
@@ -105,7 +112,7 @@ export async function POST(req: NextRequest) {
                 { onConflict: "user_id,site_id" }
                     );
 
-          await sendInviteEmail({ email, fullName: fullName || email, siteName: site.name, invitedBy: ctx.userId });
+          await sendInviteEmail({ to: email, name: fullName || email, role, inviteLink: `${siteUrl}/login` });
 
           return NextResponse.json({ success: true, userId: invitedUserId, organisationId, siteId, role });
   } catch (err) {
