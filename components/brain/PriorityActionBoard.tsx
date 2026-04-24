@@ -765,7 +765,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
           {/* Closed day revenue */}
           {forecastSummary.isDayClosed && forecastSummary.projectedClose > 0 && (
             <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 font-mono space-y-0.5">
-              <span className="text-[9px] uppercase tracking-wider text-stone-600 block">TODAY'S REVENUE</span>
+              <span className="text-[9px] uppercase tracking-wider text-stone-600 block">TODAY&apos;S REVENUE</span>
               <span className="text-base font-bold text-[#0a0a0a] dark:text-stone-200">
                 {fmtZAR(forecastSummary.projectedClose)}
               </span>

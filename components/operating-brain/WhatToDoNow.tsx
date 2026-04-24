@@ -32,7 +32,7 @@ export default function WhatToDoNow({ decisions }: Props) {
   if (decisions.length === 0) {
     return (
       <div className="rounded-xl border border-stone-200 dark:border-stone-800/40 bg-stone-50 dark:bg-stone-900/50 px-5 py-6 text-center">
-        <p className="text-sm text-emerald-400 font-medium">Nothing urgent — you're on track</p>
+        <p className="text-sm text-emerald-400 font-medium">Nothing urgent — you&apos;re on track</p>
         <p className="text-xs text-stone-500 mt-1">Check back before next service period</p>
       </div>
     );

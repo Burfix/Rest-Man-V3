@@ -135,7 +135,7 @@ export default async function SiteDrillDownPage({ params }: Props) {
       {/* Today's tasks */}
       <section>
         <h2 className="text-xs font-bold uppercase tracking-widest text-stone-500 mb-3">
-          Today's Tasks — {completedTasks} / {tasks.length} complete
+          Today&apos;s Tasks — {completedTasks} / {tasks.length} complete
           {pendingTasks > 0 && <span className="ml-2 text-amber-500">{pendingTasks} pending</span>}
         </h2>
         {tasks.length === 0 ? (

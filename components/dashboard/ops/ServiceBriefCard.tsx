@@ -84,7 +84,7 @@ export default function ServiceBriefCard({
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-stone-100 dark:border-stone-800">
         <h2 className="text-xs font-bold uppercase tracking-widest text-stone-700 dark:text-stone-300">
-          Today's Service Brief
+          Today&apos;s Service Brief
         </h2>
         <span className="text-[11px] text-stone-500 dark:text-stone-600">
           {servicePeriod}
