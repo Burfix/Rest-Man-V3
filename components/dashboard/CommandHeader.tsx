@@ -41,7 +41,7 @@ export default function CommandHeader({
   events,
 }: Props) {
   const activeAlerts = opsAlerts.filter((a) => !a.resolved).length;
-  const todayEvent   = events.find((e) => e.event_date === date && !e.cancelled);
+  const todayEvent   = (events ?? []).find((e) => e.event_date === date && !e.cancelled);
 
   const complianceStatus =
     compliance.expired > 0    ? "risk"     :

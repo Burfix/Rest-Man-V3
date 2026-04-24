@@ -172,7 +172,7 @@ function TrendChart({
   const latest = trendLines.map((tl, i) => ({
     name:  tl.name,
     color: STORE_COLORS[i % STORE_COLORS.length],
-    value: [...tl.points].reverse().find((p) => p.value !== null)?.value ?? null,
+    value: [...(tl.points ?? [])].reverse().find((p) => p.value !== null)?.value ?? null,
   }));
 
   return (

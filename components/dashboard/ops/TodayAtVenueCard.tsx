@@ -85,7 +85,7 @@ export default function TodayAtVenueCard({
   microsSyncedAt,
   salesSnapshot,
 }: Props) {
-  const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
+  const todayEvent = (events ?? []).find((e) => e.event_date === date && !e.cancelled);
   const lunchBkgs = today.bookings.filter((b) => {
     const h = parseInt((b.booking_time ?? "00:00").split(":")[0], 10);
     return h >= 11 && h < 16;

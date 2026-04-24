@@ -301,7 +301,7 @@ export default async function OperationsDashboard() {
       noOpenPOCount: inventoryIntel?.noPOItems.length ?? 0,
       atRiskItems: inventoryIntel
         ? [...inventoryIntel.criticalItems, ...inventoryIntel.lowItems].slice(0, 5).map((item) => {
-            const mi = inventoryIntel.menuImpact.find((m) => m.ingredientId === item.id);
+            const mi = (inventoryIntel.menuImpact ?? []).find((m) => m.ingredientId === item.id);
             return {
               name: item.name,
               affectedMenuItems: mi?.affectedDishes,

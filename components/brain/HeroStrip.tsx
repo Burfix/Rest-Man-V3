@@ -90,9 +90,9 @@ export default function HeroStrip({
   const barWidth = `${Math.round(Math.min(100, Math.max(0, score)))}%`;
 
   // KPI pill sources
-  const labourDriver     = systemHealth.allScoreDrivers.find((d) => d.module === "LABOUR");
-  const compDriver       = systemHealth.allScoreDrivers.find((d) => d.module === "COMPLIANCE");
-  const maintDriver      = systemHealth.allScoreDrivers.find((d) => d.module === "MAINTENANCE");
+  const labourDriver     = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "LABOUR");
+  const compDriver       = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "COMPLIANCE");
+  const maintDriver      = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "MAINTENANCE");
   const labourPctMatch = labourDriver?.reason.match(/([\d.]+)%\s+vs\s+([\d.]+)%\s+target/i);
   const labourPctText = labourPctMatch ? Number(labourPctMatch[1]).toFixed(1) : null;
   const labourReliabilityNote = labourDriver?.reason.includes("Labour % unreliable — insufficient revenue data")

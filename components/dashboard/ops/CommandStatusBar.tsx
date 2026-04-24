@@ -118,7 +118,7 @@ function buildCells(
       : "No bookings";
 
   // ── Events ────────────────────────────────────────────────────────────────
-  const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
+  const todayEvent = (events ?? []).find((e) => e.event_date === date && !e.cancelled);
   const eventVar: StatusVariant =
     todayEvent      ? "info" :
     today.total > 0 ? "neutral" : "muted";

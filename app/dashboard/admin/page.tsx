@@ -530,7 +530,7 @@ function TeamPanel({
   const [form, setForm] = useState({ email: "", full_name: "", role: "gm", site_id: "" });
 
   const startEditing = (user: UserEntry) => {
-    const primaryRole = user.roles.find((r) => r.is_active);
+    const primaryRole = (user.roles ?? []).find((r) => r.is_active);
     setEditingUser(user.id);
     setEditForm({
       role: primaryRole?.role ?? "viewer",
@@ -669,7 +669,7 @@ function TeamPanel({
 
       <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
         {users.map((u) => {
-          const primaryRole = u.roles.find((r) => r.is_active);
+          const primaryRole = (u.roles ?? []).find((r) => r.is_active);
           const isEditing = editingUser === u.id;
           return (
             <div key={u.id} className={cn("px-4 py-3 hover:bg-stone-800/40 transition-colors", isEditing && "bg-stone-100 dark:bg-stone-800/30")}>
@@ -807,7 +807,7 @@ function RolesPanel({ users }: { users: UserEntry[] | null }) {
   const allRoles = Object.keys(ROLE_LABELS);
   const roleMemberCounts: Record<string, number> = {};
   for (const u of users ?? []) {
-    const active = u.roles.find((r) => r.is_active);
+    const active = (u.roles ?? []).find((r) => r.is_active);
     if (active) roleMemberCounts[active.role] = (roleMemberCounts[active.role] ?? 0) + 1;
   }
 

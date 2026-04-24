@@ -58,7 +58,7 @@ export default function TodayOpsPanel({
   date,
   forecast,
 }: Props) {
-  const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
+  const todayEvent = (events ?? []).find((e) => e.event_date === date && !e.cancelled);
 
   // Split bookings by service period
   const lunchBkgs  = today.bookings.filter((b) => {

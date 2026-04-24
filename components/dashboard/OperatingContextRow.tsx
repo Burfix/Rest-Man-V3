@@ -173,9 +173,10 @@ function BookingsCard({ today }: { today: TodayBookingsSummary }) {
 // ── Events Context ──────────────────────────────────────────────────────────────
 
 function EventsContextCard({ events, date }: { events: VenueEvent[]; date: string }) {
-  const todayEvent  = events.find((e) => e.event_date === date && !e.cancelled);
+  const safeEvents  = events ?? [];
+  const todayEvent  = safeEvents.find((e) => e.event_date === date && !e.cancelled);
   const upcomingEvt = !todayEvent
-    ? events.find((e) => e.event_date > date && !e.cancelled)
+    ? safeEvents.find((e) => e.event_date > date && !e.cancelled)
     : null;
 
   const displayEvent = todayEvent ?? upcomingEvt;

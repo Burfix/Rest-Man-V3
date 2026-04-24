@@ -40,7 +40,7 @@ export default function ServiceBriefCard({
   salesSnapshot,
 }: Props) {
   const ss = salesSnapshot ?? null;
-  const todayEvent = events.find((e) => e.event_date === date && !e.cancelled);
+  const todayEvent = (events ?? []).find((e) => e.event_date === date && !e.cancelled);
 
   const lunchBkgs = today.bookings.filter((b) => {
     const h = parseInt((b.booking_time ?? "00:00").split(":")[0], 10);
