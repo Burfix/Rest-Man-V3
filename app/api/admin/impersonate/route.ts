@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { target_user_id } = await req.json();
-    if (!target_user_id || typeof target_user_id !== "string") {
+    const { target_user_id: targetUserId } = await req.json() as { target_user_id?: unknown };
+    if (!targetUserId || typeof targetUserId !== "string") {
       return NextResponse.json({ error: "target_user_id required" }, { status: 400 });
     }
 
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("id, email, full_name")
-      .eq("id", target_user_id)
+      .eq("id", targetUserId)
       .maybeSingle();
 
     if (!profile) {
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
         full_name: (profile as any).full_name,
       },
     });
-    res.cookies.set(COOKIE, target_user_id, {
+    res.cookies.set(COOKIE, targetUserId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     // Audit log
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
-      target_user_id,
+      target_user_id: targetUserId,
       action: "impersonation.started",
       metadata: { target_email: (profile as any).email },
     } as any);

@@ -59,18 +59,22 @@ export async function PUT(
   try {
     const body = await req.json();
     const {
-      auth_server_url,
-      app_server_url,
-      client_id,
-      org_identifier,
-      loc_ref,
+      auth_server_url: authServerUrl,
+      app_server_url: appServerUrl,
+      client_id: clientId,
+      org_identifier: orgIdentifier,
+      loc_ref: locRef,
       username,
       password,
-      location_name,
-    } = body;
+      location_name: locationName,
+    } = body as {
+      auth_server_url?: string; app_server_url?: string; client_id?: string;
+      org_identifier?: string; loc_ref?: string; username?: string;
+      password?: string; location_name?: string;
+    };
 
     // Validate required fields
-    if (!auth_server_url || !app_server_url || !client_id || !org_identifier || !loc_ref || !username || !password) {
+    if (!authServerUrl || !appServerUrl || !clientId || !orgIdentifier || !locRef || !username || !password) {
       return NextResponse.json(
         { error: "All credential fields are required" },
         { status: 400 },
@@ -103,14 +107,14 @@ export async function PUT(
     // Upsert the connection row (one per store)
     const upsertData = {
       site_id: storeId,
-      auth_server_url: auth_server_url.replace(/\/+$/, ""),
-      app_server_url: app_server_url.replace(/\/+$/, ""),
-      client_id,
-      org_identifier,
-      loc_ref,
+      auth_server_url: authServerUrl.replace(/\/+$/, ""),
+      app_server_url: appServerUrl.replace(/\/+$/, ""),
+      client_id: clientId,
+      org_identifier: orgIdentifier,
+      loc_ref: locRef,
       username,
       encrypted_password: encryptedPassword,
-      location_name: location_name || (store as any).name,
+      location_name: locationName || (store as any).name,
       api_account_name: username,
       status: "awaiting_setup",
       updated_at: new Date().toISOString(),
@@ -164,9 +168,11 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { auth_server_url, client_id, username, password, org_identifier } = body;
+    const { auth_server_url: authServerUrl, client_id: clientId, username, password, org_identifier: orgIdentifier } = body as {
+      auth_server_url?: string; client_id?: string; username?: string; password?: string; org_identifier?: string;
+    };
 
-    if (!auth_server_url || !client_id || !username || !password) {
+    if (!authServerUrl || !clientId || !username || !password) {
       return NextResponse.json(
         { error: "auth_server_url, client_id, username, and password are required to test" },
         { status: 400 },
@@ -176,10 +182,10 @@ export async function POST(
     // Attempt PKCE Step 1: authorize endpoint probe
     // We test by hitting the authorize endpoint — if it responds with a login form/redirect,
     // the server URL and client_id are valid.
-    const authorizeUrl = `${auth_server_url.replace(/\/+$/, "")}/oidc-provider/v1/oauth2/authorize`;
+    const authorizeUrl = `${authServerUrl.replace(/\/+$/, "")}/oidc-provider/v1/oauth2/authorize`;
     const testParams = new URLSearchParams({
       response_type: "code",
-      client_id,
+      client_id: clientId,
       redirect_uri: "apiaccount://callback",
       scope: "openid",
       code_challenge: "test",
@@ -197,7 +203,7 @@ export async function POST(
         signal: controller.signal,
         headers: {
           "User-Agent": "ForgeStackOpsEngine/1.0",
-          "x-app-key": org_identifier || client_id,
+          "x-app-key": orgIdentifier || clientId,
         },
       });
       clearTimeout(timeout);

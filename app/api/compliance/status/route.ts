@@ -18,17 +18,17 @@ export async function GET(req: Request): Promise<NextResponse> {
   try {
     const items = await getAllComplianceItems();
 
-    let compliant = 0, scheduled = 0, due_soon = 0, expired = 0, unknown = 0;
+    let compliant = 0, scheduled = 0, dueSoon = 0, expired = 0, unknown = 0;
     for (const item of items) {
       if (item.status === "compliant") compliant++;
       else if (item.status === "scheduled") scheduled++;
-      else if (item.status === "due_soon") due_soon++;
+      else if (item.status === "due_soon") dueSoon++;
       else if (item.status === "expired") expired++;
       else unknown++;
     }
 
     const rated = items.length - unknown;
-    const compliance_pct = rated > 0 ? Math.round(((compliant + scheduled) / rated) * 100) : 0;
+    const compliancePct = rated > 0 ? Math.round(((compliant + scheduled) / rated) * 100) : 0;
 
     const itemList = items.map((item) => ({
       display_name: item.display_name,
@@ -42,8 +42,8 @@ export async function GET(req: Request): Promise<NextResponse> {
     itemList.sort((a, b) => (order[a.status] ?? 9) - (order[b.status] ?? 9));
 
     return NextResponse.json({
-      compliance_pct, total: items.length,
-      compliant, scheduled, due_soon, expired, unknown,
+      compliance_pct: compliancePct, total: items.length,
+      compliant, scheduled, due_soon: dueSoon, expired, unknown,
       has_critical: expired > 0,
       items: itemList,
       generated_at: new Date().toISOString(),

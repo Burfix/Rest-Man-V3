@@ -9,7 +9,8 @@
     "lint": "next lint",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -37,9 +38,13 @@
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
     "autoprefixer": "^10.0.1",
     "eslint": "^8",
     "eslint-config-next": "14.2.5",
+    "eslint-plugin-unicorn": "^55.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5",
@@ -47,5 +52,9 @@
   },
   "optionalDependencies": {
     "@next/swc-darwin-x64": "^14.2.5"
+  },
+  "lint-staged": {
+    "app/api/**/*.{ts,tsx}": ["eslint"],
+    "lib/mappers/**/*.ts": ["eslint"]
   }
 }
