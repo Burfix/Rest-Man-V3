@@ -255,48 +255,44 @@ describe("worker crash simulation", () => {
     expect(workerBJobs[0].id).toBe(row.id);
 
     await markSyncJobRunning(supabase, row.id, WORKER_2);
-    await markSyncJobSuccess(supabase, row.id);
+    await markSyncJobSuccess(supabase, row.id, WORKER_2);
 
     expect(q.syncRow(row.id)!.status).toBe("succeeded");
     expect(q.syncRow(row.id)!.lease_owner).toBeNull();
     expect(q.syncRow(row.id)!.attempts).toBe(0); // completed on first real attempt
   });
 
-  it("stale ack from worker A after recovery is harmlessly rejected", async () => {
+  it("stale ack from worker A after recovery is harmlessly rejected [Bug 1 fix]", async () => {
     const row = q.insertSync(queuedJob());
 
-    // Worker A claims
-    const workerAJobs = await claimSyncJobs(supabase, WORKER_1, 1);
+    // Worker A claims and starts running
+    await claimSyncJobs(supabase, WORKER_1, 1);
     await markSyncJobRunning(supabase, row.id, WORKER_1);
 
-    // Lease expires, recovery
+    // Lease expires, stale-release recovers the job
     q.syncRow(row.id)!.leased_until = new Date(q.now().getTime() - 1);
     q.advanceSecs(1);
     await releaseStaleLeases(supabase);
+    expect(q.syncRow(row.id)!.status).toBe("queued");
 
-    // Worker B claims the recovered job
+    // Worker B claims the recovered job and moves it to running
     const workerBJobs = await claimSyncJobs(supabase, WORKER_2, 1);
     await markSyncJobRunning(supabase, workerBJobs[0].id, WORKER_2);
+    expect(q.syncRow(row.id)!.lease_owner).toBe(WORKER_2);
 
-    // Worker A sends a stale success ack — should be a no-op (status guard)
-    // At this point the job is 'running' owned by Worker B
-    // Worker A calls markSyncJobSuccess — this is the WRONG worker but the status guard
-    // only checks status IN ('leased', 'running'). The status is 'running' so this WILL
-    // succeed (we don't have owner enforcement at RPC level — that's by design:
-    // the lease ownership check is implicit via SKIP LOCKED at claim time).
-    // This documents the actual contract: the RPC does not verify lease_owner.
-    await markSyncJobFailed(supabase, workerAJobs[0].id, "stale ack from Worker A", 60);
+    // Worker A wakes from crash and sends a stale mark_sync_job_failed ack.
+    // With the Bug 1 fix, the RPC now checks lease_owner = p_worker_id.
+    // Worker A (WORKER_1) is no longer the owner, so the ack is a no-op.
+    await markSyncJobFailed(supabase, row.id, "stale ack from Worker A", 60, WORKER_1);
 
-    // Worker B's job state should reflect Worker B's ownership
-    // BUT: since both workers hold the same job ID, Worker A's stale call DID mutate it.
-    // This is the documented behavior — lease ownership is NOT enforced at mark_* level.
-    // The correct fix is for Worker A to not send acks after it knows it crashed.
-    // Document this: NOT a bug in the DB contract, but a footgun in worker design.
-    // The job is now 'queued' because Worker A sent a fail ack.
-    // Worker B will notice on its next attempt.
-    expect(["queued", "running", "succeeded"]).toContain(q.syncRow(row.id)!.status);
-    // The key safety net: dead_letter was NOT reached (attempts only +1)
-    expect(q.syncRow(row.id)!.status).not.toBe("dead_letter");
+    // Job is still running, still owned by Worker B — Worker A's ack was rejected.
+    expect(q.syncRow(row.id)!.status).toBe("running");
+    expect(q.syncRow(row.id)!.lease_owner).toBe(WORKER_2);
+    expect(q.syncRow(row.id)!.attempts).toBe(0); // not incremented by the stale ack
+
+    // Worker B can still complete the job normally
+    await markSyncJobSuccess(supabase, row.id, WORKER_2);
+    expect(q.syncRow(row.id)!.status).toBe("succeeded");
   });
 
   it("lease ownership check: mark_running from non-owner on leased job succeeds (by design)", async () => {
@@ -325,7 +321,7 @@ describe("worker crash simulation", () => {
     const jobs = await claimAsyncJobs(supabase, WORKER_2, 1);
     expect(jobs.map((j) => j.id)).toContain(row.id);
     await markAsyncJobRunning(supabase, row.id, WORKER_2);
-    await markAsyncJobSuccess(supabase, row.id);
+    await markAsyncJobSuccess(supabase, row.id, WORKER_2);
 
     expect(q.asyncRow(row.id)!.status).toBe("succeeded");
   });
@@ -336,10 +332,11 @@ describe("worker crash simulation", () => {
 // =============================================================================
 
 describe("max_attempts guard in stale release", () => {
-  it("job with attempts >= max_attempts is NOT released by stale recovery", async () => {
-    // This is an edge case: a job in 'running' with attempts already at max.
-    // In practice this shouldn't happen (mark_failed would have set dead_letter).
-    // But as a defence-in-depth test:
+  it("zombie job (attempts >= max_attempts, crashed on last attempt) is driven to dead_letter [Bug 2 fix]", async () => {
+    // A job that crashes on its LAST attempt before calling mark_sync_job_failed
+    // previously got permanently stuck: release skipped it (attempts >= max guard)
+    // and nothing else could un-stick it without manual DB intervention.
+    // The Bug 2 fix adds a zombie dead-letter path in release_stale_*_leases.
     const row = q.insertSync({
       site_id: "00000000-0000-0000-0000-000000000a01",
       loc_ref: "LOC001",
@@ -353,8 +350,11 @@ describe("max_attempts guard in stale release", () => {
 
     q.advanceSecs(1);
     const released = await releaseStaleLeases(supabase);
-    expect(released).toBe(0); // NOT released
-    expect(q.syncRow(row.id)!.status).toBe("running"); // still stuck
+    expect(released).toBeGreaterThanOrEqual(1); // zombie IS counted
+    expect(q.syncRow(row.id)!.status).toBe("dead_letter"); // no longer stuck
+    expect(q.syncRow(row.id)!.lease_owner).toBeNull();
+    expect(q.syncRow(row.id)!.leased_until).toBeNull();
+    expect(q.syncRow(row.id)!.last_error).toBe("zombie: stale lease on exhausted job");
   });
 
   it("job with attempts < max_attempts IS released by stale recovery", async () => {

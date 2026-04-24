@@ -185,9 +185,11 @@ export async function markAsyncJobRunning(
 export async function markSyncJobSuccess(
   supabase: ReturnType<typeof createServerClient>,
   jobId: string,
+  workerId?: string,
 ): Promise<void> {
   const { error } = await dbAny(supabase).rpc("mark_sync_job_success", {
     p_job_id: jobId,
+    ...(workerId != null && { p_worker_id: workerId }),
   });
   if (error) {
     logger.warn("scheduler.claim.mark_sync_success_failed", { jobId, error: error.message });
@@ -199,11 +201,13 @@ export async function markSyncJobFailed(
   jobId: string,
   errorMsg: string,
   retryDelaySecs = 60,
+  workerId?: string,
 ): Promise<void> {
   const { error } = await dbAny(supabase).rpc("mark_sync_job_failed", {
     p_job_id:           jobId,
     p_error_msg:        errorMsg.slice(0, 500),
     p_retry_delay_secs: retryDelaySecs,
+    ...(workerId != null && { p_worker_id: workerId }),
   });
   if (error) {
     logger.warn("scheduler.claim.mark_sync_failed_rpc_failed", { jobId, error: error.message });
@@ -213,9 +217,11 @@ export async function markSyncJobFailed(
 export async function markAsyncJobSuccess(
   supabase: ReturnType<typeof createServerClient>,
   jobId: string,
+  workerId?: string,
 ): Promise<void> {
   const { error } = await dbAny(supabase).rpc("mark_async_job_success", {
     p_job_id: jobId,
+    ...(workerId != null && { p_worker_id: workerId }),
   });
   if (error) {
     logger.warn("scheduler.claim.mark_async_success_failed", { jobId, error: error.message });
@@ -227,11 +233,13 @@ export async function markAsyncJobFailed(
   jobId: string,
   errorMsg: string,
   retryDelaySecs = 120,
+  workerId?: string,
 ): Promise<void> {
   const { error } = await dbAny(supabase).rpc("mark_async_job_failed", {
     p_job_id:           jobId,
     p_error_msg:        errorMsg.slice(0, 500),
     p_retry_delay_secs: retryDelaySecs,
+    ...(workerId != null && { p_worker_id: workerId }),
   });
   if (error) {
     logger.warn("scheduler.claim.mark_async_failed_rpc_failed", { jobId, error: error.message });

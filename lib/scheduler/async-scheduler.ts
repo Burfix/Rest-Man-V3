@@ -29,7 +29,7 @@ export async function executeAsyncJob(
 
   if (ctx.dry_run) {
     logger.info("async_worker.dry_run_skip", logBase);
-    await markAsyncJobSuccess(supabase, job.id);
+    await markAsyncJobSuccess(supabase, job.id, ctx.worker_id);
     return true;
   }
 
@@ -62,13 +62,13 @@ export async function executeAsyncJob(
       }
     }
 
-    await markAsyncJobSuccess(supabase, job.id);
+    await markAsyncJobSuccess(supabase, job.id, ctx.worker_id);
     logger.info("async_worker.success", logBase);
     return true;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error("async_worker.failed", { ...logBase, err: msg });
-    await markAsyncJobFailed(supabase, job.id, msg, 60);
+    await markAsyncJobFailed(supabase, job.id, msg, 60, ctx.worker_id);
     return false;
   }
 }

@@ -53,13 +53,13 @@ export async function executeSyncJob(
   if (!parsedType.success || !parsedMode.success) {
     const err = `Invalid job fields: sync_type=${job.sync_type}, mode=${job.mode}`;
     logger.error("worker.invalid_job", { ...logBase, err });
-    await markSyncJobFailed(supabase, job.id, err, /* non-retryable */ 99999);
+    await markSyncJobFailed(supabase, job.id, err, /* non-retryable */ 99999, ctx.worker_id);
     return false;
   }
 
   if (ctx.dry_run) {
     logger.info("worker.dry_run_skip", { ...logBase });
-    await markSyncJobSuccess(supabase, job.id);
+    await markSyncJobSuccess(supabase, job.id, ctx.worker_id);
     return true;
   }
 
@@ -82,7 +82,7 @@ export async function executeSyncJob(
     );
 
     if (result.ok) {
-      await markSyncJobSuccess(supabase, job.id);
+      await markSyncJobSuccess(supabase, job.id, ctx.worker_id);
       logger.info("worker.sync_success", {
         ...logBase,
         outcome:         result.outcome,
@@ -99,7 +99,7 @@ export async function executeSyncJob(
       const retryable = result.errors.some((e) => e.retryable);
       const retryDelay = retryable ? 60 : 99999;
 
-      await markSyncJobFailed(supabase, job.id, errMsg, retryDelay);
+      await markSyncJobFailed(supabase, job.id, errMsg, retryDelay, ctx.worker_id);
       logger.warn("worker.sync_failed", {
         ...logBase,
         outcome:  result.outcome,
@@ -111,7 +111,7 @@ export async function executeSyncJob(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error("worker.sync_exception", { ...logBase, err: msg });
-    await markSyncJobFailed(supabase, job.id, msg, 60);
+    await markSyncJobFailed(supabase, job.id, msg, 60, ctx.worker_id);
     return false;
   }
 }

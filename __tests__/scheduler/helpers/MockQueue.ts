@@ -510,38 +510,43 @@ export class MockQueue {
     row.lease_owner = worker_id ?? row.lease_owner;
   }
 
-  // ── mark_sync_job_success (063) ───────────────────────────────────────────
+  // ── mark_sync_job_success (064) ───────────────────────────────────────────
   //
   // Guard: WHERE id=X AND status IN ('leased','running')
-  // A stale ack from a recovered worker won't corrupt a new job.
+  //        AND (p_worker_id IS NULL OR lease_owner = p_worker_id)  ← Bug 1 fix
 
   private _markSyncJobSuccess(p: Record<string, unknown>): void {
     const job_id = String(p.p_job_id);
+    const worker_id = p.p_worker_id != null ? String(p.p_worker_id) : null;
     const completed_at =
       p.p_completed_at != null ? new Date(String(p.p_completed_at)) : this.now();
     const row = this.syncJobs.get(job_id);
-    if (!row || !["leased", "running"].includes(row.status)) return; // DD4: guard
+    if (!row || !["leased", "running"].includes(row.status)) return; // DD4: status guard
+    if (worker_id !== null && row.lease_owner !== worker_id) return; // Bug 1 fix: owner guard
     row.status = "succeeded";
     row.completed_at = completed_at;
     row.lease_owner = null;
     row.leased_until = null;
   }
 
-  // ── mark_async_job_success (063) ──────────────────────────────────────────
+  // ── mark_async_job_success (064) ──────────────────────────────────────────
 
   private _markAsyncJobSuccess(p: Record<string, unknown>): void {
     const job_id = String(p.p_job_id);
+    const worker_id = p.p_worker_id != null ? String(p.p_worker_id) : null;
     const row = this.asyncJobs.get(job_id);
     if (!row || !["leased", "running"].includes(row.status)) return;
+    if (worker_id !== null && row.lease_owner !== worker_id) return; // Bug 1 fix
     row.status = "succeeded";
     row.completed_at = this.now();
     row.lease_owner = null;
     row.leased_until = null;
   }
 
-  // ── mark_sync_job_failed (063) ────────────────────────────────────────────
+  // ── mark_sync_job_failed (064) ────────────────────────────────────────────
   //
-  // Guard: SELECT WHERE id=X AND status IN ('leased','running') → IF NOT FOUND RETURN
+  // Guard: SELECT WHERE id=X AND status IN ('leased','running')
+  //        AND (p_worker_id IS NULL OR lease_owner = p_worker_id)  ← Bug 1 fix
   // Increments attempts (DD1: only here, not at claim time).
   // Backoff: LEAST(delay * 2^v_attempts, 14400)  where v_attempts is pre-increment.
 
@@ -549,10 +554,13 @@ export class MockQueue {
     const job_id = String(p.p_job_id);
     const error_msg = p.p_error_msg != null ? String(p.p_error_msg) : null;
     const retry_delay = Number(p.p_retry_delay_secs ?? 60);
+    const worker_id = p.p_worker_id != null ? String(p.p_worker_id) : null;
 
     const row = this.syncJobs.get(job_id);
     // DD5: IF NOT FOUND (or wrong status) → RETURN
     if (!row || !["leased", "running"].includes(row.status)) return;
+    // Bug 1 fix: reject stale ack from wrong owner
+    if (worker_id !== null && row.lease_owner !== worker_id) return;
 
     const v_attempts = row.attempts; // pre-increment value (used for backoff exponent)
     const v_new_attempts = v_attempts + 1;
@@ -578,7 +586,7 @@ export class MockQueue {
     }
   }
 
-  // ── mark_async_job_failed (063) ───────────────────────────────────────────
+  // ── mark_async_job_failed (064) ───────────────────────────────────────────
   //
   // Async cap is 7200 (2 hours), not 14400.
 
@@ -586,9 +594,12 @@ export class MockQueue {
     const job_id = String(p.p_job_id);
     const error_msg = p.p_error_msg != null ? String(p.p_error_msg) : null;
     const retry_delay = Number(p.p_retry_delay_secs ?? 120);
+    const worker_id = p.p_worker_id != null ? String(p.p_worker_id) : null;
 
     const row = this.asyncJobs.get(job_id);
     if (!row || !["leased", "running"].includes(row.status)) return;
+    // Bug 1 fix: reject stale ack from wrong owner
+    if (worker_id !== null && row.lease_owner !== worker_id) return;
 
     const v_attempts = row.attempts;
     const v_new_attempts = v_attempts + 1;
@@ -612,11 +623,12 @@ export class MockQueue {
     }
   }
 
-  // ── release_stale_sync_leases (063) ───────────────────────────────────────
+  // ── release_stale_sync_leases (064) ───────────────────────────────────────
   //
   // Covers BOTH 'leased' AND 'running' — the key fix from 063.
   // Does NOT increment attempts (DD1).
-  // Skips jobs with attempts >= max_attempts (they'd become dead_letter on next fail anyway).
+  // Bug 2 fix: zombie jobs (attempts >= max_attempts) → dead_letter instead
+  //   of being permanently stuck.
 
   private _releaseStaleSyncLeases(): number {
     const now = this.now();
@@ -625,23 +637,32 @@ export class MockQueue {
       if (
         (row.status === "leased" || row.status === "running") &&
         row.leased_until !== null &&
-        row.leased_until < now &&
-        row.attempts < row.max_attempts
+        row.leased_until < now
       ) {
-        row.status = "queued";
-        row.lease_owner = null;
-        row.leased_until = null;
-        // started_at: intentionally NOT reset — preserve execution history
-        // attempts: intentionally NOT modified (DD1)
+        if (row.attempts < row.max_attempts) {
+          // Recoverable: return to queued
+          row.status = "queued";
+          row.lease_owner = null;
+          row.leased_until = null;
+          // started_at: intentionally NOT reset — preserve execution history
+          // attempts: intentionally NOT modified (DD1)
+        } else {
+          // Zombie: crashed on last attempt before mark_sync_job_failed was called
+          row.status = "dead_letter";
+          row.lease_owner = null;
+          row.leased_until = null;
+          row.completed_at = row.completed_at ?? now;
+          row.last_error = row.last_error ?? "zombie: stale lease on exhausted job";
+        }
         count++;
       }
     }
     return count;
   }
 
-  // ── release_stale_async_leases (063) ─────────────────────────────────────
+  // ── release_stale_async_leases (064) ─────────────────────────────────────
   //
-  // New in 063 — the async queue had no stale-release function before.
+  // Bug 2 fix: zombie jobs (attempts >= max_attempts) → dead_letter.
 
   private _releaseStaleAsyncLeases(): number {
     const now = this.now();
@@ -650,12 +671,20 @@ export class MockQueue {
       if (
         (row.status === "leased" || row.status === "running") &&
         row.leased_until !== null &&
-        row.leased_until < now &&
-        row.attempts < row.max_attempts
+        row.leased_until < now
       ) {
-        row.status = "queued";
-        row.lease_owner = null;
-        row.leased_until = null;
+        if (row.attempts < row.max_attempts) {
+          row.status = "queued";
+          row.lease_owner = null;
+          row.leased_until = null;
+        } else {
+          // Zombie: crashed on last attempt
+          row.status = "dead_letter";
+          row.lease_owner = null;
+          row.leased_until = null;
+          row.completed_at = row.completed_at ?? now;
+          row.last_error = row.last_error ?? "zombie: stale lease on exhausted job";
+        }
         count++;
       }
     }
