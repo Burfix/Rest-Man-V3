@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { inviteUserSchema, validateBody } from "@/lib/validation/schemas";
+import { inviteUserDtoToInternal, inviteUserInternalToDb } from "@/lib/mappers/userMapper";
 import { logger } from "@/lib/logger";
 import { sendInviteEmail } from "@/services/notifications/inviteEmail";
 
@@ -48,26 +49,24 @@ export async function POST(req: NextRequest) {
         if (guard.error) return guard.error;
         const { ctx, supabase } = guard;
 
-  const body = await validateBody(inviteUserSchema, req);
-        if (!body.success) return body.response;
-        const { email, role, site_id, full_name, region_id } = body.data;
-        const siteId = site_id ?? null;
-        const fullName = full_name;
-        const regionId = region_id ?? null;
+  const raw = await req.json();
+        const v = validateBody(inviteUserSchema, raw);
+        if (!v.success) return v.response;
+        const user = inviteUserDtoToInternal(v.data);
 
   try {
-            if (!siteId) {
+            if (!user.siteId) {
                       return NextResponse.json({ error: "site_id is required" }, { status: 400 });
             }
 
             const { data: site, error: siteErr } = await supabase
               .from("sites")
               .select("id, name, organisation_id")
-              .eq("id", siteId)
+              .eq("id", user.siteId)
               .single();
 
           if (siteErr || !site) {
-                      return NextResponse.json({ error: `Site not found: ${siteId}` }, { status: 404 });
+                      return NextResponse.json({ error: `Site not found: ${user.siteId}` }, { status: 404 });
           }
 
           const organisationId = site.organisation_id;
@@ -85,9 +84,9 @@ export async function POST(req: NextRequest) {
                   { auth: { autoRefreshToken: false, persistSession: false } }
                       );
 
-          const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
+          const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
                       redirectTo: `${siteUrl}/auth/confirm`,
-                      data: { full_name: fullName || "", invited_to_site: site.name, role },
+                      data: { full_name: user.fullName || "", invited_to_site: site.name, role: user.role },
           });
 
           if (inviteErr) {
@@ -97,24 +96,25 @@ export async function POST(req: NextRequest) {
 
           const invitedUserId = inviteData.user.id;
 
+          const profileDb = inviteUserInternalToDb(user);
           await adminClient.from("profiles").upsert(
-                { id: invitedUserId, email, full_name: fullName || "", status: "invited", updated_at: new Date().toISOString() },
+                { id: invitedUserId, email: profileDb.email, full_name: profileDb.full_name || "", status: "invited", updated_at: new Date().toISOString() },
                 { onConflict: "id" }
                     );
 
           await adminClient.from("user_roles").upsert(
-                { user_id: invitedUserId, organisation_id: organisationId, site_id: siteId, role, is_active: true, granted_by: ctx.userId, granted_at: new Date().toISOString() },
+                { user_id: invitedUserId, organisation_id: organisationId, site_id: profileDb.site_id, role: profileDb.role, is_active: true, granted_by: ctx.userId, granted_at: new Date().toISOString() },
                 { onConflict: "user_id,organisation_id,site_id,role" }
                     );
 
           await adminClient.from("user_site_access").upsert(
-                { user_id: invitedUserId, site_id: siteId, granted_by: ctx.userId, created_at: new Date().toISOString() },
+                { user_id: invitedUserId, site_id: profileDb.site_id, granted_by: ctx.userId, created_at: new Date().toISOString() },
                 { onConflict: "user_id,site_id" }
                     );
 
-          await sendInviteEmail({ to: email, name: fullName || email, role, inviteLink: `${siteUrl}/login` });
+          await sendInviteEmail({ to: user.email, name: user.fullName || user.email, role: user.role, inviteLink: `${siteUrl}/login` });
 
-          return NextResponse.json({ success: true, userId: invitedUserId, organisationId, siteId, role });
+          return NextResponse.json({ success: true, userId: invitedUserId, organisationId, siteId: user.siteId, role: user.role });
   } catch (err) {
             logger.error("Unexpected error in POST /api/admin/users", { err });
             return NextResponse.json({ error: "Internal server error" }, { status: 500 });
