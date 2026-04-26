@@ -62,6 +62,10 @@ export async function GET() {
 
     const tenantRows = ((tenantRes.data as VTenantSummary[] | null) ?? []);
 
+    if (tenantRows.length === 0 && !tenantRes.error) {
+      console.warn("[admin/overview] v_tenant_summary returned 0 rows with no error", { orgId, unrestricted });
+    }
+
     // Aggregate summary totals across visible orgs
     const totalStores       = tenantRows.reduce((s, r) => s + Number(r.total_stores ?? 0), 0);
     const activeStores      = tenantRows.reduce((s, r) => s + Number(r.active_stores ?? 0), 0);

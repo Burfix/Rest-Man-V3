@@ -60,6 +60,10 @@ export async function GET(req: NextRequest) {
             site_ids: r.site_ids ?? [],
           }));
 
+          if (users.length === 0 && !fetchErr) {
+            console.warn("[admin/users] v_users returned 0 rows with no error", { orgId: ctx.orgId });
+          }
+
           return NextResponse.json({ data: users, error: null });
   } catch (err) {
             logger.error("Unexpected error in GET /api/admin/users", { err });

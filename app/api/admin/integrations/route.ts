@@ -36,6 +36,10 @@ export async function GET() {
 
     const rows = (data as VIntegration[] | null) ?? [];
 
+    if (rows.length === 0 && !error) {
+      console.warn("[admin/integrations] v_integrations returned 0 rows with no error", { orgId: ctx.orgId });
+    }
+
     // Shape the response to match the admin UI's Integration interface.
     const integrations = rows.map((r) => ({
       store_id: r.store_id,
