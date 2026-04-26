@@ -397,6 +397,8 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
 
   if (!stores) return <LoadingSkeleton />;
 
+  const safeStores = Array.isArray(stores) ? stores : [];
+
   const handleCreate = async () => {
     setSaving(true);
     try {
@@ -440,7 +442,7 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-stone-500">{stores.length} store{stores.length !== 1 ? "s" : ""}</p>
+        <p className="text-xs text-stone-500">{safeStores.length} store{safeStores.length !== 1 ? "s" : ""}</p>
         <button onClick={() => setShowNew(!showNew)} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-500 transition-colors">
           + Add Store
         </button>
@@ -469,7 +471,7 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
       )}
 
       <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
-        {stores.map((store) => (
+        {safeStores.map((store) => (
           <div key={store.id} className="flex items-center justify-between px-4 py-3 hover:bg-stone-800/40 transition-colors">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
@@ -502,7 +504,7 @@ function StoresPanel({ stores, onRefresh }: { stores: Store[] | null; onRefresh:
             </div>
           </div>
         ))}
-        {stores.length === 0 && <EmptyState message="No stores configured" />}
+        {safeStores.length === 0 && <EmptyState message="No stores configured" />}
       </div>
     </div>
   );
@@ -593,6 +595,8 @@ function TeamPanel({
 
   if (!users) return <LoadingSkeleton />;
 
+  const safeUsers = Array.isArray(users) ? users : [];
+
   const handleInvite = async () => {
     setSaving(true);
     try {
@@ -636,7 +640,7 @@ function TeamPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-stone-500">{users.length} team member{users.length !== 1 ? "s" : ""}</p>
+        <p className="text-xs text-stone-500">{safeUsers.length} team member{safeUsers.length !== 1 ? "s" : ""}</p>
         <button onClick={() => setShowInvite(!showInvite)} className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-500 transition-colors">
           + Invite User
         </button>
@@ -668,7 +672,7 @@ function TeamPanel({
       )}
 
       <div className="divide-y divide-stone-200 dark:divide-stone-800 rounded-xl border border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-stone-900/60 overflow-hidden">
-        {users.map((u) => {
+        {safeUsers.map((u) => {
           const primaryRole = (u.roles ?? []).find((r) => r.is_active);
           const isEditing = editingUser === u.id;
           return (
@@ -795,7 +799,7 @@ function TeamPanel({
             </div>
           );
         })}
-        {users.length === 0 && <EmptyState message="No team members yet" />}
+        {safeUsers.length === 0 && <EmptyState message="No team members yet" />}
       </div>
     </div>
   );
@@ -982,6 +986,9 @@ function DataHealthPanel({ data, onRefresh }: { data: DataHealthData | null; onR
 function SyncLogsPanel({ data, page, setPage }: { data: SyncLogsData | null; page: number; setPage: (p: number) => void }) {
   if (!data) return <LoadingSkeleton />;
 
+  const runs = Array.isArray(data?.runs) ? data.runs : [];
+  const errors = Array.isArray(data?.errors) ? data.errors : [];
+
   const totalPages = Math.ceil(data.total / data.limit);
 
   const statusColors: Record<string, string> = {
@@ -1011,7 +1018,7 @@ function SyncLogsPanel({ data, page, setPage }: { data: SyncLogsData | null; pag
           <div className="col-span-2">Records</div>
           <div className="col-span-3">Started</div>
         </div>
-        {data.runs.map((run) => (
+        {runs.map((run) => (
           <div key={run.run_id} className="grid grid-cols-12 gap-2 px-4 py-3 items-center hover:bg-stone-800/40 transition-colors">
             <div className="col-span-3 text-sm text-stone-700 dark:text-stone-200 truncate">{run.store_name}</div>
             <div className="col-span-2">
@@ -1026,14 +1033,14 @@ function SyncLogsPanel({ data, page, setPage }: { data: SyncLogsData | null; pag
             <div className="col-span-3 text-[11px] text-stone-500">{timeAgo(run.started_at)}</div>
           </div>
         ))}
-        {data.runs.length === 0 && <EmptyState message="No sync runs recorded" />}
+        {runs.length === 0 && <EmptyState message="No sync runs recorded" />}
       </div>
 
       {/* Recent errors */}
-      {data.errors.length > 0 && (
-        <SectionCard title={`Recent Errors (${data.errors.length})`}>
+      {errors.length > 0 && (
+        <SectionCard title={`Recent Errors (${errors.length})`}>
           <div className="space-y-2 max-h-60 overflow-y-auto">
-            {data.errors.map((e, i) => (
+            {errors.map((e, i) => (
               <div key={i} className="rounded-lg bg-red-900/20 border border-red-800/30 p-3">
                 <div className="flex items-center gap-2 text-[10px] text-red-400">
                   <span className="font-mono">{e.sync_type}</span>
@@ -1183,27 +1190,42 @@ export default function AdminDashboard() {
   // ── Loaders ───────────────────────────────────────────────────────────────
 
   const loadOverview = useCallback(async () => {
-    try { setOverview(await apiFetch("/api/admin/overview")); }
+    try {
+      const res = await apiFetch<{ data: OverviewData | null; error: string | null }>("/api/admin/overview");
+      setOverview(res.data ?? null);
+    }
     catch (e: any) { setError(e.message); }
   }, []);
 
   const loadStores = useCallback(async () => {
-    try { setStores((await apiFetch<{ stores: Store[] }>("/api/admin/stores")).stores); }
+    try {
+      const res = await apiFetch<{ data?: Store[]; error: string | null }>("/api/admin/stores");
+      setStores(Array.isArray(res.data) ? res.data : []);
+    }
     catch (e: any) { setError(e.message); }
   }, []);
 
   const loadUsers = useCallback(async () => {
-    try { setUsers((await apiFetch<{ users: UserEntry[] }>("/api/admin/users")).users); }
+    try {
+      const res = await apiFetch<{ data?: UserEntry[]; error: string | null }>("/api/admin/users");
+      setUsers(Array.isArray(res.data) ? res.data : []);
+    }
     catch (e: any) { setError(e.message); }
   }, []);
 
   const loadAudit = useCallback(async () => {
-    try { setAudit((await apiFetch<{ entries: AuditEntry[] }>("/api/admin/audit")).entries); }
+    try {
+      const res = await apiFetch<{ entries?: AuditEntry[] }>("/api/admin/audit");
+      setAudit(Array.isArray(res.entries) ? res.entries : []);
+    }
     catch (e: any) { setError(e.message); }
   }, []);
 
   const loadDataHealth = useCallback(async () => {
-    try { setDataHealth(await apiFetch("/api/admin/data-health")); }
+    try {
+      const res = await apiFetch<DataHealthData>("/api/admin/data-health");
+      setDataHealth({ ...res, stores: Array.isArray(res.stores) ? res.stores : [] });
+    }
     catch (e: any) { setError(e.message); }
   }, []);
 
@@ -1213,7 +1235,11 @@ export default function AdminDashboard() {
   }, []);
 
   const loadIntegrations = useCallback(async () => {
-    try { setIntegrations(await apiFetch("/api/admin/integrations")); }
+    try {
+      const res = await apiFetch<{ data?: IntegrationsData; error: string | null }>("/api/admin/integrations");
+      const d = res.data;
+      setIntegrations(d ? { ...d, integrations: Array.isArray(d.integrations) ? d.integrations : [] } : { integrations: [], summary: { total_stores: 0, micros_connected: 0, micros_stale: 0, micros_expired: 0, micros_disconnected: 0, micros_none: 0 } });
+    }
     catch (e: any) { setError(e.message); }
   }, []);
 

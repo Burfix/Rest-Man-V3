@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
           if (fetchErr) {
                       logger.error("Failed to fetch team members", { err: fetchErr });
-                      return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+                      return NextResponse.json({ data: [], error: fetchErr.message }, { status: 500 });
           }
 
           // Map v_users rows to the UserEntry shape expected by the admin UI.
@@ -60,10 +60,10 @@ export async function GET(req: NextRequest) {
             site_ids: r.site_ids ?? [],
           }));
 
-          return NextResponse.json({ users, total: users.length });
+          return NextResponse.json({ data: users, error: null });
   } catch (err) {
             logger.error("Unexpected error in GET /api/admin/users", { err });
-            return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+            return NextResponse.json({ data: [], error: "Internal server error" }, { status: 500 });
   }
 }
 

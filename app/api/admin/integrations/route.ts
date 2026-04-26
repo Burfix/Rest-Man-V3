@@ -31,7 +31,7 @@ export async function GET() {
 
     if (error) {
       logger.error("Integrations GET failed", { err: error });
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ data: null, error: error.message }, { status: 500 });
     }
 
     const rows = (data as VIntegration[] | null) ?? [];
@@ -66,9 +66,9 @@ export async function GET() {
       micros_none:          integrations.filter((i) => i.micros.status === "none").length,
     };
 
-    return NextResponse.json({ integrations, summary });
+    return NextResponse.json({ data: { integrations, summary }, error: null });
   } catch (err) {
     logger.error("Integrations GET failed", { err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ data: null, error: "Internal server error" }, { status: 500 });
   }
 }

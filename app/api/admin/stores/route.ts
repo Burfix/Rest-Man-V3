@@ -21,7 +21,7 @@ export async function GET() {
   try {
     const unrestricted = isSuperAdmin(ctx);
 
-    if (!unrestricted && !ctx.orgId) return NextResponse.json({ error: "No organisation" }, { status: 400 });
+    if (!unrestricted && !ctx.orgId) return NextResponse.json({ data: [], error: "No organisation" }, { status: 400 });
 
     // Read from the contract-layer view v_stores (migration 065).
     // This is the canonical source for store counts across all dashboard tabs.
@@ -35,7 +35,7 @@ export async function GET() {
 
     if (error) {
       logger.error("Failed to fetch stores", { err: error });
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ data: [], error: error.message }, { status: 500 });
     }
 
     // Map v_stores to the Store shape expected by the admin UI.
@@ -57,10 +57,10 @@ export async function GET() {
       created_at: s.created_at,
     }));
 
-    return NextResponse.json({ stores });
+    return NextResponse.json({ data: stores, error: null });
   } catch (err) {
     logger.error("Admin stores GET failed", { err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ data: [], error: "Internal server error" }, { status: 500 });
   }
 }
 

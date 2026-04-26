@@ -25,7 +25,7 @@ export async function GET() {
     const orgId = ctx.orgId;
 
     if (!unrestricted && !orgId) {
-      return NextResponse.json({ error: "No organisation" }, { status: 400 });
+      return NextResponse.json({ data: null, error: "No organisation" }, { status: 400 });
     }
 
     // --- Core aggregate counts from contract-layer view ----------------------
@@ -111,7 +111,7 @@ export async function GET() {
       0,
     );
 
-    return NextResponse.json({
+    return NextResponse.json({ error: null, data: {
       totalStores,
       activeStores,
       totalUsers,
@@ -130,9 +130,9 @@ export async function GET() {
         is_active: s.is_active,
         store_code: s.store_code,
       })),
-    });
+    } });
   } catch (err) {
     logger.error("Admin overview failed", { err });
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ data: null, error: "Internal server error" }, { status: 500 });
   }
 }

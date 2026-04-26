@@ -134,3 +134,49 @@ export interface VSiteHealth {
   /** 'healthy' | 'warning' | 'critical' | 'unknown' */
   health: "healthy" | "warning" | "critical" | "unknown";
 }
+
+// ── API response types ────────────────────────────────────────────────────────
+//
+// These types describe the shapes returned to the frontend by the admin API
+// routes. They are derived from the view interfaces above and are intentionally
+// simpler — UI components should import these, not the raw view interfaces.
+
+/** Aggregate tenant stats returned by GET /api/admin/overview */
+export type TenantSummary = {
+  total_stores: number;
+  total_users: number;
+  total_integrations: number;
+  connected_integrations: number;
+};
+
+/** Store entry returned by GET /api/admin/stores */
+export type StoreView = {
+  id: string;
+  name: string;
+  user_count: number;
+  integration_count: number;
+  integration_status: string | null;
+};
+
+/** User entry returned by GET /api/admin/users */
+export type UserView = {
+  id: string;
+  full_name: string;
+  email: string;
+  site_id: string;
+  role_count: number;
+};
+
+/** Integration entry returned by GET /api/admin/integrations */
+export type IntegrationView = {
+  id: string;
+  site_id: string;
+  status: string;
+  last_synced_at: string | null;
+};
+
+/** Uniform API envelope used by all admin list/summary routes */
+export type AdminApiResponse<T> = {
+  data: T;
+  error: string | null;
+};
