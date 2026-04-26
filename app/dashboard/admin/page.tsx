@@ -1266,6 +1266,47 @@ export default function AdminDashboard() {
     if (tab === "sync-logs") loadSyncLogs(syncPage);
   }, [syncPage, tab, loadSyncLogs]);
 
+  // ── Dev-only consistency check ────────────────────────────────────────────
+  // Compares overview aggregate counts (from v_tenant_summary) against the
+  // actual data lengths returned by the stores/users/integrations loaders.
+  // Fires only in development; silent in production.
+
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if (!overview || !stores || !users || !integrations) return;
+
+    const checks = [
+      {
+        label: "totalStores vs stores.length",
+        expected: overview.totalStores,
+        actual: stores.length,
+      },
+      {
+        label: "totalUsers vs users.length",
+        expected: overview.totalUsers,
+        actual: users.length,
+      },
+      {
+        label: "integrationCount vs integrations.integrations.length",
+        expected: overview.integrationCount,
+        actual: integrations.integrations.filter(
+          (i) => i.micros.status === "connected"
+        ).length,
+      },
+    ];
+
+    for (const c of checks) {
+      if (c.expected !== c.actual) {
+        console.warn("[ADMIN_COUNT_MISMATCH]", {
+          check: c.label,
+          expected: c.expected,
+          actual: c.actual,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+  }, [overview, stores, users, integrations]);
+
   // ── Refresh ───────────────────────────────────────────────────────────────
 
   const handleRefresh = () => {

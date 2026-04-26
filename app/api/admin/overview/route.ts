@@ -11,7 +11,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { isSuperAdmin } from "@/lib/admin/helpers";
 import { logger } from "@/lib/logger";
-import type { VTenantSummary, VStore } from "@/lib/admin/contractTypes";
+import type { VTenantSummary, VStore, VRoleDistribution, VAuditSummary } from "@/lib/admin/contractTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -35,17 +35,19 @@ export async function GET() {
     const tenantQ = supabase.from("v_tenant_summary").select("*");
     if (!unrestricted && orgId) tenantQ.eq("org_id", orgId);
 
-    // --- Role distribution (still from user_roles — not in tenant summary) ---
+    // --- Role distribution (v_role_distribution — migration 066) ------------
+    // Replaces live scan of user_roles + JS accumulation.
     const roleQ = supabase
-      .from("user_roles")
-      .select("role, is_active, organisation_id")
-      .eq("is_active", true);
-    if (!unrestricted && orgId) roleQ.eq("organisation_id", orgId);
+      .from("v_role_distribution")
+      .select("org_id, role, member_count");
+    if (!unrestricted && orgId) roleQ.eq("org_id", orgId);
 
-    // --- Audit count ---------------------------------------------------------
+    // --- Audit count (v_audit_summary — migration 066) -----------------------
+    // Replaces COUNT(*head) on access_audit_log.
     const auditQ = supabase
-      .from("access_audit_log")
-      .select("id", { count: "exact", head: true });
+      .from("v_audit_summary")
+      .select("org_id, audit_count");
+    if (!unrestricted && orgId) auditQ.eq("org_id", orgId);
 
     // --- Store list for the overview sub-panel (from v_stores) ---------------
     const storeListQ = supabase
@@ -63,7 +65,13 @@ export async function GET() {
     const tenantRows = ((tenantRes.data as VTenantSummary[] | null) ?? []);
 
     if (tenantRows.length === 0 && !tenantRes.error) {
-      console.warn("[admin/overview] v_tenant_summary returned 0 rows with no error", { orgId, unrestricted });
+      logger.warn("ADMIN_API_EMPTY_DATA", {
+        route: "GET /api/admin/overview",
+        view: "v_tenant_summary",
+        orgId,
+        unrestricted,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // Aggregate summary totals across visible orgs
@@ -85,14 +93,16 @@ export async function GET() {
       };
     }
 
-    // Role distribution from user_roles
+    // Role distribution from v_role_distribution (view, not raw user_roles)
     const roleCounts: Record<string, number> = {};
-    for (const r of (rolesRes.data ?? []) as any[]) {
-      roleCounts[r.role] = (roleCounts[r.role] ?? 0) + 1;
+    for (const r of ((rolesRes.data as VRoleDistribution[] | null) ?? [])) {
+      roleCounts[r.role] = (roleCounts[r.role] ?? 0) + Number(r.member_count ?? 0);
     }
     const activeRoles = Object.values(roleCounts).reduce((a, b) => a + b, 0);
 
-    const auditEntries = auditRes.count ?? 0;
+    // Audit count from v_audit_summary (view, not raw access_audit_log COUNT)
+    const auditEntries = ((auditRes.data as VAuditSummary[] | null) ?? [])
+      .reduce((s, r) => s + Number(r.audit_count ?? 0), 0);
 
     // --- Weekly revenue (last 7 days from daily_sales_summary view) ----------
     const weekAgo = new Date();

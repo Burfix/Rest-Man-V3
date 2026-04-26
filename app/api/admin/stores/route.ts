@@ -58,7 +58,12 @@ export async function GET() {
     }));
 
     if (stores.length === 0 && !error) {
-      console.warn("[admin/stores] v_stores returned 0 rows with no error", { orgId: ctx.orgId });
+      logger.warn("ADMIN_API_EMPTY_DATA", {
+        route: "GET /api/admin/stores",
+        view: "v_stores",
+        orgId: ctx.orgId,
+        timestamp: new Date().toISOString(),
+      });
     }
 
     return NextResponse.json({ data: stores, error: null });

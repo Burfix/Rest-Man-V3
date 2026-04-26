@@ -61,7 +61,12 @@ export async function GET(req: NextRequest) {
           }));
 
           if (users.length === 0 && !fetchErr) {
-            console.warn("[admin/users] v_users returned 0 rows with no error", { orgId: ctx.orgId });
+            logger.warn("ADMIN_API_EMPTY_DATA", {
+              route: "GET /api/admin/users",
+              view: "v_users",
+              orgId: ctx.orgId,
+              timestamp: new Date().toISOString(),
+            });
           }
 
           return NextResponse.json({ data: users, error: null });

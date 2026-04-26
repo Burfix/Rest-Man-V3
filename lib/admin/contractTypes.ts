@@ -180,3 +180,28 @@ export type AdminApiResponse<T> = {
   data: T;
   error: string | null;
 };
+
+// ── v_role_distribution (migration 066) ───────────────────────────────────────
+
+/**
+ * One row from v_role_distribution.
+ * Active role member count per org, grouped by role.
+ * overview route reads this instead of scanning user_roles in JS.
+ */
+export interface VRoleDistribution {
+  org_id: string;
+  role: string;
+  member_count: number;
+}
+
+// ── v_audit_summary (migration 066) ───────────────────────────────────────────
+
+/**
+ * One row from v_audit_summary.
+ * Total audit events per org (actor resolved through user_roles).
+ * org_id is the null-sentinel UUID for events with no resolvable org.
+ */
+export interface VAuditSummary {
+  org_id: string;
+  audit_count: number;
+}
