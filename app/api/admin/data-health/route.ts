@@ -1,5 +1,8 @@
 /**
  * GET /api/admin/data-health — cross-store data freshness overview
+ *
+ * Reads from v_site_health_summary (migration 065).
+ * Health classification, staleness, and error counts are computed in SQL.
  */
 
 import { NextResponse } from "next/server";
@@ -7,6 +10,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { isSuperAdmin } from "@/lib/admin/helpers";
 import { logger } from "@/lib/logger";
+import type { VSiteHealth } from "@/lib/admin/contractTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -16,91 +20,44 @@ export async function GET() {
   const { ctx, supabase } = guard;
 
   try {
-    // Fetch all stores
-    const storeQuery = supabase.from("sites").select("id, name, store_code, is_active, organisation_id");
-    if (!isSuperAdmin(ctx) && ctx.orgId) storeQuery.eq("organisation_id", ctx.orgId);
-    const { data: stores } = await storeQuery;
+    // Single query replacing 5-query + JS join pattern.
+    // Health is classified in SQL using canonical thresholds.
+    const q = supabase
+      .from("v_site_health_summary")
+      .select("site_id, store_name, store_code, is_active, org_id, integration_status, last_sync_at, stale_minutes, last_sales_date, recent_errors, failed_runs, health")
+      .order("store_name");
+    if (!isSuperAdmin(ctx) && ctx.orgId) q.eq("org_id", ctx.orgId);
 
-    const siteIds = (stores ?? []).map((s: any) => s.id);
-    if (siteIds.length === 0) return NextResponse.json({ stores: [] });
+    const { data, error } = await q;
 
-    // Fetch MICROS connections for sync status
-    const { data: connections } = await supabase
-      .from("micros_connections")
-      .select("site_id, status, last_sync_at")
-      .in("site_id", siteIds);
-
-    // Fetch latest sync runs per store
-    const { data: recentRuns } = await supabase
-      .from("sync_runs")
-      .select("site_id, sync_type, status, started_at, finished_at, records_fetched")
-      .in("site_id", siteIds)
-      .order("started_at", { ascending: false })
-      .limit(100);
-
-    // Fetch recent sync errors
-    const { data: errors } = await supabase
-      .from("sync_errors")
-      .select("site_id, sync_type, message, created_at")
-      .in("site_id", siteIds)
-      .order("created_at", { ascending: false })
-      .limit(50);
-
-    // Fetch latest sales date per store
-    const { data: latestSales } = await supabase
-      .from("daily_sales_summary")
-      .select("site_id, business_date")
-      .in("site_id", siteIds)
-      .order("business_date", { ascending: false })
-      .limit(siteIds.length);
-
-    const now = Date.now();
-    const connMap = new Map((connections ?? []).map((c: any) => [c.site_id, c]));
-    const salesMap = new Map<string, string>();
-    for (const s of (latestSales ?? []) as any[]) {
-      if (!salesMap.has(s.site_id)) salesMap.set(s.site_id, s.business_date);
+    if (error) {
+      logger.error("Data health GET failed", { err: error });
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Build per-store health
-    const storeHealth = (stores ?? []).map((store: any) => {
-      const conn = connMap.get(store.id) as any;
-      const lastSync = conn?.last_sync_at ? new Date(conn.last_sync_at) : null;
-      const lastSalesDate = salesMap.get(store.id) ?? null;
-      const staleMinutes = lastSync ? Math.floor((now - lastSync.getTime()) / 60000) : null;
-      const storeRuns = ((recentRuns ?? []) as any[]).filter((r: any) => r.site_id === store.id);
-      const storeErrors = ((errors ?? []) as any[]).filter((e: any) => e.site_id === store.id);
-      const failedRuns = storeRuns.filter((r: any) => r.status === "failed").length;
-
-      let health: "healthy" | "warning" | "critical" | "unknown" = "unknown";
-      if (staleMinutes === null) health = "unknown";
-      else if (staleMinutes < 120 && failedRuns === 0) health = "healthy";
-      else if (staleMinutes < 1440) health = "warning";
-      else health = "critical";
-
-      return {
-        id: store.id,
-        name: store.name,
-        store_code: store.store_code,
-        is_active: store.is_active,
-        integration_status: conn?.status ?? "none",
-        last_sync_at: conn?.last_sync_at ?? null,
-        stale_minutes: staleMinutes,
-        last_sales_date: lastSalesDate,
-        recent_errors: storeErrors.length,
-        failed_runs: failedRuns,
-        health,
-      };
-    });
+    const stores = ((data as VSiteHealth[] | null) ?? []).map((r) => ({
+      id: r.site_id,
+      name: r.store_name,
+      store_code: r.store_code,
+      is_active: r.is_active,
+      integration_status: r.integration_status,
+      last_sync_at: r.last_sync_at,
+      stale_minutes: r.stale_minutes,
+      last_sales_date: r.last_sales_date,
+      recent_errors: Number(r.recent_errors ?? 0),
+      failed_runs: Number(r.failed_runs ?? 0),
+      health: r.health,
+    }));
 
     const summary = {
-      total: storeHealth.length,
-      healthy: storeHealth.filter((s) => s.health === "healthy").length,
-      warning: storeHealth.filter((s) => s.health === "warning").length,
-      critical: storeHealth.filter((s) => s.health === "critical").length,
-      unknown: storeHealth.filter((s) => s.health === "unknown").length,
+      total:    stores.length,
+      healthy:  stores.filter((s) => s.health === "healthy").length,
+      warning:  stores.filter((s) => s.health === "warning").length,
+      critical: stores.filter((s) => s.health === "critical").length,
+      unknown:  stores.filter((s) => s.health === "unknown").length,
     };
 
-    return NextResponse.json({ stores: storeHealth, summary });
+    return NextResponse.json({ stores, summary });
   } catch (err) {
     logger.error("Data health GET failed", { err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

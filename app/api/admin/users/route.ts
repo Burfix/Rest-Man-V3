@@ -10,6 +10,7 @@ import { inviteUserSchema, validateBody } from "@/lib/validation/schemas";
 import { inviteUserDtoToInternal, inviteUserInternalToDb } from "@/lib/mappers/userMapper";
 import { logger } from "@/lib/logger";
 import { sendInviteEmail } from "@/services/notifications/inviteEmail";
+import type { VUser } from "@/lib/admin/contractTypes";
 
 export const maxDuration = 30;
 
@@ -21,23 +22,45 @@ export async function GET(req: NextRequest) {
   try {
             const isSuperAdmin = ctx.role === "super_admin";
 
+          // Read from the contract-layer view v_users (migration 065).
+          // site_ids is a real uuid array; this is the canonical source for team counts.
           let query = supabase
-              .from("team_members_all")
-              .select("user_id, email, full_name, profile_status, last_seen_at, primary_role, primary_org_id, primary_org_name, role_is_active, all_org_names, all_site_names, all_site_ids, joined_at")
+              .from("v_users")
+              .select("user_id, email, full_name, status, last_seen_at, joined_at, primary_role, org_id, org_name, role_granted_at, role_is_active, site_ids")
               .order("joined_at", { ascending: false });
 
           if (!isSuperAdmin) {
-                      query = query.eq("primary_org_id", ctx.orgId!);
+                      query = query.eq("org_id", ctx.orgId!);
           }
 
-          const { data: members, error: membersErr } = await query;
+          const { data: rows, error: fetchErr } = await query;
 
-          if (membersErr) {
-                      logger.error("Failed to fetch team members", { err: membersErr });
-                      return NextResponse.json({ error: membersErr.message }, { status: 500 });
+          if (fetchErr) {
+                      logger.error("Failed to fetch team members", { err: fetchErr });
+                      return NextResponse.json({ error: fetchErr.message }, { status: 500 });
           }
 
-          return NextResponse.json({ users: members ?? [], total: (members ?? []).length });
+          // Map v_users rows to the UserEntry shape expected by the admin UI.
+          // The roles array is derived from primary_role + role metadata.
+          const users = ((rows as VUser[] | null) ?? []).map((r) => ({
+            id: r.user_id,
+            email: r.email,
+            full_name: r.full_name,
+            status: r.status,
+            last_seen_at: r.last_seen_at,
+            roles: r.primary_role
+              ? [{
+                  role: r.primary_role,
+                  site_id: null as string | null,
+                  region_id: null as string | null,
+                  is_active: r.role_is_active,
+                  granted_at: r.role_granted_at ?? "",
+                }]
+              : [],
+            site_ids: r.site_ids ?? [],
+          }));
+
+          return NextResponse.json({ users, total: users.length });
   } catch (err) {
             logger.error("Unexpected error in GET /api/admin/users", { err });
             return NextResponse.json({ error: "Internal server error" }, { status: 500 });

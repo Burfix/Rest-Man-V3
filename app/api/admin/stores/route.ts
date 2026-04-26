@@ -9,6 +9,7 @@ import { PERMISSIONS } from "@/lib/rbac/roles";
 import { isSuperAdmin } from "@/lib/admin/helpers";
 import { createStoreSchema, validateBody } from "@/lib/validation/schemas";
 import { logger } from "@/lib/logger";
+import type { VStore } from "@/lib/admin/contractTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,11 +23,13 @@ export async function GET() {
 
     if (!unrestricted && !ctx.orgId) return NextResponse.json({ error: "No organisation" }, { status: 400 });
 
+    // Read from the contract-layer view v_stores (migration 065).
+    // This is the canonical source for store counts across all dashboard tabs.
     const q = supabase
-      .from("sites")
-      .select("*")
+      .from("v_stores")
+      .select("id, name, store_code, address, city, timezone, is_active, org_id, org_name, region_id, seating_capacity, target_avg_spend, target_labour_pct, target_margin_pct, created_at")
       .order("name");
-    if (!unrestricted && ctx.orgId) q.eq("organisation_id", ctx.orgId);
+    if (!unrestricted && ctx.orgId) q.eq("org_id", ctx.orgId);
 
     const { data, error } = await q;
 
@@ -35,7 +38,26 @@ export async function GET() {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ stores: data ?? [] });
+    // Map v_stores to the Store shape expected by the admin UI.
+    // organisation_id is aliased for backward compatibility with UI code.
+    const stores = ((data as VStore[] | null) ?? []).map((s) => ({
+      id: s.id,
+      name: s.name,
+      store_code: s.store_code,
+      address: s.address,
+      city: s.city,
+      timezone: s.timezone,
+      is_active: s.is_active,
+      organisation_id: s.org_id,
+      region_id: s.region_id,
+      seating_capacity: s.seating_capacity,
+      target_avg_spend: s.target_avg_spend,
+      target_labour_pct: s.target_labour_pct,
+      target_margin_pct: s.target_margin_pct,
+      created_at: s.created_at,
+    }));
+
+    return NextResponse.json({ stores });
   } catch (err) {
     logger.error("Admin stores GET failed", { err });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

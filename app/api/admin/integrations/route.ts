@@ -1,5 +1,8 @@
 /**
  * GET /api/admin/integrations — per-store integration status overview
+ *
+ * Reads from v_integrations (migration 065).
+ * Token expiry and staleness are computed in SQL; no JS date calculations needed.
  */
 
 import { NextResponse } from "next/server";
@@ -7,6 +10,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { isSuperAdmin } from "@/lib/admin/helpers";
 import { logger } from "@/lib/logger";
+import type { VIntegration } from "@/lib/admin/contractTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -16,66 +20,50 @@ export async function GET() {
   const { ctx, supabase } = guard;
 
   try {
-    // Fetch all stores
-    const storeQuery = supabase.from("sites").select("id, name, store_code, is_active, organisation_id");
-    if (!isSuperAdmin(ctx) && ctx.orgId) storeQuery.eq("organisation_id", ctx.orgId);
-    const { data: stores } = await storeQuery;
+    // Single query from the contract-layer view (replaces sites + micros_connections + JS join).
+    const q = supabase
+      .from("v_integrations")
+      .select("store_id, store_name, store_code, is_active, org_id, micros_status, micros_org_id, micros_loc_id, last_sync_at, token_expires_at, sync_age_minutes, is_stale")
+      .order("store_name");
+    if (!isSuperAdmin(ctx) && ctx.orgId) q.eq("org_id", ctx.orgId);
 
-    const siteIds = (stores ?? []).map((s: any) => s.id);
-    if (siteIds.length === 0) return NextResponse.json({ integrations: [], summary: {} });
+    const { data, error } = await q;
 
-    // Fetch MICROS connections
-    const { data: connections } = await supabase
-      .from("micros_connections")
-      .select("site_id, status, last_sync_at, micros_org_id, micros_loc_id, token_expires_at")
-      .in("site_id", siteIds);
+    if (error) {
+      logger.error("Integrations GET failed", { err: error });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    const connMap = new Map((connections ?? []).map((c: any) => [c.site_id, c]));
-    const now = Date.now();
+    const rows = (data as VIntegration[] | null) ?? [];
 
-    const integrations = (stores ?? []).map((store: any) => {
-      const conn = connMap.get(store.id) as any;
-      const hasConnection = !!conn;
-      const isConnected = conn?.status === "connected";
-      const tokenExpiry = conn?.token_expires_at ? new Date(conn.token_expires_at) : null;
-      const tokenExpired = tokenExpiry ? tokenExpiry.getTime() < now : false;
-      const lastSync = conn?.last_sync_at ? new Date(conn.last_sync_at) : null;
-      const syncAge = lastSync ? Math.floor((now - lastSync.getTime()) / 60000) : null;
+    // Shape the response to match the admin UI's Integration interface.
+    const integrations = rows.map((r) => ({
+      store_id: r.store_id,
+      store_name: r.store_name,
+      store_code: r.store_code,
+      is_active: r.is_active,
+      micros: {
+        connected: r.micros_status === "connected",
+        status: r.micros_status,
+        org_id: r.micros_org_id,
+        loc_id: r.micros_loc_id,
+        last_sync_at: r.last_sync_at,
+        token_expires_at: r.token_expires_at,
+        sync_age_minutes: r.sync_age_minutes,
+      },
+      // Extensible placeholders for future integration types
+      google_reviews: { connected: false, status: "none" },
+      inventory: { connected: false, status: "none" },
+    }));
 
-      let status: "connected" | "disconnected" | "expired" | "stale" | "none" = "none";
-      if (!hasConnection) status = "none";
-      else if (tokenExpired) status = "expired";
-      else if (!isConnected) status = "disconnected";
-      else if (syncAge !== null && syncAge > 1440) status = "stale";
-      else status = "connected";
-
-      return {
-        store_id: store.id,
-        store_name: store.name,
-        store_code: store.store_code,
-        is_active: store.is_active,
-        micros: {
-          connected: isConnected,
-          status,
-          org_id: conn?.micros_org_id ?? null,
-          loc_id: conn?.micros_loc_id ?? null,
-          last_sync_at: conn?.last_sync_at ?? null,
-          token_expires_at: conn?.token_expires_at ?? null,
-          sync_age_minutes: syncAge,
-        },
-        // Placeholder for future integrations
-        google_reviews: { connected: false, status: "none" },
-        inventory: { connected: false, status: "none" },
-      };
-    });
-
+    // Summary counts derived from the same view rows — consistent by definition.
     const summary = {
       total_stores: integrations.length,
-      micros_connected: integrations.filter((i) => i.micros.status === "connected").length,
-      micros_stale: integrations.filter((i) => i.micros.status === "stale").length,
-      micros_expired: integrations.filter((i) => i.micros.status === "expired").length,
-      micros_disconnected: integrations.filter((i) => i.micros.status === "disconnected").length,
-      micros_none: integrations.filter((i) => i.micros.status === "none").length,
+      micros_connected:     integrations.filter((i) => i.micros.status === "connected").length,
+      micros_stale:         integrations.filter((i) => i.micros.status === "stale").length,
+      micros_expired:       integrations.filter((i) => i.micros.status === "expired").length,
+      micros_disconnected:  integrations.filter((i) => i.micros.status === "disconnected").length,
+      micros_none:          integrations.filter((i) => i.micros.status === "none").length,
     };
 
     return NextResponse.json({ integrations, summary });
