@@ -18,6 +18,7 @@ import StoreLeaderboard     from "./StoreLeaderboard";
 import GroupTrendsPanel     from "./GroupTrendsPanel";
 import RiskRadarPanel, { type RiskFlagRow } from "./RiskRadarPanel";
 import SystemHealthPanel   from "./SystemHealthPanel";
+import { cn }              from "@/lib/utils";
 
 import type {
   StoreSummary,
@@ -310,6 +311,7 @@ export default function HeadOfficeClient() {
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState<string | null>(null);
   const [riskFlags, setRiskFlags] = useState<RiskFlagRow[]>([]);
+  const [riskFlagsReady, setRiskFlagsReady] = useState(false);
 
   useEffect(() => {
     fetch("/api/head-office/summary")
@@ -323,8 +325,11 @@ export default function HeadOfficeClient() {
     // Independently fetch risk flags — non-blocking
     fetch("/api/head-office/risk-flags")
       .then((r) => r.ok ? r.json() : Promise.resolve({ data: [] }))
-      .then((d: { data: RiskFlagRow[] }) => setRiskFlags(Array.isArray(d.data) ? d.data : []))
-      .catch(() => { /* risk flags are best-effort */ });
+      .then((d: { data: RiskFlagRow[] }) => {
+        setRiskFlags(Array.isArray(d.data) ? d.data : []);
+        setRiskFlagsReady(true);
+      })
+      .catch(() => { setRiskFlagsReady(true); });
   }, []);
 
   const computedAt = new Date().toISOString();
@@ -378,16 +383,38 @@ export default function HeadOfficeClient() {
 
   // ── Render ───────────────────────────────────────────────────────────────
   const criticalFlagCount = riskFlags.filter((f) => f.severity === "critical").length;
+  const warningFlagCount  = riskFlags.filter((f) => f.severity === "warning").length;
 
   return (
     <div className="space-y-6">
 
-      {/* Urgency banner — shown when critical risks detected */}
-      {criticalFlagCount > 0 && (
-        <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 px-4 py-3 flex items-center gap-3">
-          <span className="text-xl">🔥</span>
-          <p className="text-sm font-bold text-orange-800 dark:text-orange-300">
-            {criticalFlagCount} store{criticalFlagCount !== 1 ? "s" : ""} need attention before next service
+      {/* Urgency banner — 3 states: critical / warning / all-clear */}
+      {riskFlagsReady && (
+        <div className={cn(
+          "rounded-lg border px-4 py-3 flex items-center gap-3",
+          criticalFlagCount > 0
+            ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800"
+            : warningFlagCount > 0
+              ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800"
+              : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800"
+        )}>
+          <span className="text-xl">
+            {criticalFlagCount > 0 ? "🔥" : warningFlagCount > 0 ? "⚠️" : "✅"}
+          </span>
+          <p className={cn(
+            "text-sm font-bold",
+            criticalFlagCount > 0
+              ? "text-red-800 dark:text-red-300"
+              : warningFlagCount > 0
+                ? "text-amber-800 dark:text-amber-300"
+                : "text-emerald-800 dark:text-emerald-300"
+          )}>
+            {criticalFlagCount > 0
+              ? `${criticalFlagCount} store${criticalFlagCount !== 1 ? "s" : ""} at risk of losing revenue before next service`
+              : warningFlagCount > 0
+                ? `${warningFlagCount} store${warningFlagCount !== 1 ? "s" : ""} need attention today`
+                : "All stores operating within targets"
+            }
           </p>
         </div>
       )}

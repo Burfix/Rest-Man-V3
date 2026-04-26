@@ -25,14 +25,14 @@ const RISK_STYLE: Record<RiskLevel, {
     header: "bg-emerald-50 dark:bg-emerald-950/20",
     badge:  "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300",
     dot:    "bg-emerald-500",
-    label:  "On Track",
+    label:  "Operating Normally",
   },
   yellow: {
     border: "border-amber-200 dark:border-amber-800",
     header: "bg-amber-50 dark:bg-amber-950/20",
     badge:  "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300",
     dot:    "bg-amber-500",
-    label:  "Attention",
+    label:  "Action Required",
   },
   red: {
     border: "border-red-300 dark:border-red-700 ring-1 ring-red-300 dark:ring-red-700",
@@ -245,15 +245,10 @@ function StoreCard({ store }: { store: StoreSummary }) {
       {/* Footer CTA */}
       <div className="border-t border-stone-100 dark:border-stone-800 px-4 py-2 bg-white dark:bg-stone-900">
         <Link
-          href={`/dashboard/head-office/site/${store.site_id}`}
-          className={cn(
-            "block text-center text-[11px] font-bold uppercase tracking-wider py-0.5 transition-colors rounded",
-            store.risk_level === "red"
-              ? "text-red-600 dark:text-red-400 hover:text-red-900"
-              : "text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
-          )}
+          href={`/dashboard?site_id=${store.site_id}`}
+          className="block text-center text-[11px] font-bold uppercase tracking-wider py-0.5 transition-colors rounded text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100"
         >
-          {store.risk_level === "red" ? "🚨 Needs attention →" : "Open dashboard →"}
+          → View Issues
         </Link>
       </div>
     </div>

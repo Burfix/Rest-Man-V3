@@ -55,10 +55,17 @@ function fmtDate(d: string | null): string {
 // ── Health palette ────────────────────────────────────────────────────────────
 
 const HEALTH_STYLE: Record<string, { dot: string; text: string }> = {
-  healthy:  { dot: "bg-emerald-500",  text: "text-emerald-600 dark:text-emerald-400" },
-  warning:  { dot: "bg-amber-400",    text: "text-amber-600 dark:text-amber-400" },
-  critical: { dot: "bg-red-500 animate-ping", text: "text-red-600 dark:text-red-400" },
-  unknown:  { dot: "bg-stone-400",    text: "text-stone-500 dark:text-stone-400" },
+  healthy:  { dot: "bg-emerald-500",           text: "text-emerald-600 dark:text-emerald-400" },
+  warning:  { dot: "bg-amber-400",             text: "text-amber-600 dark:text-amber-400" },
+  critical: { dot: "bg-red-500 animate-ping",  text: "text-red-600 dark:text-red-400" },
+  unknown:  { dot: "bg-stone-400",             text: "text-stone-500 dark:text-stone-400" },
+};
+
+const HEALTH_LABEL: Record<string, string> = {
+  healthy:  "Operating Normally",
+  warning:  "Action Required",
+  critical: "Critical",
+  unknown:  "Waiting for data",
 };
 
 // ── Loading skeleton ──────────────────────────────────────────────────────────
@@ -117,6 +124,33 @@ export default function SystemHealthPanel() {
           </span>
         )}
       </div>
+
+      {/* Exec summary strip: Data Freshness / Last Sync / Stores with Errors */}
+      {summary && (
+        <div className="grid grid-cols-3 gap-px bg-stone-100 dark:bg-stone-800 border-b border-stone-100 dark:border-stone-800">
+          <div className="bg-white dark:bg-stone-900 px-4 py-2.5 flex items-center gap-2">
+            <span className={cn("h-2 w-2 rounded-full shrink-0", summary.stale_count === 0 ? "bg-emerald-500" : "bg-amber-400")} />
+            <div>
+              <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Data Freshness</p>
+              <p className={cn("text-xs font-bold", summary.stale_count === 0 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                {summary.stale_count === 0 ? "GOOD" : "STALE"}
+              </p>
+            </div>
+          </div>
+          <div className="bg-white dark:bg-stone-900 px-4 py-2.5">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Last Sync</p>
+            <p className="text-xs font-semibold text-stone-700 dark:text-stone-300 tabular-nums">
+              {timeAgo(summary.last_sync_at)}
+            </p>
+          </div>
+          <div className="bg-white dark:bg-stone-900 px-4 py-2.5">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400">Stores with Errors</p>
+            <p className={cn("text-xs font-bold tabular-nums", summary.with_errors > 0 ? "text-red-600 dark:text-red-400" : "text-stone-600 dark:text-stone-400")}>
+              {summary.with_errors > 0 ? summary.with_errors : "None"}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Summary strip */}
       {summary && (
@@ -185,8 +219,8 @@ export default function SystemHealthPanel() {
                     <span className="relative">
                       <span className={cn("h-2 w-2 rounded-full block", style.dot)} />
                     </span>
-                    <span className={cn("text-[10px] font-semibold capitalize", style.text)}>
-                      {s.health}
+                    <span className={cn("text-[10px] font-semibold", style.text)}>
+                      {HEALTH_LABEL[s.health] ?? s.health}
                     </span>
                   </div>
 
