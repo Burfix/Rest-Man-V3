@@ -54,7 +54,7 @@ const GRADE_TEXT: Record<ScoreGrade, string> = {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 function fmtZAR(n: number | null): string {
-  if (n === null) return "—";
+  if (n === null) return "Waiting for data";
   if (n >= 1_000_000) return `R${(n / 1_000_000).toFixed(1)}m`;
   if (n >= 1_000)     return `R${Math.round(n / 1_000)}k`;
   return `R${Math.round(n)}`;
@@ -188,7 +188,7 @@ function StoreCard({ store }: { store: StoreSummary }) {
             "text-amber-600 dark:text-amber-400":     (store.labour_pct ?? 40) <= 35,
             "text-red-600 dark:text-red-400":         (store.labour_pct ?? 40) > 35,
           })}>
-            {store.labour_pct !== null ? `${store.labour_pct.toFixed(1)}%` : "—"}
+            {store.labour_pct !== null ? `${store.labour_pct.toFixed(1)}%` : "Waiting for data"}
           </span>
         </div>
 
@@ -219,6 +219,26 @@ function StoreCard({ store }: { store: StoreSummary }) {
           <p className="text-[10px] text-stone-600 dark:text-stone-700">
             Data: {store.snapshot_date}
           </p>
+        )}
+
+        {/* WHY — visible when issues are present */}
+        {(
+          (store.labour_pct !== null && store.labour_pct > 35) ||
+          store.sales_net_vat === null ||
+          (store.compliance_score !== null && store.compliance_score < 10)
+        ) && (
+          <div className="mt-1 space-y-0.5 border-t border-stone-100 dark:border-stone-800 pt-2">
+            <p className="text-[9px] font-bold uppercase tracking-widest text-stone-400 mb-0.5">Why at risk</p>
+            {store.labour_pct !== null && store.labour_pct > 35 && (
+              <p className="text-[10px] text-red-500">• Labour {store.labour_pct.toFixed(1)}% (target 30%)</p>
+            )}
+            {store.sales_net_vat === null && (
+              <p className="text-[10px] text-amber-500">• No revenue data yet</p>
+            )}
+            {store.compliance_score !== null && store.compliance_score < 10 && (
+              <p className="text-[10px] text-red-500">• Compliance issues flagged</p>
+            )}
+          </div>
         )}
       </div>
 

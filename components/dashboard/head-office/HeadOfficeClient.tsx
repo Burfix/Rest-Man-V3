@@ -16,6 +16,8 @@ import AccountabilityPanel  from "./AccountabilityPanel";
 import ActionOversightPanel from "./ActionOversightPanel";
 import StoreLeaderboard     from "./StoreLeaderboard";
 import GroupTrendsPanel     from "./GroupTrendsPanel";
+import RiskRadarPanel, { type RiskFlagRow } from "./RiskRadarPanel";
+import SystemHealthPanel   from "./SystemHealthPanel";
 
 import type {
   StoreSummary,
@@ -304,9 +306,10 @@ function GridSkeleton() {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function HeadOfficeClient() {
-  const [data, setData]     = useState<SummaryResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]   = useState<string | null>(null);
+  const [data, setData]         = useState<SummaryResponse | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState<string | null>(null);
+  const [riskFlags, setRiskFlags] = useState<RiskFlagRow[]>([]);
 
   useEffect(() => {
     fetch("/api/head-office/summary")
@@ -316,6 +319,12 @@ export default function HeadOfficeClient() {
       })
       .then((d: SummaryResponse) => { setData(d); setLoading(false); })
       .catch((e: Error) => { setError(e.message); setLoading(false); });
+
+    // Independently fetch risk flags — non-blocking
+    fetch("/api/head-office/risk-flags")
+      .then((r) => r.ok ? r.json() : Promise.resolve({ data: [] }))
+      .then((d: { data: RiskFlagRow[] }) => setRiskFlags(Array.isArray(d.data) ? d.data : []))
+      .catch(() => { /* risk flags are best-effort */ });
   }, []);
 
   const computedAt = new Date().toISOString();
@@ -368,8 +377,20 @@ export default function HeadOfficeClient() {
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
+  const criticalFlagCount = riskFlags.filter((f) => f.severity === "critical").length;
+
   return (
     <div className="space-y-6">
+
+      {/* Urgency banner — shown when critical risks detected */}
+      {criticalFlagCount > 0 && (
+        <div className="rounded-lg bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-800 px-4 py-3 flex items-center gap-3">
+          <span className="text-xl">🔥</span>
+          <p className="text-sm font-bold text-orange-800 dark:text-orange-300">
+            {criticalFlagCount} store{criticalFlagCount !== 1 ? "s" : ""} need attention before next service
+          </p>
+        </div>
+      )}
 
       {/* 0. Global alert bar */}
       <GlobalAlertBar metrics={metrics} computedAt={computedAt} />
@@ -399,6 +420,12 @@ export default function HeadOfficeClient() {
 
       {/* 2. Store risk map */}
       <StoreRiskGrid stores={storeSummaries} />
+
+      {/* 2b. Risk Radar + System Health */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <RiskRadarPanel flags={riskFlags} />
+        <SystemHealthPanel />
+      </div>
 
       {/* 3. Accountability + Action Oversight */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

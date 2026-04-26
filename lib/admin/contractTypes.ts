@@ -205,3 +205,24 @@ export interface VAuditSummary {
   org_id: string;
   audit_count: number;
 }
+
+// ── v_risk_flags (migration 067) ───────────────────────────────────────────────
+
+/**
+ * One row from v_risk_flags.
+ * Aggregates risk signals from v_site_health_summary.
+ * No raw tables — derived entirely from contract views.
+ * severity: 'critical' | 'warning' | 'info'
+ */
+export interface VRiskFlag {
+  site_id: string;
+  store_name: string;
+  org_id: string | null;
+  /** 'stale_sync' | 'sync_errors' | 'no_revenue_data' | 'failed_runs' */
+  issue_type: string;
+  issue: string;
+  /** 'critical' | 'warning' | 'info' */
+  severity: "critical" | "warning" | "info";
+  metric_value: number | null;
+  metric_label: string | null;
+}
