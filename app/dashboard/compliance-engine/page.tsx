@@ -53,6 +53,8 @@ function IconClock({ className }: { className?: string }) {
   );
 }
 
+import { isRouteAllowed } from "@/lib/rbac/nav-access";
+
 export const dynamic = "force-dynamic";
 
 const ALLOWED = ["super_admin", "executive", "head_office", "area_manager", "auditor", "tenant_owner"];
@@ -86,16 +88,18 @@ export default async function ComplianceEnginePage() {
     redirect("/login");
   }
 
+  const rbacAllowed = isRouteAllowed(ctx.role, "/dashboard/compliance-engine");
+
+  // Debug log — readable in Vercel function logs to confirm role resolution
+  logger.info("[compliance-engine] access check", {
+    email: ctx.email,
+    role: ctx.role,
+    rbacAllowed,
+  });
+
   if (!ALLOWED.includes(ctx.role ?? "")) {
     redirect("/dashboard");
   }
-
-  logger.info("Compliance Engine portal accessed", {
-    type: "external_navigation",
-    target: "compliance_engine",
-    userId: ctx.userId,
-    role: ctx.role,
-  });
 
   return (
     <div className="flex flex-col gap-6 p-6 max-w-2xl">

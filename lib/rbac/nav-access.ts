@@ -68,20 +68,22 @@ export const ROLE_ALLOWED_ROUTES: Partial<Record<UserRole, string[]>> = {
 /** Check if a given pathname is allowed for the role (and optionally the site) */
 export function isRouteAllowed(role: UserRole, pathname: string, siteAllowedRoutes?: string[] | null): boolean {
   const roleRoutes = ROLE_ALLOWED_ROUTES[role];
-  // Step 1: Check role permission
-  const roleAllowed = roleRoutes
-    ? roleRoutes.some((route) =>
-        route === "/dashboard"
-          ? pathname === "/dashboard"
-          : pathname === route || pathname.startsWith(route + "/")
-      )
-    : true; // unrestricted role
+
+  // Unrestricted role: not in ROLE_ALLOWED_ROUTES, so all routes are accessible.
+  // Site-level restrictions never apply to unrestricted roles.
+  if (roleRoutes === undefined) return true;
+
+  // Restricted role: check the role's explicit allow-list.
+  const roleAllowed = roleRoutes.some((route) =>
+    route === "/dashboard"
+      ? pathname === "/dashboard"
+      : pathname === route || pathname.startsWith(route + "/")
+  );
 
   if (!roleAllowed) return false;
 
-  // Step 2: Site-level restriction — skipped for org-level roles so that a
-  // head_office (or area_manager/executive) user assigned to a specific site
-  // is not blocked by that site's allowed_routes list.
+  // Route is in the restricted role's allow-list.
+  // Org-level roles bypass site restrictions; site-scoped roles respect them.
   if (ORG_LEVEL_ROLES.has(role)) return true;
 
   if (siteAllowedRoutes && siteAllowedRoutes.length > 0) {
@@ -98,18 +100,22 @@ export function isRouteAllowed(role: UserRole, pathname: string, siteAllowedRout
 /** Check if a nav item href should be visible for the role (and optionally the site) */
 export function isNavItemAllowed(role: UserRole, href: string, siteAllowedRoutes?: string[] | null): boolean {
   const roleRoutes = ROLE_ALLOWED_ROUTES[role];
-  // Step 1: Check role permission
-  const roleAllowed = roleRoutes
-    ? roleRoutes.some((route) =>
-        route === "/dashboard"
-          ? href === "/dashboard"
-          : href === route || href.startsWith(route + "/")
-      )
-    : true; // unrestricted role
+
+  // Unrestricted role: not in ROLE_ALLOWED_ROUTES, so all nav items are visible.
+  // Site-level restrictions never apply to unrestricted roles.
+  if (roleRoutes === undefined) return true;
+
+  // Restricted role: check the role's explicit allow-list.
+  const roleAllowed = roleRoutes.some((route) =>
+    route === "/dashboard"
+      ? href === "/dashboard"
+      : href === route || href.startsWith(route + "/")
+  );
 
   if (!roleAllowed) return false;
 
-  // Step 2: Site-level restriction — skipped for org-level roles (same reason as above).
+  // Route is in the restricted role's allow-list.
+  // Org-level roles bypass site restrictions; site-scoped roles respect them.
   if (ORG_LEVEL_ROLES.has(role)) return true;
 
   if (siteAllowedRoutes && siteAllowedRoutes.length > 0) {
