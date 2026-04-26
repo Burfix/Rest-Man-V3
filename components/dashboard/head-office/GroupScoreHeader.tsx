@@ -111,7 +111,7 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
           </div>
           {revAtRisk != null && revAtRisk > 500 && (
             <span className="text-xs font-semibold text-white/90">
-              · {fmtZAR(revAtRisk)} revenue at risk
+              · {fmtZAR(revAtRisk)} revenue will be lost today
             </span>
           )}
           {metrics.compliance_risk_count > 0 && (
@@ -191,7 +191,7 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
             icon="💰"
             label="Group Revenue"
             value={fmtZAR(metrics.total_revenue)}
-            sub={metrics.total_revenue_target ? `Target ${fmtZAR(metrics.total_revenue_target)}${revGap !== null && revGap > 0 ? ` (${revGap.toFixed(1)}% gap)` : " ✓"}` : undefined}
+            sub={metrics.total_revenue_target ? `Target ${fmtZAR(metrics.total_revenue_target)}${revGap !== null && revGap > 0 ? ` — ${revGap.toFixed(1)}% behind target` : " — on target ✓"}` : undefined}
             alert={revGap !== null && revGap > 10}
           />
           <KpiTile
@@ -200,7 +200,7 @@ export default function GroupScoreHeader({ metrics, storeCount, labourTrend }: P
             value={metrics.avg_labour_pct !== null ? `${metrics.avg_labour_pct}%` : "—"}
             sub={
               metrics.avg_labour_pct !== null
-                ? `${metrics.avg_labour_pct <= 30 ? "Healthy" : metrics.avg_labour_pct <= 35 ? "Elevated" : "Over budget"}${
+                ? `${metrics.avg_labour_pct <= 30 ? "Within target" : metrics.avg_labour_pct <= 35 ? `${(metrics.avg_labour_pct - 30).toFixed(1)}% above target` : `${(metrics.avg_labour_pct - 30).toFixed(1)}% over target`}${
                     labourTrendLabel ? ` ${labourTrendLabel}` : ""
                   }`
                 : undefined

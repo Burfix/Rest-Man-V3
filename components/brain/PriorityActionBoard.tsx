@@ -201,10 +201,12 @@ function makeOperationalTitle(
       }
       const match = driver.reason.match(/([\d.]+)% over/i);
       const overPct = match ? match[1] : "?";
-      const gap = brain.recoveryMeter?.revenueGap
-        ? ` — ${fmtZAR(Math.round(brain.recoveryMeter.revenueGap * 0.05))} overspend by close`
-        : " — reduce now before shift locks in";
-      return `Labour ${overPct}% over target${gap}`;
+      const overspendEst = brain.recoveryMeter?.revenueGap
+        ? fmtZAR(Math.round(brain.recoveryMeter.revenueGap * 0.05))
+        : null;
+      return overspendEst
+        ? `💰 ${overspendEst} labour overspend today — ${overPct}% over target, reduce before shift locks in`
+        : `💰 Labour ${overPct}% over target — reduce now to save costs this session`;
     }
 
     case "REVENUE": {
@@ -248,7 +250,7 @@ function makeOperationalConsequence(
     }
 
     case "LABOUR":
-      return `Excess labour on shift with ${hoursLeft}h remaining. No recovery path after shift ends — adjust roster now or absorb the confirmed overspend on P&L.`;
+      return `💰 Excess labour on shift with ${hoursLeft}h remaining today. No recovery possible after shift ends — adjust roster now or absorb the confirmed overspend on P&L`;
 
     case "REVENUE": {
       if (brain.recoveryMeter && brain.recoveryMeter.revenueGap > 0) {
@@ -256,9 +258,9 @@ function makeOperationalConsequence(
           ? Math.ceil(brain.recoveryMeter.revenueGap / Math.max(1, brain.forecastSummary.projectedClose / Math.max(1, 60)))
           : null;
         const coverStr = coversNeeded ? ` Approximately ${coversNeeded} covers at current average needed.` : "";
-        return `${fmtZAR(brain.recoveryMeter.revenueGap)} needed to close the gap.${coverStr} Walk-in window closes at ${closeTime}. Act before service thins.`;
+        return `💰 ${fmtZAR(brain.recoveryMeter.revenueGap)} will be lost today if not recovered before ${closeTime}.${coverStr} Walk-in window is narrowing — act now.`;
       }
-      return `Revenue is behind pace. Walk-in window closes at ${closeTime}. Push floor conversion and upsell on current tables before service thins.`;
+      return `Revenue is behind pace today. Walk-in window closes at ${closeTime} — push floor conversion and upsell before service ends.`;
     }
 
     default:
@@ -614,7 +616,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
           {brainRec && (
             <div className="border-l-[3px] border-l-amber-500 border border-[#e2e2e0] dark:border-[#2a2a2a] bg-[#fffdf5] dark:bg-amber-950/10 px-3 py-2.5 font-mono">
               <span className="text-[9px] uppercase tracking-wider text-amber-700 dark:text-amber-500 font-bold block mb-1">
-                ⚡ BRAIN RECOMMENDATION
+                ⚡ RECOMMENDED ACTION
               </span>
               <p className="text-[11px] text-[#0a0a0a] dark:text-stone-200 leading-relaxed">
                 {brainRec}
@@ -642,6 +644,11 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
               <span className="text-[10px] font-semibold text-stone-500 uppercase tracking-wider">
                 DAY STARTING
               </span>
+            )}
+            {!systemHealth.isDayStarting && systemHealth.allScoreDrivers.filter((d) => d.direction === "down").length > 0 && (
+              <p className="text-[10px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-snug">
+                driven by {systemHealth.allScoreDrivers.filter((d) => d.direction === "down").slice(0, 2).map((d) => d.module.toLowerCase()).join(" and ")}
+              </p>
             )}
           </div>
 

@@ -103,6 +103,16 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
 
   const palette = SCORE_PALETTE[score.grade];
 
+  const lowDrivers = COMPONENT_BARS
+    .map(({ key, label, max }) => ({
+      label,
+      pct: Math.round(((score.components[key]?.score ?? 0) / max) * 100),
+    }))
+    .filter(({ pct }) => pct < 60)
+    .sort((a, b) => a.pct - b.pct)
+    .slice(0, 2)
+    .map(({ label }) => label.toLowerCase());
+
   return (
     <div className={cn(
       "rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden",
@@ -114,12 +124,19 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
         <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
           Operating Score
         </p>
-        <span className={cn(
-          "rounded-full px-2.5 py-px text-[10px] font-bold uppercase tracking-wide",
-          palette.grade
-        )}>
-          Grade {score.grade} — {palette.label}
-        </span>
+        <div className="text-right">
+          <span className={cn(
+            "rounded-full px-2.5 py-px text-[10px] font-bold uppercase tracking-wide",
+            palette.grade
+          )}>
+            Grade {score.grade} — {palette.label}
+          </span>
+          {lowDrivers.length > 0 && (
+            <p className="text-[9px] text-stone-500 dark:text-stone-600 mt-0.5">
+              {score.total} {score.grade} — driven by {lowDrivers.join(" and ")}
+            </p>
+          )}
+        </div>
       </div>
 
       {/* Score + breakdown */}
