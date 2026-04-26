@@ -6,7 +6,7 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import type { LabourDashboardSummary } from "@/types/labour";
 import LabourKpiCards from "./LabourKpiCards";
@@ -28,6 +28,15 @@ export default function LabourDashboardClient({
   useMock,
 }: Props) {
   const [syncing, setSyncing] = useState(false);
+  const [syncTimeDisplay, setSyncTimeDisplay] = useState<{ stale: string; full: string } | null>(null);
+  useEffect(() => {
+    if (summary?.lastSyncAt) {
+      setSyncTimeDisplay({
+        stale: new Date(summary.lastSyncAt).toLocaleTimeString(),
+        full: new Date(summary.lastSyncAt).toLocaleString(),
+      });
+    }
+  }, [summary?.lastSyncAt]);
 
   // ── Error state ──────────────────────────────────────────────────
   if (loadError && !summary) {
@@ -73,7 +82,7 @@ export default function LabourDashboardClient({
           <p className="text-sm text-amber-700 dark:text-amber-400">
             Labour data may be stale — last synced{" "}
             {summary.lastSyncAt
-              ? new Date(summary.lastSyncAt).toLocaleTimeString()
+              ? (syncTimeDisplay?.stale ?? "…")
               : "never"}
           </p>
           <LabourSyncButton syncing={syncing} onSync={setSyncing} mode="delta" compact />
@@ -96,7 +105,7 @@ export default function LabourDashboardClient({
       <div className="flex items-center justify-between">
         <p className="text-xs text-stone-500 dark:text-stone-500">
           {summary.lastSyncAt
-            ? `Last synced: ${new Date(summary.lastSyncAt).toLocaleString()}`
+            ? `Last synced: ${syncTimeDisplay?.full ?? "…"}`
             : "Not yet synced"}
         </p>
         <div className="flex gap-2">

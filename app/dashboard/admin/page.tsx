@@ -534,7 +534,7 @@ function TeamPanel({
     setEditingUser(user.id);
     setEditForm({
       role: primaryRole?.role ?? "viewer",
-      site_ids: user.site_ids,
+      site_ids: user.site_ids ?? [],
     });
   };
 
@@ -686,12 +686,12 @@ function TeamPanel({
                         <RoleBadge role={primaryRole.role} />
                       </button>
                     )}
-                    {!isEditing && u.site_ids.length > 0 && (
+                    {!isEditing && (u.site_ids ?? []).length > 0 && (
                       <span className="text-[10px] text-stone-500">
-                        {u.site_ids.map((sid) => storeMap.get(sid) ?? sid.slice(0, 8)).join(", ")}
+                        {(u.site_ids ?? []).map((sid) => storeMap.get(sid) ?? sid.slice(0, 8)).join(", ")}
                       </span>
                     )}
-                    {!isEditing && u.site_ids.length === 0 && primaryRole && (
+                    {!isEditing && (u.site_ids ?? []).length === 0 && primaryRole && (
                       <span className="text-[10px] text-stone-600 italic">All stores</span>
                     )}
                   </div>

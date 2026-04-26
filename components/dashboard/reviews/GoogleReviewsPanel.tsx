@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { GoogleSyncResult, GoogleSyncReview } from "@/app/api/reviews/google-sync/route";
 import { cn } from "@/lib/utils";
 
@@ -13,9 +13,11 @@ interface Props {
 export default function GoogleReviewsPanel({ siteId, placeId, initialData }: Props) {
   const [data, setData] = useState<GoogleSyncResult | null>(initialData);
   const [loading, setLoading] = useState(false);
-  const [lastSynced, setLastSynced] = useState<Date | null>(
-    initialData != null ? new Date() : null,
-  );
+  const [lastSynced, setLastSynced] = useState<Date | null>(null);
+  useEffect(() => {
+    if (initialData != null) setLastSynced(new Date());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [error, setError] = useState<string | null>(null);
 
   const handleRefresh = useCallback(async () => {
