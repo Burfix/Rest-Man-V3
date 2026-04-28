@@ -113,6 +113,20 @@ export async function apiGuard(
     }
 
     const supabase = createServerClient();
+
+    // Fire-and-forget: update last_seen_at at most once per 5 minutes.
+    // The .lt filter means the DB only writes if the row is actually stale —
+    // no extra SELECT, no await, zero impact on response latency.
+    if (ctx.userId) {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      (supabase as any)
+        .from("profiles")
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq("id", ctx.userId)
+        .or(`last_seen_at.is.null,last_seen_at.lt.${fiveMinAgo}`)
+        .then(() => { /* intentional no-op — fire and forget */ });
+    }
+
     return { error: null, ctx, supabase };
   } catch (err) {
     logger.error("Auth guard failed", { route, err });
