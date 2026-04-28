@@ -113,10 +113,11 @@ export async function getUserContext(): Promise<UserContext> {
     (r) => r.site_id,
   );
 
-  // Primary site_id: use role's site_id, or first accessible site
+  // Primary site_id: use role's site_id, or first accessible site.
+  // super_admin may have no site assigned — allow them through with empty siteId.
   const siteId = (primary.site_id as string) ?? siteIds[0] ?? "";
 
-  if (!siteId) {
+  if (!siteId && role !== "super_admin") {
     throw new AuthError("No site assigned — contact your administrator", 403);
   }
 

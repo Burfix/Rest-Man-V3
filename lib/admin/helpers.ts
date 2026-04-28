@@ -7,11 +7,13 @@
 
 import type { UserRole } from "@/lib/ontology/entities";
 
-export const SUPER_ADMIN_EMAIL = "newburf@gmail.com";
+export const SUPER_ADMIN_EMAILS = ["newburf@gmail.com", "burfix@gmail.com"];
+/** @deprecated use SUPER_ADMIN_EMAILS */
+export const SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAILS[0];
 
-/** True if the user holds the super_admin role or matches the root email. */
+/** True if the user holds the super_admin role or matches a root email. */
 export function isSuperAdmin(user: { email?: string; role?: string }): boolean {
-  return user.role === "super_admin" || user.email === SUPER_ADMIN_EMAIL;
+  return user.role === "super_admin" || SUPER_ADMIN_EMAILS.includes(user.email ?? "");
 }
 
 export interface UserScope {

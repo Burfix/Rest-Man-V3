@@ -6,8 +6,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard } from "@/lib/auth/api-guard";
+import { isSuperAdmin } from "@/lib/admin/helpers";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { getPerformanceTier } from "@/services/accountability/score-calculator";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/accountability/leaderboard");
@@ -20,10 +23,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const superAdmin = isSuperAdmin(ctx);
+
   try {
     const { searchParams } = new URL(req.url);
     const period   = searchParams.get("period") ?? "7d";
-    const siteId   = searchParams.get("siteId") ?? null;
+    // super_admin: no default site filter. Others: filter by their siteId unless overridden.
+    const siteId   = searchParams.get("siteId") ?? (superAdmin ? null : (ctx.siteId || null));
     const days     = period === "30d" ? 30 : 7;
 
     const since = new Date();
@@ -57,12 +63,23 @@ export async function GET(req: NextRequest) {
     const { data: profileRows } = await supabase
       .from("profiles")
       .select("id, full_name, email")
-      .in("id", userIds);
+      .in("id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]);
 
-    const profileMap = new Map<string, { name: string; role: string }>();
+    const profileMap = new Map<string, string>();
     for (const p of (profileRows ?? []) as any[]) {
-      const name = p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown";
-      profileMap.set(p.id, { name, role: "" });
+      profileMap.set(p.id, p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown");
+    }
+
+    // Resolve site names
+    const siteIds = Array.from(new Set(scoreRows.map((r) => r.site_id).filter(Boolean)));
+    const { data: siteRows } = await supabase
+      .from("sites")
+      .select("id, name")
+      .in("id", siteIds.length > 0 ? siteIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    const siteMap = new Map<string, string>();
+    for (const s of (siteRows ?? []) as any[]) {
+      siteMap.set(s.id, s.name);
     }
 
     // Build leaderboard entries
@@ -77,15 +94,14 @@ export async function GET(req: NextRequest) {
       const totalBlocked   = dayScores.reduce((s: number, r: any) => s + (r.tasks_blocked   ?? 0), 0);
       const totalEscalated = dayScores.reduce((s: number, r: any) => s + (r.tasks_escalated ?? 0), 0);
       const completionRate = totalAssigned > 0 ? +((totalCompleted / totalAssigned) * 100).toFixed(1) : 0;
-      const profile     = profileMap.get(userId) ?? { name: "Unknown", role: "" };
 
       entries.push({
         userId,
-        siteId: userSiteId,
-        name: profile.name,
-        role: profile.role,
+        siteId:          userSiteId,
+        siteName:        siteMap.get(userSiteId) ?? "—",
+        name:            profileMap.get(userId) ?? "Unknown",
         avgScore,
-        tier: getPerformanceTier(Math.round(avgScore)),
+        tier:            getPerformanceTier(Math.round(avgScore)),
         daysActive,
         totalAssigned,
         totalCompleted,
