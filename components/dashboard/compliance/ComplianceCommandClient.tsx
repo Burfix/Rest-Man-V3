@@ -628,11 +628,13 @@ function Section({ title, subtitle, children }: {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+const TWELVE_HOURS = 12 * 60 * 60 * 1_000;
+
 export default function ComplianceCommandClient() {
-  const [data, setData]                   = useState<CommandData | null>(null);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState<string | null>(null);
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
+  const [data, setData]           = useState<CommandData | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
 
   const load = useCallback(async () => {
     try {
@@ -642,7 +644,7 @@ export default function ComplianceCommandClient() {
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       const json = await res.json();
       setData(json);
-      setLastRefreshed(new Date());
+      setLastUpdated(new Date());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load compliance data");
     } finally {
@@ -650,10 +652,18 @@ export default function ComplianceCommandClient() {
     }
   }, []);
 
+  // Initial load + 12-hour auto-refresh
   useEffect(() => {
     load();
-    const id = setInterval(load, 5 * 60 * 1_000);
+    const id = setInterval(load, TWELVE_HOURS);
     return () => clearInterval(id);
+  }, [load]);
+
+  // Refresh on window focus (tab switch / screen unlock)
+  useEffect(() => {
+    const handleFocus = () => load();
+    window.addEventListener("focus", handleFocus);
+    return () => window.removeEventListener("focus", handleFocus);
   }, [load]);
 
   if (loading && !data) return <Skeleton />;
@@ -847,19 +857,17 @@ export default function ComplianceCommandClient() {
           {data.critical_count > 0 ? ` · ${data.critical_count} critical` : ""}
           {data.warning_count  > 0 ? ` · ${data.warning_count} warning`   : ""}
         </span>
-        {lastRefreshed && (
-          <span>
-            Updated {lastRefreshed.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
+        <span>
+            Last updated: {lastUpdated.toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}
             {" · "}
             <button
               type="button"
               onClick={load}
               className="underline hover:text-slate-600 dark:hover:text-slate-200"
             >
-              Refresh
+              Refresh Now
             </button>
           </span>
-        )}
       </div>
     </div>
   );
