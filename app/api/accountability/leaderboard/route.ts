@@ -27,81 +27,107 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const period   = searchParams.get("period") ?? "7d";
-    // super_admin: no default site filter. Others: filter by their siteId unless overridden.
-    const siteId   = searchParams.get("siteId") ?? (superAdmin ? null : (ctx.siteId || null));
-    const days     = period === "30d" ? 30 : 7;
+    const period = searchParams.get("period") ?? "7d";
+    const days   = period === "30d" ? 30 : 7;
 
     const since = new Date();
     since.setDate(since.getDate() - (days - 1));
     const sinceStr = since.toISOString().split("T")[0];
 
-    let query = supabase
-      .from("manager_performance_scores")
-      .select("user_id,site_id,period_date,score,completion_rate,on_time_rate,tasks_assigned,tasks_completed,tasks_blocked,tasks_escalated")
-      .gte("period_date", sinceStr);
+    // Step 1: base set — all manager-level users from user_roles
+    let managersQ = supabase
+      .from("user_roles")
+      .select("user_id, site_id, organisation_id")
+      .in("role", ["gm", "supervisor", "area_manager", "head_office"])
+      .eq("is_active", true)
+      .is("revoked_at", null);
 
-    if (siteId) {
-      query = query.eq("site_id", siteId);
+    if (!superAdmin && ctx.orgId) {
+      managersQ = managersQ.eq("organisation_id", ctx.orgId);
     }
 
-    const { data: rows, error: rowsErr } = await query;
-    if (rowsErr) return NextResponse.json({ error: rowsErr.message }, { status: 500 });
+    const { data: managerRoleRows, error: managersErr } = await managersQ;
+    if (managersErr) return NextResponse.json({ error: managersErr.message }, { status: 500 });
+    const managerRoles = (managerRoleRows ?? []) as any[];
 
-    const scoreRows = (rows ?? []) as any[];
-
-    // Group by user_id + site_id
-    const groups = new Map<string, any[]>();
-    for (const r of scoreRows) {
-      const key = `${r.user_id}::${r.site_id}`;
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key)!.push(r);
-    }
-
-    // Resolve user names from profiles
-    const userIds = Array.from(new Set(scoreRows.map((r) => r.user_id)));
+    // Step 2: resolve profiles
+    const allUserIds = Array.from(new Set(managerRoles.map((r) => r.user_id as string)));
     const { data: profileRows } = await supabase
       .from("profiles")
       .select("id, full_name, email")
-      .in("id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+      .in("id", allUserIds.length > 0 ? allUserIds : ["00000000-0000-0000-0000-000000000000"]);
 
-    const profileMap = new Map<string, string>();
+    const profileMap = new Map<string, { name: string; email: string }>();
     for (const p of (profileRows ?? []) as any[]) {
-      profileMap.set(p.id, p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown");
+      profileMap.set(p.id, {
+        name: p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown",
+        email: p.email ?? "",
+      });
     }
 
-    // Resolve site names
-    const siteIds = Array.from(new Set(scoreRows.map((r) => r.site_id).filter(Boolean)));
+    // Step 3: resolve site names
+    const allSiteIds = Array.from(new Set(managerRoles.map((r) => r.site_id as string).filter(Boolean)));
     const { data: siteRows } = await supabase
       .from("sites")
       .select("id, name")
-      .in("id", siteIds.length > 0 ? siteIds : ["00000000-0000-0000-0000-000000000000"]);
+      .in("id", allSiteIds.length > 0 ? allSiteIds : ["00000000-0000-0000-0000-000000000000"]);
 
     const siteMap = new Map<string, string>();
-    for (const s of (siteRows ?? []) as any[]) {
-      siteMap.set(s.id, s.name);
+    for (const s of (siteRows ?? []) as any[]) siteMap.set(s.id, s.name);
+
+    // Step 4: fetch performance scores for the period
+    let scoresQ = supabase
+      .from("manager_performance_scores")
+      .select("user_id, site_id, period_date, score, tasks_assigned, tasks_completed, tasks_blocked, tasks_escalated")
+      .gte("period_date", sinceStr);
+
+    if (allUserIds.length > 0) {
+      scoresQ = scoresQ.in("user_id", allUserIds);
     }
 
-    // Build leaderboard entries
-    const entries: any[] = [];
+    const { data: scoreData, error: scoresErr } = await scoresQ;
+    if (scoresErr) return NextResponse.json({ error: scoresErr.message }, { status: 500 });
 
-    for (const [key, dayScores] of Array.from(groups.entries())) {
-      const [userId, userSiteId] = key.split("::");
-      const avgScore    = +(dayScores.reduce((s: number, r: any) => s + r.score, 0) / dayScores.length).toFixed(1);
-      const daysActive  = dayScores.length;
-      const totalAssigned  = dayScores.reduce((s: number, r: any) => s + (r.tasks_assigned  ?? 0), 0);
-      const totalCompleted = dayScores.reduce((s: number, r: any) => s + (r.tasks_completed ?? 0), 0);
-      const totalBlocked   = dayScores.reduce((s: number, r: any) => s + (r.tasks_blocked   ?? 0), 0);
-      const totalEscalated = dayScores.reduce((s: number, r: any) => s + (r.tasks_escalated ?? 0), 0);
-      const completionRate = totalAssigned > 0 ? +((totalCompleted / totalAssigned) * 100).toFixed(1) : 0;
+    // Step 5: group scores by user_id
+    const scoreGroups = new Map<string, any[]>();
+    for (const r of (scoreData ?? []) as any[]) {
+      if (!scoreGroups.has(r.user_id)) scoreGroups.set(r.user_id, []);
+      scoreGroups.get(r.user_id)!.push(r);
+    }
+
+    // Step 6: LEFT JOIN — every manager appears, scores default to 0
+    const entries: any[] = [];
+    const seen = new Set<string>();
+
+    for (const mr of managerRoles) {
+      if (seen.has(mr.user_id)) continue;
+      seen.add(mr.user_id);
+
+      const profile    = profileMap.get(mr.user_id) ?? { name: "Unknown", email: "" };
+      const siteName   = siteMap.get(mr.site_id) ?? "—";
+      const dayScores  = scoreGroups.get(mr.user_id) ?? [];
+
+      let avgScore = 0, daysActive = 0, completionRate = 0, totalBlocked = 0, totalEscalated = 0;
+      let totalAssigned = 0, totalCompleted = 0;
+
+      if (dayScores.length > 0) {
+        daysActive     = dayScores.length;
+        totalAssigned  = dayScores.reduce((s: number, r: any) => s + (r.tasks_assigned  ?? 0), 0);
+        totalCompleted = dayScores.reduce((s: number, r: any) => s + (r.tasks_completed ?? 0), 0);
+        totalBlocked   = dayScores.reduce((s: number, r: any) => s + (r.tasks_blocked   ?? 0), 0);
+        totalEscalated = dayScores.reduce((s: number, r: any) => s + (r.tasks_escalated ?? 0), 0);
+        avgScore       = +(dayScores.reduce((s: number, r: any) => s + r.score, 0) / dayScores.length).toFixed(1);
+        completionRate = totalAssigned > 0 ? +((totalCompleted / totalAssigned) * 100).toFixed(1) : 0;
+      }
 
       entries.push({
-        userId,
-        siteId:          userSiteId,
-        siteName:        siteMap.get(userSiteId) ?? "—",
-        name:            profileMap.get(userId) ?? "Unknown",
+        userId:         mr.user_id,
+        siteId:         mr.site_id ?? "",
+        siteName,
+        name:           profile.name,
+        email:          profile.email,
         avgScore,
-        tier:            getPerformanceTier(Math.round(avgScore)),
+        tier:           getPerformanceTier(Math.round(avgScore)),
         daysActive,
         totalAssigned,
         totalCompleted,
@@ -111,8 +137,12 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Sort by avgScore descending
-    entries.sort((a, b) => b.avgScore - a.avgScore);
+    // Users with scores first (desc), then no-data users at bottom
+    entries.sort((a, b) => {
+      if (a.daysActive === 0 && b.daysActive > 0) return 1;
+      if (b.daysActive === 0 && a.daysActive > 0) return -1;
+      return b.avgScore - a.avgScore;
+    });
 
     return NextResponse.json({
       period,

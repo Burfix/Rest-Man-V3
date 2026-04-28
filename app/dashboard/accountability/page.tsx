@@ -8,6 +8,7 @@
 import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUserContext } from "@/lib/auth/get-user-context";
+import { isSuperAdmin } from "@/lib/admin/helpers";
 import { getPerformanceTier } from "@/services/accountability/score-calculator";
 import type { PerformanceTier } from "@/services/accountability/score-calculator";
 import DailyScoreChart from "@/components/accountability/DailyScoreChart";
@@ -108,70 +109,114 @@ export default async function AccountabilityPage({
   }
 
   // ── Leaderboard ───────────────────────────────────────────────────────────
+  // Base set = ALL managers from user_roles (LEFT JOIN scores).
+  // Users with no score records appear at the bottom with score=0.
   let leaderboard: any[] = [];
 
   if (isElevated) {
-    const { data: lbRows } = await supabase
-      .from("manager_performance_scores")
-      .select("user_id,site_id,period_date,score,completion_rate,on_time_rate,tasks_assigned,tasks_completed,tasks_blocked,tasks_escalated")
-      .gte("period_date", sinceLb);
+    const superAdmin = isSuperAdmin(ctx);
 
-    const lbList = (lbRows ?? []) as any[];
+    // Step 1: fetch all manager-level users (base set)
+    let managersQ = supabase
+      .from("user_roles")
+      .select("user_id, site_id, organisation_id")
+      .in("role", ["gm", "supervisor", "area_manager", "head_office"])
+      .eq("is_active", true)
+      .is("revoked_at", null);
 
-    // Resolve names
-    const userIds = Array.from(new Set(lbList.map((r) => r.user_id as string)));
-    const { data: profileRows } = await supabase
-      .from("profiles")
-      .select("id,full_name,email")
-      .in("id", userIds);
-
-    const nameMap = new Map<string, string>(
-      (profileRows ?? []).map((p: any) => [
-        p.id,
-        p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown",
-      ])
-    );
-
-    // Site names
-    const siteIds = Array.from(new Set(lbList.map((r) => r.site_id as string)));
-    const { data: siteRows } = await supabase
-      .from("sites")
-      .select("id,name")
-      .in("id", siteIds);
-    const siteMap = new Map<string, string>(
-      (siteRows ?? []).map((s: any) => [s.id, s.name])
-    );
-
-    // Group by user_id
-    const groups = new Map<string, any[]>();
-    for (const r of lbList) {
-      if (!groups.has(r.user_id)) groups.set(r.user_id, []);
-      groups.get(r.user_id)!.push(r);
+    if (!superAdmin && ctx.orgId) {
+      managersQ = managersQ.eq("organisation_id", ctx.orgId);
     }
 
-    for (const [userId, rows] of Array.from(groups.entries())) {
-      const avgScore  = rows.reduce((s, r) => s + r.score, 0) / rows.length;
-      const ta        = rows.reduce((s, r) => s + (r.tasks_assigned  ?? 0), 0);
-      const tc        = rows.reduce((s, r) => s + (r.tasks_completed ?? 0), 0);
-      const tb        = rows.reduce((s, r) => s + (r.tasks_blocked   ?? 0), 0);
-      const te        = rows.reduce((s, r) => s + (r.tasks_escalated ?? 0), 0);
-      const compRate  = ta > 0 ? +((tc / ta) * 100).toFixed(1) : 0;
-      const site      = rows[0]?.site_id;
-      leaderboard.push({
-        userId,
-        name:           nameMap.get(userId) ?? "Unknown",
-        site:           siteMap.get(site) ?? "—",
-        siteId:         site ?? "",
-        avgScore:       Math.round(avgScore),
-        tier:           getPerformanceTier(Math.round(avgScore)),
-        daysActive:     rows.length,
-        completionRate: compRate,
-        totalBlocked:   tb,
-        totalEscalated: te,
+    const { data: managerRoleRows } = await managersQ;
+    const managerRoles = (managerRoleRows ?? []) as any[];
+
+    // Step 2: resolve profiles
+    const allUserIds = Array.from(new Set(managerRoles.map((r) => r.user_id as string)));
+    const { data: profileRows } = await supabase
+      .from("profiles")
+      .select("id, full_name, email")
+      .in("id", allUserIds.length > 0 ? allUserIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    const profileMap = new Map<string, { name: string; email: string }>();
+    for (const p of (profileRows ?? []) as any[]) {
+      profileMap.set(p.id, {
+        name: p.full_name ?? (p.email ? p.email.split("@")[0] : null) ?? "Unknown",
+        email: p.email ?? "",
       });
     }
 
-    leaderboard.sort((a, b) => b.avgScore - a.avgScore);
+    // Step 3: resolve site names
+    const allSiteIds = Array.from(new Set(managerRoles.map((r) => r.site_id as string).filter(Boolean)));
+    const { data: siteRows } = await supabase
+      .from("sites")
+      .select("id, name")
+      .in("id", allSiteIds.length > 0 ? allSiteIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    const siteMap = new Map<string, string>();
+    for (const s of (siteRows ?? []) as any[]) siteMap.set(s.id, s.name);
+
+    // Step 4: fetch scores for the period (scoped to known user ids)
+    let scoresQ = supabase
+      .from("manager_performance_scores")
+      .select("user_id, site_id, period_date, score, tasks_assigned, tasks_completed, tasks_blocked, tasks_escalated")
+      .gte("period_date", sinceLb);
+
+    if (allUserIds.length > 0) {
+      scoresQ = scoresQ.in("user_id", allUserIds);
+    }
+
+    const { data: lbRows } = await scoresQ;
+    const lbList = (lbRows ?? []) as any[];
+
+    // Step 5: aggregate scores per user
+    const scoreGroups = new Map<string, any[]>();
+    for (const r of lbList) {
+      if (!scoreGroups.has(r.user_id)) scoreGroups.set(r.user_id, []);
+      scoreGroups.get(r.user_id)!.push(r);
+    }
+
+    // Step 6: build leaderboard — LEFT JOIN pattern (all managers, scores optional)
+    const seen = new Set<string>();
+    for (const mr of managerRoles) {
+      if (seen.has(mr.user_id)) continue;
+      seen.add(mr.user_id);
+
+      const profile    = profileMap.get(mr.user_id) ?? { name: "Unknown", email: "" };
+      const siteName   = siteMap.get(mr.site_id) ?? "—";
+      const dayScores  = scoreGroups.get(mr.user_id) ?? [];
+
+      let avgScore = 0, daysActive = 0, completionRate = 0, totalBlocked = 0, totalEscalated = 0;
+      if (dayScores.length > 0) {
+        daysActive     = dayScores.length;
+        const ta       = dayScores.reduce((s: number, r: any) => s + (r.tasks_assigned  ?? 0), 0);
+        const tc       = dayScores.reduce((s: number, r: any) => s + (r.tasks_completed ?? 0), 0);
+        totalBlocked   = dayScores.reduce((s: number, r: any) => s + (r.tasks_blocked   ?? 0), 0);
+        totalEscalated = dayScores.reduce((s: number, r: any) => s + (r.tasks_escalated ?? 0), 0);
+        avgScore       = Math.round(dayScores.reduce((s: number, r: any) => s + r.score, 0) / dayScores.length);
+        completionRate = ta > 0 ? +((tc / ta) * 100).toFixed(1) : 0;
+      }
+
+      leaderboard.push({
+        userId:         mr.user_id,
+        name:           profile.name,
+        site:           siteName,
+        siteId:         mr.site_id ?? "",
+        avgScore,
+        tier:           getPerformanceTier(avgScore),
+        daysActive,
+        completionRate,
+        totalBlocked,
+        totalEscalated,
+      });
+    }
+
+    // Users with scores first (desc), then no-data users at bottom
+    leaderboard.sort((a, b) => {
+      if (a.daysActive === 0 && b.daysActive > 0) return 1;
+      if (b.daysActive === 0 && a.daysActive > 0) return -1;
+      return b.avgScore - a.avgScore;
+    });
   }
 
   const atRiskCount = leaderboard.filter((e) => e.avgScore < 60).length;
