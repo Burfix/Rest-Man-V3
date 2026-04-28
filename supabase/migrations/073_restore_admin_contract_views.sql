@@ -103,8 +103,8 @@ SELECT
     WHEN EXTRACT(EPOCH FROM (now() - mc.last_sync_at)) > 86400 THEN 'stale'
     ELSE mc.status
   END                                                          AS micros_status,
-  mc.micros_org_id,
-  mc.micros_loc_id,
+  mc.org_identifier                                                    AS micros_org_id,
+  mc.loc_ref                                                           AS micros_loc_id,
   mc.last_sync_at,
   mc.token_expires_at,
   CASE
