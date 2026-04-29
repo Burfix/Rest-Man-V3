@@ -1,11 +1,14 @@
 /**
  * OperatingScoreWidget
  *
- * Large live Operating Score (0–100) with colour-coded grade,
- * four component breakdown bars and a single-line status copy.
+ * System Pulse — live Operating Score (0–100) with colour-coded grade,
+ * four component breakdown bars and restaurant-grade explanations.
  *
- * Used at the top of the Operations Command dashboard so the GM
- * immediately sees the venue's operational health number.
+ * Components (weighted):
+ *   Revenue      45 pts
+ *   Labour       30 pts
+ *   Compliance   15 pts
+ *   Maintenance  10 pts
  */
 
 import { cn } from "@/lib/utils";
@@ -58,15 +61,13 @@ const SCORE_PALETTE: Record<ScoreGrade, {
   },
 };
 
-// ── Component bars config ─────────────────────────────────────────────────────
+// ── Component bars config (Revenue 45 + Labour 30 + Compliance 15 + Maintenance 10 = 100) ──
 
 const COMPONENT_BARS = [
-  { key: "revenue",        label: "Revenue",        max: 25, bar: "bg-emerald-500 dark:bg-emerald-400" },
-  { key: "labour",         label: "Labour",         max: 25, bar: "bg-sky-500 dark:bg-sky-400"         },
-  { key: "food_cost",      label: "Food Cost",      max: 15, bar: "bg-orange-500 dark:bg-orange-400"   },
-  { key: "compliance",     label: "Compliance",     max: 15, bar: "bg-violet-500 dark:bg-violet-400"   },
-  { key: "inventory_risk", label: "Inventory",      max: 10, bar: "bg-teal-500 dark:bg-teal-400"       },
-  { key: "maintenance",    label: "Maintenance",    max: 10, bar: "bg-amber-500 dark:bg-amber-400"     },
+  { key: "revenue",     label: "Revenue",     max: 45, bar: "bg-emerald-500 dark:bg-emerald-400" },
+  { key: "labour",      label: "Labour",      max: 30, bar: "bg-sky-500 dark:bg-sky-400"         },
+  { key: "compliance",  label: "Compliance",  max: 15, bar: "bg-violet-500 dark:bg-violet-400"   },
+  { key: "maintenance", label: "Maintenance", max: 10, bar: "bg-amber-500 dark:bg-amber-400"     },
 ] as const;
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -103,15 +104,12 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
 
   const palette = SCORE_PALETTE[score.grade];
 
-  const lowDrivers = COMPONENT_BARS
-    .map(({ key, label, max }) => ({
-      label,
-      pct: Math.round(((score.components[key]?.score ?? 0) / max) * 100),
-    }))
-    .filter(({ pct }) => pct < 60)
-    .sort((a, b) => a.pct - b.pct)
-    .slice(0, 2)
-    .map(({ label }) => label.toLowerCase());
+  // Use drivers/summary from the score object (computed by the scoring engine)
+  const summary = score.summary ?? "";
+  const confidenceBadge =
+    score.confidence === "low"    ? { label: "Partial data", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" } :
+    score.confidence === "medium" ? { label: "Partial data", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" } :
+    null;
 
   return (
     <div className={cn(
@@ -122,7 +120,7 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
       {/* Header bar */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-stone-800">
         <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
-          Operating Score
+          System Pulse
         </p>
         <div className="text-right">
           <span className={cn(
@@ -131,9 +129,17 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
           )}>
             Grade {score.grade} — {palette.label}
           </span>
-          {lowDrivers.length > 0 && (
+          {confidenceBadge && (
+            <span className={cn(
+              "ml-1.5 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wide",
+              confidenceBadge.cls
+            )}>
+              {confidenceBadge.label}
+            </span>
+          )}
+          {summary && (
             <p className="text-[9px] text-stone-500 dark:text-stone-600 mt-0.5">
-              {score.total} {score.grade} — driven by {lowDrivers.join(" and ")}
+              {score.total} {score.grade} — {summary}
             </p>
           )}
         </div>
@@ -156,8 +162,8 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
           </span>
         </div>
 
-        {/* Component bars — 3 columns for 6 categories */}
-        <div className="flex-1 grid grid-cols-3 gap-x-4 gap-y-2.5">
+        {/* Component bars — 2 columns for 4 categories */}
+        <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2.5">
           {COMPONENT_BARS.map(({ key, label, max, bar }) => {
             const comp = score.components[key];
             const pct  = Math.round((comp.score / max) * 100);

@@ -3,13 +3,14 @@
  *
  * getOperatingScore(locationId) → OperatingScore (0–100)
  *
- * Six weighted components:
- *   Revenue vs Target     25 pts
- *   Labour %              25 pts
- *   Food Cost             15 pts
- *   Compliance status     15 pts
- *   Inventory Risk        10 pts
- *   Maintenance status    10 pts
+ * Four weighted components (System Pulse formula):
+ *   Revenue vs Target     45 pts  (weight 0.45)
+ *   Labour %              30 pts  (weight 0.30)
+ *   Compliance status     15 pts  (weight 0.15)
+ *   Maintenance status    10 pts  (weight 0.10)
+ *
+ * Supplementary data (food cost, inventory risk) is still fetched and
+ * returned for informational use but does not affect the total score.
  *
  * All data is fetched live from the DB; results are suitable for
  * server-side rendering or caching by the caller.
@@ -18,6 +19,14 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { computeComplianceStatus } from "@/lib/compliance/scoring";
+import {
+  calcRevenueScore,
+  calcLabourScore,
+  calcComplianceScore,
+  calcMaintenanceScore,
+  toGrade as libToGrade,
+  type ScoreConfidence,
+} from "@/lib/scoring/operatingScore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -25,9 +34,15 @@ export type MaintenanceSeverity = "none" | "minor" | "critical";
 export type ComplianceWorstStatus = "compliant" | "scheduled" | "due_soon" | "expired" | "unknown";
 export type ScoreGrade = "A" | "B" | "C" | "D" | "F";
 
+/** Re-export so callers can import confidence type from this module. */
+export type { ScoreConfidence };
+
 export interface RevenueComponent {
+  /** Weighted points earned (out of max 45). */
   score:       number;
-  max:         25;
+  /** Raw score 0–100 before weighting. */
+  rawScore:    number;
+  max:         45;
   actual:      number | null;
   target:      number | null;
   gap_pct:     number | null;
@@ -36,24 +51,20 @@ export interface RevenueComponent {
 }
 
 export interface LabourComponent {
+  /** Weighted points earned (out of max 30). */
   score:       number;
-  max:         25;
+  /** Raw score 0–100 before weighting. */
+  rawScore:    number;
+  max:         30;
   labour_pct:  number | null;
   detail:      string;
 }
 
-export interface FoodCostComponent {
-  score:          number;
-  max:            15;
-  food_cost_pct:  number | null;
-  target_pct:     number | null;
-  variance_pct:   number | null;
-  stock_risk:     "none" | "low" | "medium" | "high";
-  detail:         string;
-}
-
 export interface ComplianceComponent {
+  /** Weighted points earned (out of max 15). */
   score:        number;
+  /** Raw score 0–100 before weighting. */
+  rawScore:     number;
   max:          15;
   worst_status: ComplianceWorstStatus;
   total_items:  number;
@@ -64,11 +75,26 @@ export interface ComplianceComponent {
 }
 
 export interface MaintenanceComponent {
+  /** Weighted points earned (out of max 10). */
   score:          number;
+  /** Raw score 0–100 before weighting. */
+  rawScore:       number;
   max:            10;
   severity:       MaintenanceSeverity;
   open_count:     number;
   critical_count: number;
+  detail:         string;
+}
+
+// ── Supplementary types (not counted in total score) ─────────────────────────
+
+export interface FoodCostComponent {
+  score:          number;
+  max:            15;
+  food_cost_pct:  number | null;
+  target_pct:     number | null;
+  variance_pct:   number | null;
+  stock_risk:     "none" | "low" | "medium" | "high";
   detail:         string;
 }
 
@@ -84,16 +110,23 @@ export interface InventoryRiskComponent {
 }
 
 export interface OperatingScore {
-  total:        number;         // 0–100
+  /** Final score 0–100, clamped. */
+  total:        number;
   grade:        ScoreGrade;
   location_id:  string;
+  confidence:   ScoreConfidence;
+  /** Up to 2 main drag labels, e.g. ["revenue gap", "labour over target"]. */
+  drivers:      string[];
+  /** One-sentence summary, e.g. "Driven by revenue gap and labour over target". */
+  summary:      string;
   components: {
-    revenue:        RevenueComponent;
-    labour:         LabourComponent;
-    food_cost:      FoodCostComponent;
-    compliance:     ComplianceComponent;
-    inventory_risk: InventoryRiskComponent;
-    maintenance:    MaintenanceComponent;
+    revenue:     RevenueComponent;
+    labour:      LabourComponent;
+    compliance:  ComplianceComponent;
+    maintenance: MaintenanceComponent;
+    /** Supplementary — informational only, not counted in total. */
+    food_cost?:      FoodCostComponent;
+    inventory_risk?: InventoryRiskComponent;
   };
   computed_at:  string;         // ISO timestamp
 }
@@ -101,100 +134,23 @@ export interface OperatingScore {
 // ── Grade helper ──────────────────────────────────────────────────────────────
 
 function toGrade(total: number): ScoreGrade {
-  if (total >= 85) return "A";
-  if (total >= 70) return "B";
-  if (total >= 55) return "C";
-  if (total >= 40) return "D";
-  return "F";
+  return libToGrade(total);
 }
 
-// ── Revenue scoring (max 20) ──────────────────────────────────────────────────
+// ── Compliance worst-status helper ────────────────────────────────────────────
 
-/**
- * Revenue bands (gap = how far BELOW target, as %)
- *   gap ≤ 0%  → 20   gap ≤ 5%  → 16   gap ≤ 10% → 12
- *   gap ≤ 20% → 6    gap > 20% → 0
- */
-function scoreRevenue(actual: number | null, target: number | null): { score: number; gap_pct: number | null } {
-  if (actual === null || target === null || target === 0) {
-    return { score: 0, gap_pct: null };
-  }
-  const gap_pct = ((target - actual) / target) * 100;
-  let score: number;
-  if      (gap_pct <= 0)  score = 25;
-  else if (gap_pct <= 5)  score = 20;
-  else if (gap_pct <= 10) score = 15;
-  else if (gap_pct <= 20) score = 8;
-  else                    score = 0;
-  return { score, gap_pct: Math.round(gap_pct * 10) / 10 };
-}
-
-function revenueDetail(score: number, gap_pct: number | null, actual: number | null, target: number | null, posConnected: boolean): string {
-  if (actual === null)  return posConnected ? "Awaiting live data" : "No POS connection";
-  if (target === null)  return `Sales R${actual.toLocaleString()} — no target set`;
-  if (gap_pct === null) return `Sales R${actual.toLocaleString()}`;
-  if (gap_pct <= 0)     return `On target (R${actual.toLocaleString()} vs R${target.toLocaleString()})`;
-  return `${gap_pct.toFixed(1)}% below target (R${actual.toLocaleString()} vs R${target.toLocaleString()})`;
-}
-
-// ── Labour scoring ────────────────────────────────────────────────────────────
-
-/**
- * Labour bands (cost as % of net sales):
- *   ≤ 30%       → 25
- *   30% – 35%   → 18
- *   > 35%       → 6
- */
-function scoreLabour(pct: number | null): number {
-  if (pct === null) return 0;
-  if (pct <= 30)    return 25;
-  if (pct <= 35)    return 18;
-  return 6;
-}
-
-function labourDetail(score: number, pct: number | null, posConnected: boolean): string {
-  if (pct === null) return posConnected ? "Awaiting live data" : "No POS connection";
-  if (pct <= 30)    return `Labour at ${pct.toFixed(1)}% — healthy (≤30%)`;
-  if (pct <= 35)    return `Labour at ${pct.toFixed(1)}% — above target (30–35%)`;
-  return `Labour at ${pct.toFixed(1)}% — over budget (>35%)`;
-}
-
-// ── Compliance scoring (max 15) ───────────────────────────────────────────────
-
-/**
- * Compliance bands:
- *   any expired                    →  0
- *   any unscheduled due_soon       →  6
- *   any scheduled (none at risk)   → 13
- *   all compliant / unknown        → 15
- */
-function scoreCompliance(
-  expired:   number,
-  dueSoon:   number,
+function deriveWorstStatus(
+  expired: number,
+  dueSoon: number,
   scheduled: number,
-): { score: number; worst: ComplianceWorstStatus } {
-  if (expired > 0)   return { score: 0,  worst: "expired"   };
-  if (dueSoon > 0)   return { score: 6,  worst: "due_soon"  };
-  if (scheduled > 0) return { score: 13, worst: "scheduled" };
-  return               { score: 15, worst: "compliant" };
+): ComplianceWorstStatus {
+  if (expired > 0)   return "expired";
+  if (dueSoon > 0)   return "due_soon";
+  if (scheduled > 0) return "scheduled";
+  return "compliant";
 }
 
-function complianceDetail(
-  score:     number,
-  worst:     ComplianceWorstStatus,
-  expired:   number,
-  dueSoon:   number,
-  scheduled: number,
-  total:     number,
-): string {
-  if (total === 0)           return "No compliance items found";
-  if (score === 20)          return `All ${total} items compliant`;
-  if (worst === "expired")   return `${expired} item${expired === 1 ? "" : "s"} expired`;
-  if (worst === "scheduled") return `${scheduled} renewal${scheduled === 1 ? "" : "s"} scheduled before expiry`;
-  return `${dueSoon} item${dueSoon === 1 ? "" : "s"} due soon — no renewal booked`;
-}
-
-// ── Maintenance scoring (max 10) ──────────────────────────────────────────────
+// ── Maintenance severity helper ───────────────────────────────────────────────
 
 const CRITICAL_PRIORITIES    = new Set(["urgent"]);
 const CRITICAL_IMPACT_LEVELS = new Set([
@@ -204,75 +160,44 @@ const CRITICAL_IMPACT_LEVELS = new Set([
   "revenue_loss",
 ]);
 
-/**
- * Maintenance bands:
- *   no open issues           → 10
- *   open, none critical      → 5
- *   any critical / urgent    → 0
- */
-function scoreMaintenance(
+function deriveMaintenance(
   openIssues: Array<{ priority: string; impact_level: string }>
-): { score: number; severity: MaintenanceSeverity; criticalCount: number } {
+): { severity: MaintenanceSeverity; criticalCount: number; openCount: number } {
   if (openIssues.length === 0) {
-    return { score: 10, severity: "none", criticalCount: 0 };
+    return { severity: "none", criticalCount: 0, openCount: 0 };
   }
   const criticalCount = openIssues.filter(
-    (i) =>
-      CRITICAL_PRIORITIES.has(i.priority) ||
-      CRITICAL_IMPACT_LEVELS.has(i.impact_level)
+    (i) => CRITICAL_PRIORITIES.has(i.priority) || CRITICAL_IMPACT_LEVELS.has(i.impact_level)
   ).length;
-  if (criticalCount > 0) {
-    return { score: 0, severity: "critical", criticalCount };
-  }
-  return { score: 5, severity: "minor", criticalCount: 0 };
+  return {
+    severity:     criticalCount > 0 ? "critical" : "minor",
+    criticalCount,
+    openCount:    openIssues.length,
+  };
 }
 
-function maintenanceDetail(
-  score: number,
-  severity: MaintenanceSeverity,
-  openCount: number,
-  criticalCount: number
-): string {
-  if (severity === "none")     return "No open maintenance issues";
-  if (severity === "critical") return `${criticalCount} critical issue${criticalCount === 1 ? "" : "s"} open`;
-  return `${openCount} minor issue${openCount === 1 ? "" : "s"} open`;
-}
+// ── Food Cost scoring (supplementary — not counted in total) ──────────────────
 
-// ── Food Cost scoring (max 15) ────────────────────────────────────────────────
-
-/**
- * Food cost bands (variance above target):
- *   ≤ 0% (at or below target)  → 15
- *   ≤ 2% above target          → 12
- *   ≤ 5% above target          → 8
- *   ≤ 10% above target         → 4
- *   > 10% above target         → 0
- *   no data                    → 8 (neutral)
- */
 function scoreFoodCost(
   actualPct: number | null,
   targetPct: number | null,
-): { score: number; variance_pct: number | null; stock_risk: "none" | "low" | "medium" | "high" } {
+): { score: number; variance_pct: number | null; stock_risk: FoodCostComponent["stock_risk"] } {
   if (actualPct === null || targetPct === null) {
     return { score: 8, variance_pct: null, stock_risk: "none" };
   }
   const variance = actualPct - targetPct;
   let score: number;
-  if      (variance <= 0) score = 15;
-  else if (variance <= 2) score = 12;
-  else if (variance <= 5) score = 8;
+  if      (variance <= 0)  score = 15;
+  else if (variance <= 2)  score = 12;
+  else if (variance <= 5)  score = 8;
   else if (variance <= 10) score = 4;
   else                     score = 0;
-
-  const stock_risk = variance <= 0 ? "none" as const
-    : variance <= 2 ? "low" as const
-    : variance <= 5 ? "medium" as const
-    : "high" as const;
-
+  const stock_risk: FoodCostComponent["stock_risk"] =
+    variance <= 0 ? "none" : variance <= 2 ? "low" : variance <= 5 ? "medium" : "high";
   return { score, variance_pct: Math.round(variance * 10) / 10, stock_risk };
 }
 
-function foodCostDetail(score: number, actualPct: number | null, targetPct: number | null, variance: number | null): string {
+function foodCostDetail(actualPct: number | null, targetPct: number | null, variance: number | null): string {
   if (actualPct === null) return "No food cost data available";
   if (targetPct === null) return `Food cost ${actualPct.toFixed(1)}% — no target set`;
   if (variance !== null && variance <= 0) return `Food cost ${actualPct.toFixed(1)}% — on target (${targetPct.toFixed(1)}%)`;
@@ -317,24 +242,18 @@ export async function getOperatingScore(
 ): Promise<OperatingScore> {
   const isPosConnected = posConnected ?? true;
   const supabase = createServerClient();
-  const todayStr = new Date().toISOString().slice(0, 10);
 
   // ── Fetch all data sources in parallel ────────────────────────────────────
   const [complianceResult, maintenanceResult, foodCostResult] = await Promise.all([
-
-    // Compliance items — live status recomputed from date fields.
-    // Also fetch stored status as fallback for items where next_due_date is null.
     supabase
       .from("compliance_items")
       .select("next_due_date, scheduled_service_date, status"),
 
-    // Open maintenance issues for this site
     supabase
       .from("maintenance_logs")
       .select("priority, impact_level")
       .in("repair_status", ["open", "in_progress", "awaiting_parts"]),
 
-    // Latest food cost snapshot
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (supabase as any)
       .from("food_cost_snapshots")
@@ -346,7 +265,7 @@ export async function getOperatingScore(
       .catch(() => ({ data: null, error: null })),
   ]);
 
-  // ── Resolve revenue: prefer salesOverride (MICROS/manual) ────────────────
+  // ── Resolve revenue ───────────────────────────────────────────────────────
   let actualSales: number | null;
   let targetSales: number | null;
   let dataDate: string | null;
@@ -371,59 +290,64 @@ export async function getOperatingScore(
     targetSales = (targetData?.target_sales as number | null) ?? null;
   }
 
-  // ── Score revenue (25 pts) ─────────────────────────────────────────────────
-  // When connected but override is null (e.g. source=forecast), award neutral 15 pts
-  // rather than 0 — same policy as the Brain scoring engine.
-  let revenueScore: number;
-  let gap_pct: number | null;
+  // ── Revenue component ──────────────────────────────────────────────────────
+  // When POS-connected but data hasn't synced yet, award a neutral raw score of 60
+  // (equivalent to "we're running, just haven't received data") rather than 0.
+  let revRawScore: number;
+  let revDetail:   string;
+  let revGapPct:   number | null = null;
+
   if (actualSales === null && isPosConnected) {
-    revenueScore = 15;
-    gap_pct = null;
+    revRawScore = 60;
+    revDetail   = "Awaiting live sales data";
   } else {
-    ({ score: revenueScore, gap_pct } = scoreRevenue(actualSales, targetSales));
+    const rev = calcRevenueScore(actualSales, targetSales);
+    revRawScore = rev.rawScore;
+    revDetail   = rev.explanation;
+    if (actualSales !== null && targetSales !== null && targetSales > 0) {
+      revGapPct = +((( targetSales - actualSales) / targetSales) * 100).toFixed(1);
+    }
   }
+
+  const revWeighted = Math.round(revRawScore * 0.45);
+
   const revenueComponent: RevenueComponent = {
-    score:     revenueScore,
-    max:       25,
+    score:     revWeighted,
+    rawScore:  revRawScore,
+    max:       45,
     actual:    actualSales,
     target:    targetSales,
-    gap_pct:   gap_pct ?? null,
+    gap_pct:   revGapPct,
     data_date: dataDate,
-    detail:    revenueDetail(revenueScore, gap_pct ?? null, actualSales, targetSales, isPosConnected),
+    detail:    revDetail,
   };
 
-  // ── Score labour (25 pts) — prefer live MICROS ────────────────────────────
-  // When connected but override is null (late sync), award neutral 10 pts instead of 0.
+  // ── Labour component ───────────────────────────────────────────────────────
+  // Neutral raw score of 50 when connected but not yet synced.
   const liveLabourPct = labourOverride?.labourPct ?? null;
-  let labourScore: number;
+  let labRawScore: number;
+  let labDetail:   string;
+
   if (liveLabourPct === null && isPosConnected) {
-    labourScore = 10;   // neutral — connected but not yet synced
+    labRawScore = 50;
+    labDetail   = "Awaiting live labour data";
   } else {
-    labourScore = scoreLabour(liveLabourPct);
+    const lab = calcLabourScore(liveLabourPct, actualSales, targetSales, 30, labourOverride?.totalPay ?? null);
+    labRawScore = lab.rawScore;
+    labDetail   = lab.explanation;
   }
+
+  const labWeighted = Math.round(labRawScore * 0.30);
+
   const labourComponent: LabourComponent = {
-    score:      labourScore,
-    max:        25,
+    score:      labWeighted,
+    rawScore:   labRawScore,
+    max:        30,
     labour_pct: liveLabourPct,
-    detail:     labourDetail(labourScore, liveLabourPct, isPosConnected),
+    detail:     labDetail,
   };
 
-  // ── Score food cost (15 pts) ──────────────────────────────────────────────
-  const fcData = foodCostResult.data as { estimated_food_cost_pct: number | null; target_food_cost_pct: number | null } | null;
-  const actualFoodCostPct = fcData?.estimated_food_cost_pct ?? null;
-  const targetFoodCostPct = fcData?.target_food_cost_pct ?? null;
-  const { score: foodCostScore, variance_pct: fcVariance, stock_risk } = scoreFoodCost(actualFoodCostPct, targetFoodCostPct);
-  const foodCostComponent: FoodCostComponent = {
-    score:         foodCostScore,
-    max:           15,
-    food_cost_pct: actualFoodCostPct,
-    target_pct:    targetFoodCostPct,
-    variance_pct:  fcVariance,
-    stock_risk,
-    detail:        foodCostDetail(foodCostScore, actualFoodCostPct, targetFoodCostPct, fcVariance),
-  };
-
-  // ── Score compliance (15 pts) ─────────────────────────────────────────────
+  // ── Compliance component ───────────────────────────────────────────────────
   const complianceRows = (complianceResult.data as unknown as {
     next_due_date: string | null;
     scheduled_service_date?: string | null;
@@ -435,63 +359,136 @@ export async function getOperatingScore(
   const expiredCount   = complianceItems.filter((c) => c.status === "expired").length;
   const dueSoonCount   = complianceItems.filter((c) => c.status === "due_soon").length;
   const scheduledCount = complianceItems.filter((c) => c.status === "scheduled").length;
-  const { score: complianceScore, worst: worstStatus } = scoreCompliance(expiredCount, dueSoonCount, scheduledCount);
+  const compliantCount = complianceItems.filter((c) => c.status === "compliant").length;
+
+  const comp = calcComplianceScore(
+    complianceItems.length,
+    compliantCount,
+    expiredCount,
+    dueSoonCount,
+  );
+  const compWeighted = Math.round(comp.rawScore * 0.15);
+
   const complianceComponent: ComplianceComponent = {
-    score:        complianceScore,
+    score:        compWeighted,
+    rawScore:     comp.rawScore,
     max:          15,
-    worst_status: worstStatus,
+    worst_status: deriveWorstStatus(expiredCount, dueSoonCount, scheduledCount),
     total_items:  complianceItems.length,
     expired:      expiredCount,
     scheduled:    scheduledCount,
     due_soon:     dueSoonCount,
-    detail:       complianceDetail(complianceScore, worstStatus, expiredCount, dueSoonCount, scheduledCount, complianceItems.length),
+    detail:       comp.explanation,
   };
 
-  // ── Score maintenance (10 pts) ────────────────────────────────────────────
+  // ── Maintenance component ──────────────────────────────────────────────────
   const openIssues = (maintenanceResult.data ?? []) as { priority: string; impact_level: string }[];
-  const { score: maintScore, severity, criticalCount } = scoreMaintenance(openIssues);
+  const maintInfo  = deriveMaintenance(openIssues);
+  const maint      = calcMaintenanceScore(
+    openIssues.length + (openIssues.length === 0 ? 1 : 0),   // avoid div-by-zero; 1 item = all clear
+    openIssues.length,
+    maintInfo.criticalCount,
+  );
+  // Simpler: when no open issues → raw=100; else use total/open ratio minus critical penalty
+  const maintRawScore = openIssues.length === 0
+    ? 100
+    : Math.max(0, Math.round(((openIssues.length - maintInfo.criticalCount) / openIssues.length) * 100) - maintInfo.criticalCount * 20);
+  const maintDetail =
+    maintInfo.severity === "none"     ? "No open maintenance issues" :
+    maintInfo.severity === "critical" ? `${maintInfo.criticalCount} critical issue${maintInfo.criticalCount === 1 ? "" : "s"} open` :
+    `${maintInfo.openCount} minor issue${maintInfo.openCount === 1 ? "" : "s"} open`;
+  const maintWeighted = Math.round(Math.min(maintRawScore, 100) * 0.10);
+
   const maintenanceComponent: MaintenanceComponent = {
-    score:          maintScore,
+    score:          maintWeighted,
+    rawScore:       Math.min(maintRawScore, 100),
     max:            10,
-    severity,
-    open_count:     openIssues.length,
-    critical_count: criticalCount,
-    detail:         maintenanceDetail(maintScore, severity, openIssues.length, criticalCount),
+    severity:       maintInfo.severity,
+    open_count:     maintInfo.openCount,
+    critical_count: maintInfo.criticalCount,
+    detail:         maintDetail,
   };
 
-  // ── Score inventory risk (10 pts) ─────────────────────────────────────────
+  // ── Total (0–100) ─────────────────────────────────────────────────────────
+  const total = Math.min(100, revWeighted + labWeighted + compWeighted + maintWeighted);
+
+  // ── Confidence ────────────────────────────────────────────────────────────
+  const hasRevenue    = actualSales !== null && targetSales !== null;
+  const hasLabour     = liveLabourPct !== null;
+  const hasCompliance = complianceItems.length > 0;
+
+  let confidence: ScoreConfidence;
+  if (hasRevenue && hasLabour && hasCompliance) {
+    confidence = "high";
+  } else if (hasRevenue && hasLabour) {
+    confidence = "medium";
+  } else {
+    confidence = "low";
+  }
+
+  // ── Drivers ───────────────────────────────────────────────────────────────
+  const componentPerf = [
+    { label: "revenue gap",        rawScore: revRawScore         },
+    { label: "labour over target", rawScore: labRawScore         },
+    { label: "compliance",         rawScore: comp.rawScore       },
+    { label: "maintenance",        rawScore: Math.min(maintRawScore, 100) },
+  ];
+  const drivers = componentPerf
+    .filter((c) => c.rawScore < 60)
+    .sort((a, b) => a.rawScore - b.rawScore)
+    .slice(0, 2)
+    .map((c) => c.label);
+
+  const summary = drivers.length === 0
+    ? "All systems operating well"
+    : `Driven by ${drivers.join(" and ")}`;
+
+  // ── Supplementary: food cost ───────────────────────────────────────────────
+  const fcData = foodCostResult.data as { estimated_food_cost_pct: number | null; target_food_cost_pct: number | null } | null;
+  const actualFoodCostPct = fcData?.estimated_food_cost_pct ?? null;
+  const targetFoodCostPct = fcData?.target_food_cost_pct ?? null;
+  const { score: foodCostScore, variance_pct: fcVariance, stock_risk } = scoreFoodCost(actualFoodCostPct, targetFoodCostPct);
+  const foodCostComponent: FoodCostComponent = {
+    score:         foodCostScore,
+    max:           15,
+    food_cost_pct: actualFoodCostPct,
+    target_pct:    targetFoodCostPct,
+    variance_pct:  fcVariance,
+    stock_risk,
+    detail:        foodCostDetail(actualFoodCostPct, targetFoodCostPct, fcVariance),
+  };
+
+  // ── Supplementary: inventory risk ─────────────────────────────────────────
   const invData = inventoryOverride ?? { riskScore: 7, criticalCount: 0, lowCount: 0, healthyCount: 0, totalItems: 0, noPOCount: 0 };
-  const inventoryScore = invData.riskScore;
-  const inventoryDetail =
-    invData.totalItems === 0 ? "No inventory items tracked" :
-    invData.criticalCount > 0 ? `${invData.criticalCount} stockout${invData.criticalCount > 1 ? "s" : ""} — service at risk` :
-    invData.lowCount > 0 ? `${invData.lowCount} item${invData.lowCount > 1 ? "s" : ""} running low` :
-    "All stock levels healthy";
   const inventoryRiskComponent: InventoryRiskComponent = {
-    score:          inventoryScore,
+    score:          invData.riskScore,
     max:            10,
     critical_count: invData.criticalCount,
     low_count:      invData.lowCount,
     healthy_count:  invData.healthyCount,
     total_items:    invData.totalItems,
     no_po_count:    invData.noPOCount,
-    detail:         inventoryDetail,
+    detail:
+      invData.totalItems === 0      ? "No inventory items tracked" :
+      invData.criticalCount > 0     ? `${invData.criticalCount} stockout${invData.criticalCount > 1 ? "s" : ""} — service at risk` :
+      invData.lowCount > 0          ? `${invData.lowCount} item${invData.lowCount > 1 ? "s" : ""} running low` :
+      "All stock levels healthy",
   };
-
-  // ── Total ─────────────────────────────────────────────────────────────────
-  const total = revenueScore + labourScore + foodCostScore + complianceScore + inventoryScore + maintScore;
 
   return {
     total,
     grade:       toGrade(total),
     location_id: locationId,
+    confidence,
+    drivers,
+    summary,
     components: {
       revenue:        revenueComponent,
       labour:         labourComponent,
-      food_cost:      foodCostComponent,
       compliance:     complianceComponent,
-      inventory_risk: inventoryRiskComponent,
       maintenance:    maintenanceComponent,
+      food_cost:      foodCostComponent,
+      inventory_risk: inventoryRiskComponent,
     },
     computed_at: new Date().toISOString(),
   };
