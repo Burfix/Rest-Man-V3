@@ -120,7 +120,7 @@ export default async function AccountabilityPage({
     let managersQ = supabase
       .from("user_roles")
       .select("user_id, site_id, organisation_id")
-      .in("role", ["gm", "supervisor", "area_manager", "head_office"])
+      .in("role", ["gm", "supervisor", "manager", "site_manager", "area_manager", "head_office"])
       .eq("is_active", true)
       .is("revoked_at", null);
 
