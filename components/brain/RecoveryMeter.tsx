@@ -30,6 +30,7 @@ export default function RecoveryMeter({ brain }: Props) {
     limitedWindow,
     partialOnly,
     topActions,
+    explanation,
   } = recoveryMeter;
 
   const recoverablePct = revenueGap > 0 ? Math.min(100, (recoverable / revenueGap) * 100) : 0;
@@ -100,12 +101,7 @@ export default function RecoveryMeter({ brain }: Props) {
           <span className="text-[9px] font-mono text-stone-600">
             {recoverablePct.toFixed(0)}% of gap recoverable
           </span>
-          {partialOnly && (
-            <span className="text-[9px] font-mono text-amber-500/70">partial only</span>
-          )}
-          {limitedWindow && (
-            <span className="text-[9px] font-mono text-red-400/70">narrow window</span>
-          )}
+          <span className="text-[9px] font-mono text-stone-500">{explanation}</span>
         </div>
       </div>
 

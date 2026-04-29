@@ -29,6 +29,7 @@ import {
 import { generateVoice } from "./voice-generator";
 import { forecastToday } from "@/services/forecasting/forecast-engine";
 import { getCachedBrain, setCachedBrain } from "@/lib/brain/cache";
+import { calculateRecoveryOpportunity } from "@/lib/engine/recoveryEngine";
 import type { SportsEvent } from "@/services/forecasting/events-calendar";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -50,11 +51,16 @@ export type ScoreDriver = {
 export type RecoveryMeter = {
   revenueGap: number;
   recoverable: number;
+  recoverableCovers: number;
+  recoverablePct: number;
   timeLeftMinutes: number;
   isOnTrack: boolean;
   limitedWindow: boolean;
   partialOnly: boolean;
+  window: "wide" | "narrow" | "closed";
+  confidence: "high" | "medium" | "low";
   topActions: string[];
+  explanation: string;
 };
 
 export type BrainOutput = {
@@ -865,38 +871,58 @@ function buildRecoveryMeter(
   actionQueue: BrainOutput["actionQueue"],
   dayBaseline: number | null,
 ): RecoveryMeter | null {
-  // Only during service with a meaningful gap and time remaining
+  // Only during service with a meaningful gap
   if (ctx.meta.timeOfDay === "post-service" || ctx.meta.timeOfDay === "closed") return null;
   const revenueGap = Math.max(0, ctx.revenue.target - ctx.revenue.actual);
   if (revenueGap < 2_000) return null;
-  if (minutesRemaining <= 60) return null;
 
-  const timeLeftMinutes = minutesRemaining;
-  const SERVICE_DURATION_MINUTES = 720; // 10:00–22:00
-
-  // Run rate from actual trading; if no revenue yet, use DOW baseline rate as proxy
-  let runRate = minutesElapsed > 0 ? ctx.revenue.actual / minutesElapsed : 0;
-  if (runRate === 0 && dayBaseline && dayBaseline > 0) {
-    runRate = dayBaseline / SERVICE_DURATION_MINUTES;
+  // Derive avgSpend: use run-rate-per-cover if possible; fall back to
+  // ZA casual-dining benchmark of R260 when we have no covers data.
+  const BENCHMARK_AVG_SPEND = 260;
+  let estimatedAvgSpend = BENCHMARK_AVG_SPEND;
+  // If we have a day baseline (historical avg revenue), infer spend per cover
+  // assuming ~70 covers per service day at benchmark spend.
+  if (dayBaseline && dayBaseline > 0) {
+    estimatedAvgSpend = Math.max(100, dayBaseline / 70);
   }
 
-  const potentialRevenue = runRate * minutesRemaining;
-  const recoverable    = Math.min(revenueGap, potentialRevenue * 0.5);
-  const isOnTrack      = recoverable >= revenueGap;
-  const limitedWindow  = timeLeftMinutes < 120 && !isOnTrack;
-  const partialOnly    = revenueGap > recoverable * 1.1 && !isOnTrack;
+  const result = calculateRecoveryOpportunity({
+    revenueActual:           ctx.revenue.actual,
+    revenueTarget:           ctx.revenue.target,
+    avgSpend:                estimatedAvgSpend,
+    coversActual:            0,   // not available in OperationsContext — covers gap still works
+    coversTarget:            0,
+    minutesRemaining,
+    avgTurnMinutes:          45,
+    serviceCapacityCovers:   null, // not available here; engine falls back to turn-based estimate
+    labourPct:               ctx.labour.actualPercent,
+    targetLabourPct:         ctx.labour.targetPercent,
+  });
 
-  // Specific recovery actions (ordered by immediacy)
-  const topActions: string[] = [
-    "Push walk-in conversion at entrance.",
-    "Activate upsell on current tables.",
-  ];
-  // Supplement with action queue if it has better context
-  if (actionQueue.length > 0 && !actionQueue[0].impact.toLowerCase().startsWith("revenue")) {
-    topActions[0] = actionQueue[0].impact;
+  const isOnTrack     = result.recoverablePct >= 1;
+  const limitedWindow = result.window === "narrow" && !isOnTrack;
+  const partialOnly   = result.recoverablePct < 0.9 && !isOnTrack;
+
+  // Supplement with action queue context if available
+  const topActions = [...result.actions];
+  if (actionQueue.length > 0 && !isOnTrack) {
+    topActions[0] = actionQueue[0].impact || topActions[0];
   }
 
-  return { revenueGap, recoverable, timeLeftMinutes, isOnTrack, limitedWindow, partialOnly, topActions };
+  return {
+    revenueGap:        result.revenueGap,
+    recoverable:       result.recoverableRevenue,
+    recoverableCovers: result.recoverableCovers,
+    recoverablePct:    result.recoverablePct,
+    timeLeftMinutes:   minutesRemaining,
+    isOnTrack,
+    limitedWindow,
+    partialOnly,
+    window:            result.window,
+    confidence:        result.confidence,
+    topActions,
+    explanation:       result.explanation,
+  };
 }
 
 function buildActionQueue(
