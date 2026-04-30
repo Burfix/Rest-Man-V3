@@ -5,7 +5,7 @@
  * No recomputation. Use POST /api/risk/recompute to refresh.
  *
  * Query params:
- *   siteId   — UUID (defaults to DEFAULT_SITE_ID)
+ *   siteId   — UUID (required)
  *
  * Response:
  *   { zones: ZoneSummary[], computed_at: string | null }
@@ -13,13 +13,18 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedZoneSummaries } from "@/services/universal/zoneSummary";
-import { DEFAULT_SITE_ID } from "@/types/universal";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
-  const siteId =
-    req.nextUrl.searchParams.get("siteId") ?? DEFAULT_SITE_ID;
+  const siteId = req.nextUrl.searchParams.get("siteId");
+
+  if (!siteId) {
+    return NextResponse.json(
+      { error: "siteId query parameter is required" },
+      { status: 400 }
+    );
+  }
 
   try {
     const zones = await getCachedZoneSummaries(siteId);

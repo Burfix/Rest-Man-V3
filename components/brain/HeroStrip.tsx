@@ -159,16 +159,45 @@ export default function HeroStrip({
           {/* Revenue */}
           <div className={cn(
             "border-l-[3px] border border-[#e2e2e0] dark:border-[#2a2a2a] px-2.5 py-1.5 font-mono text-[10px]",
-            revPillClass(revenueVariance),
+            salesSnapshot.data_source === "none"
+              ? "border-l-stone-300 text-stone-400 dark:text-stone-600"
+              : salesSnapshot.data_source === "estimated"
+              ? "border-l-amber-400 text-amber-700 dark:text-amber-400"
+              : revPillClass(revenueVariance),
           )}>
-            <span className="text-[9px] uppercase tracking-wider text-stone-500 dark:text-stone-600 block mb-0.5">
-              REVENUE
-            </span>
-            <span className="font-bold">{fmtZAR(salesSnapshot.netSales)}</span>
-            {" "}
-            <span className="opacity-80">
-              {fmtPct(revenueVariance, true)} {revenueVariance >= 0 ? "▲" : "▼"}
-            </span>
+            <div className="flex items-center gap-1 mb-0.5">
+              <span className="text-[9px] uppercase tracking-wider text-stone-500 dark:text-stone-600">
+                REVENUE
+              </span>
+              {salesSnapshot.data_source === "live" && (
+                <span className="inline-flex items-center gap-0.5 rounded bg-emerald-100 dark:bg-emerald-950/40 px-1 py-px text-[8px] font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                  <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                  Live
+                </span>
+              )}
+              {salesSnapshot.data_source === "estimated" && (
+                <span className="rounded bg-amber-100 dark:bg-amber-950/40 px-1 py-px text-[8px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                  Est.
+                </span>
+              )}
+              {salesSnapshot.data_source === "none" && (
+                <span className="rounded bg-stone-100 dark:bg-stone-800 px-1 py-px text-[8px] font-bold text-stone-500 dark:text-stone-500 uppercase tracking-wider">
+                  Not Connected
+                </span>
+              )}
+            </div>
+            {salesSnapshot.data_source === "none" ? (
+              <span className="text-stone-400 dark:text-stone-600">Waiting for POS</span>
+            ) : (
+              <>
+                <span className="font-bold">{fmtZAR(salesSnapshot.netSales)}</span>
+                {" "}
+                <span className={salesSnapshot.data_source === "estimated" ? "opacity-60" : "opacity-80"}>
+                  {fmtPct(revenueVariance, true)} {revenueVariance >= 0 ? "▲" : "▼"}
+                  {salesSnapshot.data_source === "estimated" && " (est.)"}
+                </span>
+              </>
+            )}
           </div>
 
           {/* Labour */}

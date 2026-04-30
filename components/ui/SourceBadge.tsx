@@ -28,7 +28,9 @@ export type SourceType =
   | "manual_upload"
   | "stale"
   | "error"
-  | "awaiting";
+  | "awaiting"
+  | "estimated"
+  | "not_connected";
 
 interface Props {
   source:     SourceType;
@@ -87,6 +89,16 @@ const STYLES: Record<SourceType, { cls: string; dot: string; label: string; puls
     cls:   "bg-stone-50 text-stone-500 dark:text-stone-400 ring-stone-200",
     dot:   "bg-stone-300",
     label: "AWAITING",
+  },
+  estimated:    {
+    cls:   "bg-amber-50 text-amber-700 ring-amber-200",
+    dot:   "bg-amber-400",
+    label: "ESTIMATED",
+  },
+  not_connected: {
+    cls:   "bg-stone-100 text-stone-400 dark:text-stone-500 ring-stone-200",
+    dot:   "bg-stone-300",
+    label: "NOT CONNECTED",
   },
 };
 

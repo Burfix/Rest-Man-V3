@@ -22,6 +22,7 @@ import { getInventoryIntelligence } from "@/services/inventory/intelligence";
 import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { evaluateOperations } from "@/services/decision-engine";
 import { getSiteConfig } from "@/lib/config/site";
+import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
 
 import type {
   TodayBookingsSummary,
@@ -32,6 +33,7 @@ import type {
 } from "@/types";
 import type { MicrosStatusSummary } from "@/types/micros";
 import { todayISO } from "@/lib/utils";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -99,6 +101,21 @@ function groupByHorizon(actions: Action[]) {
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ActionsPage() {
+  const ctx = await getUserContext().catch((err: unknown) => {
+    if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
+    return null;
+  });
+
+  if (!ctx?.siteId) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">No site assigned. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  const { siteId } = ctx;
+
   // Fetch actions from Supabase
   let actions: Action[] = [];
   let loadError: string | null = null;
@@ -117,9 +134,7 @@ export default async function ActionsPage() {
     loadError = err instanceof Error ? err.message : "Unknown error";
   }
 
-  const cfg = await getSiteConfig();
-
-  // Fetch operational context for the banner
+  const cfg = await getSiteConfig(siteId);
   const [
     todayResult,
     maintenanceResult,
@@ -164,7 +179,7 @@ export default async function ActionsPage() {
     ?? salesSnapshot.labourCostPercent
     ?? 0;
 
-  const siteConfig = await getSiteConfig();
+  const siteConfig = await getSiteConfig(siteId);
 
   const engineOutput = evaluateOperations({
     revenue: {

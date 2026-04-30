@@ -281,5 +281,5 @@ export interface SiteSummary {
 
 // ── Factory helpers ───────────────────────────────────────────────────────────
 
-/** Default site UUID — matches migration 012 seed */
-export const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001" as const;
+// DEFAULT_SITE_ID removed — callers must derive siteId from getUserContext().
+// Fallbacks to a hardcoded site UUID create cross-tenant data leaks.

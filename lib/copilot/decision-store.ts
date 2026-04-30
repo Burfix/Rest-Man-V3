@@ -15,8 +15,6 @@ import { createServerClient } from "@/lib/supabase/server";
 import type { GMDecision } from "./types";
 import { createHash } from "crypto";
 
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
-
 // Decision expires after 18 hours (covers a full service day)
 const DECISION_TTL_HOURS = 18;
 
@@ -42,7 +40,7 @@ function hashDecision(d: GMDecision): string {
  */
 export async function persistDecisions(
   decisions: GMDecision[],
-  siteId: string = DEFAULT_SITE_ID,
+  siteId: string,
 ): Promise<Map<string, string>> {
   const supabase = createServerClient();
   const idMap = new Map<string, string>(); // originalId → persistedId
@@ -155,7 +153,7 @@ export async function linkDecisionToAction(
  * Expire stale decisions (called periodically or at end of day).
  */
 export async function expireStaleDecisions(
-  siteId: string = DEFAULT_SITE_ID,
+  siteId: string,
 ): Promise<number> {
   const supabase = createServerClient();
   const { data } = await (supabase.from("copilot_decisions" as any) as any)

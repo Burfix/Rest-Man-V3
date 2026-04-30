@@ -14,7 +14,6 @@ import { createServerClient } from "@/lib/supabase/server";
 import { getOperatingScore } from "./operatingScore";
 import type { ScoreGrade } from "./operatingScore";
 
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
 const FLAT_THRESHOLD  = 2; // ±2 pts = flat
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,7 +36,7 @@ export interface GMPerformance {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export async function getGMPerformance(siteId: string = DEFAULT_SITE_ID): Promise<GMPerformance> {
+export async function getGMPerformance(siteId: string): Promise<GMPerformance> {
   const supabase = createServerClient();
 
   const [historyRes, scoreRes] = await Promise.allSettled([

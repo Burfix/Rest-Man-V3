@@ -2,13 +2,14 @@
  * OperatingScoreWidget
  *
  * System Pulse — live Operating Score (0–100) with colour-coded grade,
- * four component breakdown bars and restaurant-grade explanations.
+ * five component breakdown bars and restaurant-grade explanations.
  *
- * Components (weighted):
- *   Revenue      45 pts
- *   Labour       30 pts
- *   Compliance   15 pts
- *   Maintenance  10 pts
+ * Components (canonical weights):
+ *   Revenue      40 pts  (40%)
+ *   Labour       25 pts  (25%)
+ *   Service      15 pts  (15%)
+ *   Compliance   10 pts  (10%)
+ *   Maintenance  10 pts  (10%)
  */
 
 import { cn } from "@/lib/utils";
@@ -61,12 +62,13 @@ const SCORE_PALETTE: Record<ScoreGrade, {
   },
 };
 
-// ── Component bars config (Revenue 45 + Labour 30 + Compliance 15 + Maintenance 10 = 100) ──
+// ── Component bars config (Revenue 40 + Labour 25 + Service 15 + Compliance 10 + Maintenance 10 = 100) ──
 
 const COMPONENT_BARS = [
-  { key: "revenue",     label: "Revenue",     max: 45, bar: "bg-emerald-500 dark:bg-emerald-400" },
-  { key: "labour",      label: "Labour",      max: 30, bar: "bg-sky-500 dark:bg-sky-400"         },
-  { key: "compliance",  label: "Compliance",  max: 15, bar: "bg-violet-500 dark:bg-violet-400"   },
+  { key: "revenue",     label: "Revenue",     max: 40, bar: "bg-emerald-500 dark:bg-emerald-400" },
+  { key: "labour",      label: "Labour",      max: 25, bar: "bg-sky-500 dark:bg-sky-400"         },
+  { key: "service",     label: "Service",     max: 15, bar: "bg-purple-500 dark:bg-purple-400"   },
+  { key: "compliance",  label: "Compliance",  max: 10, bar: "bg-violet-500 dark:bg-violet-400"   },
   { key: "maintenance", label: "Maintenance", max: 10, bar: "bg-amber-500 dark:bg-amber-400"     },
 ] as const;
 
@@ -78,6 +80,8 @@ interface Props {
     label: string;
     freshnessState: SalesFreshnessState;
     freshnessMinutes: number | null;
+    /** Module-level data state for badge: "live" | "estimated" | "none" */
+    dataSource?: "live" | "estimated" | "none";
   } | null;
 }
 
@@ -104,7 +108,12 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
 
   const palette = SCORE_PALETTE[score.grade];
 
-  // Use drivers/summary from the score object (computed by the scoring engine)
+  // Use drivers from the score object for the explainer strip
+  const drivers = score.drivers ?? [];
+  const driversDisplay = drivers.length > 0
+    ? drivers.join(" • ")
+    : null;
+
   const summary = score.summary ?? "";
   const confidenceBadge =
     score.confidence === "low"    ? { label: "Partial data", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" } :
@@ -137,11 +146,15 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
               {confidenceBadge.label}
             </span>
           )}
-          {summary && (
-            <p className="text-[9px] text-stone-500 dark:text-stone-600 mt-0.5">
-              {score.total} {score.grade} — {summary}
+          {driversDisplay ? (
+            <p className="text-[9px] font-semibold text-red-500 dark:text-red-400 mt-0.5">
+              {driversDisplay}
             </p>
-          )}
+          ) : summary ? (
+            <p className="text-[9px] text-stone-500 dark:text-stone-600 mt-0.5">
+              {summary}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -189,21 +202,44 @@ export default function OperatingScoreWidget({ score, salesSource }: Props) {
                   <p className="text-[10px] text-stone-500 dark:text-stone-600 truncate" title={comp.detail}>
                     {comp.detail}
                   </p>
-                  {srcBadge && (
-                    <span className={cn(
-                      "shrink-0 inline-flex items-center gap-0.5 rounded px-1 py-px text-[8px] font-bold uppercase tracking-wider",
-                      salesSource.freshnessState === "live"
-                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
-                        : salesSource.freshnessState === "stale"
+                  {srcBadge && (() => {
+                    const ds = salesSource.dataSource;
+                    // Never show LIVE if score confidence is low (stale data)
+                    const isStaleScore = score.confidence === "low";
+                    const badgeCls =
+                      isStaleScore
                         ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
-                        : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500"
-                    )}>
-                      {salesSource.freshnessState === "live" && (
-                        <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
-                      )}
-                      {salesSource.label}
-                    </span>
-                  )}
+                        : ds === "live"
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                        : ds === "estimated"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : ds === "none"
+                        ? "bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-500"
+                        : salesSource.freshnessState === "live"
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : salesSource.freshnessState === "stale"
+                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                          : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500";
+                    // Suppress pulse dot when data is stale
+                    const showPulse = !isStaleScore && (ds === "live" || (!ds && salesSource.freshnessState === "live"));
+                    const badgeLabel =
+                      isStaleScore ? "Stale"
+                      : ds === "live" ? "Live"
+                      : ds === "estimated" ? "Est."
+                      : ds === "none" ? "Not Connected"
+                      : salesSource.label;
+                    return (
+                      <span className={cn(
+                        "shrink-0 inline-flex items-center gap-0.5 rounded px-1 py-px text-[8px] font-bold uppercase tracking-wider",
+                        badgeCls,
+                      )}>
+                        {showPulse && (
+                          <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                        )}
+                        {badgeLabel}
+                      </span>
+                    );
+                  })()}
                 </div>
               </div>
             );

@@ -67,12 +67,12 @@ function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
 // Main Orchestrator
 // ══════════════════════════════════════════════════════════════════════════
 
-export async function runCopilot(): Promise<CopilotOutput> {
+export async function runCopilot(siteId: string): Promise<CopilotOutput> {
   const now = new Date();
   const today_iso = todayISO();
 
-  // ── 0. Load site config (replaces hardcoded constants) ────────────────
-  const cfg = await getSiteConfig();
+  // ── 0. Load site config (replaces hardcoded constants) ─────────────────────
+  const cfg = await getSiteConfig(siteId);
   const TARGET_LABOUR_PCT = cfg.target_labour_pct;
   const TARGET_AVG_SPEND = cfg.target_avg_spend;
   const SEATING_CAPACITY = cfg.seating_capacity;
@@ -271,7 +271,7 @@ export async function runCopilot(): Promise<CopilotOutput> {
   });
 
   // ── 13. Persist decisions (async, non-blocking) ───────────────────────
-  const siteId = cfg.site_id;
+
   persistDecisions(decisions, siteId).then((idMap) => {
     if (idMap.size > 0) {
       const currentHashes = Array.from(idMap.values());

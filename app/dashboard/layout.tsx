@@ -19,11 +19,13 @@ export default async function DashboardLayout({
 }) {
   let role: UserRole = "viewer"; // most restrictive fallback
   let siteAllowedRoutes: string[] | null = null;
+  let deploymentStage: 'live' | 'partial' | 'pending' = 'live';
   try {
     const ctx = await getUserContext();
     role = ctx.role;
     const siteConfig = await getSiteConfig(ctx.siteId);
     siteAllowedRoutes = siteConfig.allowed_routes;
+    deploymentStage = siteConfig.deployment_stage;
   } catch {
     // Middleware handles auth redirects; default to most restrictive role
   }
@@ -39,6 +41,11 @@ export default async function DashboardLayout({
       } />
       {/* pt-14 reserves space for the fixed mobile top bar; lg:pt-0 removes it on desktop */}
       <main className="flex-1 overflow-y-auto p-4 pt-[72px] lg:p-8 lg:pt-8 bg-[#f8f8f6] dark:bg-[#0f0f0e]">
+        {deploymentStage === 'partial' && (
+          <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-800 px-4 py-2.5 text-sm text-amber-800 dark:text-amber-300">
+            <span className="font-semibold">Awaiting live data</span> — revenue and labour modules are pending POS integration. Scores reflect compliance and maintenance only.
+          </div>
+        )}
         <AutoRefresh />
         <RoleGuard role={role} siteAllowedRoutes={siteAllowedRoutes}>
           {children}

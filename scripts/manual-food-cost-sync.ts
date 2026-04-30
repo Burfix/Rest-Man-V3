@@ -23,7 +23,6 @@ for (const key of ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY", 
 
 import { syncFoodCostFromBI } from "../services/micros/foodCostSync";
 
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
 const LOC_REF = process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "2000002";
 
 function yesterday(): string {
@@ -33,13 +32,21 @@ function yesterday(): string {
 }
 
 async function main() {
-  const businessDate = process.argv[2] || yesterday();
+  const siteId   = process.argv[2];
+  const businessDate = process.argv[3] || yesterday();
+
+  if (!siteId) {
+    console.error("Usage: ts-node manual-food-cost-sync.ts <siteId> [YYYY-MM-DD]");
+    console.error("  siteId: UUID of the target site (required)");
+    process.exit(1);
+  }
+
   console.log(`\n🍽️  Food Cost Sync — ${businessDate}`);
-  console.log(`   Site: ${DEFAULT_SITE_ID}`);
+  console.log(`   Site: ${siteId}`);
   console.log(`   LocRef: ${LOC_REF}\n`);
 
   const result = await syncFoodCostFromBI({
-    siteId: DEFAULT_SITE_ID,
+    siteId,
     locRef: LOC_REF,
     businessDate,
     syncDimensions: true,

@@ -5,8 +5,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import type { Action, ActionCreateInput, ActionStats } from "@/types/actions";
 
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
-
 /* ── Read ─────────────────────────────────────────────────────────────────── */
 
 export async function getActiveActions(): Promise<Action[]> {
@@ -112,7 +110,7 @@ export async function getActionStats(): Promise<ActionStats> {
 
 /* ── Write ────────────────────────────────────────────────────────────────── */
 
-export async function createAction(input: ActionCreateInput, siteId: string = DEFAULT_SITE_ID): Promise<Action> {
+export async function createAction(input: ActionCreateInput, siteId: string): Promise<Action> {
   const sb = createServerClient();
   const { data, error } = await sb
     .from("actions")
@@ -207,7 +205,7 @@ export async function dismissAction(id: string, note?: string): Promise<Action> 
 
 /* ── Auto-generate actions from module alerts ─────────────────────────────── */
 
-export async function generateStockActions(): Promise<Action[]> {
+export async function generateStockActions(siteId: string): Promise<Action[]> {
   const sb = createServerClient();
 
   // Find critical stock items
@@ -255,7 +253,7 @@ export async function generateStockActions(): Promise<Action[]> {
         : "Prevents potential stockout before next delivery window",
       why_it_matters: `${item.name} has ${daysRemaining.toFixed(1)} days of stock remaining at current usage rates`,
       execution_type: "order",
-    });
+    }, siteId);
 
     created.push(action);
   }

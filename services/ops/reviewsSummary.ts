@@ -7,14 +7,21 @@ import { Review, ReviewPlatform, SevenDayReviewSummary } from "@/types";
 
 const PLATFORMS: ReviewPlatform[] = ["google"];
 
-export async function getSevenDayReviewSummary(): Promise<SevenDayReviewSummary> {
+export async function getSevenDayReviewSummary(siteId?: string): Promise<SevenDayReviewSummary> {
   const supabase = createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("reviews")
     .select("*")
     .order("review_date", { ascending: false })
     .limit(5);
+
+  // Always scope to site when provided — never return cross-site data
+  if (siteId) {
+    query = query.eq("site_id", siteId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`[OpsSvc/Reviews] ${error.message}`);
@@ -57,14 +64,20 @@ export async function getSevenDayReviewSummary(): Promise<SevenDayReviewSummary>
 }
 
 /** Full review list for the /dashboard/reviews page */
-export async function getAllReviews(limit = 100): Promise<Review[]> {
+export async function getAllReviews(limit = 100, siteId?: string): Promise<Review[]> {
   const supabase = createServerClient();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("reviews")
     .select("*")
     .order("review_date", { ascending: false })
     .limit(limit);
+
+  if (siteId) {
+    query = query.eq("site_id", siteId);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`[OpsSvc/Reviews] ${error.message}`);

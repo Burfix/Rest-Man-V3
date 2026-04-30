@@ -9,19 +9,28 @@
  */
 
 import { getCachedZoneSummaries } from "@/services/universal/zoneSummary";
-import { DEFAULT_SITE_ID } from "@/types/universal";
-import { getUserContext } from "@/lib/auth/get-user-context";
+import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
 import ZoneHeatmap from "@/components/dashboard/ops/ZoneHeatmap";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function HeatmapPage() {
-  let activeSiteId: string = DEFAULT_SITE_ID;
-  try {
-    const ctx = await getUserContext();
-    activeSiteId = ctx.siteId;
-  } catch {}
+  const ctx = await getUserContext().catch((err: unknown) => {
+    if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
+    return null;
+  });
+
+  if (!ctx?.siteId) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">No site assigned. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  const activeSiteId = ctx.siteId;
 
   let zones = await getCachedZoneSummaries(activeSiteId).catch(() => []);
 

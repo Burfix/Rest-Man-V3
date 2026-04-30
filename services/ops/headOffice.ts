@@ -44,6 +44,8 @@ export interface StoreSummary {
   actions_overdue:       number;
   actions_completion_pct: number | null;
   snapshot_date:         string | null;
+  /** Deployment / data readiness stage — optional for back-compat */
+  deployment_stage?:     "live" | "partial" | "pending";
 }
 
 export interface GroupMetrics {

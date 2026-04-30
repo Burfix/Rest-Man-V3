@@ -794,6 +794,7 @@ export interface Database {
           settings: Record<string, unknown>;
           google_place_id: string | null;
           allowed_routes: string[] | null;
+          deployment_stage: 'live' | 'partial' | 'pending';
           created_at: string;
           updated_at: string;
         };
@@ -818,6 +819,7 @@ export interface Database {
           settings?: Record<string, unknown>;
           google_place_id?: string | null;
           allowed_routes?: string[] | null;
+          deployment_stage?: 'live' | 'partial' | 'pending';
           created_at?: string;
           updated_at?: string;
         };
@@ -842,6 +844,7 @@ export interface Database {
           settings?: Record<string, unknown>;
           google_place_id?: string | null;
           allowed_routes?: string[] | null;
+          deployment_stage?: 'live' | 'partial' | 'pending';
           updated_at?: string;
         };
         Relationships: [];

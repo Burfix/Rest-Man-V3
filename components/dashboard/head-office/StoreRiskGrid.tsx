@@ -118,10 +118,22 @@ function StoreCard({ store }: { store: StoreSummary }) {
           </div>
         </div>
 
-        {/* Risk badge */}
-        <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", risk.badge)}>
-          {risk.label}
-        </span>
+        {/* Risk badge (+ deployment stage if not live) */}
+        <div className="shrink-0 flex flex-col items-end gap-1">
+          <span className={cn("rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider", risk.badge)}>
+            {risk.label}
+          </span>
+          {store.deployment_stage && store.deployment_stage !== "live" && (
+            <span className={cn(
+              "rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider",
+              store.deployment_stage === "partial"
+                ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300"
+                : "bg-stone-100 dark:bg-stone-800 text-stone-500 dark:text-stone-400"
+            )}>
+              {store.deployment_stage === "partial" ? "Partial" : "Pending"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Body */}

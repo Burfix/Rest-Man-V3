@@ -95,7 +95,7 @@ export async function GET() {
     // ── 3. Fetch sites scoped to user's orgs ────────────────────────────────
     let sitesQ = db
       .from("sites")
-      .select("id, name, site_type, organisation_id")
+      .select("id, name, site_type, organisation_id, deployment_stage")
       .eq("is_active", true)
       .neq("store_code", "TEST-01");
 
@@ -117,13 +117,17 @@ export async function GET() {
     }
 
     const { data: sitesData, error: sitesErr } = await sitesQ;
-    if (sitesErr) throw sitesErr;
+    if (sitesErr) {
+      logger.error("Head Office sites query failed", { err: sitesErr.message });
+      return NextResponse.json({ stores: [], accountability: [], actions: [], opsTrend: [] });
+    }
 
     const sites = (sitesData ?? []) as {
       id: string;
       name: string;
       site_type: string | null;
       organisation_id: string;
+      deployment_stage: string | null;
     }[];
 
     if (sites.length === 0) {
@@ -137,12 +141,31 @@ export async function GET() {
 
     const siteIds = sites.map((s) => s.id);
     const siteNameMap = new Map(sites.map((s) => [s.id, s.name]));
-    const siteTypeMap = new Map(sites.map((s) => [s.id, s.site_type ?? "restaurant"]));
+
+    console.log("HEAD OFFICE sites:", sites.length, siteIds);
 
     // ── 4. Parallel data queries ────────────────────────────────────────────
     const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
     const today     = new Date().toISOString().slice(0, 10);
     const sevenAgo  = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+
+    // Derive POS connection state: a site has live data if it has a recent store_snapshot
+    // with non-null net_sales. Purely from store_snapshots — no external table dependency.
+    const { data: snapshotRows, error: snapshotErr } = await db
+      .from("store_snapshots")
+      .select("site_id")
+      .in("site_id", siteIds)
+      .not("net_sales", "is", null)
+      .gte("snapshot_date", sevenAgo)
+      .limit(500);
+
+    if (snapshotErr) {
+      logger.warn("Head Office snapshot query failed — POS detection disabled", { err: snapshotErr.message });
+    }
+
+    const sitesWithRecentSales = new Set<string>(
+      ((snapshotRows ?? []) as any[]).map((r: any) => r.site_id as string),
+    );
 
     const [mpsYestResult, mpsWeekResult, tasksResult, maintResult, actionsResult] =
       await Promise.allSettled([
@@ -186,6 +209,16 @@ export async function GET() {
 
     // ── 5. Process: STORES ──────────────────────────────────────────────────
 
+    // Log any rejected queries — NEVER throw, NEVER crash the response
+    const queryNames = ["mpsYest", "mpsWeek", "tasks", "maint", "actions"] as const;
+    [mpsYestResult, mpsWeekResult, tasksResult, maintResult, actionsResult].forEach((r, i) => {
+      if (r.status === "rejected") {
+        console.error("HEAD OFFICE ERROR:", queryNames[i], r.reason);
+      } else if (r.value?.error) {
+        console.error("HEAD OFFICE DB ERROR:", queryNames[i], r.value.error);
+      }
+    });
+
     // Latest score per site from yesterday
     const scoreMap = new Map<string, number>();
     if (mpsYestResult.status === "fulfilled") {
@@ -222,11 +255,15 @@ export async function GET() {
 
     const stores = sites
       .map((site) => {
-        const score = scoreMap.get(site.id) ?? null;
+        const score           = scoreMap.get(site.id) ?? null;
+        const hasPosConnection = sitesWithRecentSales.has(site.id);
+        const deploymentStage = (site.deployment_stage ?? "live") as "live" | "partial" | "pending";
         return {
           id:                   site.id,
           name:                 site.name,
           site_type:            site.site_type ?? "restaurant",
+          deployment_stage:     deploymentStage,
+          has_pos_connection:   hasPosConnection,
           score:                score !== null ? Math.round(score) : null,
           grade:                gradeFromScore(score),
           tasks_today:          tasksTotalMap.get(site.id) ?? 0,
@@ -381,10 +418,9 @@ export async function GET() {
     // ── 9. Return ──────────────────────────────────────────────────────────
     return NextResponse.json({ stores, accountability, actions, opsTrend });
   } catch (err: any) {
+    // NEVER throw — always return a safe empty response
+    console.error("HEAD OFFICE ERROR:", err?.message ?? err);
     logger.error("Head Office summary error", { err: err?.message ?? err });
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return NextResponse.json({ stores: [], accountability: [], actions: [], opsTrend: [] });
   }
 }

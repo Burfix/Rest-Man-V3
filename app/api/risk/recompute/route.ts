@@ -8,7 +8,7 @@
  * so this endpoint can also be called as a Vercel cron job.
  *
  * Body (optional):
- *   { siteId?: string }   — defaults to DEFAULT_SITE_ID
+ *   { siteId?: string }   — required; returns 400 if missing
  *
  * Response:
  *   { ok: true, zones: ZoneSummary[], computed_at: string }
@@ -17,7 +17,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getZoneSummaries } from "@/services/universal/zoneSummary";
-import { DEFAULT_SITE_ID } from "@/types/universal";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +43,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   try {
     body = await req.json();
   } catch {
-    // empty body is fine — use default
+    // empty body — will fail siteId check below
   }
-  const siteId = body.siteId ?? DEFAULT_SITE_ID;
+  const siteId = body.siteId;
+  if (!siteId) {
+    return NextResponse.json(
+      { error: "siteId is required in request body" },
+      { status: 400 }
+    );
+  }
 
   // ── Recompute ──────────────────────────────────────────────────────────
   try {

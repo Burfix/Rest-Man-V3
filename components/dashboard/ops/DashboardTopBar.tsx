@@ -112,39 +112,43 @@ export default function DashboardTopBar({
 
   // ── Revenue tile — reads from unified sales snapshot ──────────────────────
   const ss = salesSnapshot;
-  const revMetric = ss ? compactZAR(ss.netSales) : forecast ? compactZAR(forecast.forecast_sales) : "—";
+  // data_source badge: "live" | "estimated" | "none"
+  const revDataSource = ss?.data_source ?? "none";
+  const revMetric =
+    revDataSource === "none"
+      ? "—"
+      : ss ? compactZAR(ss.netSales) : forecast ? compactZAR(forecast.forecast_sales) : "—";
   const isAutoTarget = ss?.targetSource === "auto" || forecast?.target_source === "auto";
   const variancePct = ss?.targetVariancePercent ?? forecast?.sales_gap_pct ?? null;
   const revSub =
-    (ss && ss.targetSales == null) || (!ss && !forecast) ? "No target set" :
-    ss?.targetSales == null && forecast?.target_sales == null ? "Target unavailable" :
-    variancePct != null && variancePct >= 5              ? "Ahead of target"          :
-    variancePct != null && variancePct >= 0              ? "On target"                :
-    variancePct != null
-      ? `${Math.abs(variancePct).toFixed(0)}% behind target`
-      : "No forecast available";
+    revDataSource === "none"
+      ? "Waiting for POS connection"
+      : (ss && ss.targetSales == null) || (!ss && !forecast) ? "No target set" :
+      ss?.targetSales == null && forecast?.target_sales == null ? "Target unavailable" :
+      variancePct != null && variancePct >= 5              ? "Ahead of target"          :
+      variancePct != null && variancePct >= 0              ? "On target"                :
+      variancePct != null && revDataSource === "estimated"
+        ? `${Math.abs(variancePct).toFixed(0)}% below forecast`
+        : variancePct != null
+        ? `${Math.abs(variancePct).toFixed(0)}% behind target`
+        : "No forecast available";
   const revSubColor =
-    variancePct == null                  ? "text-stone-500 dark:text-stone-600" :
-    variancePct >= 0                     ? "text-emerald-600 dark:text-emerald-500" :
-    Math.abs(variancePct) >= 20          ? "text-red-600 dark:text-red-400" :
+    revDataSource === "none"     ? "text-stone-400 dark:text-stone-600" :
+    variancePct == null          ? "text-stone-500 dark:text-stone-600" :
+    variancePct >= 0             ? "text-emerald-600 dark:text-emerald-500" :
+    revDataSource === "estimated" ? "text-amber-600 dark:text-amber-400" :
+    Math.abs(variancePct) >= 20  ? "text-red-600 dark:text-red-400" :
     "text-amber-600 dark:text-amber-400";
   const revSubNote = isAutoTarget ? "Target based on same day last year +10%" : undefined;
 
-  // Source badge for revenue tile — from snapshot
-  const revSourceType = ss
-    ? (ss.source === "micros" && ss.isLive ? "micros_live" as const
-      : ss.source === "micros" && ss.isStale ? "stale" as const
-      : ss.source === "manual" ? "manual_upload" as const
-      : "forecast" as const)
-    : microsLive ? "micros_live" as const
-    : microsStale ? "stale" as const
-    : forecast ? "forecast" as const
+  // Source badge for revenue tile — from data_source
+  const revSourceType =
+    revDataSource === "live"       ? "micros_live" as const
+    : revDataSource === "estimated" ? "estimated" as const
+    : "not_connected" as const;
+  const revSourceAge = ss?.freshnessMinutes != null
+    ? (ss.freshnessMinutes < 1 ? "now" : ss.freshnessMinutes < 60 ? `${ss.freshnessMinutes}m` : `${Math.floor(ss.freshnessMinutes / 60)}h`)
     : undefined;
-  const revSourceAge = ss
-    ? (ss.freshnessMinutes != null
-        ? (ss.freshnessMinutes < 1 ? "now" : ss.freshnessMinutes < 60 ? `${ss.freshnessMinutes}m` : `${Math.floor(ss.freshnessMinutes / 60)}h`)
-        : undefined)
-    : microsLive ? microsAgeLabel : undefined;
 
   // ── Labour tile ───────────────────────────────────────────────────────────
   const labourMetric = laborPct != null ? `${laborPct.toFixed(1)}%` : "—";

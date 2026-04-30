@@ -29,9 +29,10 @@ import { getStoredDailySummary } from "@/services/micros/labour/summary";
 import { evaluateOperations } from "@/services/decision-engine";
 import { getServicePeriod } from "@/lib/commandCenter";
 import { getSiteConfig } from "@/lib/config/site";
-import { getUserContext } from "@/lib/auth/get-user-context";
+import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { createServerClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import AccountabilityAlert from "@/components/accountability/AccountabilityAlert";
 import HeroStrip         from "@/components/brain/HeroStrip";
 import PriorityActionBoard, { type DutiesData } from "@/components/brain/PriorityActionBoard";
@@ -123,16 +124,20 @@ const EMPTY_MAINTENANCE: MaintenanceSummary = {
 
 export default async function OperationsDashboard() {
   // ─── User context (site + org) ──────────────────────────────────────────
-  const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
-  let siteId = DEFAULT_SITE_ID;
-  let orgId: string | null = null;
-  try {
-    const ctx = await getUserContext();
-    siteId = ctx.siteId;
-    orgId = ctx.orgId;
-  } catch {
-    // Not authenticated (shouldn't happen behind middleware) — fall back to defaults
+  const ctx = await getUserContext().catch((err: unknown) => {
+    if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
+    return null;
+  });
+
+  if (!ctx?.siteId) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">No site assigned. Contact your administrator.</p>
+      </div>
+    );
   }
+
+  const { siteId, orgId } = ctx;
 
   // Start brain in parallel (runs alongside main data fetches)
   const brainPromise = runOperatingBrain(siteId, todayISO());
@@ -151,7 +156,7 @@ export default async function OperationsDashboard() {
     labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
-    getSevenDayReviewSummary(),
+    getSevenDayReviewSummary(siteId),
     getLatestSalesSummary(),
     getMaintenanceSummary(siteId),
     getUpcomingEvents(),
@@ -484,6 +489,7 @@ export default async function OperationsDashboard() {
               isLive={salesSnapshot.isLive}
               source={salesSnapshot.source}
               sourceNote={salesSnapshot.notes?.[0]}
+              dataSource={salesSnapshot.data_source}
             />
           </div>
 

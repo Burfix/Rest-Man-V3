@@ -212,15 +212,20 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient();
 
-    // Resolve the site for this upload (falls back to default pilot-store ID)
-    const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
-    let siteId = DEFAULT_SITE_ID;
+    // Resolve the site for this upload — reject if not authenticated
+    let ctx;
     try {
-      const ctx = await getUserContext();
-      siteId = ctx.siteId || DEFAULT_SITE_ID;
+      ctx = await getUserContext();
     } catch {
-      // Not authenticated — shouldn't happen behind middleware
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+    if (!ctx.siteId) {
+      return NextResponse.json(
+        { error: "No site assigned — contact your administrator" },
+        { status: 403 }
+      );
+    }
+    const siteId = ctx.siteId;
 
     // Insert upload header row
     const { data: uploadData, error: uploadErr } = await supabase

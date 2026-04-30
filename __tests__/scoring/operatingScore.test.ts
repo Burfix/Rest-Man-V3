@@ -261,6 +261,7 @@ describe("calculateOperatingScore", () => {
     const total =
       result.components.revenue.maxPoints +
       result.components.labour.maxPoints +
+      result.components.service.maxPoints +
       result.components.compliance.maxPoints +
       result.components.maintenance.maxPoints;
     expect(total).toBe(100);
@@ -268,9 +269,10 @@ describe("calculateOperatingScore", () => {
 
   it("TC7: weightedScore never exceeds maxPoints", () => {
     const result = calculateOperatingScore(FULL_TARGET);
-    expect(result.components.revenue.weightedScore).toBeLessThanOrEqual(45);
-    expect(result.components.labour.weightedScore).toBeLessThanOrEqual(30);
-    expect(result.components.compliance.weightedScore).toBeLessThanOrEqual(15);
+    expect(result.components.revenue.weightedScore).toBeLessThanOrEqual(40);
+    expect(result.components.labour.weightedScore).toBeLessThanOrEqual(25);
+    expect(result.components.service.weightedScore).toBeLessThanOrEqual(15);
+    expect(result.components.compliance.weightedScore).toBeLessThanOrEqual(10);
     expect(result.components.maintenance.weightedScore).toBeLessThanOrEqual(10);
   });
 
@@ -288,5 +290,13 @@ describe("calculateOperatingScore", () => {
     const result = calculateOperatingScore(FULL_TARGET);
     expect(result.drivers).toHaveLength(0);
     expect(result.summary).toBe("All systems operating well");
+  });
+
+  it("TC10: omitting serviceScore uses neutral and still produces valid output", () => {
+    const result = calculateOperatingScore({ ...FULL_TARGET, serviceScore: undefined });
+    expect(result.score).toBeGreaterThanOrEqual(0);
+    expect(result.score).toBeLessThanOrEqual(100);
+    expect(result.components.service.rawScore).toBe(75);
+    expect(result.components.service.maxPoints).toBe(15);
   });
 });

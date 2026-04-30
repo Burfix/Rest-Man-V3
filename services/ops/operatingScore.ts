@@ -19,12 +19,14 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { DEFAULT_ORG_ID } from "@/lib/constants";
 import { computeComplianceStatus } from "@/lib/compliance/scoring";
+import { isFresh } from "@/lib/data/freshness";
 import {
   calcRevenueScore,
   calcLabourScore,
   calcComplianceScore,
   calcMaintenanceScore,
   toGrade as libToGrade,
+  WEIGHTS,
   type ScoreConfidence,
 } from "@/lib/scoring/operatingScore";
 
@@ -38,11 +40,11 @@ export type ScoreGrade = "A" | "B" | "C" | "D" | "F";
 export type { ScoreConfidence };
 
 export interface RevenueComponent {
-  /** Weighted points earned (out of max 45). */
+  /** Weighted points earned (out of max 40). */
   score:       number;
   /** Raw score 0–100 before weighting. */
   rawScore:    number;
-  max:         45;
+  max:         40;
   actual:      number | null;
   target:      number | null;
   gap_pct:     number | null;
@@ -51,21 +53,21 @@ export interface RevenueComponent {
 }
 
 export interface LabourComponent {
-  /** Weighted points earned (out of max 30). */
+  /** Weighted points earned (out of max 25). */
   score:       number;
   /** Raw score 0–100 before weighting. */
   rawScore:    number;
-  max:         30;
+  max:         25;
   labour_pct:  number | null;
   detail:      string;
 }
 
 export interface ComplianceComponent {
-  /** Weighted points earned (out of max 15). */
+  /** Weighted points earned (out of max 10). */
   score:        number;
   /** Raw score 0–100 before weighting. */
   rawScore:     number;
-  max:          15;
+  max:          10;
   worst_status: ComplianceWorstStatus;
   total_items:  number;
   expired:      number;
@@ -84,6 +86,15 @@ export interface MaintenanceComponent {
   open_count:     number;
   critical_count: number;
   detail:         string;
+}
+
+export interface ServiceComponent {
+  /** Weighted points earned (out of max 15). */
+  score:    number;
+  /** Raw score 0–100 before weighting. Always 75 in non-copilot context (neutral). */
+  rawScore: number;
+  max:      15;
+  detail:   string;
 }
 
 // ── Supplementary types (not counted in total score) ─────────────────────────
@@ -122,6 +133,7 @@ export interface OperatingScore {
   components: {
     revenue:     RevenueComponent;
     labour:      LabourComponent;
+    service:     ServiceComponent;
     compliance:  ComplianceComponent;
     maintenance: MaintenanceComponent;
     /** Supplementary — informational only, not counted in total. */
@@ -309,12 +321,12 @@ export async function getOperatingScore(
     }
   }
 
-  const revWeighted = Math.round(revRawScore * 0.45);
+  const revWeighted = Math.round(revRawScore * WEIGHTS.revenue);
 
   const revenueComponent: RevenueComponent = {
     score:     revWeighted,
     rawScore:  revRawScore,
-    max:       45,
+    max:       40,
     actual:    actualSales,
     target:    targetSales,
     gap_pct:   revGapPct,
@@ -337,15 +349,20 @@ export async function getOperatingScore(
     labDetail   = lab.explanation;
   }
 
-  const labWeighted = Math.round(labRawScore * 0.30);
+  const labWeighted = Math.round(labRawScore * WEIGHTS.labour);
 
   const labourComponent: LabourComponent = {
     score:      labWeighted,
     rawScore:   labRawScore,
-    max:        30,
+    max:        25,
     labour_pct: liveLabourPct,
     detail:     labDetail,
   };
+
+  // ── Service component (neutral when not in real-time context) ─────────────
+  // Service is tracked by the GM Co-Pilot in real-time; here we use neutral 75.
+  const svcRawScore = 75;
+  const svcWeighted = Math.round(svcRawScore * WEIGHTS.service);
 
   // ── Compliance component ───────────────────────────────────────────────────
   const complianceRows = (complianceResult.data as unknown as {
@@ -367,12 +384,12 @@ export async function getOperatingScore(
     expiredCount,
     dueSoonCount,
   );
-  const compWeighted = Math.round(comp.rawScore * 0.15);
+  const compWeighted = Math.round(comp.rawScore * WEIGHTS.compliance);
 
   const complianceComponent: ComplianceComponent = {
     score:        compWeighted,
     rawScore:     comp.rawScore,
-    max:          15,
+    max:          10,
     worst_status: deriveWorstStatus(expiredCount, dueSoonCount, scheduledCount),
     total_items:  complianceItems.length,
     expired:      expiredCount,
@@ -397,7 +414,7 @@ export async function getOperatingScore(
     maintInfo.severity === "none"     ? "No open maintenance issues" :
     maintInfo.severity === "critical" ? `${maintInfo.criticalCount} critical issue${maintInfo.criticalCount === 1 ? "" : "s"} open` :
     `${maintInfo.openCount} minor issue${maintInfo.openCount === 1 ? "" : "s"} open`;
-  const maintWeighted = Math.round(Math.min(maintRawScore, 100) * 0.10);
+  const maintWeighted = Math.round(Math.min(maintRawScore, 100) * WEIGHTS.maintenance);
 
   const maintenanceComponent: MaintenanceComponent = {
     score:          maintWeighted,
@@ -409,16 +426,41 @@ export async function getOperatingScore(
     detail:         maintDetail,
   };
 
-  // ── Total (0–100) ─────────────────────────────────────────────────────────
-  const total = Math.min(100, revWeighted + labWeighted + compWeighted + maintWeighted);
+  // ── Total (0–100) ───────────────────────────────────────────────────────
+  // Use canonical weights via WEIGHTS — single source of truth
+  const total = Math.min(100, revWeighted + labWeighted + svcWeighted + compWeighted + maintWeighted);
+
+  // ── SCORE INPUT log — catches bad inputs before they corrupt the score ─────
+  console.log("SCORE INPUT [services/ops/operatingScore]:", {
+    actualRevenue:  actualSales,
+    targetRevenue:  targetSales,
+    labourPct:      liveLabourPct,
+    targetLabourPct: 30,
+    serviceScore:   "neutral (75)",
+    expiredItems:   expiredCount,
+    dueSoonItems:   dueSoonCount,
+    openIssues:     maintInfo.openCount,
+    criticalIssues: maintInfo.criticalCount,
+    // derived
+    revWeighted, labWeighted, svcWeighted, compWeighted, maintWeighted, total,
+  });
 
   // ── Confidence ────────────────────────────────────────────────────────────
   const hasRevenue    = actualSales !== null && targetSales !== null;
   const hasLabour     = liveLabourPct !== null;
   const hasCompliance = complianceItems.length > 0;
 
+  // Freshness check: if revenue or labour data is stale (> 30 min), cap at "low"
+  const revenueIsFresh = isFresh(dataDate);
+  if (hasRevenue && !revenueIsFresh) {
+    console.warn("SCORE FRESHNESS WARN: revenue data is stale", { dataDate });
+  }
+
   let confidence: ScoreConfidence;
-  if (hasRevenue && hasLabour && hasCompliance) {
+  if (!revenueIsFresh && hasRevenue) {
+    // Stale revenue — never show as high or medium confidence
+    confidence = "low";
+  } else if (hasRevenue && hasLabour && hasCompliance) {
     confidence = "high";
   } else if (hasRevenue && hasLabour) {
     confidence = "medium";
@@ -426,18 +468,31 @@ export async function getOperatingScore(
     confidence = "low";
   }
 
-  // ── Drivers ───────────────────────────────────────────────────────────────
-  const componentPerf = [
-    { label: "revenue gap",        rawScore: revRawScore         },
-    { label: "labour over target", rawScore: labRawScore         },
-    { label: "compliance",         rawScore: comp.rawScore       },
-    { label: "maintenance",        rawScore: Math.min(maintRawScore, 100) },
-  ];
-  const drivers = componentPerf
-    .filter((c) => c.rawScore < 60)
-    .sort((a, b) => a.rawScore - b.rawScore)
-    .slice(0, 2)
-    .map((c) => c.label);
+  // ── Drivers — threshold-based critical messages matching canonical scorer ──
+  const drivers: string[] = [];
+
+  if (revWeighted <= 10) {
+    drivers.push("Revenue critically behind target");
+  } else if (revRawScore < 60) {
+    drivers.push("Revenue behind target");
+  }
+
+  if (labWeighted <= 10) {
+    drivers.push("Labour significantly over target");
+  } else if (labRawScore < 60) {
+    drivers.push("Labour over target");
+  }
+
+  if (comp.rawScore < 60) {
+    drivers.push("Compliance gaps");
+  }
+
+  if (Math.min(maintRawScore, 100) < 60) {
+    drivers.push("Maintenance issues");
+  }
+
+  // Keep at most 2
+  drivers.splice(2);
 
   const summary = drivers.length === 0
     ? "All systems operating well"
@@ -485,6 +540,12 @@ export async function getOperatingScore(
     components: {
       revenue:        revenueComponent,
       labour:         labourComponent,
+      service: {
+        score:    svcWeighted,
+        rawScore: svcRawScore,
+        max:      15,
+        detail:   "Service score neutral — live score computed by GM Co-Pilot",
+      },
       compliance:     complianceComponent,
       maintenance:    maintenanceComponent,
       food_cost:      foodCostComponent,

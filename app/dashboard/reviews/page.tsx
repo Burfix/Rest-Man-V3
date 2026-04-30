@@ -1,8 +1,9 @@
 /**
- * Reviews page — live Google reviews + summary + full log.
+ * Reviews page — Guest Experience Intelligence + platform feeds + full log.
  */
 
 import { getAllReviews, getSevenDayReviewSummary } from "@/services/ops/reviewsSummary";
+import { getReviewSummaryForSite } from "@/services/reviews/reviewsSummaryService";
 import { getPlaceDetails } from "@/lib/google-places";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUserContext } from "@/lib/auth/get-user-context";
@@ -11,6 +12,10 @@ import { Review, SevenDayReviewSummary } from "@/types";
 import { cn, formatShortDate } from "@/lib/utils";
 import ReviewActions from "@/components/dashboard/reviews/ReviewActions";
 import GoogleReviewsPanel from "@/components/dashboard/reviews/GoogleReviewsPanel";
+import ReviewsSummaryCard from "@/components/dashboard/reviews/ReviewsSummaryCard";
+import ReviewRiskPanel from "@/components/dashboard/reviews/ReviewRiskPanel";
+import GuestVoiceFeed from "@/components/dashboard/reviews/GuestVoiceFeed";
+import ReviewActionsPanel from "@/components/dashboard/reviews/ReviewActionsPanel";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -33,6 +38,8 @@ export default async function ReviewsPage() {
   let googlePlaceId: string | null = null;
   let siteId = "";
   let loadError: string | null = null;
+  let reviewActions: Array<{ id: string; title: string; description?: string | null; department: string; priority: string; status: string; due_date?: string | null }> = [];
+  let intelligenceSummary: Awaited<ReturnType<typeof getReviewSummaryForSite>> | null = null;
 
   // ── Auth + site context ───────────────────────────────────────────────────
   try {
@@ -79,15 +86,26 @@ export default async function ReviewsPage() {
     };
   };
 
-  const [summaryResult, reviewsResult, googleResult] = await Promise.allSettled([
-    getSevenDayReviewSummary(),
-    getAllReviews(200),
+  const [summaryResult, reviewsResult, googleResult, actionsResult, intelligenceResult] = await Promise.allSettled([
+    getSevenDayReviewSummary(siteId),
+    getAllReviews(200, siteId),
     fetchGoogle(),
+    siteId
+      ? createServerClient()
+          .from("review_actions")
+          .select("id, title, description, department, priority, status, due_date")
+          .eq("site_id", siteId)
+          .in("status", ["open", "in_progress"])
+          .order("priority")
+      : Promise.resolve({ data: [] }),
+    siteId ? getReviewSummaryForSite(siteId) : Promise.resolve(null),
   ]);
 
   if (summaryResult.status === "fulfilled") summary = summaryResult.value;
   if (reviewsResult.status === "fulfilled") reviews = reviewsResult.value;
   if (googleResult.status === "fulfilled") googleData = googleResult.value;
+  if (actionsResult.status === "fulfilled") reviewActions = (actionsResult.value as { data: typeof reviewActions }).data ?? [];
+  if (intelligenceResult.status === "fulfilled") intelligenceSummary = intelligenceResult.value;
 
   if (summaryResult.status === "rejected" || reviewsResult.status === "rejected") {
     loadError = "Failed to load some review data. Showing available results.";
@@ -97,14 +115,11 @@ export default async function ReviewsPage() {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-stone-900">Reviews</h1>
+        <h1 className="text-2xl font-bold text-stone-900 dark:text-stone-100">Guest Experience Intelligence</h1>
         <p className="mt-0.5 text-sm text-stone-500">
-          Customer reputation tracking
+          Reviews · Sentiment · Operational risks · Response management
         </p>
       </div>
-
-      {/* Manual review entry */}
-      <ReviewActions />
 
       {loadError && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
@@ -112,9 +127,84 @@ export default async function ReviewsPage() {
         </div>
       )}
 
+      {/* ── Intelligence panels ─────────────────────────────── */}
+      {intelligenceSummary && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* Left: summary card */}
+          <ReviewsSummaryCard
+            averageRating={intelligenceSummary.averageRating}
+            totalReviews={intelligenceSummary.totalReviews}
+            sentiment={{
+              positive: intelligenceSummary.positiveCount,
+              neutral:  intelligenceSummary.neutralCount,
+              negative: intelligenceSummary.negativeCount,
+            }}
+            unresolvedActions={intelligenceSummary.unresolvedActions}
+            ratingTrend={
+              intelligenceSummary.riskLevel === "critical" || intelligenceSummary.negativeLast7 >= 3
+                ? "declining"
+                : intelligenceSummary.averageRating >= 4.3
+                ? "positive"
+                : "stable"
+            }
+            riskLevel={intelligenceSummary.riskLevel}
+          />
+
+          {/* Middle: risk panel */}
+          <ReviewRiskPanel
+            riskLevel={intelligenceSummary.riskLevel}
+            riskDrivers={intelligenceSummary.riskDrivers}
+            operationalRisks={[]}
+            urgentReviews={reviews.filter((r) => {
+              const rating = Number(r.rating);
+              return rating <= 3 || (r as unknown as { urgency?: string }).urgency === "critical";
+            }).slice(0, 3).map((r) => ({
+              id:            r.id,
+              reviewer_name: r.reviewer_name,
+              rating:        Number(r.rating),
+              review_date:   r.review_date,
+              review_text:   r.review_text,
+              urgency:       (r as unknown as { urgency?: string }).urgency,
+              source:        (r as unknown as { source?: string }).source,
+            }))}
+          />
+
+          {/* Right: actions panel */}
+          <ReviewActionsPanel actions={reviewActions} />
+        </div>
+      )}
+
+      {/* ── Guest Voice Feed ────────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-base font-semibold text-stone-900 dark:text-stone-100">
+          Guest Voice
+        </h2>
+        <GuestVoiceFeed reviews={reviews.map((r) => ({
+          id:              r.id,
+          reviewer_name:   r.reviewer_name,
+          rating:          Number(r.rating),
+          rating_scale:    5,
+          review_date:     r.review_date,
+          review_text:     r.review_text,
+          source:          (r as unknown as { source?: string }).source ?? r.platform,
+          sentiment_label: (r as unknown as { sentiment_label?: string }).sentiment_label ?? r.sentiment,
+          category_tags:   (r as unknown as { category_tags?: string[] }).category_tags ?? r.tags,
+          review_status:   (r as unknown as { review_status?: string }).review_status,
+          urgency:         (r as unknown as { urgency?: string }).urgency,
+        }))} />
+      </div>
+
+      {/* ── Manual review entry ─────────────────────────────── */}
+      <div>
+        <h2 className="mb-3 text-base font-semibold text-stone-900 dark:text-stone-100">
+          Import / Add Review
+        </h2>
+        <ReviewActions />
+      </div>
+
       {/* ── Live platform feeds ─────────────────────────────── */}
       <div>
-        <h2 className="mb-3 text-base font-semibold text-stone-900">
+        <h2 className="mb-3 text-base font-semibold text-stone-900 dark:text-stone-100">
           Live Platform Reviews
         </h2>
         <GoogleReviewsPanel
@@ -127,7 +217,7 @@ export default async function ReviewsPage() {
       {/* ── 7-day Supabase summary ──────────────────────────── */}
       {summary && summary.totalReviews > 0 && (
         <div>
-          <h2 className="mb-3 text-base font-semibold text-stone-900">
+          <h2 className="mb-3 text-base font-semibold text-stone-900 dark:text-stone-100">
             7-Day Summary
           </h2>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -162,41 +252,6 @@ export default async function ReviewsPage() {
           </div>
         </div>
       )}
-
-      {/* ── Full review log (manual DB entries) ─────────────── */}
-      <div>
-        <h2 className="mb-3 text-base font-semibold text-stone-900">Review Log</h2>
-        {reviews.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-stone-300 bg-stone-50 px-6 py-10 text-center">
-            <p className="text-sm font-medium text-stone-500">No reviews recorded yet</p>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              Use the &ldquo;Add Review&rdquo; button above to log a customer review manually.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-stone-200">
-            <table className="min-w-full divide-y divide-stone-100 bg-white text-sm">
-              <thead>
-                <tr className="bg-stone-50 text-left text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
-                  <th className="px-4 py-3">Date</th>
-                  <th className="px-4 py-3">Platform</th>
-                  <th className="px-4 py-3">Rating</th>
-                  <th className="px-4 py-3">Reviewer</th>
-                  <th className="px-4 py-3">Sentiment</th>
-                  <th className="px-4 py-3">Review</th>
-                  <th className="px-4 py-3">Tags</th>
-                  <th className="px-4 py-3">Flagged</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-100">
-                {reviews.map((r) => (
-                  <ReviewRow key={r.id} review={r} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

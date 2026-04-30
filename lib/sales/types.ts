@@ -81,6 +81,16 @@ export interface NormalizedSalesSnapshot {
 
   /** Optional notes (e.g. "Event: Quiz Night", "Forecast confidence: low") */
   notes: string[];
+
+  // ── Module-level data state ───────────────────────────────────────────────
+
+  /**
+   * High-level data state for UI badges:
+   *   "live"      — POS connected, data flowing (MICROS)
+   *   "estimated" — Fallback active: manual upload or revenue forecast
+   *   "none"      — No data at all; UI must hide revenue numbers
+   */
+  data_source: "live" | "estimated" | "none";
 }
 
 // ── Revenue score (pure, from snapshot) ─────────────────────────────────────

@@ -98,6 +98,7 @@ function buildFromMicros(
     bookingsToday,
     bookedCoversToday,
     notes: [],
+    data_source: "live" as const,
   };
 }
 
@@ -167,6 +168,7 @@ function buildFromManual(
     bookingsToday,
     bookedCoversToday,
     notes,
+    data_source: "estimated" as const,
   };
 }
 
@@ -216,6 +218,7 @@ function buildFromForecast(
     bookingsToday,
     bookedCoversToday,
     notes,
+    data_source: "estimated" as const,
   };
 }
 
@@ -310,6 +313,7 @@ export async function getCurrentSalesSnapshot(
     bookingsToday,
     bookedCoversToday,
     notes: ["No sales data available — upload daily sales or connect MICROS"],
+    data_source: "none" as const,
   };
 }
 

@@ -10,8 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
+import { getUserContext } from "@/lib/auth/get-user-context";
 
 function daysAgo(n: number): string {
   const d = new Date(
@@ -27,6 +26,12 @@ function todayJHB(): string {
 
 export async function GET() {
   try {
+    const ctx = await getUserContext().catch(() => null);
+    if (!ctx?.siteId) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+    const siteId = ctx.siteId;
+
     const supabase  = createServerClient();
     const today     = todayJHB();
     const sevenDaysAgo = daysAgo(7);
@@ -62,7 +67,7 @@ export async function GET() {
     const { data: dailyStats } = await supabase
       .from("action_daily_stats")
       .select("*")
-      .eq("site_id", DEFAULT_SITE_ID)
+      .eq("site_id", siteId)
       .gte("stat_date", sevenDaysAgo)
       .lt("stat_date", today)
       .order("stat_date", { ascending: false });

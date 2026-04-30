@@ -15,9 +15,10 @@
  */
 
 import { runCopilot } from "@/lib/copilot/orchestrator";
-import { getUserContext } from "@/lib/auth/get-user-context";
+import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { todayISO } from "@/lib/utils";
+import { redirect } from "next/navigation";
 import BrainCopilotHero from "@/components/brain/BrainCopilotHero";
 import BrainTopDecisions from "@/components/brain/BrainTopDecisions";
 import RecoveryMeter     from "@/components/brain/RecoveryMeter";
@@ -41,15 +42,22 @@ export const revalidate = 0;
 
 export default async function GMCoPilotPage() {
   // Get siteId early so brain can run in parallel with copilot
-  const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
-  let siteId = DEFAULT_SITE_ID;
-  try {
-    const userCtx = await getUserContext();
-    siteId = userCtx.siteId;
-  } catch {}
+  const ctx = await getUserContext().catch((err: unknown) => {
+    if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
+    return null;
+  });
 
+  if (!ctx?.siteId) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <p className="text-sm text-muted-foreground">No site assigned. Contact your administrator.</p>
+      </div>
+    );
+  }
+
+  const { siteId } = ctx;
   const brainPromise = runOperatingBrain(siteId, todayISO());
-  const copilot = await runCopilot();
+  const copilot = await runCopilot(siteId);
 
   const brain = await brainPromise.catch(() => null);
 

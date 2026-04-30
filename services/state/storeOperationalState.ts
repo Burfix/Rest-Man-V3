@@ -12,6 +12,10 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import {
+  calculateOperatingScore,
+  toGrade as libToGrade,
+} from "@/lib/scoring/operatingScore";
 import type {
   StoreOperationalState,
   Store,
@@ -20,76 +24,16 @@ import type {
   SourceFact,
 } from "@/lib/ontology/entities";
 
-// ── Score computation ─────────────────────────────────────────────────────────
+// ── Grade and risk helpers ─────────────────────────────────────────────────────────────────────
 
 function gradeFromScore(score: number): ScoreGrade {
-  if (score >= 90) return "A";
-  if (score >= 75) return "B";
-  if (score >= 60) return "C";
-  if (score >= 45) return "D";
-  return "F";
+  return libToGrade(score) as ScoreGrade;
 }
 
 function riskFromScore(score: number): RiskLevel {
   if (score >= 70) return "green";
   if (score >= 45) return "yellow";
   return "red";
-}
-
-/**
- * Weighted operating score:
- *   40% — Revenue attainment      (0–100)
- *   25% — Labour efficiency       (0–100, inverted above target)
- *   20% — Compliance              (0–100, penalised for overdue)
- *   15% — Maintenance             (0–100, penalised for critical tickets)
- */
-function computeOperatingScore(params: {
-  revenueActual:         number;
-  revenueTarget:         number;
-  labourPct:             number | null;
-  targetLabourPct:       number;
-  complianceOverdue:     number;
-  complianceDueSoon:     number;
-  maintenanceCritical:   number;
-  maintenanceRepeat:     number;
-}): { score: number; breakdown: Record<string, number> } {
-  const {
-    revenueActual, revenueTarget, labourPct, targetLabourPct,
-    complianceOverdue, complianceDueSoon,
-    maintenanceCritical, maintenanceRepeat,
-  } = params;
-
-  // Revenue component (0–100)
-  const revScore = revenueTarget > 0
-    ? Math.min(100, Math.max(0, (revenueActual / revenueTarget) * 100))
-    : 50;
-
-  // Labour component (0–100): 100 = at or below target; penalise over-target
-  const labScore = labourPct != null
-    ? Math.min(100, Math.max(0, 100 - Math.max(0, labourPct - targetLabourPct) * 3))
-    : 50;
-
-  // Compliance component (0–100): each overdue −15, each due-soon −5
-  const compScore = Math.min(100, Math.max(0,
-    100 - complianceOverdue * 15 - complianceDueSoon * 5
-  ));
-
-  // Maintenance component (0–100): each critical −20, each repeat −10
-  const maintScore = Math.min(100, Math.max(0,
-    100 - maintenanceCritical * 20 - maintenanceRepeat * 10
-  ));
-
-  const score = Math.round(
-    revScore  * 0.40 +
-    labScore  * 0.25 +
-    compScore * 0.20 +
-    maintScore * 0.15
-  );
-
-  return {
-    score,
-    breakdown: { revScore, labScore, compScore, maintScore },
-  };
 }
 
 // ── Main function ─────────────────────────────────────────────────────────────
@@ -177,17 +121,30 @@ export async function getStoreOperationalState(
   ).length;
   const maintenanceRepeat = maintTickets.filter((t: any) => t.recurrence_count > 1).length;
 
-  // ── Operating score ────────────────────────────────────────────────────────
-  const { score, breakdown } = computeOperatingScore({
-    revenueActual:   salesNetVat,
-    revenueTarget,
+  // ── Operating score — canonical formula ───────────────────────────────────
+  const scoreInput = {
+    actualRevenue:         salesNetVat,
+    targetRevenue:         revenueTarget,
     labourPct,
     targetLabourPct,
-    complianceOverdue,
-    complianceDueSoon,
-    maintenanceCritical,
-    maintenanceRepeat,
+    expiredItems:          complianceOverdue,
+    dueSoonItems:          complianceDueSoon,
+    criticalIssues:        maintenanceCritical,
+  };
+  console.log("SCORE INPUT [services/state/storeOperationalState]:", {
+    ...scoreInput,
+    // guard checks
+    revenueTargetZero:  revenueTarget === 0,
+    labourPctFromRevenue: salesNetVat === 0 ? "WARN: labourPct derived from zero revenue" : "ok",
   });
+  const scoreResult = calculateOperatingScore(scoreInput);
+  const score    = scoreResult.score;
+  const breakdown = {
+    revScore:   scoreResult.components.revenue.rawScore,
+    labScore:   scoreResult.components.labour.rawScore,
+    compScore:  scoreResult.components.compliance.rawScore,
+    maintScore: scoreResult.components.maintenance.rawScore,
+  };
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const now = Date.now();
@@ -205,10 +162,11 @@ export async function getStoreOperationalState(
   // ── Provenance ─────────────────────────────────────────────────────────────
   const provenance: Record<string, SourceFact[]> = {
     operating_score: [
-      { label: "Revenue component (40%)",    value: `${breakdown.revScore.toFixed(1)}/100` },
-      { label: "Labour component (25%)",     value: `${breakdown.labScore.toFixed(1)}/100` },
-      { label: "Compliance component (20%)", value: `${breakdown.compScore.toFixed(1)}/100` },
-      { label: "Maintenance component (15%)",value: `${breakdown.maintScore.toFixed(1)}/100` },
+      { label: "Revenue component (40%)",     value: `${breakdown.revScore.toFixed(1)}/100` },
+      { label: "Labour component (25%)",      value: `${breakdown.labScore.toFixed(1)}/100` },
+      { label: "Service component (15%)",     value: "75/100 (neutral — live score from Co-Pilot)" },
+      { label: "Compliance component (10%)",  value: `${breakdown.compScore.toFixed(1)}/100` },
+      { label: "Maintenance component (10%)", value: `${breakdown.maintScore.toFixed(1)}/100` },
     ],
     revenue_target: [
       {

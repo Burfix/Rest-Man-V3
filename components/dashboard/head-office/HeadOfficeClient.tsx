@@ -20,6 +20,8 @@ import RiskRadarPanel, { type RiskFlagRow } from "./RiskRadarPanel";
 import SystemHealthPanel   from "./SystemHealthPanel";
 import { cn }              from "@/lib/utils";
 
+import SiteStatusPanel, { type SiteStatusRow } from "./SiteStatusPanel";
+
 import type {
   StoreSummary,
   GroupMetrics,
@@ -37,6 +39,8 @@ type StoreRow = {
   id:                   string;
   name:                 string;
   site_type:            string;
+  deployment_stage:     "live" | "partial" | "pending";
+  has_pos_connection:   boolean;
   score:                number | null;
   grade:                string;
   tasks_today:          number;
@@ -92,12 +96,25 @@ function scoreToRisk(score: number | null): RiskLevel {
   return "green";
 }
 
+/** Map stores[] → SiteStatusRow[] for SiteStatusPanel */
+function mapStoresToSiteStatus(stores: StoreRow[]): SiteStatusRow[] {
+  return stores.map((s) => ({
+    id:                 s.id,
+    name:               s.name,
+    deployment_stage:   s.deployment_stage,
+    has_pos_connection: s.has_pos_connection,
+    has_compliance:     true,  // assumed once site is active
+    has_maintenance:    true,  // assumed once site is active
+  }));
+}
+
 /** Map stores[] → StoreSummary[] for StoreRiskGrid, StoreLeaderboard */
 function mapStoresToSummaries(stores: StoreRow[]): StoreSummary[] {
   return stores.map((s) => ({
     site_id:               s.id,
     name:                  s.name,
     city:                  "",
+    deployment_stage:      s.deployment_stage,
     operating_score:       s.score,
     score_grade:           gradeToScoreGrade(s.grade),
     sales_net_vat:         null,
@@ -339,6 +356,7 @@ export default function HeadOfficeClient() {
   const accSummaries     = data ? mapAccountabilityToSummaries(data.accountability) : [];
   const actionStats      = data ? mapActions(data.actions)                         : [];
   const trends           = data ? mapOpsTrend(data.opsTrend)                       : { revenue: [], labour: [], risk_score: [] };
+  const siteStatusRows   = data ? mapStoresToSiteStatus(data.stores)               : [];
   const metrics          = computeMetrics(storeSummaries);
   const leaderboard      = buildLeaderboard(storeSummaries);
   const criticalActions  = deriveCriticalActions(accSummaries);
@@ -447,6 +465,9 @@ export default function HeadOfficeClient() {
 
       {/* 2. Store risk map */}
       <StoreRiskGrid stores={storeSummaries} />
+
+      {/* 2a. Store setup status (partial / pending sites only) */}
+      <SiteStatusPanel sites={siteStatusRows} />
 
       {/* 2b. Risk Radar + System Health */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

@@ -21,8 +21,8 @@ export interface SiteConfig {
   currency_symbol: string;
   timezone: string;
   /** Optional route restrictions for this site. NULL = all routes visible. */
-  allowed_routes: string[] | null;
-}
+  allowed_routes: string[] | null;  /** Deployment readiness: live = fully operational, partial = some modules awaiting data/integration, pending = not yet deployed. */
+  deployment_stage: 'live' | 'partial' | 'pending';}
 
 const DEFAULTS: Omit<SiteConfig, "site_id" | "site_name"> = {
   target_labour_pct: 30,
@@ -32,17 +32,17 @@ const DEFAULTS: Omit<SiteConfig, "site_id" | "site_name"> = {
   currency_symbol: "R",
   timezone: "Africa/Johannesburg",
   allowed_routes: null,
+  deployment_stage: 'live',
 };
-
-const DEFAULT_SITE_ID = "00000000-0000-0000-0000-000000000001";
 
 // In-memory cache (per process lifetime, ~5 min TTL)
 let _cache: { config: SiteConfig; ts: number } | null = null;
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export async function getSiteConfig(
-  siteId: string = DEFAULT_SITE_ID,
+  siteId: string,
 ): Promise<SiteConfig> {
+  if (!siteId) throw new Error("getSiteConfig: siteId is required");
   // Check cache
   if (_cache && _cache.config.site_id === siteId && Date.now() - _cache.ts < CACHE_TTL_MS) {
     return _cache.config;
@@ -51,7 +51,7 @@ export async function getSiteConfig(
   const supabase = createServerClient();
   const { data, error } = await supabase
     .from("sites")
-    .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone, allowed_routes")
+    .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone, allowed_routes, deployment_stage")
     .eq("id", siteId)
     .maybeSingle();
 
@@ -66,6 +66,9 @@ export async function getSiteConfig(
     currency_symbol: (row?.currency_symbol as string) ?? DEFAULTS.currency_symbol,
     timezone: (row?.timezone as string) ?? DEFAULTS.timezone,
     allowed_routes: (row?.allowed_routes as string[] | null) ?? null,
+    deployment_stage: ((row?.deployment_stage as string) === 'partial' || (row?.deployment_stage as string) === 'pending'
+      ? (row?.deployment_stage as 'partial' | 'pending')
+      : 'live'),
   };
 
   _cache = { config, ts: Date.now() };

@@ -1,17 +1,29 @@
 /**
  * lib/scoring/operatingScore.ts
  *
- * Pure operating-score calculator — no DB calls, no side effects.
+ * ══ SINGLE SOURCE OF TRUTH for operating score ══
  *
  * System Pulse = weighted score out of 100
- *   Revenue      45 pts  (weight 0.45)
- *   Labour       30 pts  (weight 0.30)
- *   Compliance   15 pts  (weight 0.15)
+ *   Revenue      40 pts  (weight 0.40)
+ *   Labour       25 pts  (weight 0.25)
+ *   Service      15 pts  (weight 0.15) — optional; neutral 75 when not available
+ *   Compliance   10 pts  (weight 0.10)
  *   Maintenance  10 pts  (weight 0.10)
  *
  * Grade:
  *   90–100 → A   75–89 → B   60–74 → C   40–59 → D   0–39 → F
+ *
+ * ALL scoring modules must import from this file — no inline weight definitions.
  */
+
+// ── Canonical weights (import these, never redefine) ──────────────────────────
+export const WEIGHTS = {
+  revenue:     0.40,
+  labour:      0.25,
+  service:     0.15,
+  compliance:  0.10,
+  maintenance: 0.10,
+} as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -31,6 +43,9 @@ export interface OperatingScoreInput {
   targetLabourPct?: number | null;
   /** Total labour cost in Rand (optional — used for excess-cost explanation). */
   labourCost?: number | null;
+
+  // Service (optional — in-service context only; defaults to neutral 75 when absent)
+  serviceScore?: number | null;  // 0–100 raw score
 
   // Compliance
   totalComplianceItems?: number | null;
@@ -61,9 +76,10 @@ export interface OperatingScoreResult {
   grade: PulseGrade;
   confidence: ScoreConfidence;
   components: {
-    revenue:     ScoreComponent & { maxPoints: 45 };
-    labour:      ScoreComponent & { maxPoints: 30 };
-    compliance:  ScoreComponent & { maxPoints: 15 };
+    revenue:     ScoreComponent & { maxPoints: 40 };
+    labour:      ScoreComponent & { maxPoints: 25 };
+    service:     ScoreComponent & { maxPoints: 15 };
+    compliance:  ScoreComponent & { maxPoints: 10 };
     maintenance: ScoreComponent & { maxPoints: 10 };
   };
   /** Up to 2 lowest-scoring component labels — the main drag on the score. */
@@ -247,6 +263,21 @@ export function calcMaintenanceScore(
   };
 }
 
+// ── Service ───────────────────────────────────────────────────────────────────
+
+export function calcServiceScore(
+  serviceScore: number | null | undefined,
+): { rawScore: number; explanation: string } {
+  if (serviceScore === null || serviceScore === undefined) {
+    return { rawScore: 75, explanation: "Service data unavailable — using neutral score" };
+  }
+  const raw = Math.max(0, Math.min(100, serviceScore));
+  return {
+    rawScore:    raw,
+    explanation: `Service score ${raw}/100`,
+  };
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export function calculateOperatingScore(input: OperatingScoreInput): OperatingScoreResult {
@@ -265,30 +296,54 @@ export function calculateOperatingScore(input: OperatingScoreInput): OperatingSc
     targetLabourPct,
     input.labourCost,
   );
+  const { rawScore: svcRaw,   explanation: svcExpl  } = calcServiceScore(
+    input.serviceScore,
+  );
   const { rawScore: compRaw,  explanation: compExpl,  hasData: compHasData  } = calcComplianceScore(
     input.totalComplianceItems,
     input.compliantItems,
     input.expiredItems,
     input.dueSoonItems,
   );
-  const { rawScore: maintRaw, explanation: maintExpl, hasData: maintHasData } = calcMaintenanceScore(
+  const { rawScore: maintRaw, explanation: maintExpl } = calcMaintenanceScore(
     input.totalMaintenanceItems,
     input.openIssues,
     input.criticalIssues,
   );
 
-  // ── Weighted scores → points toward total ─────────────────────────────────
-  const revWeighted   = Math.round(revRaw   * 0.45);
-  const labWeighted   = Math.round(labRaw   * 0.30);
-  const compWeighted  = Math.round(compRaw  * 0.15);
-  const maintWeighted = Math.round(maintRaw * 0.10);
+  // ── Weighted scores → points toward total (canonical weights — do NOT redefine elsewhere) ──
+  const revWeighted   = Math.round(revRaw   * WEIGHTS.revenue);
+  const labWeighted   = Math.round(labRaw   * WEIGHTS.labour);
+  const svcWeighted   = Math.round(svcRaw   * WEIGHTS.service);
+  const compWeighted  = Math.round(compRaw  * WEIGHTS.compliance);
+  const maintWeighted = Math.round(maintRaw * WEIGHTS.maintenance);
 
-  const total = clamp(revWeighted + labWeighted + compWeighted + maintWeighted);
+  const total = clamp(revWeighted + labWeighted + svcWeighted + compWeighted + maintWeighted);
   const grade = toGrade(total);
 
+  // ── Debug log — full input so bad values are immediately visible ──────────
+  console.log("SCORE INPUT:", {
+    actualRevenue:    input.actualRevenue,
+    targetRevenue:    input.targetRevenue,
+    labourPct:        input.labourPct,
+    targetLabourPct,
+    serviceScore:     input.serviceScore ?? null,
+    expiredItems:     input.expiredItems ?? null,
+    dueSoonItems:     input.dueSoonItems ?? null,
+    openIssues:       input.openIssues ?? null,
+    criticalIssues:   input.criticalIssues ?? null,
+    // derived weighted scores
+    revWeighted,
+    labWeighted,
+    svcWeighted,
+    compWeighted,
+    maintWeighted,
+    total,
+  });
+
   // ── Confidence ─────────────────────────────────────────────────────────────
-  const hasRevenue    = input.actualRevenue !== null && input.targetRevenue !== null;
-  const hasLabour     = input.labourPct !== null;
+  const hasRevenue = input.actualRevenue !== null && input.targetRevenue !== null;
+  const hasLabour  = input.labourPct !== null;
 
   let confidence: ScoreConfidence;
   if (hasRevenue && hasLabour && compHasData) {
@@ -299,18 +354,38 @@ export function calculateOperatingScore(input: OperatingScoreInput): OperatingSc
     confidence = "low";
   }
 
-  // ── Drivers — up to 2 lowest-performing components ─────────────────────────
-  const componentPerf = [
-    { label: "revenue gap",        rawScore: revRaw   },
-    { label: "labour over target", rawScore: labRaw   },
-    { label: "compliance",         rawScore: compRaw  },
-    { label: "maintenance",        rawScore: maintRaw },
-  ];
-  const drivers = componentPerf
-    .filter((c) => c.rawScore < 60)
-    .sort((a, b) => a.rawScore - b.rawScore)
-    .slice(0, 2)
-    .map((c) => c.label);
+  // ── Drivers — threshold-based critical messages, then below-60 fallbacks ──
+  // Order matters: most critical issues first.
+  const drivers: string[] = [];
+
+  if (revWeighted <= 10) {
+    drivers.push("Revenue critically behind target");
+  } else if (revRaw < 60) {
+    drivers.push("Revenue behind target");
+  }
+
+  if (labWeighted <= 10) {
+    drivers.push("Labour significantly over target");
+  } else if (labRaw < 60) {
+    drivers.push("Labour over target");
+  }
+
+  if (input.serviceScore != null && svcWeighted <= 5) {
+    drivers.push("Service performance weak");
+  } else if (input.serviceScore != null && svcRaw < 60) {
+    drivers.push("Service below standard");
+  }
+
+  if (compRaw < 60) {
+    drivers.push("Compliance gaps");
+  }
+
+  if (maintRaw < 60) {
+    drivers.push("Maintenance issues");
+  }
+
+  // Keep at most 2 (highest-priority are already first in the array)
+  drivers.splice(2);
 
   // ── Summary ────────────────────────────────────────────────────────────────
   const summary = drivers.length === 0
@@ -325,19 +400,25 @@ export function calculateOperatingScore(input: OperatingScoreInput): OperatingSc
       revenue: {
         rawScore:      revRaw,
         weightedScore: revWeighted,
-        maxPoints:     45,
+        maxPoints:     40,
         explanation:   revExpl,
       },
       labour: {
         rawScore:      labRaw,
         weightedScore: labWeighted,
-        maxPoints:     30,
+        maxPoints:     25,
         explanation:   labExpl,
+      },
+      service: {
+        rawScore:      svcRaw,
+        weightedScore: svcWeighted,
+        maxPoints:     15,
+        explanation:   svcExpl,
       },
       compliance: {
         rawScore:      compRaw,
         weightedScore: compWeighted,
-        maxPoints:     15,
+        maxPoints:     10,
         explanation:   compExpl,
       },
       maintenance: {
