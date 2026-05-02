@@ -5,14 +5,19 @@ import { getAllComplianceItems, daysUntilDue } from "@/services/ops/complianceSu
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request): Promise<NextResponse> {
-  // External API — auth via IMPORT_API_KEY (WordPress plugin)
+  // External API — auth via IMPORT_API_KEY (WordPress plugin).
+  // Key MUST be configured; absence is a deployment error, not a bypass.
   const apiKey = process.env.IMPORT_API_KEY;
-  if (apiKey) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    if (token !== apiKey) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Server misconfiguration: IMPORT_API_KEY is not set" },
+      { status: 500 },
+    );
+  }
+  const authHeader = req.headers.get("authorization") ?? "";
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+  if (token !== apiKey) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {

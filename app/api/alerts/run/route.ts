@@ -23,21 +23,16 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { runAlertsEngine } from "@/services/alerts/engine";
+import { cronGuard } from "@/lib/auth/cron-guard";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // Vercel Pro: up to 300s; Hobby: 10s
 
-export async function POST(req: Request): Promise<NextResponse> {
-  // Validate cron secret if set (skip check in development)
-  const secret = process.env.ALERTS_CRON_SECRET;
-  if (secret) {
-    const authHeader = req.headers.get("authorization");
-    if (authHeader !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+export async function POST(req: NextRequest): Promise<NextResponse> {
+  const denied = cronGuard(req, "POST /api/alerts/run");
+  if (denied) return denied;
 
   try {
     const result = await runAlertsEngine();

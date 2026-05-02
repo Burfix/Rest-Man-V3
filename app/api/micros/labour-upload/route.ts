@@ -9,6 +9,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { todayISO } from "@/lib/utils";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -44,6 +46,9 @@ function parseCsvLine(line: string): string[] {
 }
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "POST /api/micros/labour-upload");
+  if (guard.error) return guard.error;
+
   try {
     const formData = await req.formData();
     const file = formData.get("file");

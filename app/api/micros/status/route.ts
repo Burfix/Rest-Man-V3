@@ -16,6 +16,8 @@
 import { NextResponse }         from "next/server";
 import { getMicrosStatus }      from "@/services/micros/status";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 // Vars to audit at runtime — name only, NO values ever returned.
 const AUDIT_VARS = [
@@ -35,6 +37,9 @@ export const runtime = "nodejs";
 const BUILD_ID = "f724ad2-2026-03-20"; // bump on each deploy to confirm code version
 
 export async function GET() {
+  const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/micros/status");
+  if (guard.error) return guard.error;
+
   try {
     const [dbStatus, cfgStatus] = await Promise.all([
       getMicrosStatus(),

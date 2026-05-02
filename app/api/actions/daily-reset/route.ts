@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getOperatingScore } from "@/services/ops/operatingScore";
+import { cronGuard } from "@/lib/auth/cron-guard";
 
 /** Fetch all active site IDs from the database. */
 async function getAllActiveSiteIds(): Promise<string[]> {
@@ -40,12 +41,8 @@ function todayJHB(): string {
 }
 
 export async function POST(req: NextRequest) {
-  // Protect with a shared secret when called from a cron job
-  const authHeader = req.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = cronGuard(req, "POST /api/actions/daily-reset");
+  if (denied) return denied;
 
   try {
     const supabase = createServerClient();

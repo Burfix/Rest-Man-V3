@@ -7,15 +7,20 @@
  * Response 404: { error: "Alert not found or already resolved" }
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { resolveAlert } from "@/services/alerts/engine";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: { id: string } }
-): Promise<NextResponse> {
+): Promise<Response> {
+  const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "POST /api/alerts/[id]/resolve");
+  if (guard.error) return guard.error;
+
   const { id } = params;
 
   if (!id) {

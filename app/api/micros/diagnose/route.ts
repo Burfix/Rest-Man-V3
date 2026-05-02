@@ -8,11 +8,16 @@
 import { NextResponse } from "next/server";
 import { randomBytes, createHash } from "crypto";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
+  const guard = await apiGuard(PERMISSIONS.RUN_INTEGRATION_SYNC, "GET /api/micros/diagnose");
+  if (guard.error) return guard.error;
+
   const cfg = getMicrosEnvConfig();
   if (!cfg.authServer || !cfg.clientId) {
     return NextResponse.json({ error: "Missing MICROS config" });

@@ -13,10 +13,14 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedZoneSummaries } from "@/services/universal/zoneSummary";
+import { apiGuard } from "@/lib/auth/api-guard";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest): Promise<NextResponse> {
+export async function GET(req: NextRequest): Promise<Response> {
+  const guard = await apiGuard(null, "GET /api/risk/scores");
+  if (guard.error) return guard.error;
+
   const siteId = req.nextUrl.searchParams.get("siteId");
 
   if (!siteId) {

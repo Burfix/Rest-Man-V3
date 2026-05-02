@@ -12,11 +12,16 @@ import { NextResponse }       from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getMicrosIdToken, MicrosAuthError, clearMicrosTokenCache } from "@/lib/micros/auth";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function POST() {
+  const guard = await apiGuard(PERMISSIONS.MANAGE_INTEGRATIONS, "POST /api/micros/test-connection");
+  if (guard.error) return guard.error;
+
   const cfgStatus = getMicrosConfigStatus();
 
   if (!cfgStatus.enabled) {

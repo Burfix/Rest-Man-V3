@@ -1,5 +1,5 @@
 /**
- * Diagnostic endpoint — remove after debugging.
+ * Diagnostic endpoint — admin-only, remove after debugging.
  * GET /api/debug-bookings
  *
  * Returns the raw website API response + filter results
@@ -8,6 +8,8 @@
 
 import { NextResponse } from "next/server";
 import { todayISO } from "@/lib/utils";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +17,9 @@ const WEBSITE_RESERVATIONS_URL =
   "https://www.sicantinasociale.co.za/api/reservations";
 
 export async function GET() {
+  const guard = await apiGuard(PERMISSIONS.VIEW_AUDIT_LOG, "GET /api/debug-bookings");
+  if (guard.error) return guard.error;
+
   const today = todayISO();
   try {
     const res = await fetch(WEBSITE_RESERVATIONS_URL, { cache: "no-store" });

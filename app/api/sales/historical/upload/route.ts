@@ -17,6 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 // ── Column alias normalisation ────────────────────────────────────────────────
 
@@ -181,6 +183,9 @@ function parseCsv(text: string): { sale_date: string; gross_sales: number }[] {
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  const guard = await apiGuard(PERMISSIONS.MANAGE_STORE_SETTINGS, "POST /api/sales/historical/upload");
+  if (guard.error) return guard.error;
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
