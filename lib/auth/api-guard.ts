@@ -129,7 +129,16 @@ export async function apiGuard(
 
     return { error: null, ctx, supabase };
   } catch (err) {
-    logger.error("Auth guard failed", { route, err });
+    // During `next build`, Next.js statically evaluates API routes and throws
+    // "Dynamic server usage" when cookies() is called. This is expected — the
+    // route is auth-gated and will never actually serve unauthenticated traffic
+    // at runtime. Log at debug so the build output stays clean.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("Dynamic server usage")) {
+      logger.info("Auth guard skipped during static build evaluation", { route });
+    } else {
+      logger.error("Auth guard failed", { route, err });
+    }
     return { error: authErrorResponse(err), ctx: null, supabase: null };
   }
 }

@@ -43,6 +43,7 @@ export const ROLE_ALLOWED_ROUTES: Partial<Record<UserRole, string[]>> = {
     "/dashboard/bookings",          // Bookings
     "/dashboard/labour",            // Labour
     "/dashboard/reviews",           // Reviews
+    "/dashboard/profit",            // Profit Intelligence
     "/dashboard/access-restricted", // Access Restricted page itself
   ],
   supervisor: [
