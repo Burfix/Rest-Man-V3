@@ -67,7 +67,7 @@ function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
 // Main Orchestrator
 // ══════════════════════════════════════════════════════════════════════════
 
-export async function runCopilot(siteId: string): Promise<CopilotOutput> {
+export async function runCopilot(siteId: string, orgId = ""): Promise<CopilotOutput> {
   const now = new Date();
   const today_iso = todayISO();
 
@@ -85,7 +85,7 @@ export async function runCopilot(siteId: string): Promise<CopilotOutput> {
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(cfg.site_id),
-    generateRevenueForecast(today_iso),
+    generateRevenueForecast(today_iso, orgId),
     getComplianceSummary(),
     getMicrosStatus(),
     getStoredDailySummary(

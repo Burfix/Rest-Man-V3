@@ -12,7 +12,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
+
 import { todayISO } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ function daysLeftInWeek(): number {
 
 // ── Main export ───────────────────────────────────────────────────────────────
 
-export async function getConsequences(orgId: string = DEFAULT_ORG_ID): Promise<ConsequenceSummary> {
+export async function getConsequences(orgId = ""): Promise<ConsequenceSummary> {
   const supabase  = createServerClient();
   const today     = todayISO();
   const weekStart = weekStartISO();

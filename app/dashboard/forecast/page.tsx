@@ -57,7 +57,7 @@ export default async function GMCoPilotPage() {
 
   const { siteId } = ctx;
   const brainPromise = runOperatingBrain(siteId, todayISO());
-  const copilot = await runCopilot(siteId);
+  const copilot = await runCopilot(siteId, ctx.orgId ?? "");
 
   const brain = await brainPromise.catch(() => null);
 

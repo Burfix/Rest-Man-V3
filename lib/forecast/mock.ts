@@ -6,7 +6,7 @@
  */
 
 import { todayISO, getDayName } from "@/lib/utils";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
+
 import type { ForecastInput, GMBriefing } from "@/types/forecast";
 import { buildGMBriefing } from "./briefing";
 
@@ -31,7 +31,7 @@ export function getMockForecastInput(date: string = todayISO()): ForecastInput {
   const eventMultiplier = isFriday ? 1.15 : 1.0;
 
   return {
-    storeId: DEFAULT_ORG_ID,
+    storeId: "mock-store",
     date,
     dayName,
     confirmedCovers: Math.round(45 * scale),

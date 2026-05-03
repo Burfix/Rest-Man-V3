@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   try {
     const [microsStatus, forecast, bookingsResult] = await Promise.all([
       getMicrosStatus(),
-      generateRevenueForecast(date),
+      generateRevenueForecast(date, ctx.orgId ?? ""),
       supabase
         .from("reservations")
         .select("guest_count")

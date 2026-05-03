@@ -73,12 +73,6 @@ export const RISK = {
   EVENT_LOW_FILL_RATIO: 0.70,
 } as const;
 
-/**
- * Fixed organisation ID for this single-tenant deployment.
- * Replace with a real UUID if multi-tenancy is ever added.
- */
-export const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
-
 // ============================================================
 // Localisation
 // ============================================================

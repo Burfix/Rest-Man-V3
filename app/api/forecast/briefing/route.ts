@@ -24,7 +24,11 @@ export async function GET(req: NextRequest) {
       briefing = getMockGMBriefing(date);
     } else {
       try {
-        const input = await getForecastInputs(guard.ctx!.orgId ?? undefined, date);
+      const orgId = guard.ctx!.orgId;
+        if (!orgId) {
+          return NextResponse.json({ error: "No organisation assigned — contact your administrator" }, { status: 403 });
+        }
+        const input = await getForecastInputs(orgId, date);
         const cfg = await getSiteConfig(guard.ctx!.siteId);
         briefing = buildGMBriefing(input, cfg.target_labour_pct);
       } catch (inputErr) {

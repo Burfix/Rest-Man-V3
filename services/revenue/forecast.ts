@@ -18,7 +18,6 @@ import {
   SalesTarget,
 } from "@/types";
 import {
-  DEFAULT_ORG_ID,
   EVENT_REVENUE_MULTIPLIERS,
   DEFAULT_EVENT_MULTIPLIER,
   DEFAULT_AVG_SPEND_ZAR,
@@ -29,9 +28,6 @@ import {
   SALSA_NIGHT_ANCHOR,
   SALSA_NIGHT_INTERVAL_DAYS,
 } from "@/lib/constants";
-
-// Re-export for callers that need the fallback
-export { DEFAULT_ORG_ID };
 
 // ── Date helpers ───────────────────────────────────────────────────────────────
 
@@ -215,7 +211,7 @@ export async function getEventMultiplierForDate(
   return { multiplier: DEFAULT_EVENT_MULTIPLIER, eventName: null };
 }
 
-export async function getSalesTarget(dateStr: string, orgId: string = DEFAULT_ORG_ID): Promise<SalesTarget | null> {
+export async function getSalesTarget(dateStr: string, orgId = ""): Promise<SalesTarget | null> {
   const supabase = createServerClient();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -469,7 +465,7 @@ export function generateForecastRecommendations(
 
 export async function generateRevenueForecast(
   dateStr: string,
-  orgId: string = DEFAULT_ORG_ID,
+  orgId = "",
 ): Promise<RevenueForecast> {
   const supabase = createServerClient();
 
@@ -620,7 +616,7 @@ export async function generateRevenueForecast(
 
 // ── Snapshot persistence (for cron / audit trail) ──────────────────────────────
 
-export async function saveForecastSnapshot(dateStr: string, orgId: string = DEFAULT_ORG_ID): Promise<void> {
+export async function saveForecastSnapshot(dateStr: string, orgId = ""): Promise<void> {
   const forecast = await generateRevenueForecast(dateStr, orgId);
   const supabase = createServerClient();
 
@@ -648,7 +644,7 @@ export async function saveForecastSnapshot(dateStr: string, orgId: string = DEFA
 
 // ── Upcoming targets (for targets settings page) ───────────────────────────────
 
-export async function getUpcomingTargets(days = 30, orgId: string = DEFAULT_ORG_ID): Promise<SalesTarget[]> {
+export async function getUpcomingTargets(days = 30, orgId = ""): Promise<SalesTarget[]> {
   const supabase = createServerClient();
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
   const future = new Date(today + "T12:00:00Z");

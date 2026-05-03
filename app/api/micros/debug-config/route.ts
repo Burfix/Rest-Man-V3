@@ -8,8 +8,9 @@
  * NEVER log or return the raw password, full client_id, or any token.
  */
 
-import { NextResponse }       from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { NextResponse }   from "next/server";
+import { apiGuard }        from "@/lib/auth/api-guard";
+import { PERMISSIONS }     from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,22 +20,10 @@ function norm(v: string): string {
   return v.replace(/[\r\n]/g, "").trim();
 }
 
-export async function GET() {
-  // ── Auth guard ──────────────────────────────────────────────────────────
-  // Only allow authenticated users with admin role.
-  const supabase = createServerClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Check admin role via user metadata (adjust field to match your schema).
-  const role = (user.user_metadata?.role as string | undefined) ??
-               (user.app_metadata?.role  as string | undefined) ?? "";
-  if (role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+export async function GET(): Promise<Response> {
+  // ── Auth guard — requires MANAGE_INTEGRATIONS permission (DB role) ──────
+  const guard = await apiGuard(PERMISSIONS.MANAGE_INTEGRATIONS, "GET /api/micros/debug-config");
+  if (guard.error) return guard.error;
 
   // ── Config inspection ───────────────────────────────────────────────────
   const rawClientId  = process.env.MICROS_CLIENT_ID       ?? "";

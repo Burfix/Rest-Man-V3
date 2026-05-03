@@ -17,7 +17,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import { DEFAULT_ORG_ID } from "@/lib/constants";
+
 import { computeComplianceStatus } from "@/lib/compliance/scoring";
 import { isFresh } from "@/lib/data/freshness";
 import {
@@ -296,7 +296,7 @@ export async function getOperatingScore(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: targetData } = await (supabase.from("sales_targets") as any)
       .select("target_sales")
-      .eq("organization_id", orgId ?? DEFAULT_ORG_ID)
+      .eq("organization_id", orgId ?? "")
       .eq("target_date", dataDate)
       .maybeSingle();
     targetSales = (targetData?.target_sales as number | null) ?? null;

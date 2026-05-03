@@ -146,7 +146,7 @@ export default async function ActionsPage() {
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(cfg.site_id),
-    generateRevenueForecast(todayISO()),
+    generateRevenueForecast(todayISO(), ctx.orgId ?? ""),
     getComplianceSummary(),
     getMicrosStatus(),
     getInventoryIntelligence(cfg.site_id),

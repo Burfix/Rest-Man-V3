@@ -7,7 +7,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { todayISO, getDayName, toNum } from "@/lib/utils";
-import { DEFAULT_ORG_ID, DEFAULT_AVG_SPEND_ZAR } from "@/lib/constants";
+import { DEFAULT_AVG_SPEND_ZAR } from "@/lib/constants";
 import {
   getSameDayLastYearSales,
   getRecentWeekdayAverageSales,
@@ -53,7 +53,7 @@ async function getLatestMarginPct(): Promise<number | null> {
  * Gather all inputs needed to generate a forecast for a given date.
  */
 export async function getForecastInputs(
-  storeId: string = DEFAULT_ORG_ID,
+  orgId = "",
   date: string = todayISO(),
 ): Promise<ForecastInput> {
   const [
@@ -77,7 +77,7 @@ export async function getForecastInputs(
     getConfirmedCoversForDate(date),
     getHistoricalAvgSpendPerGuest(date),
     getEventMultiplierForDate(date),
-    getSalesTarget(date),
+    getSalesTarget(date, orgId),
     getLatestLabourPct(),
     getLatestMarginPct(),
     getMaintenanceSummary().catch(() => null),  // forecast doesn't need site-scoping
@@ -85,7 +85,7 @@ export async function getForecastInputs(
   ]);
 
   return {
-    storeId,
+    storeId: orgId,
     date,
     dayName: getDayName(date),
     confirmedCovers,

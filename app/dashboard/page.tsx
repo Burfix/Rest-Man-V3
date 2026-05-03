@@ -161,7 +161,7 @@ export default async function OperationsDashboard() {
     getMaintenanceSummary(siteId),
     getUpcomingEvents(),
     getDataFreshnessSummary(),
-    generateRevenueForecast(todayISO(), orgId ?? undefined),
+    generateRevenueForecast(todayISO(), orgId ?? ""),
     getComplianceSummary(),
     getMicrosStatus(),
     getInventoryIntelligence(siteId),
