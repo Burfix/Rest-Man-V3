@@ -75,6 +75,11 @@ export const PERMISSIONS = {
   TRIGGER_SYNC:                 "trigger_sync",
   SYNC_INVENTORY:               "sync_inventory",
   RESPOND_TO_REVIEWS:           "respond_to_reviews",
+
+  // System health + operations console
+  VIEW_SYSTEM_HEALTH:           "view_system_health",
+  MANAGE_SYSTEM_HEALTH:         "manage_system_health",
+  RUN_JOBS:                     "run_jobs",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -89,8 +94,8 @@ export type ExtendedRole = UserRole | "platform_super_admin" | "tenant_owner" | 
 
 export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
   // Platform-level: full access to everything
-  super_admin: Object.values(PERMISSIONS),
-  platform_super_admin: Object.values(PERMISSIONS),
+  super_admin: Object.values(PERMISSIONS) as Permission[],
+  platform_super_admin: Object.values(PERMISSIONS) as Permission[],
 
   // Tenant owner: full access within their organisation
   tenant_owner: [
@@ -131,6 +136,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     PERMISSIONS.TRIGGER_SYNC,
     PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.VIEW_SYSTEM_HEALTH,
+    PERMISSIONS.MANAGE_SYSTEM_HEALTH,
+    PERMISSIONS.RUN_JOBS,
   ],
 
   executive: [
@@ -142,6 +150,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     PERMISSIONS.VIEW_COMPLIANCE,
     PERMISSIONS.VIEW_CONTRACTOR_TICKETS,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.VIEW_SYSTEM_HEALTH,
   ],
 
   head_office: [
@@ -177,6 +186,9 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     PERMISSIONS.TRIGGER_SYNC,
     PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.VIEW_SYSTEM_HEALTH,
+    PERMISSIONS.MANAGE_SYSTEM_HEALTH,
+    PERMISSIONS.RUN_JOBS,
   ],
 
   auditor: [
@@ -188,6 +200,7 @@ export const ROLE_PERMISSIONS: Record<string, readonly Permission[]> = {
     PERMISSIONS.VIEW_COMPLIANCE,
     PERMISSIONS.VIEW_RAW_INGESTION,
     PERMISSIONS.VIEW_CONTRACTOR_TICKETS,
+    PERMISSIONS.VIEW_SYSTEM_HEALTH,
   ],
 
   area_manager: [
