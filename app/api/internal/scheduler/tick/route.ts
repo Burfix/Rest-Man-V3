@@ -22,6 +22,7 @@ import { releaseStaleLeases, claimSyncJobs, claimAsyncJobs } from "@/lib/schedul
 import { enqueueDueSyncJobs } from "@/lib/scheduler/sync-scheduler";
 import { runSyncJobBatch } from "@/lib/scheduler/worker";
 import { runAsyncJobBatch } from "@/lib/scheduler/async-scheduler";
+import * as Sentry from "@sentry/nextjs";
 import type { SchedulerTickSummary, SchedulerWorkerContext } from "@/lib/scheduler/types";
 
 export const dynamic    = "force-dynamic";
@@ -62,6 +63,15 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     dry_run: ctx.dry_run,
   });
 
+  // Tag all Sentry events from this tick with route + tick context
+  Sentry.setTag("route", "scheduler-tick");
+  Sentry.setContext("tick", {
+    tickId,
+    dryRun:      ctx.dry_run,
+    startedAt:   ctx.started_at,
+    deadlineMs:  ctx.deadline_ms,
+  });
+
   const supabase = createServerClient();
 
   try {
@@ -75,8 +85,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     });
 
     // ── 3. Claim + execute sync jobs ──────────────────────────────────────
-    const syncJobs   = await claimSyncJobs(supabase, ctx.worker_id, MAX_SYNC_JOBS_PER_TICK);
-    const syncResult = await runSyncJobBatch(supabase, syncJobs, ctx);
+    const syncJobs = await Sentry.startSpan(
+      { name: "claimSyncJobs", op: "db" },
+      () => claimSyncJobs(supabase, ctx.worker_id, MAX_SYNC_JOBS_PER_TICK),
+    );
+    const syncResult = await Sentry.startSpan(
+      { name: "runSyncJobBatch", op: "cron" },
+      () => runSyncJobBatch(supabase, syncJobs, ctx),
+    );
 
     // ── 4. Claim + execute async jobs ─────────────────────────────────────
     const asyncJobs   = await claimAsyncJobs(supabase, ctx.worker_id, MAX_ASYNC_JOBS_PER_TICK);
@@ -106,6 +122,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.error("scheduler.tick.unhandled_error", { tick_id: tickId, err: msg });
+    Sentry.captureException(err, {
+      tags:  { route: "scheduler-tick" },
+      extra: { tickId, dryRun: ctx.dry_run },
+    });
     return NextResponse.json(
       { error: "Tick failed", detail: msg, tick_id: tickId },
       { status: 500 },

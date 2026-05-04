@@ -15,6 +15,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { auditBrainAction } from "@/lib/audit/logger";
+import * as Sentry from "@sentry/nextjs";
 import {
   buildOperationsContext,
   type OperationsContext,
@@ -1066,11 +1067,23 @@ export async function runOperatingBrain(
   const cached = getCachedBrain(siteId, date);
   if (cached) return cached;
 
+  // Tag every Sentry event originating from this function with site/module context
+  Sentry.withScope((scope) => {
+    scope.setTag("module", "operating-brain");
+    scope.setTag("site_id", siteId);
+  });
+
   const supabase = createServerClient();
 
   // Run context build + GM lookup + site events in parallel
   const [ctx, gmData, dbEvents] = await Promise.all([
-    buildOperationsContext(siteId, date).catch(() => null as OperationsContext | null),
+    buildOperationsContext(siteId, date).catch((err) => {
+      Sentry.captureException(err, {
+        tags:  { module: "operating-brain", site_id: siteId },
+        extra: { stage: "buildOperationsContext", date },
+      });
+      return null as OperationsContext | null;
+    }),
     fetchGmSituation(supabase, siteId),
     fetchSiteEvents(supabase, siteId, date),
   ]);

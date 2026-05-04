@@ -22,6 +22,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -188,6 +189,20 @@ export async function GET(): Promise<Response> {
     logger.warn("health.check.non_healthy", {
       status, database, lag, dl, sync,
       duration_ms: Date.now() - startedAt,
+    });
+
+    // Report to Sentry so degraded/unhealthy states surface as alerts
+    Sentry.captureMessage(
+      `Health check ${status}`,
+      status === "unhealthy" ? "error" : "warning",
+    );
+    Sentry.setContext("health_check", {
+      status,
+      database,
+      scheduler_lag_seconds: lag,
+      dead_letter_count:     dl,
+      micros_sync_minutes:   sync ?? null,
+      duration_ms:           Date.now() - startedAt,
     });
   }
 

@@ -19,6 +19,7 @@ import { dispatchSync } from "@/lib/sync/orchestrator";
 import { SyncTypeEnum, SyncModeEnum } from "@/lib/sync/contract";
 import { markSyncJobSuccess, markSyncJobFailed, markSyncJobRunning } from "./claim";
 import { auditJobTransition } from "@/lib/audit/logger";
+import * as Sentry from "@sentry/nextjs";
 import type { ClaimedSyncJob, SchedulerWorkerContext } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -79,17 +80,39 @@ export async function executeSyncJob(
   }).catch(() => {});
 
   try {
-    const result = await dispatchSync(
-      {
-        loc_ref:       job.loc_ref,
-        sync_type:     parsedType.data,
-        mode:          parsedMode.data,
-        business_date: job.business_date,
-        trace_id:      job.trace_id,
-      },
-      job.site_id,
-      job.trace_id,
-    );
+    let result: Awaited<ReturnType<typeof dispatchSync>>;
+
+    try {
+      result = await Sentry.withScope(async (scope) => {
+        scope.setTag("job_type", job.sync_type);
+        scope.setTag("site_id", job.site_id);
+        scope.setTag("scheduler", "sync");
+        scope.setContext("job", {
+          jobId:    job.id,
+          locRef:   job.loc_ref,
+          attempts: job.attempts,
+          traceId:  job.trace_id,
+        });
+        return dispatchSync(
+          {
+            loc_ref:       job.loc_ref,
+            sync_type:     parsedType.data,
+            mode:          parsedMode.data,
+            business_date: job.business_date,
+            trace_id:      job.trace_id,
+          },
+          job.site_id,
+          job.trace_id,
+        );
+      });
+    } catch (dispatchErr) {
+      // dispatchSync threw (network / unhandled error) — capture before re-throwing
+      Sentry.captureException(dispatchErr, {
+        tags: { job_type: job.sync_type, site_id: job.site_id, scheduler: "sync" },
+        extra: { jobId: job.id, attempts: job.attempts },
+      });
+      throw dispatchErr;
+    }
 
     if (result.ok) {
       await markSyncJobSuccess(supabase, job.id, ctx.worker_id);

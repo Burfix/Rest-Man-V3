@@ -27,6 +27,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { auditScoreCalculation } from "@/lib/audit/logger";
+import * as Sentry from "@sentry/nextjs";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -230,10 +231,34 @@ export async function calculateDailyScores(
   }
 
   if (upserts.length > 0) {
+    // Set Sentry context before the upsert so any error is captured with full detail
+    Sentry.withScope((scope) => {
+      scope.setTag("module", "score-calculator");
+      scope.setTag("site_id", siteId);
+      scope.setContext("scores", {
+        siteId,
+        date,
+        rowCount:   upserts.length,
+        userIds:    upserts.map((r) => r.user_id),
+        scoreRange: {
+          min: Math.min(...upserts.map((r) => r.score)),
+          max: Math.max(...upserts.map((r) => r.score)),
+        },
+      });
+    });
+
     const { error: upsertErr } = await supabase
       .from("manager_performance_scores")
       .upsert(upserts, { onConflict: "user_id,site_id,period_date" });
-    if (upsertErr) throw new Error(`Upsert failed: ${upsertErr.message}`);
+
+    if (upsertErr) {
+      const err = new Error(`Upsert failed: ${upsertErr.message}`);
+      Sentry.captureException(err, {
+        tags:  { module: "score-calculator", site_id: siteId },
+        extra: { date, rowCount: upserts.length },
+      });
+      throw err;
+    }
 
     // Audit each score written — fire-and-forget, never throws
     await Promise.all(
