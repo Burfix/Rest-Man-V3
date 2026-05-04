@@ -60,7 +60,7 @@ export type PriorityActionCard = {
  * Backed by the full brain cache (in-memory L1 → Redis L2 → compute).
  */
 export async function getHeroStrip(siteId: string): Promise<HeroStrip> {
-  const brain = await runOperatingBrain(siteId, todaySAST());
+  const brain = await runOperatingBrain(siteId, todaySAST(), { caller: "dashboard" });
   return {
     score:        brain.systemHealth.score,
     grade:        brain.systemHealth.grade,
@@ -86,7 +86,7 @@ export async function getHeroStrip(siteId: string): Promise<HeroStrip> {
 export async function getPriorityActions(
   siteId: string,
 ): Promise<PriorityActionCard[]> {
-  const brain = await runOperatingBrain(siteId, todaySAST());
+  const brain = await runOperatingBrain(siteId, todaySAST(), { caller: "dashboard" });
   return brain.actionQueue.map((a) => ({
     title:       a.title,
     priority:    a.priority,

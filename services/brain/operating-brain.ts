@@ -1063,16 +1063,22 @@ async function fetchSiteEvents(
 export async function runOperatingBrain(
   siteId: string,
   date: string,
+  options?: { caller?: "scheduler" | "dashboard" | "api" },
 ): Promise<BrainOutput> {
+  const useRedisL2 = options?.caller !== "scheduler";
+
   const cached = getCachedBrain(siteId, date);
   if (cached) return cached;
 
   // L2 cache: Redis (cross-process, survives cold starts between Vercel invocations)
-  const redisCached = await getCachedBrainFromRedis(siteId, date);
-  if (redisCached) {
-    // Promote to in-memory for subsequent requests in this process
-    setCachedBrain(siteId, date, redisCached);
-    return redisCached;
+  // Skip for scheduler callers — they trigger recompute intentionally after a sync.
+  if (useRedisL2) {
+    const redisCached = await getCachedBrainFromRedis(siteId, date);
+    if (redisCached) {
+      // Promote to in-memory for subsequent requests in this process
+      setCachedBrain(siteId, date, redisCached);
+      return redisCached;
+    }
   }
 
   // Tag every Sentry event originating from this function with site/module context

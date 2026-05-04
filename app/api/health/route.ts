@@ -22,8 +22,25 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
-import { pingRedis } from "@/lib/cache/redis";
+import { pingRedis, getCommandCount } from "@/lib/cache/redis";
 import * as Sentry from "@sentry/nextjs";
+
+// ── Redis status cache (30 s TTL) ──────────────────────────────────────────
+// Avoids issuing a Redis PING on every health check (every 5 min = 288 commands/day).
+// With 30 s cache: max 2 pings/min = ~48 commands/day.
+
+let _cachedRedisStatus: { status: "ok" | "error"; checkedAt: number } | null = null;
+const REDIS_STATUS_TTL_MS = 30_000;
+
+async function getRedisStatus(): Promise<"ok" | "error"> {
+  const now = Date.now();
+  if (_cachedRedisStatus && now - _cachedRedisStatus.checkedAt < REDIS_STATUS_TTL_MS) {
+    return _cachedRedisStatus.status;
+  }
+  const status = await pingRedis();
+  _cachedRedisStatus = { status, checkedAt: now };
+  return status;
+}
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -161,7 +178,7 @@ export async function GET(): Promise<Response> {
     checkDatabase(supabase),
     checkScheduler(supabase),
     checkMicros(supabase),
-    pingRedis(),
+    getRedisStatus(),
   ]);
 
   const database  = dbResult.status  === "fulfilled" ? dbResult.value  : "error" as const;
@@ -214,6 +231,7 @@ export async function GET(): Promise<Response> {
     checks: {
       database,
       redis,
+      redis_commands_today: getCommandCount(),
       scheduler_lag_seconds:          scheduler?.scheduler_lag_seconds          ?? null,
       oldest_queued_job_age_seconds:  scheduler?.oldest_queued_job_age_seconds  ?? null,
       dead_letter_count:              scheduler?.dead_letter_count              ?? 0,

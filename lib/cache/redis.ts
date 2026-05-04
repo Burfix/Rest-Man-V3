@@ -13,6 +13,22 @@
 import { Redis } from "@upstash/redis";
 import { logger } from "@/lib/logger";
 
+// ── Command count (for monitoring) ───────────────────────────────────────────
+
+/** Module-level counter — resets on cold start / process restart. */
+let _commandCount = 0;
+const LOG_THRESHOLD = 100;
+
+/** Return the number of Redis commands issued since process start (or last reset). */
+export function getCommandCount(): number {
+  return _commandCount;
+}
+
+/** Reset the counter (e.g. at start of a new calendar day). */
+export function resetCommandCount(): void {
+  _commandCount = 0;
+}
+
 // ── Client ────────────────────────────────────────────────────────────────────
 
 let _redis: Redis | null = null;
@@ -34,19 +50,19 @@ function getRedis(): Redis | null {
 
 export const TTL = {
   /** Score calculation inputs (context-builder output) */
-  SCORE_CONTEXT:    300,   // 5 min
+  SCORE_CONTEXT:    600,   // 10 min (was 300) — context stable between ticks
   /** Detected cross-module threats (slow-moving) */
-  THREAT_CACHE:     600,   // 10 min
+  THREAT_CACHE:     900,   // 15 min (was 600) — threats are slow-moving
   /** Hero strip: score + grade + voice line */
-  DASHBOARD_HERO:   180,   // 3 min
+  DASHBOARD_HERO:   300,   // 5 min (was 180) — GM won't perceive 2 min diff
   /** Ranked action cards */
-  PRIORITY_ACTIONS: 240,   // 4 min
+  PRIORITY_ACTIONS: 600,   // 10 min (was 240) — actions change on duty completion
   /** Revenue forecast (stable between syncs) */
-  FORECAST:        1800,   // 30 min
+  FORECAST:        7200,   // 2 hours (was 1800) — forecasts are stable
   /** Site config weights / thresholds */
-  SITE_CONFIG:     3600,   // 1 hour
+  SITE_CONFIG:    21600,   // 6 hours (was 3600) — config changes are rare
   /** Health check aggregation */
-  HEALTH_STATUS:     60,   // 1 min
+  HEALTH_STATUS:     60,   // 1 min (unchanged)
 } as const;
 
 // ── Key helpers ───────────────────────────────────────────────────────────────
@@ -73,6 +89,7 @@ export async function registerKey(siteId: string, key: string): Promise<void> {
   const r = getRedis();
   if (!r) return;
   try {
+    _commandCount++;
     await r.sadd(`forgestack:${siteId}:_keys`, key);
   } catch (err) {
     logger.warn("cache.registerKey.failed", { siteId, key, err: String(err) });
@@ -96,6 +113,10 @@ export async function getOrSet<T>(
 
   if (r) {
     try {
+      _commandCount++;
+      if (_commandCount % LOG_THRESHOLD === 0) {
+        logger.info("cache.commands", { count: _commandCount });
+      }
       const cached = await r.get<T>(key);
       if (cached !== null && cached !== undefined) {
         return cached;
@@ -110,6 +131,7 @@ export async function getOrSet<T>(
 
   if (r) {
     try {
+      _commandCount++;
       await r.set(key, value, { ex: ttl });
     } catch (err) {
       logger.warn("cache.set.failed", { key, err: String(err) });
@@ -132,11 +154,14 @@ export async function invalidateSite(siteId: string): Promise<void> {
   const r = getRedis();
   if (!r) return;
   try {
+    _commandCount++;
     const keys = await r.smembers(`forgestack:${siteId}:_keys`);
     if (keys.length > 0) {
-      await r.del(...(keys as [string, ...string[]]));
+      await batchDel([...keys, `forgestack:${siteId}:_keys`]);
+    } else {
+      _commandCount++;
+      await r.del(`forgestack:${siteId}:_keys`);
     }
-    await r.del(`forgestack:${siteId}:_keys`);
     logger.info("cache.invalidateSite", { siteId, keysEvicted: keys.length });
   } catch (err) {
     logger.warn("cache.invalidateSite.failed", { siteId, err: String(err) });
@@ -151,6 +176,7 @@ export async function invalidateKey(key: string): Promise<void> {
   const r = getRedis();
   if (!r) return;
   try {
+    _commandCount++;
     await r.del(key);
   } catch (err) {
     logger.warn("cache.invalidateKey.failed", { key, err: String(err) });
@@ -165,6 +191,7 @@ export async function pingRedis(): Promise<"ok" | "error"> {
   const r = getRedis();
   if (!r) return "error";
   try {
+    _commandCount++;
     const result = await r.ping();
     return result === "PONG" ? "ok" : "error";
   } catch {
@@ -180,9 +207,53 @@ export async function redisSafeGet<T>(key: string): Promise<T | null> {
   const r = getRedis();
   if (!r) return null;
   try {
+    _commandCount++;
     return await r.get<T>(key);
   } catch (err) {
     logger.warn("cache.safeGet.failed", { key, err: String(err) });
     return null;
+  }
+}
+
+// ── Batch operations ──────────────────────────────────────────────
+
+/** @internal Split an array into chunks of `size`. */
+function chunk<T>(arr: T[], size: number): T[][] {
+  return Array.from({ length: Math.ceil(arr.length / size) }, (_, i) =>
+    arr.slice(i * size, i * size + size),
+  );
+}
+
+/**
+ * Write multiple keys in parallel (one command per key — Upstash has no MSET TTL).
+ * Never throws — Redis errors are logged and silently bypassed.
+ */
+export async function batchSet(
+  items: { key: string; value: unknown; ttl: number }[],
+): Promise<void> {
+  const r = getRedis();
+  if (!r || items.length === 0) return;
+  try {
+    _commandCount += items.length;
+    await Promise.all(items.map((item) => r.set(item.key, item.value, { ex: item.ttl })));
+  } catch (err) {
+    logger.warn("cache.batchSet.failed", { count: items.length, err: String(err) });
+  }
+}
+
+/**
+ * Delete multiple keys in batches of 100 (Upstash DEL limit).
+ * Includes the tag-set key itself when called from invalidateSite.
+ * Never throws.
+ */
+export async function batchDel(keys: string[]): Promise<void> {
+  const r = getRedis();
+  if (!r || keys.length === 0) return;
+  try {
+    const batches = chunk(keys, 100);
+    _commandCount += batches.length;
+    await Promise.all(batches.map((batch) => r.del(...(batch as [string, ...string[]]))));
+  } catch (err) {
+    logger.warn("cache.batchDel.failed", { count: keys.length, err: String(err) });
   }
 }
