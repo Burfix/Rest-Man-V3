@@ -46,9 +46,19 @@ interface RouteAudit {
   notes: string;
 }
 
+// ── Routes that are intentionally public (no auth by design) ─────────────────
+// These are listed explicitly here so the audit does not flag them as unprotected.
+// Paths here must match the output of routeFromPath() — i.e. include the "app/" prefix.
+const INTENTIONALLY_PUBLIC_ROUTES: string[] = [
+  "/app/api/health",  // uptime / health check — safe to expose, returns no PII
+];
+
 // ── Detection helpers ─────────────────────────────────────────────────────────
 
-function detectProtection(content: string): { protection: Protection; notes: string } {
+function detectProtection(content: string, route?: string): { protection: Protection; notes: string } {
+  if (route && INTENTIONALLY_PUBLIC_ROUTES.includes(route)) {
+    return { protection: "webhook", notes: "Public by design — no auth (health check)" };
+  }
   // cronGuard helper (standardised — best practice)
   if (/cronGuard\s*\(/.test(content)) {
     return { protection: "cronGuard", notes: "Uses cronGuard() helper" };
@@ -156,9 +166,9 @@ function scanDir(dir: string, results: RouteAudit[]): void {
       scanDir(full, results);
     } else if (entry.name === "route.ts" || entry.name === "route.js") {
       const content = fs.readFileSync(full, "utf-8");
-      const { protection, notes } = detectProtection(content);
-      const methods = findMethods(content);
       const route = routeFromPath(full);
+      const { protection, notes } = detectProtection(content, route);
+      const methods = findMethods(content);
       results.push({
         file: path.relative(process.cwd(), full).replace(/\\/g, "/"),
         route,

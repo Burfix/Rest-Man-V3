@@ -34,10 +34,11 @@ const WEBHOOK_PATHS = [
 ];
 
 // ── Bypass category 2: external API callers ──────────────────────────────────
-// Called by non-browser clients (WordPress, external tools).
-// No Supabase session. Route-level API key verification is mandatory.
+// Called by non-browser clients (WordPress, external tools) or uptime monitors.
+// No Supabase session. Route-level verification is mandatory (API key, or public by design).
 const EXTERNAL_API_PATHS = [
   "/api/compliance/status",
+  "/api/health",           // public health check — no auth required for uptime monitors
 ];
 
 function isWebhook(pathname: string): boolean {
