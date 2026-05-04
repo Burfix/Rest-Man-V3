@@ -10,6 +10,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import { getOrSet, cacheKey, TTL, registerKey } from "@/lib/cache/redis";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,7 +96,29 @@ function computeSessionPressure(
 
 // ── Main builder ──────────────────────────────────────────────────────────────
 
+/**
+ * Fetches and normalises all module data for a site into a single
+ * OperationsContext. Result is Redis-cached for TTL.SCORE_CONTEXT (5 min)
+ * to reduce Supabase connection load.
+ *
+ * Cache misses fall back to a fresh DB query — Redis failure is transparent.
+ */
 export async function buildOperationsContext(
+  siteId: string,
+  date: string,
+): Promise<OperationsContext> {
+  const key = cacheKey(siteId, "context", date);
+  const result = await getOrSet(key, TTL.SCORE_CONTEXT, () =>
+    _buildOperationsContextUncached(siteId, date),
+  );
+  // Register for site-scoped invalidation (fire-and-forget)
+  registerKey(siteId, key).catch(() => {});
+  return result;
+}
+
+// Private: contains all DB query logic. Extracted so the public function
+// can wrap it with caching without duplicating code.
+async function _buildOperationsContextUncached(
   siteId: string,
   date: string,  // ISO date: "YYYY-MM-DD"
 ): Promise<OperationsContext> {

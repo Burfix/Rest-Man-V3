@@ -10,6 +10,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import { getOrSet, invalidateKey, cacheKey, TTL } from "@/lib/cache/redis";
 
 export interface SiteConfig {
   site_id: string;
@@ -43,39 +44,48 @@ export async function getSiteConfig(
   siteId: string,
 ): Promise<SiteConfig> {
   if (!siteId) throw new Error("getSiteConfig: siteId is required");
-  // Check cache
+  // L1: in-memory (single-process, fastest)
   if (_cache && _cache.config.site_id === siteId && Date.now() - _cache.ts < CACHE_TTL_MS) {
     return _cache.config;
   }
 
-  const supabase = createServerClient();
-  const { data, error } = await supabase
-    .from("sites")
-    .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone, allowed_routes, deployment_stage")
-    .eq("id", siteId)
-    .maybeSingle();
+  // L2: Redis (cross-process, 1-hour TTL)
+  const key = cacheKey(siteId, "config");
+  const config = await getOrSet(key, TTL.SITE_CONFIG, async () => {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("sites")
+      .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone, allowed_routes, deployment_stage")
+      .eq("id", siteId)
+      .maybeSingle();
 
-  const row = data as Record<string, unknown> | null;
-  const config: SiteConfig = {
-    site_id: siteId,
-    site_name: (row?.name as string) ?? "Unknown",
-    target_labour_pct: Number(row?.target_labour_pct) || DEFAULTS.target_labour_pct,
-    target_avg_spend: Number(row?.target_avg_spend) || DEFAULTS.target_avg_spend,
-    target_margin_pct: Number(row?.target_margin_pct) || DEFAULTS.target_margin_pct,
-    seating_capacity: Number(row?.seating_capacity) || DEFAULTS.seating_capacity,
-    currency_symbol: (row?.currency_symbol as string) ?? DEFAULTS.currency_symbol,
-    timezone: (row?.timezone as string) ?? DEFAULTS.timezone,
-    allowed_routes: (row?.allowed_routes as string[] | null) ?? null,
-    deployment_stage: ((row?.deployment_stage as string) === 'partial' || (row?.deployment_stage as string) === 'pending'
-      ? (row?.deployment_stage as 'partial' | 'pending')
-      : 'live'),
-  };
+    const row = data as Record<string, unknown> | null;
+    return {
+      site_id: siteId,
+      site_name: (row?.name as string) ?? "Unknown",
+      target_labour_pct: Number(row?.target_labour_pct) || DEFAULTS.target_labour_pct,
+      target_avg_spend: Number(row?.target_avg_spend) || DEFAULTS.target_avg_spend,
+      target_margin_pct: Number(row?.target_margin_pct) || DEFAULTS.target_margin_pct,
+      seating_capacity: Number(row?.seating_capacity) || DEFAULTS.seating_capacity,
+      currency_symbol: (row?.currency_symbol as string) ?? DEFAULTS.currency_symbol,
+      timezone: (row?.timezone as string) ?? DEFAULTS.timezone,
+      allowed_routes: (row?.allowed_routes as string[] | null) ?? null,
+      deployment_stage: ((row?.deployment_stage as string) === "partial" || (row?.deployment_stage as string) === "pending"
+        ? (row?.deployment_stage as "partial" | "pending")
+        : "live"),
+    } satisfies SiteConfig;
+  });
 
+  // Promote to in-memory for this process
   _cache = { config, ts: Date.now() };
   return config;
 }
 
 /** Clear config cache (e.g., after settings update) */
-export function clearSiteConfigCache(): void {
+/** Clear config cache — call after settings update (busts both in-memory and Redis) */
+export function clearSiteConfigCache(siteId?: string): void {
   _cache = null;
+  if (siteId) {
+    invalidateKey(cacheKey(siteId, "config")).catch(() => {});
+  }
 }

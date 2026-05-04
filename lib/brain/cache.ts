@@ -1,4 +1,5 @@
 import type { BrainOutput } from "@/services/brain/operating-brain";
+import { getOrSet, invalidateSite, cacheKey, TTL, registerKey, redisSafeGet } from "@/lib/cache/redis";
 
 type CacheEntry = {
   value: BrainOutput;
@@ -28,10 +29,28 @@ export function setCachedBrain(siteId: string, date: string, value: BrainOutput)
     value,
     expiresAt: Date.now() + BRAIN_CACHE_TTL_MS,
   });
+  // Also persist to Redis (cross-process, survives cold starts)
+  const rKey = cacheKey(siteId, "brain", date);
+  getOrSet(rKey, TTL.DASHBOARD_HERO, async () => value).catch(() => {});
+  registerKey(siteId, rKey).catch(() => {});
+}
+
+/**
+ * Try Redis for a cached BrainOutput before triggering a full recompute.
+ * Returns null on cache miss or Redis error.
+ */
+export async function getCachedBrainFromRedis(
+  siteId: string,
+  date: string,
+): Promise<BrainOutput | null> {
+  return redisSafeGet<BrainOutput>(cacheKey(siteId, "brain", date));
 }
 
 export function invalidateBrainCacheForSite(siteId: string): void {
   for (const key of Array.from(cache.keys())) {
     if (key.startsWith(`${siteId}:`)) cache.delete(key);
   }
+  // Also bust Redis
+  invalidateSite(siteId).catch(() => {});
 }
+

@@ -30,7 +30,7 @@ import {
 } from "@/services/accountability/score-calculator";
 import { generateVoice } from "./voice-generator";
 import { forecastToday } from "@/services/forecasting/forecast-engine";
-import { getCachedBrain, setCachedBrain } from "@/lib/brain/cache";
+import { getCachedBrain, setCachedBrain, getCachedBrainFromRedis } from "@/lib/brain/cache";
 import { calculateRecoveryOpportunity } from "@/lib/engine/recoveryEngine";
 import type { SportsEvent } from "@/services/forecasting/events-calendar";
 
@@ -1066,6 +1066,14 @@ export async function runOperatingBrain(
 ): Promise<BrainOutput> {
   const cached = getCachedBrain(siteId, date);
   if (cached) return cached;
+
+  // L2 cache: Redis (cross-process, survives cold starts between Vercel invocations)
+  const redisCached = await getCachedBrainFromRedis(siteId, date);
+  if (redisCached) {
+    // Promote to in-memory for subsequent requests in this process
+    setCachedBrain(siteId, date, redisCached);
+    return redisCached;
+  }
 
   // Tag every Sentry event originating from this function with site/module context
   Sentry.withScope((scope) => {

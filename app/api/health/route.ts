@@ -22,6 +22,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { pingRedis } from "@/lib/cache/redis";
 import * as Sentry from "@sentry/nextjs";
 
 export const dynamic = "force-dynamic";
@@ -156,15 +157,17 @@ export async function GET(): Promise<Response> {
   const supabase = createServerClient();
   const startedAt = Date.now();
 
-  const [dbResult, schedulerResult, microsResult] = await Promise.allSettled([
+  const [dbResult, schedulerResult, microsResult, redisResult] = await Promise.allSettled([
     checkDatabase(supabase),
     checkScheduler(supabase),
     checkMicros(supabase),
+    pingRedis(),
   ]);
 
   const database  = dbResult.status  === "fulfilled" ? dbResult.value  : "error" as const;
   const scheduler = schedulerResult.status === "fulfilled" ? schedulerResult.value : null;
   const micros    = microsResult.status    === "fulfilled" ? microsResult.value    : null;
+  const redis     = redisResult.status     === "fulfilled" ? redisResult.value     : "error" as const;
 
   const lag  = scheduler?.scheduler_lag_seconds ?? 0;
   const dl   = scheduler?.dead_letter_count     ?? 0;
@@ -210,6 +213,7 @@ export async function GET(): Promise<Response> {
     status,
     checks: {
       database,
+      redis,
       scheduler_lag_seconds:          scheduler?.scheduler_lag_seconds          ?? null,
       oldest_queued_job_age_seconds:  scheduler?.oldest_queued_job_age_seconds  ?? null,
       dead_letter_count:              scheduler?.dead_letter_count              ?? 0,

@@ -19,6 +19,7 @@ import { dispatchSync } from "@/lib/sync/orchestrator";
 import { SyncTypeEnum, SyncModeEnum } from "@/lib/sync/contract";
 import { markSyncJobSuccess, markSyncJobFailed, markSyncJobRunning } from "./claim";
 import { auditJobTransition } from "@/lib/audit/logger";
+import { invalidateSite } from "@/lib/cache/redis";
 import * as Sentry from "@sentry/nextjs";
 import type { ClaimedSyncJob, SchedulerWorkerContext } from "./types";
 
@@ -131,6 +132,10 @@ export async function executeSyncJob(
         records_written: result.records_written,
         duration_ms:     result.duration_ms,
       });
+
+      // Bust the Redis cache for this site so the next dashboard load reflects
+      // the newly-synced data (fire-and-forget, never blocks the job response)
+      invalidateSite(job.site_id).catch(() => {});
 
       // ── Enqueue dependent downstream jobs on success ────────────────────
       await enqueueDependentJobs(supabase, job, ctx);
