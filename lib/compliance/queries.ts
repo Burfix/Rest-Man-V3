@@ -270,14 +270,24 @@ export async function createReview(input: {
 
 // ── Risk view ─────────────────────────────────────────────────────────────────
 
+/**
+ * Returns risk flags from v_compliance_risk.
+ *
+ * @param filter.tenantId  When provided, scopes the query to a single tenant.
+ *                         Officer/executive views legitimately omit this to see all tenants.
+ * @param filter.riskLevel Optional severity filter.
+ */
 export async function getRiskFlags(
-  filter?: { riskLevel?: "CRITICAL" | "WARNING" | "INFO" },
+  filter?: { riskLevel?: "CRITICAL" | "WARNING" | "INFO"; tenantId?: string },
 ): Promise<RiskRow[]> {
   let q = serviceDb()
     .from("v_compliance_risk")
     .select("tenant_id, tenant, precinct, certificate_type, certificate_id, status, expiry_date, risk_level, recommended_action, action_owner, action_deadline")
     .order("risk_level");
 
+  if (filter?.tenantId) {
+    q = q.eq("tenant_id", filter.tenantId);
+  }
   if (filter?.riskLevel) {
     q = q.eq("risk_level", filter.riskLevel);
   }
@@ -291,25 +301,49 @@ export async function getRiskFlags(
  * Open action items only (CRITICAL + WARNING with a recommended_action).
  * Sorted by urgency (CRITICAL first, then by deadline).
  * Comes from v_compliance_actions view (migration 072).
+ *
+ * @param tenantId  When provided, scopes to a single tenant.
+ *                  Officer/executive views legitimately omit this.
  */
-export async function getOpenActions(limit = 50): Promise<RiskRow[]> {
-  const { data, error } = await serviceDb()
+export async function getOpenActions(
+  limit = 50,
+  tenantId?: string,
+): Promise<RiskRow[]> {
+  let q = serviceDb()
     .from("v_compliance_actions")
     .select("tenant_id, tenant, precinct, certificate_type, certificate_id, status, expiry_date, risk_level, recommended_action, action_owner, action_deadline")
     .limit(limit);
+
+  if (tenantId) {
+    q = q.eq("tenant_id", tenantId);
+  }
+
+  const { data, error } = await q;
   if (error) throw new Error(`getOpenActions: ${error.message}`);
   return (data ?? []) as RiskRow[];
 }
 
 // ── Expiring soon view ────────────────────────────────────────────────────────
 
+/**
+ * Returns certificates expiring soon from v_compliance_expiring_soon.
+ *
+ * @param window    Optional time-window filter ("30_DAYS", "60_DAYS", "90_DAYS").
+ * @param tenantId  When provided, scopes to a single tenant.
+ *                  Officer/executive views legitimately omit this to see all tenants.
+ */
 export async function getExpiringSoon(
   window?: "30_DAYS" | "60_DAYS" | "90_DAYS",
+  tenantId?: string,
 ): Promise<ExpiringRow[]> {
   let q = serviceDb()
     .from("v_compliance_expiring_soon")
     .select("*")
     .order("expiry_date");
+
+  if (tenantId) {
+    q = q.eq("tenant_id", tenantId);
+  }
 
   if (window) {
     // Return only certs in this window or worse
@@ -332,11 +366,26 @@ export async function getExpiringSoon(
 
 // ── Tenant summary view ───────────────────────────────────────────────────────
 
-export async function getTenantSummaries(): Promise<TenantSummary[]> {
-  const { data, error } = await serviceDb()
+/**
+ * Returns per-tenant compliance summaries from v_compliance_summary_by_tenant.
+ * Returns ALL tenants by default (for officer/executive overview).
+ *
+ * @param tenantIds  When provided, scopes the query to these tenant IDs only.
+ *                   Pass a single-element array for one-tenant views.
+ */
+export async function getTenantSummaries(
+  tenantIds?: string[],
+): Promise<TenantSummary[]> {
+  let q = serviceDb()
     .from("v_compliance_summary_by_tenant")
     .select("*")
     .order("compliance_pct", { ascending: true }); // worst first
+
+  if (tenantIds && tenantIds.length > 0) {
+    q = q.in("tenant_id", tenantIds);
+  }
+
+  const { data, error } = await q;
   if (error) throw new Error(`getTenantSummaries: ${error.message}`);
   return (data ?? []) as TenantSummary[];
 }

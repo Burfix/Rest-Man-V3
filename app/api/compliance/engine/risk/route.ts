@@ -20,9 +20,12 @@ export async function GET(req: NextRequest) {
     | "WARNING"
     | "INFO"
     | null;
+  const tenantId = req.nextUrl.searchParams.get("tenant_id") ?? undefined;
 
   try {
-    const rows = await getRiskFlags(level ? { riskLevel: level } : undefined);
+    const rows = await getRiskFlags(
+      level || tenantId ? { riskLevel: level ?? undefined, tenantId } : undefined,
+    );
     return NextResponse.json({ data: rows, count: rows.length });
   } catch (err) {
     logger.error("compliance engine: getRiskFlags failed", { err: String(err) });

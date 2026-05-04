@@ -4,6 +4,20 @@
  * Data access layer for the commercial tracking module.
  * All queries run with the service_role key (bypasses RLS).
  * Called directly by server components and API route handlers.
+ *
+ * SCOPE: These functions return ForgeStack's own internal commercial data
+ * (client subscriptions, revenue, expenses). This is system-level data —
+ * NOT per-restaurant tenant data. There is no per-org partition.
+ *
+ * Access MUST be enforced at the route layer (ALLOWED role list). These
+ * functions assume the caller has already validated the user's role.
+ *
+ * M2 AUDIT NOTE: The commercial module is intentionally global. Adding
+ * org_id scoping here would be incorrect because:
+ *   (a) Commercial tables have no org_id column — they belong to ForgeStack.
+ *   (b) The legitimate callers (super_admin, executive) need full visibility.
+ * If a multi-org ForgeStack deployment ever becomes a requirement, this
+ * module will need a schema change (org_id FK) before scoping can be added.
  */
 
 import { createClient } from "@supabase/supabase-js";

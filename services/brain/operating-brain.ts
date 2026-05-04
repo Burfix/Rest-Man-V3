@@ -14,6 +14,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
+import { auditBrainAction } from "@/lib/audit/logger";
 import {
   buildOperationsContext,
   type OperationsContext,
@@ -1186,6 +1187,22 @@ export async function runOperatingBrain(
 
   brain.voiceLine = generateVoice(brain, effectiveCtx);
   setCachedBrain(siteId, date, brain);
+
+  // Audit the generated priority action — fire-and-forget, never blocks response
+  // Only log when a real threat exists (not the "All Systems Nominal" fallback)
+  if (brain.primaryThreat.title !== "All Systems Nominal" && brain.primaryThreat.title !== "System Initialising") {
+    auditBrainAction({
+      siteId,
+      threatTitle:       brain.primaryThreat.title,
+      threatSeverity:    brain.primaryThreat.severity,
+      modulesInvolved:   brain.primaryThreat.modulesInvolved,
+      moneyAtRisk:       brain.primaryThreat.moneyAtRisk,
+      recommendedAction: brain.primaryThreat.recommendedAction,
+      confidence:        brain.primaryThreat.confidence,
+      systemHealthScore: brain.systemHealth.score,
+      systemHealthGrade: brain.systemHealth.grade,
+    }).catch(() => {});
+  }
 
   return brain;
 }

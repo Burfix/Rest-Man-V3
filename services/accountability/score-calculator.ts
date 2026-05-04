@@ -26,6 +26,7 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { auditScoreCalculation } from "@/lib/audit/logger";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -233,6 +234,27 @@ export async function calculateDailyScores(
       .from("manager_performance_scores")
       .upsert(upserts, { onConflict: "user_id,site_id,period_date" });
     if (upsertErr) throw new Error(`Upsert failed: ${upsertErr.message}`);
+
+    // Audit each score written — fire-and-forget, never throws
+    await Promise.all(
+      upserts.map((row) =>
+        auditScoreCalculation({
+          siteId:     row.site_id,
+          userId:     row.user_id,
+          periodDate: row.period_date,
+          afterScore: row.score,
+          metrics: {
+            tasksAssigned:  row.tasks_assigned,
+            tasksCompleted: row.tasks_completed,
+            tasksOnTime:    row.tasks_on_time,
+            tasksBlocked:   row.tasks_blocked,
+            tasksEscalated: row.tasks_escalated,
+            completionRate: row.completion_rate,
+            onTimeRate:     row.on_time_rate,
+          },
+        }).catch(() => {}),
+      ),
+    );
   }
 
   return upserts.length;

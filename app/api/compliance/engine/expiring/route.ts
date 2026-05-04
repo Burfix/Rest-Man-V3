@@ -18,9 +18,10 @@ export async function GET(req: NextRequest) {
     | "60_DAYS"
     | "90_DAYS"
     | null;
+  const tenantId = req.nextUrl.searchParams.get("tenant_id") ?? undefined;
 
   try {
-    const rows = await getExpiringSoon(window ?? undefined);
+    const rows = await getExpiringSoon(window ?? undefined, tenantId);
     return NextResponse.json({ data: rows, count: rows.length });
   } catch (err) {
     logger.error("compliance engine: getExpiringSoon failed", { err: String(err) });

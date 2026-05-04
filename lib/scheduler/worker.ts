@@ -18,6 +18,7 @@ import { logger } from "@/lib/logger";
 import { dispatchSync } from "@/lib/sync/orchestrator";
 import { SyncTypeEnum, SyncModeEnum } from "@/lib/sync/contract";
 import { markSyncJobSuccess, markSyncJobFailed, markSyncJobRunning } from "./claim";
+import { auditJobTransition } from "@/lib/audit/logger";
 import type { ClaimedSyncJob, SchedulerWorkerContext } from "./types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,6 +68,15 @@ export async function executeSyncJob(
 
   // Transition leased → running for accurate lifecycle tracking in DB
   await markSyncJobRunning(supabase, job.id, ctx.worker_id);
+  await auditJobTransition({
+    siteId:     job.site_id,
+    jobId:      job.id,
+    jobType:    job.sync_type,
+    fromStatus: "leased",
+    toStatus:   "running",
+    attempts:   job.attempts,
+    traceId:    job.trace_id,
+  }).catch(() => {});
 
   try {
     const result = await dispatchSync(
@@ -83,6 +93,15 @@ export async function executeSyncJob(
 
     if (result.ok) {
       await markSyncJobSuccess(supabase, job.id, ctx.worker_id);
+      await auditJobTransition({
+        siteId:     job.site_id,
+        jobId:      job.id,
+        jobType:    job.sync_type,
+        fromStatus: "running",
+        toStatus:   "success",
+        attempts:   job.attempts,
+        traceId:    job.trace_id,
+      }).catch(() => {});
       logger.info("worker.sync_success", {
         ...logBase,
         outcome:         result.outcome,
@@ -100,6 +119,16 @@ export async function executeSyncJob(
       const retryDelay = retryable ? 60 : 99999;
 
       await markSyncJobFailed(supabase, job.id, errMsg, retryDelay, ctx.worker_id);
+      await auditJobTransition({
+        siteId:        job.site_id,
+        jobId:         job.id,
+        jobType:       job.sync_type,
+        fromStatus:    "running",
+        toStatus:      "failed",
+        attempts:      job.attempts,
+        errorMessage:  errMsg,
+        traceId:       job.trace_id,
+      }).catch(() => {});
       logger.warn("worker.sync_failed", {
         ...logBase,
         outcome:  result.outcome,
@@ -112,6 +141,16 @@ export async function executeSyncJob(
     const msg = err instanceof Error ? err.message : String(err);
     logger.error("worker.sync_exception", { ...logBase, err: msg });
     await markSyncJobFailed(supabase, job.id, msg, 60, ctx.worker_id);
+    await auditJobTransition({
+      siteId:       job.site_id,
+      jobId:        job.id,
+      jobType:      job.sync_type,
+      fromStatus:   "running",
+      toStatus:     "failed",
+      attempts:     job.attempts,
+      errorMessage: msg,
+      traceId:      job.trace_id,
+    }).catch(() => {});
     return false;
   }
 }
