@@ -1243,6 +1243,7 @@ export interface Database {
         Row: {
           id: string;
           location_name: string;
+          location_key: string | null;
           loc_ref: string;
           auth_server_url: string;
           app_server_url: string;
@@ -1260,6 +1261,7 @@ export interface Database {
         Insert: {
           id?: string;
           location_name?: string;
+          location_key?: string | null;
           loc_ref?: string;
           auth_server_url: string;
           app_server_url: string;
@@ -1277,6 +1279,7 @@ export interface Database {
         Update: {
           id?: string;
           location_name?: string;
+          location_key?: string | null;
           loc_ref?: string;
           auth_server_url?: string;
           app_server_url?: string;

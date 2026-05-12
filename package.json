@@ -10,7 +10,8 @@
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "prepare": "husky"
+    "prepare": "husky",
+    "micros:check:primi": "npx tsx scripts/check-micros-primi.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
