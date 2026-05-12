@@ -107,17 +107,20 @@ function buildSiCantinaConfig(): LocationConfig {
 }
 
 function buildPrimiCampsBayConfig(): LocationConfig {
-  const authUrl     = n(process.env.MICROS_PRIMI_CAMPS_BAY_AUTH_URL).replace(/\/$/, "");
-  const baseUrl     = n(process.env.MICROS_PRIMI_CAMPS_BAY_BASE_URL).replace(/\/$/, "");
-  const clientId    = n(process.env.MICROS_PRIMI_CAMPS_BAY_CLIENT_ID);
-  const clientSecret= n(process.env.MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET);
-  const enterprise  = n(process.env.MICROS_PRIMI_CAMPS_BAY_ENTERPRISE);
-  const locRef      = n(process.env.MICROS_PRIMI_CAMPS_BAY_LOCATION_REF);
-  const enabled     = n(process.env.MICROS_PRIMI_CAMPS_BAY_ENABLED).toLowerCase() === "true";
+  const authUrl   = n(process.env.MICROS_PRIMI_CAMPS_BAY_AUTH_URL).replace(/\/$/, "");
+  const baseUrl   = n(process.env.MICROS_PRIMI_CAMPS_BAY_BASE_URL).replace(/\/$/, "");
+  const clientId  = n(process.env.MICROS_PRIMI_CAMPS_BAY_CLIENT_ID);
+  const enterprise= n(process.env.MICROS_PRIMI_CAMPS_BAY_ENTERPRISE);
+  // USERNAME = API account name (e.g. PRI_THAMSANQA_BIAPI)
+  const username  = n(process.env.MICROS_PRIMI_CAMPS_BAY_USERNAME);
+  // PASSWORD = API account password — stored as CLIENT_SECRET in env for backward compat
+  const password  = n(process.env.MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET);
+  const locRef    = n(process.env.MICROS_PRIMI_CAMPS_BAY_LOCATION_REF);
+  const enabled   = n(process.env.MICROS_PRIMI_CAMPS_BAY_ENABLED).toLowerCase() === "true";
 
   const configured =
-    !!authUrl && !!baseUrl && !!clientId && !!clientSecret &&
-    !!enterprise && !!locRef;
+    !!authUrl && !!baseUrl && !!clientId && !!enterprise &&
+    !!username && !!password && !!locRef;
 
   return {
     key:                "primi-camps-bay",
@@ -126,11 +129,11 @@ function buildPrimiCampsBayConfig(): LocationConfig {
     authUrl,
     baseUrl,
     clientId,
-    clientSecret,      // CLIENT_CREDENTIALS — never log
-    username:           null,
-    password:           null,
+    clientSecret:       null,   // PKCE flow — no OAuth client secret
+    username,
+    password,                   // API account password — never log
     locationRef:        locRef,
-    authFlow:           "client_credentials",
+    authFlow:           "pkce",
     enabled,
     configured,
   };

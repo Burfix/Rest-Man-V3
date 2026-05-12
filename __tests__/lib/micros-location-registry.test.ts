@@ -21,9 +21,10 @@ const PRIMI_ENV: Record<string, string> = {
   MICROS_PRIMI_CAMPS_BAY_ENTERPRISE: "PRI",
   MICROS_PRIMI_CAMPS_BAY_AUTH_URL: "https://ors-idm.msaf.oraclerestaurants.com",
   MICROS_PRIMI_CAMPS_BAY_BASE_URL: "https://simphony-home.msaf.oraclerestaurants.com",
-  MICROS_PRIMI_CAMPS_BAY_CLIENT_ID: "UFJJLmQ1Zjg3YjNlLWM4MmItNDM0ZC05OTZlLWM5NzVlZjVjN2VhYQ",
+  MICROS_PRIMI_CAMPS_BAY_CLIENT_ID: "PRI.d5f87b3e-c82b-434d-996e-c975ef5c7eaa",
+  MICROS_PRIMI_CAMPS_BAY_USERNAME: "PRI_THAMSANQA_BIAPI",
   MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET: "test-secret-value",
-  MICROS_PRIMI_CAMPS_BAY_LOCATION_REF: "100123",
+  MICROS_PRIMI_CAMPS_BAY_LOCATION_REF: "101003",
 };
 
 const SI_CANTINA_ENV: Record<string, string> = {
@@ -71,7 +72,7 @@ describe("micros-location-registry", () => {
     const cfg = getLocationConfig("primi-camps-bay");
     expect(cfg.configured).toBe(true);
     expect(cfg.enabled).toBe(true);
-    expect(cfg.authFlow).toBe("client_credentials");
+    expect(cfg.authFlow).toBe("pkce");
     expect(cfg.key).toBe("primi-camps-bay");
     expect(cfg.enterpriseShortName).toBe("PRI");
   });

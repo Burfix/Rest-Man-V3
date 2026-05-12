@@ -94,10 +94,9 @@ async function main() {
       // Discard immediately — never print
       void tokenSet;
       console.log("  ✅ Token acquired successfully (token NOT printed)");
+      const expiresInSec = Math.round(((tokenSet as any).expiresAt - Date.now()) / 1000);
       console.log(
-        `  Auth flow: ${cfg.authFlow} | Expires in ~${Math.round(
-          ((tokenSet as any).expiresAt - Date.now()) / 1000
-        )}s`
+        `  Auth flow: ${cfg.authFlow} | Expires in ~${isNaN(expiresInSec) ? "unknown" : expiresInSec}s`
       );
     }
   } catch (err: unknown) {

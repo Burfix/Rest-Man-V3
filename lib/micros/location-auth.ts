@@ -306,7 +306,9 @@ async function acquireClientCredentialsToken(cfg: LocationConfig): Promise<Locat
 
   const body = new URLSearchParams();
   body.set("grant_type", "client_credentials");
-  body.set("scope", "openid");
+  // Include client_id in body as well — some Oracle IDM deployments require it
+  // alongside Basic auth (RFC 6749 §2.3.1 allows either or both)
+  body.set("client_id", cfg.clientId);
 
   // Use HTTP Basic auth: Authorization: Basic base64(clientId:clientSecret)
   // clientSecret is read from env var, never logged
