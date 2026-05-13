@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
   if (!isValidLocationKey(locationKey)) {
     return NextResponse.json(
-      { error: `Invalid locationKey. Expected: si-cantina | primi-camps-bay. Got: ${locationKey}` },
+      { error: `Invalid locationKey. Expected: si-cantina | primi-camps-bay | sea-castle-camps-bay. Got: ${locationKey}` },
       { status: 400 },
     );
   }

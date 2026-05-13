@@ -14,7 +14,10 @@
     "micros:check:primi": "npx tsx scripts/check-micros-primi.ts",
     "micros:test:primi": "npx tsx scripts/test-micros-camps-bay.ts",
     "micros:sync:primi": "npx tsx scripts/run-sync-primi.ts",
-    "micros:backfill:primi": "npx tsx scripts/backfill-primi-30-days.ts"
+    "micros:backfill:primi": "npx tsx scripts/backfill-primi-30-days.ts",
+    "micros:sync:sea-castle": "npx tsx scripts/run-sync-sea-castle.ts",
+    "micros:backfill:sea-castle": "npx tsx scripts/backfill-sea-castle-30-days.ts",
+    "micros:validate": "npx tsx scripts/validate-micros-location-refs.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

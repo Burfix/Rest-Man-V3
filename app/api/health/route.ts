@@ -24,6 +24,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { pingRedis, getCommandCount } from "@/lib/cache/redis";
 import * as Sentry from "@sentry/nextjs";
+import { validateLocationRefUniqueness } from "@/lib/micros/micros-location-registry";
 
 // ── Redis status cache (30 s TTL) ──────────────────────────────────────────
 // Avoids issuing a Redis PING on every health check (every 5 min = 288 commands/day).
@@ -190,6 +191,13 @@ export async function GET(): Promise<Response> {
   const dl   = scheduler?.dead_letter_count     ?? 0;
   const sync = micros?.micros_last_sync_minutes_ago;
 
+  // ── Location ref conflict check ────────────────────────────────────────────
+  const locRefConflicts = validateLocationRefUniqueness();
+  const hasLocRefConflict = locRefConflicts.length > 0;
+  if (hasLocRefConflict) {
+    logger.error("MICROS location ref conflict detected", { conflicts: locRefConflicts });
+  }
+
   // ── Overall status ─────────────────────────────────────────────────────────
   const isUnhealthy =
     database === "error"    ||
@@ -200,7 +208,8 @@ export async function GET(): Promise<Response> {
     !isUnhealthy && (
       lag  >= LAG_DEGRADED_S                                       ||
       dl   >= DL_DEGRADED                                          ||
-      (sync !== null && sync !== undefined && sync >= MICROS_DEGRADED_MIN)
+      (sync !== null && sync !== undefined && sync >= MICROS_DEGRADED_MIN) ||
+      hasLocRefConflict
     );
 
   const status = isUnhealthy ? "unhealthy" : isDegraded ? "degraded" : "healthy";
@@ -236,6 +245,9 @@ export async function GET(): Promise<Response> {
       oldest_queued_job_age_seconds:  scheduler?.oldest_queued_job_age_seconds  ?? null,
       dead_letter_count:              scheduler?.dead_letter_count              ?? 0,
       micros_last_sync_minutes_ago:   micros?.micros_last_sync_minutes_ago      ?? null,
+      micros_location_ref_conflicts:  hasLocRefConflict
+        ? locRefConflicts.map((c) => ({ locationRef: c.locationRef, keys: c.keys }))
+        : null,
     },
     checked_at:   new Date().toISOString(),
     duration_ms:  Date.now() - startedAt,

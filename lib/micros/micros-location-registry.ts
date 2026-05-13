@@ -11,11 +11,12 @@
  *   - clientSecret and password are read from env vars and never logged.
  *
  * Supported locations:
- *   si-cantina       → PKCE auth (username + password), env: MICROS_*
- *   primi-camps-bay  → Client credentials auth (clientId + clientSecret), env: MICROS_PRIMI_CAMPS_BAY_*
+ *   si-cantina            → PKCE auth (username + password), env: MICROS_*
+ *   primi-camps-bay       → PKCE auth (username + password), env: MICROS_PRIMI_CAMPS_BAY_*
+ *   sea-castle-camps-bay  → PKCE auth — shares Si Cantina credentials, own loc ref: env: MICROS_SEA_CASTLE_*
  */
 
-export type LocationKey = "si-cantina" | "primi-camps-bay";
+export type LocationKey = "si-cantina" | "primi-camps-bay" | "sea-castle-camps-bay";
 
 /**
  * Auth flow used by the location.
@@ -140,6 +141,57 @@ function buildPrimiCampsBayConfig(): LocationConfig {
 }
 
 /**
+ * Sea Castle Hotel Camps Bay
+ *
+ * Shares all Oracle MICROS auth credentials with Si Cantina (same enterprise,
+ * same PKCE flow, same API account).  Only the location reference differs.
+ *
+ * Required env vars (shared — already set for Si Cantina):
+ *   MICROS_AUTH_SERVER, MICROS_BI_SERVER, MICROS_CLIENT_ID,
+ *   MICROS_USERNAME, MICROS_PASSWORD, MICROS_ORG_SHORT_NAME
+ *
+ * Sea-Castle-specific env vars:
+ *   MICROS_SEA_CASTLE_ENABLED         "true" | "false"
+ *   MICROS_SEA_CASTLE_LOCATION_REF    Oracle locRef for Sea Castle (e.g. "2001002")
+ *
+ * SECURITY: No secrets are duplicated.  Credential env vars are referenced
+ * once (in buildSiCantinaConfig) and reused here by reading the same vars.
+ */
+function buildSeaCastleConfig(): LocationConfig {
+  // ── Shared credentials (same as Si Cantina) ──────────────────────────────
+  const authUrl   = n(process.env.MICROS_AUTH_SERVER).replace(/\/$/, "");
+  const baseUrl   = n(process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER).replace(/\/$/, "");
+  const clientId  = n(process.env.MICROS_CLIENT_ID);
+  const enterprise= n(process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER);
+  const username  = n(process.env.MICROS_USERNAME ?? process.env.MICROS_API_ACCOUNT_NAME);
+  const password  = n(process.env.MICROS_PASSWORD ?? process.env.MICROS_API_ACCOUNT_PASSWORD);
+
+  // ── Sea-Castle-specific ──────────────────────────────────────────────────
+  const locRef    = n(process.env.MICROS_SEA_CASTLE_LOCATION_REF ?? "2001002");
+  const enabled   = n(process.env.MICROS_SEA_CASTLE_ENABLED).toLowerCase() === "true";
+
+  const configured =
+    !!authUrl && !!baseUrl && !!clientId && !!enterprise &&
+    !!username && !!password && !!locRef;
+
+  return {
+    key:                "sea-castle-camps-bay",
+    displayName:        "Sea Castle Hotel Camps Bay",
+    enterpriseShortName: enterprise,
+    authUrl,
+    baseUrl,
+    clientId,
+    clientSecret:       null,   // PKCE — no client secret
+    username,
+    password,
+    locationRef:        locRef,
+    authFlow:           "pkce",
+    enabled,
+    configured,
+  };
+}
+
+/**
  * Returns the config for a specific location key.
  * Throws if the key is unknown.
  * Does NOT throw for unconfigured or disabled locations — callers must check
@@ -147,8 +199,9 @@ function buildPrimiCampsBayConfig(): LocationConfig {
  */
 export function getLocationConfig(key: LocationKey): LocationConfig {
   switch (key) {
-    case "si-cantina":      return buildSiCantinaConfig();
-    case "primi-camps-bay": return buildPrimiCampsBayConfig();
+    case "si-cantina":           return buildSiCantinaConfig();
+    case "primi-camps-bay":      return buildPrimiCampsBayConfig();
+    case "sea-castle-camps-bay": return buildSeaCastleConfig();
     default: {
       const _exhaustive: never = key;
       throw new Error(`[MICROS] Unknown location key: ${_exhaustive}`);
@@ -161,7 +214,41 @@ export function getLocationConfig(key: LocationKey): LocationConfig {
  * Safe to iterate for health checks and admin dashboards.
  */
 export function getAllLocationConfigs(): LocationConfig[] {
-  return [buildSiCantinaConfig(), buildPrimiCampsBayConfig()];
+  return [buildSiCantinaConfig(), buildPrimiCampsBayConfig(), buildSeaCastleConfig()];
+}
+
+// ── Location-ref uniqueness validation ───────────────────────────────────
+
+export interface LocationRefConflict {
+  locationRef: string;
+  keys: LocationKey[];
+}
+
+/**
+ * Checks that no two ENABLED + CONFIGURED locations share the same
+ * MICROS location reference.  Duplicate refs would cause data from
+ * different stores to be written to the same DB rows.
+ *
+ * Call this at startup or in a health-check route to surface conflicts.
+ *
+ * Returns an array of conflicts (empty = all clear).
+ *
+ * WARNING if conflicts detected:
+ *   "MICROS location ref conflict detected"
+ */
+export function validateLocationRefUniqueness(): LocationRefConflict[] {
+  const configs = getAllLocationConfigs().filter((c) => c.configured && c.enabled && !!c.locationRef);
+  const refMap  = new Map<string, LocationKey[]>();
+
+  for (const c of configs) {
+    const existing = refMap.get(c.locationRef) ?? [];
+    existing.push(c.key);
+    refMap.set(c.locationRef, existing);
+  }
+
+  return Array.from(refMap.entries())
+    .filter(([, keys]) => keys.length > 1)
+    .map(([locationRef, keys]) => ({ locationRef, keys }));
 }
 
 /**
@@ -192,5 +279,5 @@ export function safeConfigSummary(cfg: LocationConfig) {
  * Use this to sanitize user-supplied locationKey query params.
  */
 export function isValidLocationKey(key: string): key is LocationKey {
-  return key === "si-cantina" || key === "primi-camps-bay";
+  return key === "si-cantina" || key === "primi-camps-bay" || key === "sea-castle-camps-bay";
 }
