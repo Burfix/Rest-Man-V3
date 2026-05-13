@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "husky",
-    "micros:check:primi": "npx tsx scripts/check-micros-primi.ts"
+    "micros:check:primi": "npx tsx scripts/check-micros-primi.ts",
+    "micros:test:primi": "npx tsx scripts/test-micros-camps-bay.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
