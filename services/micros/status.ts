@@ -125,3 +125,19 @@ export async function getMicrosConnection(): Promise<MicrosConnection | null> {
     .maybeSingle();
   return (data as MicrosConnection | null) ?? null;
 }
+
+/**
+ * Loads a connection row by its stable location_key (e.g. 'primi-camps-bay').
+ * Returns null if not found. Never returns token fields.
+ */
+export async function getMicrosConnectionByLocationKey(
+  locationKey: string,
+): Promise<MicrosConnection | null> {
+  const supabase = createServerClient();
+  const { data } = await supabase
+    .from("micros_connections")
+    .select(SAFE_CONNECTION_COLUMNS)
+    .eq("location_key" as never, locationKey)
+    .maybeSingle();
+  return (data as MicrosConnection | null) ?? null;
+}

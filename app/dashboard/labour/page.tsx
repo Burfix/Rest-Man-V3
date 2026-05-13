@@ -8,7 +8,8 @@
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { getStoredDailySummary, buildDailySummary } from "@/services/micros/labour/summary";
 import { getMockLabourSummary } from "@/services/micros/labour/mock";
-import { getMicrosConnection } from "@/services/micros/status";
+import { getMicrosConnection, getMicrosConnectionByLocationKey } from "@/services/micros/status";
+import { getAllLocationConfigs } from "@/lib/micros/micros-location-registry";
 import LabourDashboardClient from "@/components/dashboard/labour/LabourDashboardClient";
 import type { LabourDashboardSummary } from "@/types/labour";
 
@@ -21,9 +22,33 @@ export default async function LabourPage() {
   let loadError: string | null = null;
   let useMock = false;
 
-  // Prefer DB connection locRef over env var
-  const connection = await getMicrosConnection().catch(() => null);
-  const locRef = connection?.loc_ref ?? cfg.locRef;
+  // Resolve locRef: check all configured multi-location registrations first
+  // (Primi Camps Bay, etc.), then fall back to Si Cantina / legacy env var.
+  let locRef: string | null = null;
+
+  const allLocations = getAllLocationConfigs();
+  const configuredLocations = allLocations.filter(
+    (l) => l.configured && l.key !== "si-cantina",
+  );
+
+  for (const loc of configuredLocations) {
+    const conn = await getMicrosConnectionByLocationKey(loc.key).catch(() => null);
+    if (conn?.loc_ref) {
+      locRef = conn.loc_ref;
+      break; // Use first configured non-Si-Cantina location
+    }
+    // Fall back to env var locRef for this location
+    if (loc.locationRef) {
+      locRef = loc.locationRef;
+      break;
+    }
+  }
+
+  // Fall back to Si Cantina if no other location resolved
+  if (!locRef) {
+    const connection = await getMicrosConnection().catch(() => null);
+    locRef = connection?.loc_ref ?? cfg.locRef ?? null;
+  }
 
   if (cfg.enabled && locRef) {
     try {
