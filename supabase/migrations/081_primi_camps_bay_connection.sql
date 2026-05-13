@@ -35,21 +35,28 @@ UPDATE micros_connections
      OR site_id = '00000000-0000-0000-0000-000000000001'
    );
 
--- ── 3. Ensure Primi Camps Bay site is present and in 'partial' stage ─────
+-- ── 3. Ensure Primi Camps Bay site is present ────────────────────────────
 
-INSERT INTO sites (id, name, store_code, is_active, deployment_stage)
+INSERT INTO sites (id, name, store_code, is_active)
 VALUES (
   '00000000-0000-0000-0000-000000000003',
   'Primi Camps Bay',
   'PCB',
-  false,
-  'partial'
+  false
 )
 ON CONFLICT (id) DO UPDATE
-  SET name             = EXCLUDED.name,
-      deployment_stage = 'partial';
+  SET name = EXCLUDED.name;
 
--- ── 4. Upsert Primi Camps Bay micros_connections row ──────────────────────
+-- ── 4. Add 'pending' to allowed status values (before INSERT needs it) ───
+
+ALTER TABLE micros_connections
+  DROP CONSTRAINT IF EXISTS micros_connections_status_check;
+
+ALTER TABLE micros_connections
+  ADD CONSTRAINT micros_connections_status_check
+    CHECK (status IN ('awaiting_setup', 'pending', 'connected', 'syncing', 'stale', 'error'));
+
+-- ── 5. Upsert Primi Camps Bay micros_connections row ──────────────────────
 --
 -- We use a DO UPDATE so this migration is safe to re-run.
 -- The real locRef and org details will be confirmed once the env vars are
@@ -93,18 +100,6 @@ DO UPDATE
       app_server_url   = EXCLUDED.app_server_url,
       client_id        = EXCLUDED.client_id,
       org_identifier   = EXCLUDED.org_identifier;
-
--- ── 5. Add 'pending' to allowed status values (if not already present) ───
-
--- The existing CHECK constraint is: status IN ('awaiting_setup', 'connected', 'syncing', 'stale', 'error')
--- We add 'pending' to represent "row exists but live test not yet passed".
-
-ALTER TABLE micros_connections
-  DROP CONSTRAINT IF EXISTS micros_connections_status_check;
-
-ALTER TABLE micros_connections
-  ADD CONSTRAINT micros_connections_status_check
-    CHECK (status IN ('awaiting_setup', 'pending', 'connected', 'syncing', 'stale', 'error'));
 
 -- ── 6. Index for location_key lookups ─────────────────────────────────────
 
