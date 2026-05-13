@@ -52,23 +52,25 @@ interface AlertPayload {
  */
 async function persistAlert(
   supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
   payload: AlertPayload
 ): Promise<OperationalAlert | null> {
   const dedupCutoff = new Date(
     Date.now() - DEDUP_WINDOW_HOURS * 3_600_000
   ).toISOString();
 
-  // De-duplication: skip if same type already unresolved within window
+  // De-duplication: skip if same type already unresolved within window for THIS site
   const { data: existing } = await (supabase as any)
     .from("alerts")
     .select("id")
     .eq("alert_type", payload.alert_type)
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .eq("resolved", false)
     .gte("created_at", dedupCutoff)
     .limit(1)
     .maybeSingle();
 
-  if (existing) return null; // already active — no duplicate
+  if (existing) return null;
 
   const { data, error } = await (supabase as any)
     .from("alerts")
@@ -78,6 +80,7 @@ async function persistAlert(
       severity:       payload.severity,
       message:        payload.message,
       recommendation: payload.recommendation,
+      site_id:        siteId,               // TENANT SCOPE: always tag alert with site
     })
     .select()
     .single();
@@ -104,13 +107,14 @@ async function dispatch(alert: OperationalAlert): Promise<void> {
 // ── Check 1: Revenue Risk ────────────────────────────────────────────────────
 
 async function checkRevenueRisk(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const today = todayISO();
 
   let forecast;
   try {
-    forecast = await generateRevenueForecast(today);
+    forecast = await generateRevenueForecast(today, siteId);
   } catch {
     return null;
   }
@@ -139,11 +143,13 @@ async function checkRevenueRisk(
 // ── Check 2: Labor Cost Risk ─────────────────────────────────────────────────
 
 async function checkLaborRisk(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const { data } = await supabase
     .from("daily_operations_reports")
     .select("labor_cost_percent, report_date")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .order("report_date", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -172,11 +178,13 @@ async function checkLaborRisk(
 // ── Check 3: Margin Risk ─────────────────────────────────────────────────────
 
 async function checkMarginRisk(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const { data } = await supabase
     .from("daily_operations_reports")
     .select("margin_percent, report_date")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .order("report_date", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -205,13 +213,15 @@ async function checkMarginRisk(
 // ── Check 4: Maintenance Risk ────────────────────────────────────────────────
 
 async function checkMaintenanceRisk(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
-  const cutoff = nDaysAgoISO(MAINT_STALE_DAYS - 1); // `updated_at <= cutoff` means stale
+  const cutoff = nDaysAgoISO(MAINT_STALE_DAYS - 1);
 
   const { data } = await supabase
     .from("equipment")
     .select("id, unit_name, location, updated_at")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .eq("status", "needs_attention")
     .lte("updated_at", new Date(cutoff + "T23:59:59Z").toISOString());
 
@@ -237,13 +247,15 @@ async function checkMaintenanceRisk(
 // ── Check 6: Compliance Expired ──────────────────────────────────────────────
 
 async function checkComplianceExpired(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const today = todayISO();
 
   const { data, error } = await (supabase as any)
     .from("compliance_items")
     .select("id, display_name, next_due_date")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .not("next_due_date", "is", null)
     .lt("next_due_date", today);
 
@@ -264,7 +276,8 @@ async function checkComplianceExpired(
 // ── Check 7: Compliance Due Soon ─────────────────────────────────────────────
 
 async function checkComplianceDueSoon(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const today = todayISO();
   const threshold = new Date(today);
@@ -274,9 +287,10 @@ async function checkComplianceDueSoon(
   const { data, error } = await (supabase as any)
     .from("compliance_items")
     .select("id, display_name, next_due_date")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .not("next_due_date", "is", null)
-    .gte("next_due_date", today)          // not yet expired
-    .lte("next_due_date", thresholdISO);  // but within 30 days
+    .gte("next_due_date", today)
+    .lte("next_due_date", thresholdISO);
 
   if (error || !data || data.length === 0) return null;
 
@@ -303,7 +317,8 @@ async function checkComplianceDueSoon(
 // ── Check 5: Reputation Risk ─────────────────────────────────────────────────
 
 async function checkReputationRisk(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const sevenDaysAgo = nDaysAgoISO(6);
   const fourteenDaysAgo = nDaysAgoISO(13);
@@ -311,11 +326,13 @@ async function checkReputationRisk(
   const { data: recent } = await supabase
     .from("reviews")
     .select("rating")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .gte("review_date", sevenDaysAgo);
 
   const { data: prior } = await supabase
     .from("reviews")
     .select("rating")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .gte("review_date", fourteenDaysAgo)
     .lt("review_date", sevenDaysAgo);
 
@@ -349,7 +366,8 @@ async function checkReputationRisk(
 // ── Check 8: Equipment Warranty Expiring ─────────────────────────────────────
 
 async function checkEquipmentWarrantyExpiring(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const today = todayISO();
   const threshold = new Date(today);
@@ -359,6 +377,7 @@ async function checkEquipmentWarrantyExpiring(
   const { data, error } = await (supabase as any)
     .from("equipment")
     .select("id, unit_name, warranty_expiry")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .not("warranty_expiry", "is", null)
     .lte("warranty_expiry", thresholdISO);
 
@@ -389,7 +408,8 @@ async function checkEquipmentWarrantyExpiring(
 // ── Check 9: Equipment Service Due ───────────────────────────────────────────
 
 async function checkEquipmentServiceDue(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const today = todayISO();
   const threshold = new Date(today);
@@ -398,7 +418,7 @@ async function checkEquipmentServiceDue(
 
   const { data, error } = await (supabase as any)
     .from("equipment_repairs")
-    .select("equipment_id, next_service_due, equipment:equipment_id(unit_name)")
+    .select("equipment_id, next_service_due, equipment:equipment_id(unit_name, site_id)")
     .not("next_service_due", "is", null)
     .lte("next_service_due", thresholdISO)
     .gte("next_service_due", today);
@@ -407,7 +427,9 @@ async function checkEquipmentServiceDue(
 
   // Deduplicate by equipment_id — keep earliest service due
   const seen = new Map<string, { unit_name: string; next_service_due: string }>();
-  for (const row of data as { equipment_id: string; next_service_due: string; equipment: { unit_name: string } | null }[]) {
+  for (const row of data as { equipment_id: string; next_service_due: string; equipment: { unit_name: string; site_id?: string } | null }[]) {
+    // Only include equipment belonging to this site
+    if (row.equipment?.site_id && row.equipment.site_id !== siteId) continue;
     const unitName = row.equipment?.unit_name ?? "Unknown";
     if (!seen.has(row.equipment_id)) {
       seen.set(row.equipment_id, { unit_name: unitName, next_service_due: row.next_service_due });
@@ -435,13 +457,15 @@ async function checkEquipmentServiceDue(
 // ── Check 10: Equipment Overdue Attention ─────────────────────────────────────
 
 async function checkEquipmentOverdueAttention(
-  supabase: ReturnType<typeof createServerClient>
+  supabase: ReturnType<typeof createServerClient>,
+  siteId: string,
 ): Promise<AlertPayload | null> {
   const cutoff = nDaysAgoISO(7 - 1);
 
   const { data, error } = await (supabase as any)
     .from("equipment")
     .select("id, unit_name, location, updated_at")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .eq("status", "out_of_service")
     .lte("updated_at", new Date(cutoff + "T23:59:59Z").toISOString());
 
@@ -474,26 +498,28 @@ export interface AlertsEngineResult {
 /**
  * Run all operational metric checks.
  * Safe to call from a cron job or API route; internally idempotent.
+ *
+ * @param siteId - REQUIRED. Scopes all DB queries to this site. Never run globally.
  */
-export async function runAlertsEngine(): Promise<AlertsEngineResult> {
+export async function runAlertsEngine(siteId: string): Promise<AlertsEngineResult> {
+  if (!siteId) throw new Error("[alerts_engine] siteId is required — never run globally");
   const supabase = createServerClient();
-
   const checkFns = [
-    checkRevenueRisk,
-    checkLaborRisk,
-    checkMarginRisk,
-    checkMaintenanceRisk,
-    checkReputationRisk,
-    checkComplianceExpired,
-    checkComplianceDueSoon,
-    checkEquipmentWarrantyExpiring,
-    checkEquipmentServiceDue,
-    checkEquipmentOverdueAttention,
+    () => checkRevenueRisk(supabase, siteId),
+    () => checkLaborRisk(supabase, siteId),
+    () => checkMarginRisk(supabase, siteId),
+    () => checkMaintenanceRisk(supabase, siteId),
+    () => checkReputationRisk(supabase, siteId),
+    () => checkComplianceExpired(supabase, siteId),
+    () => checkComplianceDueSoon(supabase, siteId),
+    () => checkEquipmentWarrantyExpiring(supabase, siteId),
+    () => checkEquipmentServiceDue(supabase, siteId),
+    () => checkEquipmentOverdueAttention(supabase, siteId),
   ];
 
   // Run all checks in parallel
   const results = await Promise.allSettled(
-    checkFns.map((fn) => fn(supabase))
+    checkFns.map((fn) => fn())
   );
 
   let triggered = 0;
@@ -514,7 +540,7 @@ export async function runAlertsEngine(): Promise<AlertsEngineResult> {
       continue;
     }
 
-    const alert = await persistAlert(supabase, payload);
+    const alert = await persistAlert(supabase, siteId, payload);
     if (!alert) {
       skipped++; // de-duplicated
       continue;
@@ -535,15 +561,19 @@ export async function runAlertsEngine(): Promise<AlertsEngineResult> {
 }
 
 /**
- * Fetch all active (unresolved) alerts from the database.
+ * Fetch all active (unresolved) alerts scoped to a specific site.
  * Used by the GET /api/alerts route and dashboard server component.
+ *
+ * @param siteId - REQUIRED. Never fetch alerts globally across all tenants.
  */
-export async function getActiveAlerts(): Promise<OperationalAlert[]> {
+export async function getActiveAlerts(siteId: string): Promise<OperationalAlert[]> {
+  if (!siteId) throw new Error("[alerts_engine] siteId is required in getActiveAlerts");
   const supabase = createServerClient();
 
   const { data, error } = await (supabase as any)
     .from("alerts")
     .select("*")
+    .eq("site_id", siteId)                  // TENANT SCOPE
     .eq("resolved", false);
 
   if (error) {

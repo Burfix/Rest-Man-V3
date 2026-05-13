@@ -21,7 +21,13 @@ export async function GET(req: Request): Promise<NextResponse> {
   }
 
   try {
-    const items = await getAllComplianceItems();
+    const url = new URL(req.url);
+    const siteId = url.searchParams.get("site_id");
+    if (!siteId) {
+      return NextResponse.json({ error: "site_id query param is required" }, { status: 400 });
+    }
+
+    const items = await getAllComplianceItems(siteId);
 
     let compliant = 0, scheduled = 0, dueSoon = 0, expired = 0, unknown = 0;
     for (const item of items) {

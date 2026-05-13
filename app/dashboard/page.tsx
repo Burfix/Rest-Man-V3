@@ -162,7 +162,7 @@ export default async function OperationsDashboard() {
     getUpcomingEvents(),
     getDataFreshnessSummary(),
     generateRevenueForecast(todayISO(), orgId ?? ""),
-    getComplianceSummary(),
+    getComplianceSummary(siteId),
     getMicrosStatus(),
     getInventoryIntelligence(siteId),
     // locRef resolved after micros status is fetched — use placeholder

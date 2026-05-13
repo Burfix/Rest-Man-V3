@@ -17,7 +17,16 @@ export async function GET(req: NextRequest) {
   if (guard.error) return guard.error;
 
   const { ctx } = guard;
-  const siteId  = req.nextUrl.searchParams.get("siteId") ?? ctx.siteId;
+  const requestedSiteId = req.nextUrl.searchParams.get("siteId");
+  const siteId = requestedSiteId ?? ctx.siteId;
+
+  // TENANT GUARD: validate requested site belongs to caller
+  if (!ctx.siteIds.includes(siteId)) {
+    return NextResponse.json(
+      { error: "Access denied: you do not have access to this site" },
+      { status: 403 },
+    );
+  }
 
   const supabase = createServerClient();
   const { data, error } = await (supabase as any)
@@ -56,6 +65,15 @@ export async function POST(req: NextRequest) {
   }
 
   const siteId           = body.siteId ?? ctx.siteId;
+
+  // TENANT GUARD: validate requested site belongs to caller
+  if (!ctx.siteIds.includes(siteId)) {
+    return NextResponse.json(
+      { error: "Access denied: you do not have access to this site" },
+      { status: 403 },
+    );
+  }
+
   const eventName        = (body.eventName ?? "").trim();
   const eventDate        = body.eventDate ?? "";
   const category         = body.category ?? "custom";

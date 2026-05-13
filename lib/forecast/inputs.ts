@@ -80,8 +80,8 @@ export async function getForecastInputs(
     getSalesTarget(date, orgId),
     getLatestLabourPct(),
     getLatestMarginPct(),
-    getMaintenanceSummary().catch(() => null),  // forecast doesn't need site-scoping
-    getComplianceSummary().catch(() => null),
+    getMaintenanceSummary(undefined).catch(() => null),
+    getComplianceSummary(undefined).catch(() => null),  // forecast context — no siteId available
   ]);
 
   return {

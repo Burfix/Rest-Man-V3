@@ -29,11 +29,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unsupported file type" }, { status: 415 });
     }
 
-    // Verify item exists
+    // Verify item exists AND belongs to this site (IDOR guard)
     const { data: item } = await (supabase as any)
       .from("compliance_items")
       .select("id")
       .eq("id", itemId)
+      .eq("site_id", ctx.siteId)           // TENANT SCOPE
       .maybeSingle();
     if (!item) return NextResponse.json({ error: "Compliance item not found" }, { status: 404 });
 
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     const { data: doc, error: dbErr } = await (supabase as any)
       .from("compliance_documents")
-      .insert({ item_id: itemId, file_name: file.name, file_url: fileUrl, file_size: file.size })
+      .insert({ item_id: itemId, site_id: ctx.siteId, file_name: file.name, file_url: fileUrl, file_size: file.size })
       .select()
       .single();
 

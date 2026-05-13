@@ -113,6 +113,25 @@ export async function getMicrosStatus(): Promise<MicrosStatusSummary> {
 
 /**
  * Loads the connection row for use in sync services.
+ * Scoped to a specific site — never returns a global/first connection.
+ * Never returns token fields.
+ */
+export async function getMicrosConnectionBySiteId(
+  siteId: string,
+): Promise<MicrosConnection | null> {
+  if (!siteId) throw new Error("[micros/status] siteId is required in getMicrosConnectionBySiteId");
+  const supabase = createServerClient();
+  const { data } = await supabase
+    .from("micros_connections")
+    .select(SAFE_CONNECTION_COLUMNS)
+    .eq("site_id" as never, siteId)
+    .maybeSingle();
+  return (data as MicrosConnection | null) ?? null;
+}
+
+/**
+ * Loads the connection row for use in sync services.
+ * @deprecated Use getMicrosConnectionBySiteId(siteId) to ensure tenant isolation.
  * Never returns the token fields.
  */
 export async function getMicrosConnection(): Promise<MicrosConnection | null> {

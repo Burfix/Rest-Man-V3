@@ -10,8 +10,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
+import { createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -19,14 +19,6 @@ const ALLOWED       = ["super_admin", "executive", "head_office", "tenant_owner"
 const VALID_TYPES   = ["payment", "refund", "credit", "setup_fee", "addon"] as const;
 const UUID_RE       = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE_RE       = /^\d{4}-\d{2}-\d{2}$/;
-
-function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
-}
 
 export async function POST(req: NextRequest) {
   let ctx;
@@ -60,7 +52,7 @@ export async function POST(req: NextRequest) {
     ? event_date
     : new Date().toISOString().slice(0, 10);
 
-  const db = serviceDb();
+  const db = createServerClient();
 
   // Verify client exists
   const { data: clientRow } = await db
@@ -75,13 +67,14 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await db
     .from("commercial_revenue_events")
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .insert({
       client_id,
       amount:      parsedAmount,
       event_type:  effectiveType,
       description: typeof description === "string" ? description.slice(0, 500) : null,
       event_date:  effectiveDate,
-    })
+    } as any)
     .select()
     .single();
 

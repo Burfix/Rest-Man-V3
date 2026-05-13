@@ -13,21 +13,12 @@
  */
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
+import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-// ── Service-role DB client ────────────────────────────────────────────────────
-
-function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
-}
 
 // ── Grade helper ──────────────────────────────────────────────────────────────
 
@@ -60,7 +51,7 @@ export async function GET() {
     );
   }
 
-  const db = serviceDb() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const db = createServerClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   try {
     // ── 2. Resolve org IDs from user_roles ──────────────────────────────────

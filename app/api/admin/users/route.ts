@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
                       );
 
           const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
-                      redirectTo: `${siteUrl}/auth/confirm`,
+                      redirectTo: `${siteUrl}/reset-password`,
                       data: { full_name: user.fullName || "", invited_to_site: site.name, role: user.role },
           });
 

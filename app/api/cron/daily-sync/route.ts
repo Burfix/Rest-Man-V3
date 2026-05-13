@@ -39,13 +39,43 @@ export async function GET(req: NextRequest) {
   // Date in SAST (UTC+2)
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
 
-  // â”€â”€ 1. Kick off intraday syncs (best-effort, non-blocking) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── 1. Kick off intraday syncs per active MICROS connection ──────────────
   const cfgStatus = getMicrosConfigStatus();
   if (cfgStatus.enabled && cfgStatus.configured) {
-    Promise.allSettled([
-      new MicrosSyncService().runFullSync(today),
-      runLabourDeltaSync(),
-    ]).catch((err) => logger.warn("[DailySync] Background sync error", { err: String(err) }));
+    Promise.resolve().then(async () => {
+      const db2 = createServerClient() as any;
+      const { data: conns } = await db2
+        .from("micros_connections")
+        .select("site_id, loc_ref, location_name")
+        .not("loc_ref", "is", null)
+        .neq("loc_ref", "");
+
+      if (conns?.length) {
+        const siteIds = (conns as any[]).map((c: any) => c.site_id as string);
+        const { data: roleRows } = await db2
+          .from("user_roles")
+          .select("site_id, organisation_id")
+          .in("site_id", siteIds)
+          .not("organisation_id", "is", null)
+          .limit(100);
+        const orgBySite: Record<string, string> = {};
+        for (const row of (roleRows ?? []) as any[]) {
+          if (row.site_id && row.organisation_id && !orgBySite[row.site_id]) {
+            orgBySite[row.site_id] = row.organisation_id;
+          }
+        }
+        await Promise.allSettled(
+          (conns as any[]).map((conn: any) =>
+            new MicrosSyncService().runFullSync({
+              siteId:            conn.site_id,
+              organisationId:    orgBySite[conn.site_id] ?? "",
+              microsLocationRef: conn.loc_ref,
+            }, today)
+          )
+        );
+      }
+      await runLabourDeltaSync();
+    }).catch((err) => logger.warn("[DailySync] Background sync error", { err: String(err) }));
   }
 
   // â”€â”€ 2. Enqueue send_daily_report async job â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

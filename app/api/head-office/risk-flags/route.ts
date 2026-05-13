@@ -8,22 +8,14 @@
  */
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
+import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import type { VRiskFlag } from "@/lib/admin/contractTypes";
 
 export const dynamic = "force-dynamic";
 
 const ELEVATED = ["head_office", "super_admin", "executive", "area_manager", "tenant_owner"];
-
-function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
-}
 
 export async function GET() {
   let ctx;
@@ -37,7 +29,7 @@ export async function GET() {
     return NextResponse.json({ data: [], error: "Insufficient permissions" }, { status: 403 });
   }
 
-  const db = serviceDb() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  const db = createServerClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   try {
     const isSuperAdmin = ctx.role === "super_admin";

@@ -21,12 +21,21 @@ export async function GET(req: NextRequest): Promise<Response> {
   const guard = await apiGuard(null, "GET /api/risk/scores");
   if (guard.error) return guard.error;
 
+  const { ctx } = guard;
   const siteId = req.nextUrl.searchParams.get("siteId");
 
   if (!siteId) {
     return NextResponse.json(
       { error: "siteId query parameter is required" },
       { status: 400 }
+    );
+  }
+
+  // TENANT GUARD: reject requests for sites the caller cannot access
+  if (!ctx.siteIds.includes(siteId)) {
+    return NextResponse.json(
+      { error: "Access denied: you do not have access to this site" },
+      { status: 403 }
     );
   }
 

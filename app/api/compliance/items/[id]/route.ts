@@ -19,6 +19,7 @@ export async function GET(
       .from("compliance_items")
       .select("*, compliance_documents(*)")
       .eq("id", id)
+      .eq("site_id", ctx.siteId)           // TENANT SCOPE: 404 if item belongs to another site
       .single();
 
     if (error || !data) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -47,6 +48,7 @@ export async function PUT(
       .from("compliance_items")
       .update(v.data)
       .eq("id", id)
+      .eq("site_id", ctx.siteId)           // TENANT SCOPE: can only update own site's items
       .select();
 
     if (error) {
@@ -75,7 +77,8 @@ export async function DELETE(
     const { error } = await (supabase as any)
       .from("compliance_items")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("site_id", ctx.siteId);          // TENANT SCOPE: can only delete own site's items
 
     if (error) throw error;
     invalidateBrainCacheForSite(ctx.siteId);

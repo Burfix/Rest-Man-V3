@@ -10,10 +10,22 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/maintenance/repairs");
   if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
 
   const equipmentId = req.nextUrl.searchParams.get("equipment_id");
   if (!equipmentId) {
     return NextResponse.json({ error: "equipment_id query param required" }, { status: 400 });
+  }
+
+  // Verify equipment belongs to this site (IDOR guard)
+  const { data: equip } = await supabase
+    .from("equipment")
+    .select("id")
+    .eq("id", equipmentId)
+    .eq("site_id", ctx.siteId)
+    .maybeSingle();
+  if (!equip) {
+    return NextResponse.json({ error: "Equipment not found" }, { status: 404 });
   }
 
   try {

@@ -11,8 +11,10 @@ export async function GET() {
   const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/alerts");
   if (guard.error) return guard.error;
 
+  const { ctx } = guard;
+
   try {
-    const alerts = await getActiveAlerts();
+    const alerts = await getActiveAlerts(ctx.siteId);
     const response: AlertsApiResponse = {
       active_alerts: alerts,
       critical_count: alerts.filter((a) => a.severity === "critical").length,

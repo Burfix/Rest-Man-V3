@@ -38,18 +38,21 @@ export function daysUntilDue(nextDueDate: string | null): number | null {
 
 // ── DB helpers ────────────────────────────────────────────────────────────────
 
-/** Fetch all compliance items with their associated documents */
-export async function getAllComplianceItems(): Promise<ComplianceItem[]> {
+/** Fetch all compliance items with their associated documents — scoped to a site */
+export async function getAllComplianceItems(siteId: string): Promise<ComplianceItem[]> {
+  if (!siteId) throw new Error("[Compliance] siteId is required in getAllComplianceItems");
   const supabase = createServerClient();
 
   const [itemsResult, docsResult] = await Promise.all([
     (supabase as any)
       .from("compliance_items")
       .select("*")
+      .eq("site_id", siteId)               // TENANT SCOPE
       .order("display_name", { ascending: true }),
     (supabase as any)
       .from("compliance_documents")
       .select("*")
+      .eq("site_id", siteId)               // TENANT SCOPE
       .order("uploaded_at", { ascending: false }),
   ]);
 
@@ -76,8 +79,9 @@ export async function getAllComplianceItems(): Promise<ComplianceItem[]> {
 }
 
 /** Build the aggregate compliance summary used on the dashboard */
-export async function getComplianceSummary(): Promise<ComplianceSummary> {
-  const items = await getAllComplianceItems();
+export async function getComplianceSummary(siteId?: string): Promise<ComplianceSummary> {
+  if (!siteId) return { total: 0, compliant: 0, scheduled: 0, due_soon: 0, expired: 0, unknown: 0, compliance_pct: 0, critical_items: [], due_soon_items: [], scheduled_items: [] };
+  const items = await getAllComplianceItems(siteId);
 
   const summary: ComplianceSummary = {
     total:           items.length,

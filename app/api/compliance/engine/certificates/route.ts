@@ -21,14 +21,21 @@ import {
 import { apiGuard } from "@/lib/auth/api-guard";
 import { logger } from "@/lib/logger";
 
+import { PERMISSIONS } from "@/lib/rbac/roles";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const guard = await apiGuard(null, "GET /api/compliance/engine/certificates");
+  const guard = await apiGuard(PERMISSIONS.VIEW_COMPLIANCE, "GET /api/compliance/engine/certificates");
   if (guard.error) return guard.error;
+  const { ctx } = guard;
   const tenantId = req.nextUrl.searchParams.get("tenant_id");
   if (!tenantId) {
     return NextResponse.json({ error: "tenant_id is required" }, { status: 400 });
+  }
+  // TENANT GUARD: non-super_admin can only query their own org/site
+  if (ctx.role !== "super_admin" && tenantId !== ctx.orgId && !ctx.siteIds.includes(tenantId)) {
+    return NextResponse.json({ error: "Access denied: you do not have access to this tenant" }, { status: 403 });
   }
 
   try {
@@ -41,8 +48,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await apiGuard(null, "POST /api/compliance/engine/certificates");
+  const guard = await apiGuard(PERMISSIONS.EDIT_COMPLIANCE_ITEM, "POST /api/compliance/engine/certificates");
   if (guard.error) return guard.error;
+  const { ctx } = guard;
 
   let body: Record<string, unknown>;
   try {
@@ -65,6 +73,10 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+  // TENANT GUARD: non-super_admin can only write to their own org/site
+  if (ctx.role !== "super_admin" && tenantId !== ctx.orgId && !ctx.siteIds.includes(tenantId)) {
+    return NextResponse.json({ error: "Access denied: you do not have access to this tenant" }, { status: 403 });
+  }
 
   try {
     const cert = await upsertCertificate({ tenantId, certificateTypeId, fileUrl, status, expiryDate });
@@ -81,7 +93,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const guard = await apiGuard(null, "PATCH /api/compliance/engine/certificates");
+  const guard = await apiGuard(PERMISSIONS.EDIT_COMPLIANCE_ITEM, "PATCH /api/compliance/engine/certificates");
   if (guard.error) return guard.error;
 
   let body: Record<string, unknown>;

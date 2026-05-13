@@ -7,6 +7,7 @@
 
 import { getAllComplianceItems, getComplianceSummary } from "@/services/ops/complianceSummary";
 import ComplianceHub from "@/components/dashboard/compliance/ComplianceHub";
+import { getUserContext } from "@/lib/auth/get-user-context";
 import type { ComplianceItem, ComplianceSummary } from "@/types";
 
 export const dynamic = "force-dynamic";
@@ -30,10 +31,13 @@ export default async function CompliancePage() {
   let summary: ComplianceSummary = EMPTY_SUMMARY;
   let loadError: string | null = null;
 
+  const ctx = await getUserContext().catch(() => null);
+  const siteId = ctx?.siteId ?? "";
+
   try {
     [items, summary] = await Promise.all([
-      getAllComplianceItems(),
-      getComplianceSummary(),
+      getAllComplianceItems(siteId),
+      getComplianceSummary(siteId),
     ]);
   } catch (err) {
     loadError = err instanceof Error ? err.message : "Failed to load compliance data.";

@@ -16,6 +16,7 @@ export async function GET() {
     const { data, error } = await (supabase as any)
       .from("compliance_items")
       .select("*, compliance_documents(*)")
+      .eq("site_id", ctx.siteId)           // TENANT SCOPE: never return another site's items
       .order("next_due_date", { ascending: true });
 
     if (error) throw error;
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
         next_due_date: d.next_due_date ?? null,
         responsible_party: d.responsible_party?.trim() || null,
         notes: d.notes?.trim() || null,
+        site_id: ctx.siteId,               // TENANT SCOPE: always write caller's site_id
       })
       .select()
       .single();

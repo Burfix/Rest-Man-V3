@@ -35,15 +35,16 @@ export async function POST(
 
     const profileData = profile as { id: string; email: string; full_name: string | null; status: string };
 
-    if (profileData.status !== "invited") {
+    // Allow both invited (resend invite) and active (send password reset)
+    if (profileData.status !== "invited" && profileData.status !== "active") {
       return NextResponse.json(
-        { error: "User has already accepted their invite or has a different status" },
+        { error: "Cannot send a reset link to a user with this status" },
         { status: 400 }
       );
     }
 
-    // 2. Generate a recovery (password-reset) link — avoids SMTP hang from invite type
-    const siteUrl = "https://si-cantina-concierge.vercel.app";
+    // 2. Generate a recovery (password-reset) link — works for both invited and active users
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
     const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
       type: "recovery",
       email: profileData.email,
@@ -55,11 +56,13 @@ export async function POST(
       return NextResponse.json({ error: linkErr?.message ?? "Failed to generate link" }, { status: 500 });
     }
 
+    const auditAction = profileData.status === "invited" ? "user.invite_resent" : "user.password_reset_sent";
+
     // 3. Audit log
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
       target_user_id: targetId,
-      action: "user.invite_resent",
+      action: auditAction,
       metadata: { email: profileData.email },
     } as any);
 

@@ -15,7 +15,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { MicrosApiClient } from "@/lib/micros/client";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
-import { getMicrosConnection } from "@/services/micros/status";
+import { getMicrosConnectionBySiteId } from "@/services/micros/status";
 import { aggregateGuestChecksToDailySales } from "./normalize";
 import { todayISO } from "@/lib/utils";
 import { logger } from "@/lib/logger";
@@ -31,24 +31,57 @@ export interface SyncResult {
   errors?:        string[];
 }
 
+/**
+ * Required tenant context for every MICROS sync operation.
+ * All three fields must be non-empty — the sync engine will throw if any are missing.
+ */
+export interface MicrosSyncContext {
+  /** Supabase site UUID (e.g. "00000000-0000-0000-0000-000000000002"). Required. */
+  siteId: string;
+  /** Supabase organisation UUID. Required. */
+  organisationId: string;
+  /** Oracle MICROS location reference (e.g. "2001002"). Required. Validated against DB. */
+  microsLocationRef: string;
+}
+
 export class MicrosSyncService {
   /**
    * Fetches guest checks for the given date (default: today),
    * aggregates into daily sales, and upserts into Supabase.
+   *
+   * @param context - REQUIRED tenant context. Fails closed if any field missing.
+   * @param date    - Business date (YYYY-MM-DD). Defaults to today.
    */
-  async runFullSync(date?: string): Promise<SyncResult> {
+  async runFullSync(context: MicrosSyncContext, date?: string): Promise<SyncResult> {
+    // ── Tenant context validation (fail closed) ───────────────────────────
+    const { siteId, organisationId, microsLocationRef } = context;
+    if (!siteId)            throw new Error("[MicrosSyncService] siteId is required — never run globally");
+    if (!organisationId)    throw new Error("[MicrosSyncService] organisationId is required");
+    if (!microsLocationRef) throw new Error("[MicrosSyncService] microsLocationRef is required");
     const businessDate = date ?? todayISO();
     const t0 = Date.now();
     const cfg = getMicrosEnvConfig();
-    const connection = await getMicrosConnection();
 
+    // ── Tenant-scoped connection lookup ───────────────────────────────────
+    const connection = await getMicrosConnectionBySiteId(siteId);
     if (!connection) {
-      return { success: false, message: "No MICROS connection configured." };
+      return { success: false, message: `No MICROS connection configured for site ${siteId}.` };
     }
+
+    // ── Cross-check: requested locRef must match DB record ────────────────
+    if (connection.loc_ref && connection.loc_ref !== microsLocationRef) {
+      const msg = `[MicrosSyncService] SECURITY: microsLocationRef mismatch. ` +
+        `Requested=${microsLocationRef}, DB=${connection.loc_ref}, siteId=${siteId}`;
+      logger.error(msg);
+      throw new Error(msg);
+    }
+
+    // Use the caller-supplied locRef (authoritative) for all MICROS API calls
+    const effectiveLocRef = microsLocationRef;
 
     const supabase = createServerClient();
 
-    // ── Clean up zombie sync runs (stale "running" entries) ─────────────
+    // ── Clean up zombie sync runs scoped to this connection ──────────────
     try {
       const cutoff = new Date(Date.now() - ZOMBIE_THRESHOLD_MS).toISOString();
       const { data: zombies } = await supabase
@@ -59,6 +92,7 @@ export class MicrosSyncService {
           error_message: "Sync run timed out (zombie cleanup)",
         })
         .eq("status", "running")
+        .eq("connection_id", connection.id)    // TENANT SCOPE
         .lt("started_at", cutoff)
         .select("id");
       if (zombies && zombies.length > 0) {
@@ -139,14 +173,18 @@ export class MicrosSyncService {
 
     try {
       // Fetch guest checks from Oracle BIAPI
-      logger.info("Fetching guest checks from Oracle", { businessDate, locRef: cfg.locRef });
+      logger.info("Fetching guest checks from Oracle", {
+        businessDate,
+        locRef: effectiveLocRef,
+        siteId,
+      });
       const raw = await MicrosApiClient.post<{
         curUTC: string;
         locRef: string;
         guestChecks: unknown[] | null;
       }>("getGuestChecks", {
         busDt: businessDate,
-        locRef: cfg.locRef,
+        locRef: effectiveLocRef,
       });
 
       const checkCount = raw?.guestChecks?.length ?? 0;
@@ -173,7 +211,8 @@ export class MicrosSyncService {
         .upsert(
           {
             connection_id: connection.id,
-            loc_ref: daily.loc_ref || cfg.locRef,
+            site_id:        siteId,                              // TENANT TAG — required
+            loc_ref: daily.loc_ref || effectiveLocRef,
             business_date: daily.business_date,
             net_sales: daily.net_sales,
             gross_sales: daily.gross_sales,
@@ -261,6 +300,8 @@ export class MicrosSyncService {
 
       logger.error("MICROS sales sync failed", {
         businessDate,
+        siteId,
+        microsLocationRef,
         elapsed: `${elapsed}ms`,
         error: errMsg,
         errorName: err instanceof Error ? err.name : "unknown",

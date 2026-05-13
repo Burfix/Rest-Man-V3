@@ -571,23 +571,28 @@ function TeamPanel({
     } catch { /* toast */ } finally { setDeleting(null); }
   };
 
-  const handleResendInvite = async (userId: string, email: string) => {
-    if (!confirm(`Generate new invite link for ${email}?`)) return;
+  const handleResendInvite = async (userId: string, email: string, status?: string) => {
+    const isActive = status === "active";
+    const confirmMsg = isActive
+      ? `Send a password reset link to ${email}?`
+      : `Generate new invite link for ${email}?`;
+    if (!confirm(confirmMsg)) return;
     setResending(userId);
     try {
       const result = await apiFetch<{ success: boolean; email: string; inviteLink?: string; emailSent?: boolean }>(`/api/admin/users/${userId}/resend-invite`, { method: "POST" });
 
       if (result.emailSent) {
-        alert(`Invite email resent to ${result.email}!`);
+        alert(isActive ? `Password reset email sent to ${result.email}!` : `Invite email resent to ${result.email}!`);
       } else if (result.inviteLink) {
         const copied = await navigator.clipboard.writeText(result.inviteLink).then(() => true).catch(() => false);
-        alert(`Email could not be sent.\n\nInvite link${copied ? " (copied to clipboard)" : ""}:\n${result.inviteLink}`);
+        const label = isActive ? "Password reset link" : "Invite link";
+        alert(`Email could not be sent.\n\n${label}${copied ? " (copied to clipboard)" : ""}:\n${result.inviteLink}`);
       } else {
-        alert(`Invite generated for ${email}`);
+        alert(isActive ? `Reset link generated for ${email}` : `Invite generated for ${email}`);
       }
       onRefresh();
     } catch (e: any) {
-      alert(`Failed to generate invite: ${e.message}`);
+      alert(`Failed: ${e.message}`);
     } finally {
       setResending(null);
     }
@@ -703,12 +708,22 @@ function TeamPanel({
                 <div className="flex items-center gap-2">
                   {u.status === "invited" && (
                     <button
-                      onClick={() => handleResendInvite(u.id, u.email)}
+                      onClick={() => handleResendInvite(u.id, u.email, u.status)}
                       disabled={resending === u.id}
                       className="rounded px-2 py-1 text-[10px] font-semibold bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition-colors disabled:opacity-40"
                       title="Resend invite email"
                     >
                       {resending === u.id ? "…" : "Resend Invite"}
+                    </button>
+                  )}
+                  {u.status === "active" && primaryRole?.role !== "super_admin" && (
+                    <button
+                      onClick={() => handleResendInvite(u.id, u.email, u.status)}
+                      disabled={resending === u.id}
+                      className="rounded px-2 py-1 text-[10px] font-semibold bg-violet-500/20 text-violet-300 hover:bg-violet-500/30 transition-colors disabled:opacity-40"
+                      title="Send password reset link"
+                    >
+                      {resending === u.id ? "…" : "Send Reset Link"}
                     </button>
                   )}
                   {primaryRole?.role !== "super_admin" && (

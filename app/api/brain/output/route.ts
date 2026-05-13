@@ -23,7 +23,18 @@ export async function GET(req: NextRequest) {
   if (guard.error) return guard.error;
 
   const { ctx } = guard;
-  const siteId = req.nextUrl.searchParams.get("siteId") ?? ctx.siteId;
+  const requestedSiteId = req.nextUrl.searchParams.get("siteId");
+
+  // TENANT GUARD: only head_office and above may request a different site;
+  // all callers must still own the target site.
+  const siteId = requestedSiteId ?? ctx.siteId;
+  if (!ctx.siteIds.includes(siteId)) {
+    return NextResponse.json(
+      { error: "Access denied: you do not have access to this site" },
+      { status: 403 },
+    );
+  }
+
   const date   = todayISO();
 
   let brain = null;

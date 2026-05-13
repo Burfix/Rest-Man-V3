@@ -7,13 +7,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTenantSummaries, getTenantSummary } from "@/lib/compliance/queries";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { logger } from "@/lib/logger";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const guard = await apiGuard(null, "GET /api/compliance/engine/summary");
+  const guard = await apiGuard(PERMISSIONS.VIEW_COMPLIANCE, "GET /api/compliance/engine/summary");
   if (guard.error) return guard.error;
-  const tenantId = req.nextUrl.searchParams.get("tenant_id");
+  const { ctx } = guard;
+
+  // TENANT GUARD: restrict to caller's own org unless super_admin
+  const requestedTenantId = req.nextUrl.searchParams.get("tenant_id");
+  const tenantId = requestedTenantId ?? ctx.orgId ?? ctx.siteId;
+
+  // Non-super_admin callers may only query their own org/site
+  if (ctx.role !== "super_admin") {
+    const allowed = ctx.orgId
+      ? requestedTenantId === null || requestedTenantId === ctx.orgId
+      : requestedTenantId === null || ctx.siteIds.includes(requestedTenantId ?? "");
+    if (!allowed) {
+      return NextResponse.json({ error: "Access denied: you do not have access to this tenant" }, { status: 403 });
+    }
+  }
 
   try {
     if (tenantId) {

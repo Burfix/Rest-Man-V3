@@ -147,7 +147,7 @@ export default async function ActionsPage() {
     getTodayBookingsSummary(),
     getMaintenanceSummary(cfg.site_id),
     generateRevenueForecast(todayISO(), ctx.orgId ?? ""),
-    getComplianceSummary(),
+    getComplianceSummary(cfg.site_id),
     getMicrosStatus(),
     getInventoryIntelligence(cfg.site_id),
     getStoredDailySummary(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"),

@@ -36,17 +36,18 @@ const DEFAULTS: Omit<SiteConfig, "site_id" | "site_name"> = {
   deployment_stage: 'live',
 };
 
-// In-memory cache (per process lifetime, ~5 min TTL)
-let _cache: { config: SiteConfig; ts: number } | null = null;
+// In-memory cache (per process lifetime, ~5 min TTL) — keyed by siteId to prevent cross-site races
+const _cache = new Map<string, { config: SiteConfig; ts: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
 export async function getSiteConfig(
   siteId: string,
 ): Promise<SiteConfig> {
   if (!siteId) throw new Error("getSiteConfig: siteId is required");
-  // L1: in-memory (single-process, fastest)
-  if (_cache && _cache.config.site_id === siteId && Date.now() - _cache.ts < CACHE_TTL_MS) {
-    return _cache.config;
+  // L1: in-memory per-site cache (no cross-site bleed)
+  const cached = _cache.get(siteId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.config;
   }
 
   // L2: Redis (cross-process, 1-hour TTL)
@@ -76,16 +77,17 @@ export async function getSiteConfig(
     } satisfies SiteConfig;
   });
 
-  // Promote to in-memory for this process
-  _cache = { config, ts: Date.now() };
+  // Promote to in-memory for this process (keyed by siteId)
+  _cache.set(siteId, { config, ts: Date.now() });
   return config;
 }
 
-/** Clear config cache (e.g., after settings update) */
 /** Clear config cache — call after settings update (busts both in-memory and Redis) */
 export function clearSiteConfigCache(siteId?: string): void {
-  _cache = null;
   if (siteId) {
+    _cache.delete(siteId);
     invalidateKey(cacheKey(siteId, "config")).catch(() => {});
+  } else {
+    _cache.clear();
   }
 }

@@ -25,7 +25,9 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { runAlertsEngine } from "@/services/alerts/engine";
+import { getAllLocationConfigs } from "@/lib/micros/micros-location-registry";
 import { cronGuard } from "@/lib/auth/cron-guard";
+import { createServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30; // Vercel Pro: up to 300s; Hobby: 10s
@@ -35,8 +37,28 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   if (denied) return denied;
 
   try {
-    const result = await runAlertsEngine();
-    return NextResponse.json({ ok: true, ...result });
+    // Resolve all registered sites and run alerts engine per site (tenant isolation)
+    const supabase = createServerClient();
+    const { data: sites, error: sitesErr } = await (supabase as any)
+      .from("sites")
+      .select("id")
+      .eq("active", true);
+
+    if (sitesErr || !sites?.length) {
+      return NextResponse.json({ ok: false, error: "Could not resolve active sites" }, { status: 500 });
+    }
+
+    const results = await Promise.allSettled(
+      (sites as { id: string }[]).map((s) => runAlertsEngine(s.id))
+    );
+
+    const summary = results.map((r, i) =>
+      r.status === "fulfilled"
+        ? { siteId: sites[i].id, ok: true, ...r.value }
+        : { siteId: sites[i].id, ok: false, error: String((r as PromiseRejectedResult).reason) }
+    );
+
+    return NextResponse.json({ ok: true, sites: summary });
   } catch (err) {
     Sentry.captureException(err, { tags: { route: "POST /api/alerts/run", trigger: "cron" } });
     console.error("[POST /api/alerts/run]", err);

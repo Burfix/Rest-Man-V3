@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { getUserContext } from "@/lib/auth/get-user-context";
 import { getZoneSummaries } from "@/services/universal/zoneSummary";
 
 export const dynamic = "force-dynamic";
@@ -28,12 +29,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     !!process.env.CRON_SECRET;
 
   if (!isCron) {
-    // Require a valid dashboard session
-    const supabase = createServerClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (!session) {
+    // Require a valid dashboard session — use getUser() (server-validated), never getSession()
+    try {
+      const userCtx = await getUserContext();
+      // Validate siteId ownership (resolved after body parse below)
+      // Store for post-parse check
+      (req as unknown as { _userCtx: typeof userCtx })._userCtx = userCtx;
+    } catch {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
@@ -51,6 +53,17 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { error: "siteId is required in request body" },
       { status: 400 }
     );
+  }
+
+  // TENANT GUARD: non-cron callers must own the requested site
+  if (!isCron) {
+    const userCtx = (req as unknown as { _userCtx?: { siteIds: string[] } })._userCtx;
+    if (!userCtx || !userCtx.siteIds.includes(siteId)) {
+      return NextResponse.json(
+        { error: "Access denied: you do not have access to this site" },
+        { status: 403 }
+      );
+    }
   }
 
   // ── Recompute ──────────────────────────────────────────────────────────

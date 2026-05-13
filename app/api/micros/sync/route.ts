@@ -4,6 +4,7 @@ import { apiGuard } from "@/lib/auth/api-guard";
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { MicrosSyncService } from "@/services/micros/MicrosSyncService";
+import { getMicrosConnectionBySiteId } from "@/services/micros/status";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { todayISO } from "@/lib/utils";
 import { SyncRequest as SyncRequestSchema } from "@/lib/sync/contract";
@@ -56,8 +57,21 @@ export async function POST(req: NextRequest) {
   // Legacy path — keep backward compat for callers that send {loc_ref, date}
   const date = rawBody.date as string | undefined;
   try {
+    // Resolve tenant-scoped connection for this user's site
+    const connection = await getMicrosConnectionBySiteId(ctx.siteId);
+    if (!connection?.loc_ref) {
+      return NextResponse.json({
+        ok: false,
+        message: `No MICROS connection found for site ${ctx.siteId}`,
+      }, { status: 404 });
+    }
+
     const svc = new MicrosSyncService();
-    const result = await svc.runFullSync(date ?? todayISO());
+    const result = await svc.runFullSync({
+      siteId:            ctx.siteId,
+      organisationId:    ctx.orgId ?? "",
+      microsLocationRef: connection.loc_ref,
+    }, date ?? todayISO());
 
     logger.info("MICROS sync completed", { route: "POST /api/micros/sync", success: result.success, trace_id: traceId });
     return NextResponse.json({
@@ -89,21 +103,54 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, message: "MICROS not configured" });
   }
 
-  try {
-    const svc = new MicrosSyncService();
-    const result = await svc.runFullSync(todayISO());
+  // Resolve all active MICROS connections and sync each one
+  const { createServerClient } = await import("@/lib/supabase/server");
+  const db = createServerClient() as any;
 
-    return NextResponse.json({
-      ok: result.success,
-      message: result.message,
-      businessDate: result.businessDate,
-      recordsSynced: result.recordsSynced,
-      source: "cron",
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    Sentry.captureException(err, { tags: { route: "GET /api/micros/sync", trigger: "cron" } });
-    logger.error("MICROS cron sync crashed", { route: "GET /api/micros/sync", err });
-    return NextResponse.json({ ok: false, message: msg, source: "cron" }, { status: 500 });
+  const { data: connections } = await db
+    .from("micros_connections")
+    .select("id, site_id, loc_ref, location_name")
+    .not("loc_ref", "is", null)
+    .neq("loc_ref", "");
+
+  if (!connections?.length) {
+    return NextResponse.json({ ok: false, message: "No MICROS connections found" });
   }
+
+  // Resolve organisationId per site via user_roles
+  const { data: roleRows } = await db
+    .from("user_roles")
+    .select("site_id, organisation_id")
+    .in("site_id", connections.map((c: any) => c.site_id))
+    .not("organisation_id", "is", null)
+    .limit(100);
+
+  const orgBySite: Record<string, string> = {};
+  for (const row of (roleRows ?? []) as any[]) {
+    if (row.site_id && row.organisation_id && !orgBySite[row.site_id]) {
+      orgBySite[row.site_id] = row.organisation_id;
+    }
+  }
+
+  const today = todayISO();
+  const svc = new MicrosSyncService();
+
+  const results = await Promise.allSettled(
+    (connections as any[]).map((conn) =>
+      svc.runFullSync({
+        siteId:            conn.site_id,
+        organisationId:    orgBySite[conn.site_id] ?? "",
+        microsLocationRef: conn.loc_ref,
+      }, today)
+    )
+  );
+
+  const summary = results.map((r, i) => ({
+    siteId: connections[i].site_id,
+    location: connections[i].location_name,
+    ok:    r.status === "fulfilled" ? r.value.success : false,
+    error: r.status === "rejected"  ? String((r as PromiseRejectedResult).reason) : undefined,
+  }));
+
+  return NextResponse.json({ ok: true, sites: summary, source: "cron" });
 }
