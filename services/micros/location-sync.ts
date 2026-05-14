@@ -18,6 +18,7 @@ import { aggregateGuestChecksToDailySales } from "./normalize";
 import { normalizeTimecards, normalizeJobCodes } from "./labour/normalize";
 import { logger }                       from "@/lib/logger";
 import type { Database }                from "@/types/database";
+import { writeSyncLog }                 from "@/lib/system-health/micros-sync-log";
 import type {
   OracleTimeCard,
   OracleTimeCardResponse,
@@ -338,11 +339,12 @@ export async function runLocationSync(
   const supabase = createServerClient();
 
   // Fetch DB connection row (needed for connection_id)
-  const { data: conn } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: conn } = await (supabase as any)
     .from("micros_connections")
-    .select("id, status")
+    .select("id, site_id, status")
     .eq("location_key", locationKey)
-    .maybeSingle();
+    .maybeSingle() as { data: { id: string; site_id: string | null; status: string } | null; error: unknown };
 
   if (!conn?.id) {
     return {
@@ -433,6 +435,21 @@ export async function runLocationSync(
   const message = success
     ? `Sync complete in ${elapsed}ms — ${salesChecks} guest checks, ${labourTimecards} timecards`
     : `Sync failed after ${elapsed}ms: ${errors.join("; ")}`;
+
+  // ── Write structured sync log ────────────────────────────────────────────
+  await writeSyncLog({
+    siteId:        conn.site_id ?? undefined,
+    connectionId:  conn.id,
+    locationKey,
+    locationRef:   cfg.locationRef,
+    syncType:      "full",
+    businessDate,
+    status:        success ? (errors.length > 0 ? "partial" : "success") : "error",
+    durationMs:    elapsed,
+    salesRecords:  salesChecks,
+    labourRecords: labourTimecards,
+    errorMessage:  errorStr ?? undefined,
+  }).catch(() => { /* never fail the main sync due to logging */ });
 
   return {
     success,
