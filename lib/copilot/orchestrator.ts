@@ -87,7 +87,7 @@ export async function runCopilot(siteId: string, orgId = ""): Promise<CopilotOut
     getMaintenanceSummary(cfg.site_id),
     generateRevenueForecast(today_iso, orgId),
     getComplianceSummary(cfg.site_id),
-    getMicrosStatus(),
+    getMicrosStatus(siteId),
     getStoredDailySummary(
       process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"
     ),

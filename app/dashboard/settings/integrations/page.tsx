@@ -8,6 +8,7 @@ import { getMicrosConfigStatus }         from "@/lib/micros/config";
 import { deriveMicrosIntegrationStatus } from "@/lib/integrations/status";
 import { sanitizeMicrosError }           from "@/lib/integrations/status";
 import { createServerClient }            from "@/lib/supabase/server";
+import { getUserContext }                from "@/lib/auth/get-user-context";
 import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
 import MicrosDebugPanel                  from "@/components/dashboard/settings/MicrosDebugPanel";
 import SyncHealthPanel                   from "@/components/settings/SyncHealthPanel";
@@ -26,10 +27,12 @@ interface SyncHealthRow {
 }
 
 export default async function IntegrationsPage() {
+  const ctx      = await getUserContext().catch(() => null);
+  const siteId   = ctx?.siteId ?? "";
   const supabase = createServerClient();
 
   const [microsResult, labourRes, userRes, healthRes] = await Promise.all([
-    getMicrosStatus().catch(() => null),
+    siteId ? getMicrosStatus(siteId).catch(() => null) : Promise.resolve(null),
     supabase
       .from("labour_sync_state")
       .select("last_sync_at, last_bus_dt, error_message")

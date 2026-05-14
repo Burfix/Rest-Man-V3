@@ -42,7 +42,7 @@ export async function GET() {
 
   try {
     const [dbStatus, cfgStatus] = await Promise.all([
-      getMicrosStatus(),
+      getMicrosStatus(guard.ctx.siteId),
       Promise.resolve(getMicrosConfigStatus()),
     ]);
 

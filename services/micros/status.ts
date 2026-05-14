@@ -15,14 +15,18 @@ const SAFE_CONNECTION_COLUMNS =
 /**
  * Returns the full status summary for the dashboard freshness bar and settings page.
  * Never returns access_token or token_expires_at.
+ *
+ * @param siteId - Required. Returns the connection for this specific site.
  */
-export async function getMicrosStatus(): Promise<MicrosStatusSummary> {
+export async function getMicrosStatus(siteId: string): Promise<MicrosStatusSummary> {
+  if (!siteId) throw new Error("[getMicrosStatus] siteId is required — never call globally");
   const supabase = createServerClient();
 
   const [connRes, v1RunRes, v2RunRes] = await Promise.all([
     supabase
       .from("micros_connections")
       .select(SAFE_CONNECTION_COLUMNS)
+      .eq("site_id" as never, siteId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),

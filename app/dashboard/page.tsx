@@ -163,7 +163,7 @@ export default async function OperationsDashboard() {
     getDataFreshnessSummary(),
     generateRevenueForecast(todayISO(), orgId ?? ""),
     getComplianceSummary(siteId),
-    getMicrosStatus(),
+    getMicrosStatus(siteId),
     getInventoryIntelligence(siteId),
     // locRef resolved after micros status is fetched — use placeholder
     Promise.resolve(null as any),
