@@ -33,7 +33,7 @@ function fmt(n: number | null, prefix = ""): string {
 
 function fmtCurrency(n: number | null): string {
   if (n == null) return "—";
-  return `R ${(n / 100).toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `R ${n.toLocaleString("en-ZA", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
 function fmtAge(mins: number | null): string {
@@ -76,9 +76,16 @@ export default function SiteOverviewCard({ site }: Props) {
             <p className="text-xs text-slate-500 mt-0.5 pl-4">{site.storeCode}</p>
           )}
         </div>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${grade.badge}`}>
-          {site.healthGrade}
-        </span>
+        <div className="flex flex-col items-end gap-1 shrink-0">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${grade.badge}`}>
+            {site.healthGrade}
+          </span>
+          {site.isDemoData && (
+            <span className="rounded-full px-2 py-0.5 text-[10px] font-medium text-slate-500 bg-slate-800/60 border border-slate-700/40">
+              Demo · {site.mirroredFrom ?? "Si Cantina"}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Stats grid */}
@@ -89,7 +96,7 @@ export default function SiteOverviewCard({ site }: Props) {
         </div>
         <div>
           <span className="text-slate-500 block">Covers</span>
-          <span className="text-slate-100">{fmt(site.revenueChecks)}</span>
+          <span className="text-slate-100">{fmt(site.guestCount ?? site.revenueChecks)}</span>
         </div>
         <div>
           <span className="text-slate-500 block">Labour Hours</span>
@@ -99,6 +106,12 @@ export default function SiteOverviewCard({ site }: Props) {
           <span className="text-slate-500 block">Compliance</span>
           <span className={site.complianceScore != null && site.complianceScore < 70 ? "text-red-400 font-semibold" : "text-slate-100"}>
             {site.complianceScore != null ? `${site.complianceScore}%` : "—"}
+            {site.complianceDueSoon != null && site.complianceDueSoon > 0 && (
+              <span className="text-amber-400 ml-1">· {site.complianceDueSoon} due</span>
+            )}
+            {site.complianceOverdue != null && site.complianceOverdue > 0 && (
+              <span className="text-red-400 ml-1">· {site.complianceOverdue} overdue</span>
+            )}
           </span>
         </div>
         <div className="flex items-center gap-1">

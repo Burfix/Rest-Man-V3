@@ -29,6 +29,12 @@ export default function SitesGridClient() {
   const healthy  = sites.filter((s) => s.healthGrade === "healthy").length;
   const warning  = sites.filter((s) => s.healthGrade === "warning").length;
   const critical = sites.filter((s) => s.healthGrade === "critical").length;
+  const totalRevenue = sites
+    .filter((s) => !s.isDemoData)
+    .reduce((a, s) => a + (s.revenueTodayNet ?? 0), 0);
+  const totalCovers = sites
+    .filter((s) => !s.isDemoData)
+    .reduce((a, s) => a + (s.guestCount ?? s.revenueChecks ?? 0), 0);
 
   return (
     <div className="flex flex-col gap-6">
@@ -41,9 +47,12 @@ export default function SitesGridClient() {
           <Stat label="Critical"      value={String(critical)}             color={critical > 0 ? "text-red-400" : "text-slate-400"} />
           <Stat
             label="Revenue Today"
-            value={"R " + sites.reduce((a, s) => a + (s.revenueTodayNet ?? 0), 0).toLocaleString("en-ZA", { maximumFractionDigits: 0 })}
+            value={"R " + totalRevenue.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}
             color="text-slate-100"
           />
+          {totalCovers > 0 && (
+            <Stat label="Covers" value={totalCovers.toLocaleString("en-ZA")} color="text-slate-100" />
+          )}
           {asOf && (
             <div className="ml-auto self-end text-xs text-slate-500">
               Updated {new Date(asOf).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })}

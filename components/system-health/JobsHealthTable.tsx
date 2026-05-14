@@ -72,7 +72,7 @@ export default function JobsHealthTable({ jobs }: JobsHealthTableProps) {
           Jobs &amp; Cron Health
         </h2>
         <p className="mt-0.5 text-xs text-zinc-500">
-          Scheduled sync jobs. "Run now" queues the job for the next scheduler tick.
+          Scheduled sync jobs. &ldquo;Run now&rdquo; queues the job for the next scheduler tick.
         </p>
       </div>
 

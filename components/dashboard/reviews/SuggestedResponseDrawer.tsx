@@ -111,7 +111,7 @@ export default function SuggestedResponseDrawer({
               <span className="font-medium">Rating:</span> {rating}/{ratingScale}
             </p>
             {reviewText && (
-              <p className="line-clamp-2 italic">"{reviewText}"</p>
+              <p className="line-clamp-2 italic">&ldquo;{reviewText}&rdquo;</p>
             )}
           </div>
 
