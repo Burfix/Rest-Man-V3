@@ -26,8 +26,9 @@ const NAV: NavGroup[] = [
     group: "",
     items: [
       { href: "/dashboard",             label: "Command Center", icon: "⚡" },
-      { href: "/dashboard/head-office", label: "Head Office",    icon: "🏢" },
-      { href: "/dashboard/head-office/reports", label: "Daily Report", icon: "📊" },
+      { href: "/dashboard/head-office",         label: "Head Office",    icon: "🏢" },
+      { href: "/dashboard/head-office/sites",   label: "Sites Overview", icon: "🗺️" },
+      { href: "/dashboard/head-office/reports", label: "Daily Report",   icon: "📊" },
       { href: "/dashboard/forecast",    label: "GM Co-Pilot",    icon: "🧭" },
     ],
   },
@@ -151,9 +152,11 @@ interface Props {
   footer?: React.ReactNode;
   role?: UserRole;
   siteAllowedRoutes?: string[] | null;
+  /** Rendered directly below the brand header — used for SiteSwitcher */
+  siteSwitcher?: React.ReactNode;
 }
 
-export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
+export default function Sidebar({ footer, role, siteAllowedRoutes, siteSwitcher }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -180,6 +183,7 @@ export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
           </div>
         </div>
 
+        {siteSwitcher}
         <NavList pathname={pathname} role={role} siteAllowedRoutes={siteAllowedRoutes} />
         {footer}
       </aside>
@@ -234,6 +238,7 @@ export default function Sidebar({ footer, role, siteAllowedRoutes }: Props) {
               </button>
             </div>
 
+            {siteSwitcher}
             <NavList pathname={pathname} onNavClick={() => setOpen(false)} role={role} siteAllowedRoutes={siteAllowedRoutes} />
             {footer}
           </div>

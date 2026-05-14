@@ -18,9 +18,11 @@ export interface UserContext {
   userId: string;
   email: string;
   role: UserRole;
-  siteId: string;       // primary site (for GM/supervisor/contractor)
+  siteId: string;       // active/selected site (URL → cookie → assigned primary)
   siteIds: string[];     // all accessible sites (for area_manager/executive/super_admin)
   orgId: string | null;
+  /** True when the user has manually selected a site via the site switcher. */
+  hasSelectedSite?: boolean;
   // Impersonation
   isImpersonating?: boolean;
   realUserId?: string;
@@ -115,10 +117,30 @@ export async function getUserContext(): Promise<UserContext> {
 
   // Primary site_id: use role's site_id, or first accessible site.
   // super_admin may have no site assigned — allow them through with empty siteId.
-  const siteId = (primary.site_id as string) ?? siteIds[0] ?? "";
+  const primarySiteId = (primary.site_id as string) ?? siteIds[0] ?? "";
 
-  if (!siteId && role !== "super_admin") {
+  if (!primarySiteId && role !== "super_admin") {
     throw new AuthError("No site assigned — contact your administrator", 403);
+  }
+
+  // Site switcher — multi-site roles may override via cookie fs-site-id.
+  // Priority: cookie > assigned primary site.
+  // (URL-param priority is handled at page level by passing searchParams.site_id
+  //  and calling the POST /api/preferences/site to set the cookie.)
+  const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
+  let siteId = primarySiteId;
+  let hasSelectedSite = false;
+
+  if (MULTI_SITE_ROLES.has(role)) {
+    const cookieSiteId = (cookieStore as any).get("fs-site-id")?.value as string | undefined;
+    // "all" is a sentinel for aggregate mode — stored but resolved to empty here
+    if (cookieSiteId && cookieSiteId !== "all" && siteIds.includes(cookieSiteId)) {
+      siteId = cookieSiteId;
+      hasSelectedSite = true;
+    } else if (cookieSiteId === "all") {
+      // Aggregate mode: siteId stays as primary, but callers can detect "all" via hasSelectedSite=false + siteIds
+      hasSelectedSite = false;
+    }
   }
 
   const baseCtx: UserContext = {
@@ -128,6 +150,7 @@ export async function getUserContext(): Promise<UserContext> {
     siteId,
     siteIds: siteIds.length > 0 ? siteIds : [siteId],
     orgId,
+    hasSelectedSite,
   };
 
   // 5. Impersonation — super_admin only
