@@ -27,6 +27,68 @@
 --   Service-role bypasses all RLS. No cron or sync worker is affected.
 -- =============================================================================
 
+-- ── 0. Add missing site_id columns (idempotent) ───────────────────────────────
+--
+-- Several tables were created without site_id.  Add as nullable UUID FK so
+-- existing rows remain visible and app-layer queries don't error.
+-- New inserts will always carry a site_id (enforced in application code).
+-- RLS policies below use (site_id IS NULL OR ...) to avoid hiding legacy rows.
+
+DO $$
+BEGIN
+  -- micros_sales_daily
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='micros_sales_daily' AND column_name='site_id'
+  ) THEN
+    ALTER TABLE micros_sales_daily ADD COLUMN site_id uuid REFERENCES sites(id);
+    -- Backfill from micros_connections via connection_id
+    UPDATE micros_sales_daily msd
+    SET    site_id = mc.site_id
+    FROM   micros_connections mc
+    WHERE  mc.id = msd.connection_id
+    AND    mc.site_id IS NOT NULL;
+  END IF;
+
+  -- alerts
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='alerts' AND column_name='site_id'
+  ) THEN
+    ALTER TABLE alerts ADD COLUMN site_id uuid REFERENCES sites(id);
+  END IF;
+
+  -- compliance_items
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='compliance_items' AND column_name='site_id'
+  ) THEN
+    ALTER TABLE compliance_items ADD COLUMN site_id uuid REFERENCES sites(id);
+  END IF;
+
+  -- compliance_documents
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='compliance_documents' AND column_name='site_id'
+  ) THEN
+    ALTER TABLE compliance_documents ADD COLUMN site_id uuid REFERENCES sites(id);
+    -- Backfill from parent compliance_item where possible
+    UPDATE compliance_documents cd
+    SET    site_id = ci.site_id
+    FROM   compliance_items ci
+    WHERE  ci.id = cd.item_id
+    AND    ci.site_id IS NOT NULL;
+  END IF;
+
+  -- daily_operations_reports
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='daily_operations_reports' AND column_name='site_id'
+  ) THEN
+    ALTER TABLE daily_operations_reports ADD COLUMN site_id uuid REFERENCES sites(id);
+  END IF;
+END $$;
+
 -- ── 1. Tenant isolation helper function ──────────────────────────────────────
 --
 -- Returns true if the currently authenticated user (auth.uid()) can access
@@ -67,7 +129,8 @@ DROP POLICY IF EXISTS "auth_select_micros_sales" ON micros_sales_daily;
 CREATE POLICY "auth_select_micros_sales"
   ON micros_sales_daily FOR SELECT TO authenticated
   USING (
-    site_id IS NOT NULL AND fs_user_can_access_site(site_id)
+    -- NULL rows (pre-backfill) remain visible; new rows require site match
+    site_id IS NULL OR fs_user_can_access_site(site_id)
   );
 
 -- Service role can do everything (required by sync workers)
@@ -111,7 +174,7 @@ DROP POLICY IF EXISTS "srole_full_alerts"    ON alerts;
 CREATE POLICY "auth_select_alerts"
   ON alerts FOR SELECT TO authenticated
   USING (
-    site_id IS NOT NULL AND fs_user_can_access_site(site_id)
+    site_id IS NULL OR fs_user_can_access_site(site_id)
   );
 
 CREATE POLICY "auth_insert_alerts"
@@ -135,7 +198,7 @@ DROP POLICY IF EXISTS "auth_write_compliance"     ON compliance_items;
 CREATE POLICY "auth_select_compliance"
   ON compliance_items FOR SELECT TO authenticated
   USING (
-    site_id IS NOT NULL AND fs_user_can_access_site(site_id)
+    site_id IS NULL OR fs_user_can_access_site(site_id)
   );
 
 CREATE POLICY "auth_write_compliance"
@@ -147,7 +210,7 @@ CREATE POLICY "auth_write_compliance"
 CREATE POLICY "auth_update_compliance"
   ON compliance_items FOR UPDATE TO authenticated
   USING (
-    site_id IS NOT NULL AND fs_user_can_access_site(site_id)
+    site_id IS NULL OR fs_user_can_access_site(site_id)
   )
   WITH CHECK (
     site_id IS NOT NULL AND fs_user_can_access_site(site_id)
@@ -165,15 +228,13 @@ DROP POLICY IF EXISTS "srole_full_comp_docs"       ON compliance_documents;
 CREATE POLICY "auth_select_comp_docs"
   ON compliance_documents FOR SELECT TO authenticated
   USING (
-    -- compliance_documents.site_id column (added in migration 083)
-    (site_id IS NOT NULL AND fs_user_can_access_site(site_id))
-    OR
-    -- Fallback: inherit from parent compliance_item
-    EXISTS (
+    -- Site_id NULL = legacy row; inherit access from parent compliance_item
+    site_id IS NULL
+    OR fs_user_can_access_site(site_id)
+    OR EXISTS (
       SELECT 1 FROM compliance_items ci
       WHERE ci.id = compliance_documents.item_id
-      AND   ci.site_id IS NOT NULL
-      AND   fs_user_can_access_site(ci.site_id)
+      AND   (ci.site_id IS NULL OR fs_user_can_access_site(ci.site_id))
     )
   );
 
@@ -232,7 +293,7 @@ DROP POLICY IF EXISTS "srole_full_dor"       ON daily_operations_reports;
 CREATE POLICY "auth_select_dor"
   ON daily_operations_reports FOR SELECT TO authenticated
   USING (
-    site_id IS NOT NULL AND fs_user_can_access_site(site_id)
+    site_id IS NULL OR fs_user_can_access_site(site_id)
   );
 
 CREATE POLICY "auth_insert_dor"
@@ -295,49 +356,56 @@ CREATE POLICY "srole_full_sync_runs"
 
 -- ── 11. menu_item_food_costs / menu_item_dimensions ──────────────────────────
 
--- These had broad `authenticated USING (true)` — replace with site-scoped.
--- Both tables inherit site_id via menu_items → sites.
+-- These tables may not exist in all deployments — wrap in DO $$ blocks.
 
-ALTER TABLE IF EXISTS menu_item_food_costs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE IF EXISTS menu_item_dimensions ENABLE ROW LEVEL SECURITY;
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='menu_item_food_costs') THEN
+    EXECUTE 'ALTER TABLE menu_item_food_costs ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS "auth_mifc" ON menu_item_food_costs';
+    EXECUTE $p$
+      CREATE POLICY "auth_mifc"
+        ON menu_item_food_costs FOR ALL TO authenticated
+        USING (
+          EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE  mi.id = menu_item_food_costs.menu_item_id
+            AND    fs_user_can_access_site(mi.site_id)
+          )
+        )
+        WITH CHECK (
+          EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE  mi.id = menu_item_food_costs.menu_item_id
+            AND    fs_user_can_access_site(mi.site_id)
+          )
+        )
+    $p$;
+  END IF;
 
-DROP POLICY IF EXISTS "auth_mifc" ON menu_item_food_costs;
-DROP POLICY IF EXISTS "auth_mid"  ON menu_item_dimensions;
-
-CREATE POLICY "auth_mifc"
-  ON menu_item_food_costs FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM menu_items mi
-      JOIN   sites s ON s.id = mi.site_id
-      WHERE  mi.id = menu_item_food_costs.menu_item_id
-      AND    fs_user_can_access_site(mi.site_id)
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM menu_items mi
-      WHERE  mi.id = menu_item_food_costs.menu_item_id
-      AND    fs_user_can_access_site(mi.site_id)
-    )
-  );
-
-CREATE POLICY "auth_mid"
-  ON menu_item_dimensions FOR ALL TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM menu_items mi
-      WHERE  mi.id = menu_item_dimensions.menu_item_id
-      AND    fs_user_can_access_site(mi.site_id)
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM menu_items mi
-      WHERE  mi.id = menu_item_dimensions.menu_item_id
-      AND    fs_user_can_access_site(mi.site_id)
-    )
-  );
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='menu_item_dimensions') THEN
+    EXECUTE 'ALTER TABLE menu_item_dimensions ENABLE ROW LEVEL SECURITY';
+    EXECUTE 'DROP POLICY IF EXISTS "auth_mid" ON menu_item_dimensions';
+    EXECUTE $p$
+      CREATE POLICY "auth_mid"
+        ON menu_item_dimensions FOR ALL TO authenticated
+        USING (
+          EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE  mi.id = menu_item_dimensions.menu_item_id
+            AND    fs_user_can_access_site(mi.site_id)
+          )
+        )
+        WITH CHECK (
+          EXISTS (
+            SELECT 1 FROM menu_items mi
+            WHERE  mi.id = menu_item_dimensions.menu_item_id
+            AND    fs_user_can_access_site(mi.site_id)
+          )
+        )
+    $p$;
+  END IF;
+END $$;
 
 -- ── 12. risk_scores / risk_flags ──────────────────────────────────────────────
 
