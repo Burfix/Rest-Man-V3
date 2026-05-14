@@ -183,12 +183,13 @@ export default async function OperationsDashboard() {
   const msConn = microsStatus as MicrosStatusSummary | null;
   const locRef = msConn?.connection?.loc_ref ?? process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual";
   let labourSummary = await getStoredDailySummary(locRef).catch(() => null);
-  // Fall back to yesterday if today has no labour data yet
+  // Fall back up to 3 days if today has no data (handles multi-day sync gaps)
   if (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0)) {
-    const yest = new Date(); yest.setDate(yest.getDate() - 1);
-    const yDate = yest.toISOString().split("T")[0];
-    const fallback = await getStoredDailySummary(locRef, yDate).catch(() => null);
-    if (fallback && fallback.totalLabourHours > 0) labourSummary = fallback;
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const fb = await getStoredDailySummary(locRef, d.toISOString().split("T")[0]).catch(() => null);
+      if (fb && fb.totalLabourHours > 0) { labourSummary = fb; break; }
+    }
   }
 
   // ─── Unified sales snapshot (single source of truth for revenue) ─────────

@@ -142,7 +142,6 @@ export default async function ActionsPage() {
     complianceResult,
     microsResult,
     inventoryResult,
-    labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(cfg.site_id),
@@ -150,7 +149,6 @@ export default async function ActionsPage() {
     getComplianceSummary(cfg.site_id),
     getMicrosStatus(cfg.site_id),
     getInventoryIntelligence(cfg.site_id),
-    getStoredDailySummary(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"),
   ]);
 
   const { value: today }              = settled(todayResult, EMPTY_TODAY);
@@ -159,7 +157,21 @@ export default async function ActionsPage() {
   const { value: complianceSummary }  = settled(complianceResult, EMPTY_COMPLIANCE);
   const { value: microsStatus }       = settled(microsResult, null);
   const { value: inventoryIntel }     = settled(inventoryResult, null);
-  const { value: labourSummary }      = settled(labourResult, null);
+
+  // Labour lookup uses site-specific loc_ref (not global env var)
+  const msLocRef = (microsStatus as MicrosStatusSummary | null)?.connection?.loc_ref
+    || process.env.MICROS_LOCATION_REF
+    || process.env.MICROS_LOC_REF
+    || "manual";
+  let labourSummary = await getStoredDailySummary(msLocRef).catch(() => null);
+  // Fall back up to 3 days if today has no data (sync lag or stale site)
+  if (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0)) {
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const fb = await getStoredDailySummary(msLocRef, d.toISOString().slice(0, 10)).catch(() => null);
+      if (fb && fb.totalLabourHours > 0) { labourSummary = fb; break; }
+    }
+  }
 
   const today_iso = todayISO();
   const ms = microsStatus as MicrosStatusSummary | null;

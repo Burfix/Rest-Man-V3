@@ -81,16 +81,12 @@ export async function runCopilot(siteId: string, orgId = ""): Promise<CopilotOut
   const [
     todayResult, maintenanceResult,
     forecastResult, complianceResult, microsResult,
-    labourResult,
   ] = await Promise.allSettled([
     getTodayBookingsSummary(),
     getMaintenanceSummary(cfg.site_id),
     generateRevenueForecast(today_iso, orgId),
     getComplianceSummary(cfg.site_id),
     getMicrosStatus(siteId),
-    getStoredDailySummary(
-      process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF ?? "manual"
-    ),
   ]);
 
   const today = settled(todayResult, EMPTY_TODAY);
@@ -98,7 +94,21 @@ export async function runCopilot(siteId: string, orgId = ""): Promise<CopilotOut
   const forecast = settled(forecastResult, null as RevenueForecast | null);
   const complianceSummary = settled(complianceResult, EMPTY_COMPLIANCE);
   const microsStatus = settled(microsResult, null) as MicrosStatusSummary | null;
-  const labourSummary = settled(labourResult, null);
+
+  // Labour lookup uses site-specific loc_ref (not global env var)
+  const locRef = microsStatus?.connection?.loc_ref
+    || process.env.MICROS_LOCATION_REF
+    || process.env.MICROS_LOC_REF
+    || "manual";
+  let labourSummary = await getStoredDailySummary(locRef).catch(() => null);
+  // Fall back up to 3 days if today/yesterday has no data (e.g. sync lag)
+  if (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0)) {
+    for (let i = 1; i <= 3; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const fb = await getStoredDailySummary(locRef, d.toISOString().slice(0, 10)).catch(() => null);
+      if (fb && fb.totalLabourHours > 0) { labourSummary = fb; break; }
+    }
+  }
 
   // ── 2. Unified sales snapshot ─────────────────────────────────────────
   const salesSnapshot = await getCurrentSalesSnapshot(

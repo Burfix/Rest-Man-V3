@@ -15,9 +15,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { MicrosSyncService } from "@/services/micros/MicrosSyncService";
 import { runLabourDeltaSync } from "@/services/micros/labour/sync";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
+import { getLocationConfig, getAllLocationConfigs } from "@/lib/micros/micros-location-registry";
+import { runLocationSync } from "@/services/micros/location-sync";
 import { logger } from "@/lib/logger";
 import { sendDailyReport } from "@/services/reports/dailyReport";
 
@@ -43,37 +44,14 @@ export async function GET(req: NextRequest) {
   const cfgStatus = getMicrosConfigStatus();
   if (cfgStatus.enabled && cfgStatus.configured) {
     Promise.resolve().then(async () => {
-      const db2 = createServerClient() as any;
-      const { data: conns } = await db2
-        .from("micros_connections")
-        .select("site_id, loc_ref, location_name")
-        .not("loc_ref", "is", null)
-        .neq("loc_ref", "");
+      // Use per-location configs — each location has its own credentials
+      const allConfigs = getAllLocationConfigs();
+      const enabledConfigs = allConfigs.filter((c) => c.enabled && c.configured);
 
-      if (conns?.length) {
-        const siteIds = (conns as any[]).map((c: any) => c.site_id as string);
-        const { data: roleRows } = await db2
-          .from("user_roles")
-          .select("site_id, organisation_id")
-          .in("site_id", siteIds)
-          .not("organisation_id", "is", null)
-          .limit(100);
-        const orgBySite: Record<string, string> = {};
-        for (const row of (roleRows ?? []) as any[]) {
-          if (row.site_id && row.organisation_id && !orgBySite[row.site_id]) {
-            orgBySite[row.site_id] = row.organisation_id;
-          }
-        }
-        await Promise.allSettled(
-          (conns as any[]).map((conn: any) =>
-            new MicrosSyncService().runFullSync({
-              siteId:            conn.site_id,
-              organisationId:    orgBySite[conn.site_id] ?? "",
-              microsLocationRef: conn.loc_ref,
-            }, today)
-          )
-        );
-      }
+      await Promise.allSettled(
+        enabledConfigs.map((cfg) => runLocationSync(cfg, today))
+      );
+
       await runLabourDeltaSync();
     }).catch((err) => logger.warn("[DailySync] Background sync error", { err: String(err) }));
   }
