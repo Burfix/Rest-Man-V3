@@ -77,7 +77,19 @@ export async function GET() {
     ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // ── 1. Accessible site IDs ──────────────────────────────────────────────
-    const siteIds = ctx.siteIds.filter(Boolean);
+    let siteIds = ctx.siteIds.filter(Boolean);
+
+    // HQ / super roles may have no explicit site_id in user_roles — fall back
+    // to all active sites so the overview always shows the full estate.
+    const HQ_ALL_SITES = new Set(["super_admin", "executive", "head_office"]);
+    if (siteIds.length === 0 && HQ_ALL_SITES.has(ctx.role)) {
+      const { data: allSites } = await db
+        .from("sites")
+        .select("id")
+        .eq("is_active", true);
+      siteIds = ((allSites ?? []) as { id: string }[]).map((s) => s.id);
+    }
+
     if (siteIds.length === 0) {
       return NextResponse.json({ sites: [], asOf: new Date().toISOString() });
     }
