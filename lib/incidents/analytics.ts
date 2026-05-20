@@ -240,7 +240,7 @@ export function computeSlaBreachTrend(
     if (ab || rb) b.uniqueBreached++;
   }
 
-  return [...buckets.entries()].map(([date, b]) => ({
+  return Array.from(buckets.entries()).map(([date, b]) => ({
     date,
     total:              b.total,
     ackBreached:        b.ackBreached,
@@ -274,7 +274,7 @@ export function computeMttrTrend(
     byWeek.get(week)!.push(mttr);
   }
 
-  return [...byWeek.entries()]
+  return Array.from(byWeek.entries())
     .map(([weekStart, times]) => ({
       weekStart,
       avgMttrMinutes: avg(times) ?? 0,
@@ -304,7 +304,7 @@ export function computeAckLatencyBySite(
     bySite.get(inc.siteId)!.push(tta);
   }
 
-  return [...bySite.entries()]
+  return Array.from(bySite.entries())
     .map(([siteId, times]) => {
       const sorted = [...times].sort((a, b) => a - b);
       return {
@@ -398,7 +398,7 @@ export function computeOperatorWorkload(
     byOp.get(inc.assignedTo)!.push(inc);
   }
 
-  return [...byOp.entries()]
+  return Array.from(byOp.entries())
     .map(([userId, incs]) => {
       const resolved   = incs.filter(i => i.status === "resolved" && i.resolvedAt);
       const mttrValues = resolved.map(
@@ -446,7 +446,7 @@ export function computeEscalationTrend(
     else                                          b.normalCount++;
   }
 
-  return [...buckets.entries()].map(([date, b]) => ({ date, ...b }));
+  return Array.from(buckets.entries()).map(([date, b]) => ({ date, ...b }));
 }
 
 /**
@@ -508,7 +508,7 @@ export function computeWeeklySummary(
     if (!mttrBySiteMap.has(inc.siteId)) mttrBySiteMap.set(inc.siteId, []);
     mttrBySiteMap.get(inc.siteId)!.push(mttr);
   }
-  const mttrBySite = [...mttrBySiteMap.entries()]
+  const mttrBySite = Array.from(mttrBySiteMap.entries())
     .map(([siteId, times]) => ({
       siteId,
       siteName:       siteNameMap.get(siteId) ?? siteId,

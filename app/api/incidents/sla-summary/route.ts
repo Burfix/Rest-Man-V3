@@ -255,7 +255,7 @@ export async function GET() {
       if (!bySite.has(row.site_id)) bySite.set(row.site_id, []);
       bySite.get(row.site_id)!.push(mttr);
     }
-    const mttrBySite = [...bySite.entries()]
+    const mttrBySite = Array.from(bySite.entries())
       .map(([siteId, times]) => ({
         siteId,
         siteName:       siteNameMap.get(siteId) ?? siteId,
@@ -272,7 +272,7 @@ export async function GET() {
       if (!bySource.has(row.source)) bySource.set(row.source, []);
       bySource.get(row.source)!.push(mttr);
     }
-    const mttrBySource = [...bySource.entries()]
+    const mttrBySource = Array.from(bySource.entries())
       .map(([source, times]) => ({
         source,
         avgMttrMinutes: avg(times) ?? 0,
