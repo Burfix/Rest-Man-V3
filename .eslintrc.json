@@ -1,0 +1,56 @@
+{
+  "extends": ["next/core-web-vitals"],
+  "plugins": ["unicorn", "@typescript-eslint"],
+  "rules": {
+    "camelcase": ["warn", { "properties": "never", "ignoreDestructuring": false, "ignoreImports": false, "ignoreGlobals": true }],
+    "@typescript-eslint/no-explicit-any": "warn",
+    "unicorn/no-array-for-each": "warn",
+    "unicorn/no-useless-undefined": "warn",
+    "unicorn/prefer-type-error": "warn"
+  },
+  "overrides": [
+    {
+      "files": [
+        "lib/mappers/**/*",
+        "lib/supabase/**/*",
+        "lib/db/**/*",
+        "lib/sync/**/*",
+        "lib/scheduler/**/*",
+        "lib/copilot/**/*",
+        "lib/brain/**/*",
+        "lib/sales/**/*",
+        "lib/micros/**/*",
+        "lib/forecast/**/*",
+        "lib/integrations/**/*",
+        "lib/ontology/**/*",
+        "lib/audit/**/*",
+        "lib/google-places.ts",
+        "lib/modules.ts",
+        "lib/maintenance-utils.ts",
+        "lib/revenueSnapshot.ts",
+        "lib/commandCenter.ts",
+        "supabase/**/*",
+        "types/**/*",
+        "scripts/**/*",
+        "__tests__/**/*",
+        "**/*.test.ts",
+        "**/*.spec.ts"
+      ],
+      "rules": {
+        "camelcase": "off"
+      }
+    },
+    {
+      "files": [
+        "app/api/admin/**/*",
+        "app/api/compliance/**/*",
+        "app/api/micros/**/*",
+        "app/api/sales/**/*",
+        "app/api/labour/**/*"
+      ],
+      "rules": {
+        "camelcase": ["error", { "properties": "never", "ignoreDestructuring": false, "ignoreGlobals": true }]
+      }
+    }
+  ]
+}

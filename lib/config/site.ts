@@ -1,0 +1,93 @@
+/**
+ * Site Configuration — single source of truth for per-site operational targets.
+ *
+ * Replaces all hardcoded constants (TARGET_LABOUR_PCT, TARGET_AVG_SPEND,
+ * SEATING_CAPACITY, etc.) with database-backed values per site.
+ *
+ * Usage:
+ *   const cfg = await getSiteConfig(siteId);
+ *   // cfg.target_labour_pct, cfg.target_avg_spend, cfg.seating_capacity
+ */
+
+import { createServerClient } from "@/lib/supabase/server";
+import { getOrSet, invalidateKey, cacheKey, TTL } from "@/lib/cache/redis";
+
+export interface SiteConfig {
+  site_id: string;
+  site_name: string;
+  target_labour_pct: number;
+  target_avg_spend: number;
+  target_margin_pct: number;
+  seating_capacity: number;
+  currency_symbol: string;
+  timezone: string;
+  /** Optional route restrictions for this site. NULL = all routes visible. */
+  allowed_routes: string[] | null;  /** Deployment readiness: live = fully operational, partial = some modules awaiting data/integration, pending = not yet deployed. */
+  deployment_stage: 'live' | 'partial' | 'pending';}
+
+const DEFAULTS: Omit<SiteConfig, "site_id" | "site_name"> = {
+  target_labour_pct: 30,
+  target_avg_spend: 280,
+  target_margin_pct: 12,
+  seating_capacity: 200,
+  currency_symbol: "R",
+  timezone: "Africa/Johannesburg",
+  allowed_routes: null,
+  deployment_stage: 'live',
+};
+
+// In-memory cache (per process lifetime, ~5 min TTL) — keyed by siteId to prevent cross-site races
+const _cache = new Map<string, { config: SiteConfig; ts: number }>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+export async function getSiteConfig(
+  siteId: string,
+): Promise<SiteConfig> {
+  if (!siteId) throw new Error("getSiteConfig: siteId is required");
+  // L1: in-memory per-site cache (no cross-site bleed)
+  const cached = _cache.get(siteId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
+    return cached.config;
+  }
+
+  // L2: Redis (cross-process, 1-hour TTL)
+  const key = cacheKey(siteId, "config");
+  const config = await getOrSet(key, TTL.SITE_CONFIG, async () => {
+    const supabase = createServerClient();
+    const { data } = await supabase
+      .from("sites")
+      .select("id, name, target_labour_pct, target_avg_spend, target_margin_pct, seating_capacity, currency_symbol, timezone, allowed_routes, deployment_stage")
+      .eq("id", siteId)
+      .maybeSingle();
+
+    const row = data as Record<string, unknown> | null;
+    return {
+      site_id: siteId,
+      site_name: (row?.name as string) ?? "Unknown",
+      target_labour_pct: Number(row?.target_labour_pct) || DEFAULTS.target_labour_pct,
+      target_avg_spend: Number(row?.target_avg_spend) || DEFAULTS.target_avg_spend,
+      target_margin_pct: Number(row?.target_margin_pct) || DEFAULTS.target_margin_pct,
+      seating_capacity: Number(row?.seating_capacity) || DEFAULTS.seating_capacity,
+      currency_symbol: (row?.currency_symbol as string) ?? DEFAULTS.currency_symbol,
+      timezone: (row?.timezone as string) ?? DEFAULTS.timezone,
+      allowed_routes: (row?.allowed_routes as string[] | null) ?? null,
+      deployment_stage: ((row?.deployment_stage as string) === "partial" || (row?.deployment_stage as string) === "pending"
+        ? (row?.deployment_stage as "partial" | "pending")
+        : "live"),
+    } satisfies SiteConfig;
+  });
+
+  // Promote to in-memory for this process (keyed by siteId)
+  _cache.set(siteId, { config, ts: Date.now() });
+  return config;
+}
+
+/** Clear config cache — call after settings update (busts both in-memory and Redis) */
+export function clearSiteConfigCache(siteId?: string): void {
+  if (siteId) {
+    _cache.delete(siteId);
+    invalidateKey(cacheKey(siteId, "config")).catch(() => {});
+  } else {
+    _cache.clear();
+  }
+}

@@ -1,0 +1,154 @@
+/**
+ * Compliance Hub — service layer
+ *
+ * Reads compliance_items and compliance_documents from Supabase, computes
+ * live status from next_due_date (overriding the stored status column), and
+ * returns structured summaries for both the full compliance page and the
+ * main dashboard widget.
+ *
+ * Status logic (applied at query time so it is always up-to-date):
+ *   expired   — next_due_date < today
+ *   due_soon  — next_due_date <= today + 14 days
+ *   compliant — next_due_date > today + 14 days
+ *   unknown   — next_due_date is null
+ */
+
+import { createServerClient } from "@/lib/supabase/server";
+import { todayISO } from "@/lib/utils";
+import { computeComplianceStatus } from "@/lib/compliance/scoring";
+import type { ComplianceItem, ComplianceSummary, ComplianceDocument, ComplianceStatus } from "@/types";
+
+// ── Status computation ────────────────────────────────────────────────────────
+
+export function computeStatus(
+  nextDueDate:           string | null,
+  scheduledServiceDate?: string | null,
+  storedStatus?:         string | null,
+): ComplianceStatus {
+  return computeComplianceStatus(nextDueDate, scheduledServiceDate, storedStatus);
+}
+
+/** Days until the due date (negative = overdue) */
+export function daysUntilDue(nextDueDate: string | null): number | null {
+  if (!nextDueDate) return null;
+  const today = new Date(todayISO());
+  const due = new Date(nextDueDate);
+  return Math.round((due.getTime() - today.getTime()) / 86_400_000);
+}
+
+// ── DB helpers ────────────────────────────────────────────────────────────────
+
+/** Fetch all compliance items with their associated documents — scoped to a site */
+export async function getAllComplianceItems(siteId: string): Promise<ComplianceItem[]> {
+  if (!siteId) throw new Error("[Compliance] siteId is required in getAllComplianceItems");
+  const supabase = createServerClient();
+
+  const [itemsResult, docsResult] = await Promise.all([
+    (supabase as any)
+      .from("compliance_items")
+      .select("*")
+      .eq("site_id", siteId)               // TENANT SCOPE
+      .order("display_name", { ascending: true }),
+    (supabase as any)
+      .from("compliance_documents")
+      .select("*")
+      .eq("site_id", siteId)               // TENANT SCOPE
+      .order("uploaded_at", { ascending: false }),
+  ]);
+
+  if (itemsResult.error) {
+    throw new Error(`[Compliance] Items: ${itemsResult.error.message}`);
+  }
+
+  const items = (itemsResult.data ?? []) as ComplianceItem[];
+  const docs = (docsResult.data ?? []) as ComplianceDocument[];
+
+  // Group documents by item_id
+  const docsByItem: Record<string, ComplianceDocument[]> = {};
+  for (const doc of docs) {
+    if (!docsByItem[doc.item_id]) docsByItem[doc.item_id] = [];
+    docsByItem[doc.item_id].push(doc);
+  }
+
+  // Recompute live status and attach documents
+  return items.map((item) => ({
+    ...item,
+    status: computeStatus(item.next_due_date, item.scheduled_service_date, item.status),
+    documents: docsByItem[item.id] ?? [],
+  }));
+}
+
+/** Build the aggregate compliance summary used on the dashboard */
+export async function getComplianceSummary(siteId?: string): Promise<ComplianceSummary> {
+  if (!siteId) return { total: 0, compliant: 0, scheduled: 0, due_soon: 0, expired: 0, unknown: 0, compliance_pct: 0, critical_items: [], due_soon_items: [], scheduled_items: [] };
+  const items = await getAllComplianceItems(siteId);
+
+  const summary: ComplianceSummary = {
+    total:           items.length,
+    compliant:       0,
+    scheduled:       0,
+    due_soon:        0,
+    expired:         0,
+    unknown:         0,
+    compliance_pct:  0,
+    critical_items:  [],
+    due_soon_items:  [],
+    scheduled_items: [],
+  };
+
+  for (const item of items) {
+    if (
+      item.status === "compliant" || item.status === "scheduled" ||
+      item.status === "due_soon"  || item.status === "expired"   ||
+      item.status === "unknown"
+    ) {
+      summary[item.status]++;
+    }
+    if (item.status === "expired")   summary.critical_items.push(item);
+    if (item.status === "due_soon")  summary.due_soon_items.push(item);
+    if (item.status === "scheduled") summary.scheduled_items.push(item);
+  }
+
+  // Sort due_soon by nearest deadline first
+  summary.due_soon_items.sort((a, b) => {
+    if (!a.next_due_date) return 1;
+    if (!b.next_due_date) return -1;
+    return a.next_due_date.localeCompare(b.next_due_date);
+  });
+
+  // Scheduled items are proactively managed — count as compliant for percentage
+  const rated = summary.total - summary.unknown;
+  summary.compliance_pct = rated > 0
+    ? Math.round(((summary.compliant + summary.scheduled) / rated) * 100)
+    : 0;
+
+  return summary;
+}
+
+/** Fetch a single compliance item with its documents */
+export async function getComplianceItem(id: string): Promise<ComplianceItem | null> {
+  const supabase = createServerClient();
+
+  const [itemResult, docsResult] = await Promise.all([
+    (supabase as any)
+      .from("compliance_items")
+      .select("*")
+      .eq("id", id)
+      .maybeSingle(),
+    (supabase as any)
+      .from("compliance_documents")
+      .select("*")
+      .eq("item_id", id)
+      .order("uploaded_at", { ascending: false }),
+  ]);
+
+  if (itemResult.error) throw new Error(itemResult.error.message);
+  if (!itemResult.data) return null;
+
+  const item = itemResult.data as ComplianceItem;
+  return {
+    ...item,
+    status: computeStatus(item.next_due_date, item.scheduled_service_date, item.status),
+    documents: (docsResult.data ?? []) as ComplianceDocument[],
+  };
+}

@@ -1,0 +1,109 @@
+/**
+ * Settings → Integrations page
+ * Matches the existing settings aesthetic: same card style, same typography.
+ */
+
+import { getMicrosStatus }               from "@/services/micros/status";
+import { getMicrosConfigStatus }         from "@/lib/micros/config";
+import { deriveMicrosIntegrationStatus } from "@/lib/integrations/status";
+import { sanitizeMicrosError }           from "@/lib/integrations/status";
+import { createServerClient }            from "@/lib/supabase/server";
+import { getUserContext }                from "@/lib/auth/get-user-context";
+import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
+import MicrosDebugPanel                  from "@/components/dashboard/settings/MicrosDebugPanel";
+import SyncHealthPanel                   from "@/components/settings/SyncHealthPanel";
+
+export const dynamic   = "force-dynamic";
+export const revalidate = 0;
+
+interface SyncHealthRow {
+  sync_type: string;
+  last_synced_at: string | null;
+  last_outcome: string | null;
+  consecutive_failures: number;
+  is_overdue: boolean;
+  total_runs_today: number;
+  next_run_eta: string | null;
+}
+
+export default async function IntegrationsPage() {
+  const ctx      = await getUserContext().catch(() => null);
+  const siteId   = ctx?.siteId ?? "";
+  const supabase = createServerClient();
+
+  const [microsResult, labourRes, userRes, healthRes] = await Promise.all([
+    siteId ? getMicrosStatus(siteId).catch(() => null) : Promise.resolve(null),
+    supabase
+      .from("labour_sync_state")
+      .select("last_sync_at, last_bus_dt, error_message")
+      .order("last_sync_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+    (async () => {
+      try {
+        return await (supabase as never as { from: (t: string) => any })
+          .from("sync_health_monitor")
+          .select("sync_type, last_synced_at, last_outcome, consecutive_failures, is_overdue, total_runs_today, next_run_eta")
+          .order("is_overdue", { ascending: false })
+          .order("sync_type", { ascending: true });
+      } catch {
+        return { data: null };
+      }
+    })(),
+  ]);
+
+  const connection      = microsResult?.connection ?? null;
+  const cfgStatus       = getMicrosConfigStatus();
+  const microsHealth    = deriveMicrosIntegrationStatus(
+    microsResult, cfgStatus.configured, cfgStatus.enabled,
+  );
+  const labourLastSyncAt = labourRes.data?.last_sync_at ?? null;
+
+  const user    = userRes.data.user;
+  const role    = (user?.user_metadata?.role as string | undefined) ??
+                  (user?.app_metadata?.role  as string | undefined) ?? "";
+  const isAdmin = role === "admin";
+
+  const syncHealthRows = (healthRes.data ?? []) as SyncHealthRow[];
+
+  return (
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-bold text-stone-900">Integrations</h1>
+        <p className="mt-1 text-sm text-stone-500">
+          Connect third-party data sources to power live operational intelligence.
+        </p>
+      </div>
+
+      <MicrosSettingsCard
+        connection={connection as never}
+        microsHealth={microsHealth}
+        labourLastSyncAt={labourLastSyncAt}
+      />
+
+      {/* Live data health — is my data trustworthy right now? */}
+      <SyncHealthPanel rows={syncHealthRows} />
+
+      {/* Admin-only: MICROS config diagnostics panel */}
+      {isAdmin && (
+        <MicrosDebugPanel
+          lastSyncError={
+            connection?.last_sync_error
+              ? sanitizeMicrosError(connection.last_sync_error)
+              : null
+          }
+          connectionStatus={connection?.status ?? null}
+        />
+      )}
+
+      {/* Future integration slots — placeholder style matches empty maintenance card */}
+      <section className="rounded-lg border border-dashed border-stone-200 bg-stone-50 p-6">
+        <h2 className="text-sm font-semibold text-stone-500">More integrations</h2>
+        <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+          Upcoming: Google Reviews sync, WhatsApp automation, compliance feed.
+        </p>
+      </section>
+    </div>
+  );
+}

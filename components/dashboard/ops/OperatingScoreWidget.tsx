@@ -1,0 +1,251 @@
+/**
+ * OperatingScoreWidget
+ *
+ * System Pulse — live Operating Score (0–100) with colour-coded grade,
+ * five component breakdown bars and restaurant-grade explanations.
+ *
+ * Components (canonical weights):
+ *   Revenue      40 pts  (40%)
+ *   Labour       25 pts  (25%)
+ *   Service      15 pts  (15%)
+ *   Compliance   10 pts  (10%)
+ *   Maintenance  10 pts  (10%)
+ */
+
+import { cn } from "@/lib/utils";
+import type { OperatingScore, ScoreGrade } from "@/services/ops/operatingScore";
+import type { SalesFreshnessState } from "@/lib/sales/types";
+
+// ── Score palette ─────────────────────────────────────────────────────────────
+
+const SCORE_PALETTE: Record<ScoreGrade, {
+  ring:    string;
+  number:  string;
+  grade:   string;
+  label:   string;
+  bg:      string;
+}> = {
+  A: {
+    ring:   "ring-emerald-400",
+    number: "text-emerald-600 dark:text-emerald-400",
+    grade:  "bg-emerald-600 text-white",
+    label:  "Excellent",
+    bg:     "bg-emerald-50 dark:bg-emerald-950/20",
+  },
+  B: {
+    ring:   "ring-lime-400",
+    number: "text-lime-600 dark:text-lime-400",
+    grade:  "bg-lime-600 text-white",
+    label:  "Strong",
+    bg:     "bg-lime-50 dark:bg-lime-950/20",
+  },
+  C: {
+    ring:   "ring-amber-400",
+    number: "text-amber-600 dark:text-amber-400",
+    grade:  "bg-amber-500 text-white",
+    label:  "Needs Attention",
+    bg:     "bg-amber-50 dark:bg-amber-950/20",
+  },
+  D: {
+    ring:   "ring-orange-400",
+    number: "text-orange-600 dark:text-orange-400",
+    grade:  "bg-orange-600 text-white",
+    label:  "At Risk",
+    bg:     "bg-orange-50 dark:bg-orange-950/20",
+  },
+  F: {
+    ring:   "ring-red-500 animate-pulse",
+    number: "text-red-600 dark:text-red-400",
+    grade:  "bg-red-600 text-white",
+    label:  "Critical — Act Now",
+    bg:     "bg-red-50 dark:bg-red-950/20",
+  },
+};
+
+// ── Component bars config (Revenue 40 + Labour 25 + Service 15 + Compliance 10 + Maintenance 10 = 100) ──
+
+const COMPONENT_BARS = [
+  { key: "revenue",     label: "Revenue",     max: 40, bar: "bg-emerald-500 dark:bg-emerald-400" },
+  { key: "labour",      label: "Labour",      max: 25, bar: "bg-sky-500 dark:bg-sky-400"         },
+  { key: "service",     label: "Service",     max: 15, bar: "bg-purple-500 dark:bg-purple-400"   },
+  { key: "compliance",  label: "Compliance",  max: 10, bar: "bg-violet-500 dark:bg-violet-400"   },
+  { key: "maintenance", label: "Maintenance", max: 10, bar: "bg-amber-500 dark:bg-amber-400"     },
+] as const;
+
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface Props {
+  score: OperatingScore | null;
+  salesSource?: {
+    label: string;
+    freshnessState: SalesFreshnessState;
+    freshnessMinutes: number | null;
+    /** Module-level data state for badge: "live" | "estimated" | "none" */
+    dataSource?: "live" | "estimated" | "none";
+  } | null;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function OperatingScoreWidget({ score, salesSource }: Props) {
+  if (!score) {
+    return (
+      <div className="flex items-center gap-4 rounded-xl border border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-900 px-5 py-4">
+        <div className="h-16 w-16 shrink-0 rounded-full ring-4 ring-stone-200 dark:ring-stone-700 flex items-center justify-center">
+          <span className="text-2xl font-bold text-stone-600 dark:text-stone-600">—</span>
+        </div>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600 mb-0.5">
+            Operating Score
+          </p>
+          <p className="text-sm text-stone-500 dark:text-stone-500">
+            Connect data sources to generate score
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const palette = SCORE_PALETTE[score.grade];
+
+  // Use drivers from the score object for the explainer strip
+  const drivers = score.drivers ?? [];
+  const driversDisplay = drivers.length > 0
+    ? drivers.join(" • ")
+    : null;
+
+  const summary = score.summary ?? "";
+  const confidenceBadge =
+    score.confidence === "low"    ? { label: "Partial data", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" } :
+    score.confidence === "medium" ? { label: "Partial data", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" } :
+    null;
+
+  return (
+    <div className={cn(
+      "rounded-xl border border-stone-200 dark:border-stone-800 overflow-hidden",
+      "bg-white dark:bg-stone-900"
+    )}>
+
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-stone-100 dark:border-stone-800">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-stone-500 dark:text-stone-600">
+          System Pulse
+        </p>
+        <div className="text-right">
+          <span className={cn(
+            "rounded-full px-2.5 py-px text-[10px] font-bold uppercase tracking-wide",
+            palette.grade
+          )}>
+            Grade {score.grade} — {palette.label}
+          </span>
+          {confidenceBadge && (
+            <span className={cn(
+              "ml-1.5 rounded px-1.5 py-px text-[9px] font-bold uppercase tracking-wide",
+              confidenceBadge.cls
+            )}>
+              {confidenceBadge.label}
+            </span>
+          )}
+          {driversDisplay ? (
+            <p className="text-[9px] font-semibold text-red-500 dark:text-red-400 mt-0.5">
+              {driversDisplay}
+            </p>
+          ) : summary ? (
+            <p className="text-[9px] text-stone-500 dark:text-stone-600 mt-0.5">
+              {summary}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Score + breakdown */}
+      <div className="flex items-center gap-5 px-5 py-4">
+
+        {/* Big number */}
+        <div className={cn(
+          "h-20 w-20 shrink-0 rounded-full ring-4 flex flex-col items-center justify-center",
+          palette.ring,
+          palette.bg
+        )}>
+          <span className={cn("text-3xl font-black tabular-nums leading-none", palette.number)}>
+            {score.total}
+          </span>
+          <span className="text-[10px] font-semibold text-stone-500 dark:text-stone-600 mt-0.5">
+            /100
+          </span>
+        </div>
+
+        {/* Component bars — 2 columns for 4 categories */}
+        <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-2.5">
+          {COMPONENT_BARS.map(({ key, label, max, bar }) => {
+            const comp = score.components[key];
+            const pct  = Math.round((comp.score / max) * 100);
+            const isRevenue = key === "revenue";
+            const srcBadge = isRevenue && salesSource;
+            return (
+              <div key={key}>
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-500">
+                    {label}
+                  </span>
+                  <span className="text-[10px] font-bold tabular-nums text-stone-700 dark:text-stone-300">
+                    {comp.score}<span className="font-normal text-stone-500 dark:text-stone-400">/{max}</span>
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-stone-100 dark:bg-stone-800 overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full transition-all", bar)}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="mt-0.5 flex items-center gap-1">
+                  <p className="text-[10px] text-stone-500 dark:text-stone-600 truncate" title={comp.detail}>
+                    {comp.detail}
+                  </p>
+                  {srcBadge && (() => {
+                    const ds = salesSource.dataSource;
+                    // Never show LIVE if score confidence is low (stale data)
+                    const isStaleScore = score.confidence === "low";
+                    const badgeCls =
+                      isStaleScore
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : ds === "live"
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                        : ds === "estimated"
+                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                        : ds === "none"
+                        ? "bg-stone-100 text-stone-400 dark:bg-stone-800 dark:text-stone-500"
+                        : salesSource.freshnessState === "live"
+                          ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : salesSource.freshnessState === "stale"
+                          ? "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400"
+                          : "bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-500";
+                    // Suppress pulse dot when data is stale
+                    const showPulse = !isStaleScore && (ds === "live" || (!ds && salesSource.freshnessState === "live"));
+                    const badgeLabel =
+                      isStaleScore ? "Stale"
+                      : ds === "live" ? "Live"
+                      : ds === "estimated" ? "Est."
+                      : ds === "none" ? "Not Connected"
+                      : salesSource.label;
+                    return (
+                      <span className={cn(
+                        "shrink-0 inline-flex items-center gap-0.5 rounded px-1 py-px text-[8px] font-bold uppercase tracking-wider",
+                        badgeCls,
+                      )}>
+                        {showPulse && (
+                          <span className="h-1 w-1 rounded-full bg-emerald-500 animate-pulse" />
+                        )}
+                        {badgeLabel}
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
