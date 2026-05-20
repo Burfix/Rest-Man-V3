@@ -24,7 +24,7 @@ export async function POST(
   { params }: { params: { id: string } },
 ) {
   const guard = await guardIncidentWrite(params.id);
-  if (guard instanceof NextResponse) return guard;
+  if (guard instanceof Response) return guard;
   const { ctx, incident, db } = guard;
 
   const now = new Date().toISOString();

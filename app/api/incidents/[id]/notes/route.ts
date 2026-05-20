@@ -30,7 +30,7 @@ export async function PATCH(
   { params }: { params: { id: string } },
 ) {
   const guard = await guardIncidentWrite(params.id);
-  if (guard instanceof NextResponse) return guard;
+  if (guard instanceof Response) return guard;
   const { ctx, incident, db } = guard;
 
   let body: unknown;

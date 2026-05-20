@@ -10,8 +10,8 @@
  *   4. Check visibility: incident.site_id must be in the caller's siteIds
  *   5. Check write permission: caller's role must be in ALL_WRITE_ROLES
  *
- * Returns IncidentWriteGuard on success, NextResponse error on any failure.
- * Route handlers check: if (guard instanceof NextResponse) return guard;
+ * Returns IncidentWriteGuard on success, Response error on any failure.
+ * Route handlers check: if (guard instanceof Response) return guard;
  *
  * RLS note: application-layer checks here are defense-in-depth.
  * Migration 091 adds UPDATE RLS policies that enforce the same rules at DB level.
@@ -74,12 +74,12 @@ function serviceDb() {
  *
  * Usage in route handlers:
  *   const guard = await guardIncidentWrite(params.id);
- *   if (guard instanceof NextResponse) return guard;
+ *   if (guard instanceof Response) return guard;
  *   const { ctx, incident, db } = guard;
  */
 export async function guardIncidentWrite(
   incidentId: string,
-): Promise<IncidentWriteGuard | NextResponse> {
+): Promise<IncidentWriteGuard | Response> {
   // ── 1. Authenticate ────────────────────────────────────────────────────────
   let ctx: UserContext;
   try {
