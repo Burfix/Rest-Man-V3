@@ -148,7 +148,7 @@ export async function computeReliabilityTrend(
     }
 
     // Compute per-feed success rate + overall for each day
-    for (const day of dayMap.values()) {
+    for (const day of Array.from(dayMap.values())) {
       for (const feed of day.feeds) {
         feed.successRate =
           feed.totalRuns > 0

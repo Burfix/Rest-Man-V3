@@ -335,7 +335,7 @@ export function computeRepeatOffenders(
   }
 
   const result: RepeatOffender[] = [];
-  for (const [source, incs] of bySource.entries()) {
+  for (const [source, incs] of Array.from(bySource.entries())) {
     if (incs.length < minCount) continue;
     const sorted = [...incs].sort(
       (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
@@ -484,7 +484,7 @@ export function computeWeeklySummary(
     bySite.set(inc.siteId, (bySite.get(inc.siteId) ?? 0) + 1);
   }
   let worstSite: WeeklySummary["worstSite"] = null;
-  for (const [siteId, count] of bySite.entries()) {
+  for (const [siteId, count] of Array.from(bySite.entries())) {
     if (!worstSite || count > worstSite.incidentCount) {
       worstSite = { siteId, siteName: siteNameMap.get(siteId) ?? siteId, incidentCount: count };
     }
@@ -494,7 +494,7 @@ export function computeWeeklySummary(
   const bySource = new Map<string, number>();
   for (const inc of weekly) bySource.set(inc.source, (bySource.get(inc.source) ?? 0) + 1);
   let worstSource: WeeklySummary["worstSource"] = null;
-  for (const [source, count] of bySource.entries()) {
+  for (const [source, count] of Array.from(bySource.entries())) {
     if (!worstSource || count > worstSource.incidentCount) {
       worstSource = { source, incidentCount: count };
     }

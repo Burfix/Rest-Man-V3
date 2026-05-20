@@ -213,7 +213,7 @@ export async function correlateIncidents(
   // ── 2. Find clusters ──────────────────────────────────────────────────────
   const clusters: IncidentCluster[] = [];
 
-  for (const [src, group] of bySource.entries()) {
+  for (const [src, group] of Array.from(bySource.entries())) {
     const window = findHottestWindow(group);
     const distinctSites = Array.from(new Set(window.map((x) => x.site_id)));
 
@@ -258,7 +258,7 @@ export async function correlateIncidents(
   }
 
   const repeatedFailures: RepeatedFailure[] = [];
-  for (const [key, incs] of pairMap.entries()) {
+  for (const [key, incs] of Array.from(pairMap.entries())) {
     if (incs.length < REPEATED_FAILURE_THRESHOLD) continue;
 
     const [siteId, src] = key.split("::");
