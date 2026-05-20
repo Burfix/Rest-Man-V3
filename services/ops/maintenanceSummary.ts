@@ -28,6 +28,7 @@ export async function getMaintenanceSummary(siteId?: string): Promise<Maintenanc
           .from("maintenance_logs")
           .select("*")
           .in("repair_status", Array.from(OPEN_STATUSES))
+      ).order("date_reported", { ascending: false }),
       scoped(
         supabase
           .from("maintenance_logs")
