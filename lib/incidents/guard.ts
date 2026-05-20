@@ -35,7 +35,9 @@ export const SITE_WRITE_ROLES = new Set([
 ]);
 
 /** Union of all roles permitted to mutate incidents. */
-export const ALL_WRITE_ROLES = new Set([...HQ_WRITE_ROLES, ...SITE_WRITE_ROLES]);
+export const ALL_WRITE_ROLES = new Set(
+  Array.from(HQ_WRITE_ROLES).concat(Array.from(SITE_WRITE_ROLES))
+);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

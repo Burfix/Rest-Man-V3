@@ -27,8 +27,7 @@ export async function getMaintenanceSummary(siteId?: string): Promise<Maintenanc
         supabase
           .from("maintenance_logs")
           .select("*")
-          .in("repair_status", [...OPEN_STATUSES])
-      ).order("date_reported", { ascending: false }),
+          .in("repair_status", Array.from(OPEN_STATUSES))
       scoped(
         supabase
           .from("maintenance_logs")
@@ -133,7 +132,7 @@ export async function getAllMaintenanceLogs(options?: {
   }
 
   if (options?.openOnly) {
-    query = query.in("repair_status", [...OPEN_STATUSES]);
+    query = query.in("repair_status", Array.from(OPEN_STATUSES));
   }
 
   if (options?.limit) {
