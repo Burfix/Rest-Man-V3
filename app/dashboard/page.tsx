@@ -187,7 +187,7 @@ export default async function OperationsDashboard() {
     ? await getStoredDailySummary(locRef).catch(() => null)
     : null;
   // Fall back up to 3 days if today has no data (handles multi-day sync gaps)
-  if (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0)) {
+  if (locRef && (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0))) {
     for (let i = 1; i <= 3; i++) {
       const d = new Date(); d.setDate(d.getDate() - i);
       const fb = await getStoredDailySummary(locRef, d.toISOString().split("T")[0]).catch(() => null);
