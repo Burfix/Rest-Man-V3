@@ -188,7 +188,7 @@ export async function resolveOperationalContext(
     labourCostPercent: null,
     labourCostAmount: null,
     targetSales: null,
-    sameDayLastYear: null,
+    sameDayLastYearSales: null,
     targetSource: null,
     notes: [],
     data_source: "none",
