@@ -203,7 +203,7 @@ export async function GET() {
       const reliability =
         reliabilityResult.status === "fulfilled"
           ? reliabilityResult.value
-          : { overall: 0, grade: "D" as ReliabilityGrade, feeds: [] };
+          : { overall: 0, grade: "D" as ReliabilityGrade, feeds: [], siteId: row.site_id, computedAt: new Date().toISOString(), windowDays: 7 };
 
       const feeds: SiteFeedHealth[] = reliability.feeds.map((f) => ({
         feedType:            f.feedType,
