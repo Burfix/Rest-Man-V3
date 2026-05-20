@@ -41,12 +41,16 @@ export default function SiteSwitcher({ sites, currentId, role }: Props) {
   async function handleChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const selected = e.target.value;
 
-    // Persist selection via cookie API (non-blocking)
-    fetch("/api/preferences/site", {
-      method:  "POST",
-      headers: { "Content-Type": "application/json" },
-      body:    JSON.stringify({ siteId: selected }),
-    }).catch(() => { /* best-effort */ });
+    // Persist cookie BEFORE navigating — prevents race condition where the
+    // server re-renders the page before the cookie is set, causing
+    // getUserContext() to still return the old siteId.
+    try {
+      await fetch("/api/preferences/site", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ siteId: selected }),
+      });
+    } catch { /* best-effort — navigate anyway */ }
 
     // Navigate — rebuild search params keeping any existing ones
     const params = new URLSearchParams(searchParams.toString());

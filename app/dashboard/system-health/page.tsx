@@ -1,4 +1,5 @@
 import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
+import { resolvePageSite }           from "@/lib/auth/resolve-site";
 import { redirect }                  from "next/navigation";
 import { getSystemHealth }           from "@/lib/system-health/getSystemHealth";
 import SystemHealthOverview          from "@/components/system-health/SystemHealthOverview";
@@ -16,7 +17,11 @@ import IncidentPerformancePanel      from "@/components/system-health/IncidentPe
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
 
-export default async function SystemHealthPage() {
+export default async function SystemHealthPage({
+  searchParams,
+}: {
+  searchParams?: { site_id?: string };
+}) {
   const ctx = await getUserContext().catch((err: unknown) => {
     if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
     return null;
@@ -30,7 +35,9 @@ export default async function SystemHealthPage() {
     );
   }
 
-  const health = await getSystemHealth(ctx.siteId);
+  // URL param takes priority over cookie (supports shared links)
+  const { siteId } = resolvePageSite(ctx, searchParams?.site_id);
+  const health = await getSystemHealth(siteId);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">

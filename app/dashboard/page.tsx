@@ -30,6 +30,7 @@ import { evaluateOperations } from "@/services/decision-engine";
 import { getServicePeriod } from "@/lib/commandCenter";
 import { getSiteConfig } from "@/lib/config/site";
 import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
+import { resolvePageSite }           from "@/lib/auth/resolve-site";
 import { runOperatingBrain } from "@/services/brain/operating-brain";
 import { createServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -122,7 +123,11 @@ const EMPTY_MAINTENANCE: MaintenanceSummary = {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default async function OperationsDashboard() {
+export default async function OperationsDashboard({
+  searchParams,
+}: {
+  searchParams?: { site_id?: string };
+}) {
   // ─── User context (site + org) ──────────────────────────────────────────
   const ctx = await getUserContext().catch((err: unknown) => {
     if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
@@ -137,7 +142,9 @@ export default async function OperationsDashboard() {
     );
   }
 
-  const { siteId, orgId } = ctx;
+  // URL param overrides cookie — supports shared links & SiteSwitcher navigation
+  const { siteId } = resolvePageSite(ctx, searchParams?.site_id);
+  const { orgId } = ctx;
 
   // Start brain in parallel (runs alongside main data fetches)
   const brainPromise = runOperatingBrain(siteId, todayISO());

@@ -7,6 +7,7 @@
 
 import { redirect }               from "next/navigation";
 import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
+import { resolvePageSite }         from "@/lib/auth/resolve-site";
 import { getMicrosConnectionBySiteId } from "@/services/micros/status";
 import { getStoredDailySummary, buildDailySummary } from "@/services/micros/labour/summary";
 import { getMockLabourSummary }   from "@/services/micros/labour/mock";
@@ -17,14 +18,19 @@ import type { LabourDashboardSummary } from "@/types/labour";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function LabourPage() {
-  // ── 1. Resolve authenticated user's site ─────────────────────────────────
+export default async function LabourPage({
+  searchParams,
+}: {
+  searchParams?: { site_id?: string };
+}) {
+  // ── 1. Resolve authenticated user's site ──────────────────────────────────────
   // getUserContext() throws AuthError(401) when unauthenticated.
   // Never use a global/env fallback — fail closed.
   let siteId: string;
   try {
     const ctx = await getUserContext();
-    siteId = ctx.siteId;
+    // URL param takes priority over cookie (supports shared links)
+    siteId = resolvePageSite(ctx, searchParams?.site_id).siteId;
   } catch (err) {
     if (err instanceof AuthError && err.statusCode === 401) {
       redirect("/login");
