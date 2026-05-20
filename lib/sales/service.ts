@@ -382,6 +382,47 @@ async function getManualSalesForDate(businessDate: string, siteId?: string): Pro
   return (data as ManualSalesRow | null) ?? null;
 }
 
+// ── Empty/fallback factory ───────────────────────────────────────────────────
+
+/**
+ * Returns a fully-typed zero-value NormalizedSalesSnapshot.
+ * Use in error catch blocks and fallback branches instead of inline object literals.
+ */
+export function emptySalesSnapshot(
+  businessDate: string,
+): NormalizedSalesSnapshot {
+  return {
+    source: "forecast",
+    sourceLabel: "No data",
+    isLive: false,
+    isStale: true,
+    freshnessState: "offline",
+    freshnessMinutes: null,
+    lastUpdatedAt: null,
+    businessDate,
+    netSales: 0,
+    grossSales: 0,
+    covers: 0,
+    checks: 0,
+    averageSpendPerCover: 0,
+    averageCheckValue: 0,
+    labourCostPercent: null,
+    labourCostAmount: null,
+    targetSales: null,
+    sameDayLastYearSales: null,
+    targetSource: null,
+    targetVarianceAmount: null,
+    targetVariancePercent: null,
+    forecastProgressPercent: null,
+    walkInRecoveryNeeded: null,
+    additionalCoversNeeded: null,
+    bookingsToday: null,
+    bookedCoversToday: null,
+    notes: [],
+    data_source: "none",
+  };
+}
+
 // ── Selector helpers (for widgets) ──────────────────────────────────────────
 
 export function selectRevenueStatus(s: NormalizedSalesSnapshot): {

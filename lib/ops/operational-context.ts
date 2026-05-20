@@ -28,6 +28,7 @@ import {
 import { buildDataProvenance } from "@/lib/types/data-provenance";
 import type { DataProvenance } from "@/lib/types/data-provenance";
 import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
+import { emptySalesSnapshot } from "@/lib/sales/service";
 import type { LabourDashboardSummary } from "@/types/labour";
 import type { MicrosConnection } from "@/types/micros";
 import { todayISO } from "@/lib/utils";
@@ -170,29 +171,7 @@ export async function resolveOperationalContext(
     null,
     null,
     siteId,
-  ).catch((): NormalizedSalesSnapshot => ({
-    source: "forecast",
-    sourceLabel: "No data",
-    isLive: false,
-    isStale: true,
-    freshnessState: "offline",
-    freshnessMinutes: null,
-    lastUpdatedAt: null,
-    businessDate: today,
-    netSales: 0,
-    grossSales: 0,
-    covers: 0,
-    checks: 0,
-    averageSpendPerCover: 0,
-    averageCheckValue: 0,
-    labourCostPercent: null,
-    labourCostAmount: null,
-    targetSales: null,
-    sameDayLastYearSales: null,
-    targetSource: null,
-    notes: [],
-    data_source: "none",
-  }));
+  ).catch(() => emptySalesSnapshot(today));
 
   // ── 4. Canonical provenances ─────────────────────────────────────────────
   const revenueProvenance = snapshotToProvenance(salesSnapshot, siteId, locRef);
