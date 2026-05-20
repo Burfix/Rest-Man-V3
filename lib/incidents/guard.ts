@@ -82,8 +82,8 @@ export async function guardIncidentWrite(
   let ctx: UserContext;
   try {
     ctx = await getUserContext();
-  } catch {
-    return authErrorResponse();
+  } catch (err) {
+    return authErrorResponse(err);
   }
 
   // ── 2. Validate UUID format ────────────────────────────────────────────────

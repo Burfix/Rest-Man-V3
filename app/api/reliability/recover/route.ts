@@ -32,8 +32,8 @@ export async function POST() {
   let ctx: Awaited<ReturnType<typeof getUserContext>>;
   try {
     ctx = await getUserContext();
-  } catch {
-    return authErrorResponse();
+  } catch (err) {
+    return authErrorResponse(err);
   }
 
   const { siteId, orgId } = ctx;

@@ -23,12 +23,12 @@ if [[ ! -f "$SQL_FILE" ]]; then
 fi
 
 echo "→ Encoding SQL payload…"
-PAYLOAD=$(python3 - <<'PYEOF'
+PAYLOAD=$(python3 - "$SQL_FILE" <<'PYEOF'
 import sys, json
 sql = open(sys.argv[1]).read()
 print(json.dumps({"query": sql}))
 PYEOF
-"$SQL_FILE")
+)
 
 echo "→ Sending to Supabase (project: $PROJECT_REF)…"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
@@ -38,13 +38,13 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 
-HTTP_BODY=$(echo "$RESPONSE" | head -n -1)
+HTTP_BODY=$(echo "$RESPONSE" | sed '$d')
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 
 echo "→ HTTP $HTTP_CODE"
 echo "$HTTP_BODY" | python3 -m json.tool 2>/dev/null || echo "$HTTP_BODY"
 
-if [[ "$HTTP_CODE" == "200" ]]; then
+if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "201" ]]; then
   echo "✓ Migration deployed successfully."
 else
   echo "✗ Deployment failed (HTTP $HTTP_CODE)."

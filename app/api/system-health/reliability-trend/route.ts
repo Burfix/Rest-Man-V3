@@ -23,8 +23,8 @@ export async function GET(req: Request) {
   let ctx: Awaited<ReturnType<typeof getUserContext>>;
   try {
     ctx = await getUserContext();
-  } catch {
-    return authErrorResponse();
+  } catch (err) {
+    return authErrorResponse(err);
   }
 
   const { searchParams } = new URL(req.url);

@@ -81,8 +81,8 @@ export async function GET() {
   let ctx: Awaited<ReturnType<typeof getUserContext>>;
   try {
     ctx = await getUserContext();
-  } catch {
-    return authErrorResponse();
+  } catch (err) {
+    return authErrorResponse(err);
   }
 
   const { siteId } = ctx;
