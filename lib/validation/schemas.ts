@@ -267,6 +267,7 @@ export const microsSettingsSchema = z.object({
   id: uuidString.optional(),
   location_name: z.string().max(200).optional().nullable(),
   loc_ref: z.string().max(100).optional().nullable(),
+  sales_location_ref: z.string().max(100).optional().nullable(),
   auth_server_url: z.string().url().min(1),
   app_server_url: z.string().url().min(1),
   client_id: z.string().min(1).max(200),

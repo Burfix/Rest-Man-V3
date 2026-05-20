@@ -185,11 +185,20 @@ async function upsertJobCodes(codes: NormalizedJobCode[]): Promise<number> {
 
 export async function runLabourFullSync(
   date?: string,
+  locRef?: string,
 ): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
-  const locRef = cfg.locRef;
+  // Use caller-supplied locRef (per-site DB value) or fall back to env var (legacy)
+  const effectiveLocRef = locRef?.trim() || cfg.locRef;
   const businessDate = date ?? todayISO();
   const errors: string[] = [];
+
+  logger.info("[LabourSync] runLabourFullSync starting", {
+    businessDate, locRef: effectiveLocRef,
+    usingPerSiteRef: !!(locRef?.trim()),
+  });
+  // Shadow outer `locRef` so all code below uses effectiveLocRef
+  const resolvedLocRef = effectiveLocRef;
 
   // Seed in-memory token cache from DB to avoid PKCE on cold-starts
   try {
@@ -215,8 +224,8 @@ export async function runLabourFullSync(
     // 1. Sync job codes
     let jobCodeCount = 0;
     try {
-      const jcRes = await getJobCodeDimensions({ locRef });
-      const normalized = normalizeJobCodes(jcRes.jobCodes, locRef);
+      const jcRes = await getJobCodeDimensions({ locRef: resolvedLocRef });
+      const normalized = normalizeJobCodes(jcRes.jobCodes, resolvedLocRef);
       jobCodeCount = await upsertJobCodes(normalized);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -225,14 +234,14 @@ export async function runLabourFullSync(
     }
 
     // 2. Fetch timecards
-    const tcRes = await getTimeCardDetails({ busDt: businessDate, locRef });
+    const tcRes = await getTimeCardDetails({ busDt: businessDate, locRef: resolvedLocRef });
     const rawCards = flattenTimeCards(tcRes);
-    const cards = normalizeTimecards(rawCards, tcRes.locRef || locRef);
+    const cards = normalizeTimecards(rawCards, tcRes.locRef || resolvedLocRef);
     const upserted = await upsertTimecards(cards);
 
     // 3. Build and upsert daily summary
     try {
-      await buildAndStoreDailySummary(locRef, businessDate);
+      await buildAndStoreDailySummary(resolvedLocRef, businessDate);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       errors.push(`Summary: ${msg}`);
@@ -240,7 +249,7 @@ export async function runLabourFullSync(
 
     // 4. Save sync cursor
     await upsertSyncState(
-      locRef,
+      resolvedLocRef,
       tcRes.curUTC ?? null,
       businessDate,
       errors.length > 0 ? errors.join("; ") : null,
@@ -262,6 +271,7 @@ export async function runLabourFullSync(
 
     logger.info("Labour full sync completed", {
       businessDate, timecards: upserted, jobCodes: jobCodeCount,
+      locRef: resolvedLocRef,
       errors: errors.length > 0 ? errors : undefined,
     });
 
@@ -276,8 +286,8 @@ export async function runLabourFullSync(
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error("Labour full sync failed", { businessDate, error: msg });
-    await upsertSyncState(locRef, null, businessDate, msg).catch(() => {});
+    logger.error("Labour full sync failed", { businessDate, locRef: resolvedLocRef, error: msg });
+    await upsertSyncState(resolvedLocRef, null, businessDate, msg).catch(() => {});
     return {
       success: false,
       mode: "full",
@@ -290,11 +300,17 @@ export async function runLabourFullSync(
 
 // ── Delta sync ────────────────────────────────────────────────────────────
 
-export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
+export async function runLabourDeltaSync(locRef?: string): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
-  const locRef = cfg.locRef;
+  // Use caller-supplied locRef (per-site DB value) or fall back to env var (legacy)
+  const effectiveLocRef = locRef?.trim() || cfg.locRef;
+  const resolvedLocRef = effectiveLocRef;
   const errors: string[] = [];
 
+  logger.info("[LabourSync] runLabourDeltaSync starting", {
+    locRef: resolvedLocRef,
+    usingPerSiteRef: !!(locRef?.trim()),
+  });
   // Seed in-memory token cache from DB (same as full sync)
   try {
     const sb = createServerClient();
@@ -316,27 +332,27 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
   }
 
   try {
-    const state = await getSyncState(locRef);
+    const state = await getSyncState(resolvedLocRef);
 
     // If no previous sync state, fall back to full sync for today
     if (!state?.lastCurUTC) {
-      return runLabourFullSync();
+      return runLabourFullSync(undefined, resolvedLocRef);
     }
 
     // Fetch timecards changed since last curUTC
     const tcRes = await getTimeCardDetails({
       changedSinceUTC: state.lastCurUTC,
-      locRef,
+      locRef: resolvedLocRef,
     });
 
-    const cards = normalizeTimecards(flattenTimeCards(tcRes), tcRes.locRef || locRef);
+    const cards = normalizeTimecards(flattenTimeCards(tcRes), tcRes.locRef || resolvedLocRef);
     const upserted = await upsertTimecards(cards);
 
     // Re-build daily summary for all affected dates
     const affectedDates = Array.from(new Set(cards.map((c) => c.businessDate)));
     for (const dt of affectedDates) {
       try {
-        await buildAndStoreDailySummary(locRef, dt);
+        await buildAndStoreDailySummary(resolvedLocRef, dt);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         errors.push(`Summary ${dt}: ${msg}`);
@@ -345,7 +361,7 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
 
     // Update sync cursor
     await upsertSyncState(
-      locRef,
+      resolvedLocRef,
       tcRes.curUTC ?? state.lastCurUTC,
       state.lastBusDt,
       errors.length > 0 ? errors.join("; ") : null,
@@ -353,6 +369,7 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
 
     logger.info("Labour delta sync completed", {
       timecards: upserted, affectedDates: affectedDates.length,
+      locRef: resolvedLocRef,
       errors: errors.length > 0 ? errors : undefined,
     });
 
@@ -365,8 +382,8 @@ export async function runLabourDeltaSync(): Promise<LabourSyncResult> {
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error("Labour delta sync failed", { error: msg });
-    await upsertSyncState(locRef, null, null, msg).catch(() => {});
+    logger.error("Labour delta sync failed", { locRef: resolvedLocRef, error: msg });
+    await upsertSyncState(resolvedLocRef, null, null, msg).catch(() => {});
     return {
       success: false,
       mode: "delta",

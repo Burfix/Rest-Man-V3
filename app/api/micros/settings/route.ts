@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     const payload = {
       location_name: (d.location_name ?? "Pilot Store").trim(),
       loc_ref: (d.loc_ref ?? "").trim(),
+      sales_location_ref: d.sales_location_ref?.trim() || null,
       auth_server_url: d.auth_server_url.trim().replace(/\/$/, ""),
       app_server_url: d.app_server_url.trim().replace(/\/$/, ""),
       client_id: d.client_id.trim(),

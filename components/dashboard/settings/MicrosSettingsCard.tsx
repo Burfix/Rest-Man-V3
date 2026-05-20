@@ -109,14 +109,15 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
 
     const fd = new FormData(e.currentTarget);
     const payload = {
-      id:              connection?.id,
+      id:                 connection?.id,
       siteId,
-      location_name:   (fd.get("location_name") as string).trim(),
-      loc_ref:         (fd.get("loc_ref") as string).trim(),
-      auth_server_url: (fd.get("auth_server_url") as string).trim(),
-      app_server_url:  (fd.get("app_server_url") as string).trim(),
-      client_id:       (fd.get("client_id") as string).trim(),
-      org_identifier:  (fd.get("org_identifier") as string).trim(),
+      location_name:      (fd.get("location_name") as string).trim(),
+      loc_ref:            (fd.get("loc_ref") as string).trim(),
+      sales_location_ref: ((fd.get("sales_location_ref") as string) || "").trim() || null,
+      auth_server_url:    (fd.get("auth_server_url") as string).trim(),
+      app_server_url:     (fd.get("app_server_url") as string).trim(),
+      client_id:          (fd.get("client_id") as string).trim(),
+      org_identifier:     (fd.get("org_identifier") as string).trim(),
     };
 
     try {
@@ -297,12 +298,15 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       {/* Read-only state */}
       {!editing && connection && (
         <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Row label="Location"       value={connection.location_name || "—"} />
-          <Row label="Location ref"   value={connection.loc_ref || "—"} />
-          <Row label="Auth server"    value={obfuscate(connection.auth_server_url)} />
-          <Row label="App server"     value={obfuscate(connection.app_server_url)} />
-          <Row label="Client ID"      value={connection.client_id ? `${connection.client_id.slice(0, 8)}…` : "—"} />
-          <Row label="Org identifier" value={connection.org_identifier || "—"} />
+          <Row label="Location"           value={connection.location_name || "—"} />
+          <Row label="Location ref"        value={connection.loc_ref || "—"} />
+          {connection.sales_location_ref && (
+            <Row label="Sales location ref" value={connection.sales_location_ref} />
+          )}
+          <Row label="Auth server"         value={obfuscate(connection.auth_server_url)} />
+          <Row label="App server"          value={obfuscate(connection.app_server_url)} />
+          <Row label="Client ID"           value={connection.client_id ? `${connection.client_id.slice(0, 8)}…` : "—"} />
+          <Row label="Org identifier"      value={connection.org_identifier || "—"} />
         </dl>
       )}
 
@@ -327,8 +331,11 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Location name" name="location_name" placeholder="Si Cantina — Pilot"
               defaultValue={connection?.location_name ?? ""} />
-            <Field label="Location ref (locRef)" name="loc_ref" placeholder="e.g. 1"
+            <Field label="Location ref (labour/general)" name="loc_ref" placeholder="e.g. 101003"
               defaultValue={connection?.loc_ref ?? ""} />
+            <Field label="Sales location ref (override)" name="sales_location_ref"
+              placeholder="Leave blank to use Location ref for sales"
+              defaultValue={connection?.sales_location_ref ?? ""} />
             <Field label="Auth server URL" name="auth_server_url" type="url"
               placeholder="https://identity.oraclecloud.com"
               defaultValue={connection?.auth_server_url ?? ""} required />

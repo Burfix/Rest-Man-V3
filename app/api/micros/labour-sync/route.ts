@@ -14,6 +14,7 @@ import { PERMISSIONS } from "@/lib/rbac/roles";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
 import { todayISO } from "@/lib/utils";
 import { runLabourFullSync, runLabourDeltaSync } from "@/services/micros/labour/sync";
+import { getMicrosConnectionBySiteId } from "@/services/micros/status";
 import { SyncRequest as SyncRequestSchema } from "@/lib/sync/contract";
 import { dispatchSync } from "@/lib/sync/orchestrator";
 
@@ -73,9 +74,15 @@ export async function POST(req: NextRequest) {
   const mode: "full" | "delta" = rawBody.mode === "full" ? "full" : "delta";
   const date = rawBody.date as string | undefined;
 
+  // Look up the per-site loc_ref from DB so labour sync is scoped correctly
+  const connection = resolvedSiteId
+    ? await getMicrosConnectionBySiteId(resolvedSiteId).catch(() => null)
+    : null;
+  const siteLocRef = connection?.loc_ref ?? undefined;
+
   const result = mode === "full"
-    ? await runLabourFullSync(date ?? todayISO())
-    : await runLabourDeltaSync();
+    ? await runLabourFullSync(date ?? todayISO(), siteLocRef)
+    : await runLabourDeltaSync(siteLocRef);
 
   return NextResponse.json({
     ok: result.success,

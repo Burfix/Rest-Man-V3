@@ -30,6 +30,8 @@ export type MicrosSyncStatus = "running" | "success" | "error" | "partial";
 export interface MicrosConnectionConfig {
   location_name: string;
   loc_ref:        string;
+  /** Optional override: Oracle revenue-centre locRef for getGuestChecks (sales). Falls back to loc_ref when null. */
+  sales_location_ref?: string | null;
   auth_server_url: string;
   app_server_url:  string;
   client_id:       string;

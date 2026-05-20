@@ -76,8 +76,11 @@ export class MicrosSyncService {
       throw new Error(msg);
     }
 
-    // Use the caller-supplied locRef (authoritative) for all MICROS API calls
-    const effectiveLocRef = microsLocationRef;
+    // ── Resolve effective locRef for sales (getGuestChecks) ──────────────
+    // sales_location_ref overrides loc_ref when Oracle uses a different
+    // revenue-centre hierarchy (e.g. Primi Camps Bay: labour=101003, sales=different).
+    const effectiveLocRef = (connection as { sales_location_ref?: string | null }).sales_location_ref?.trim()
+      || microsLocationRef;
 
     const supabase = createServerClient();
 
@@ -173,19 +176,43 @@ export class MicrosSyncService {
 
     try {
       // Fetch guest checks from Oracle BIAPI
-      logger.info("Fetching guest checks from Oracle", {
-        businessDate,
-        locRef: effectiveLocRef,
+      logger.info("[MicrosSyncService] Calling getGuestChecks", {
         siteId,
+        labourLocRef:      microsLocationRef,
+        salesLocRef:       effectiveLocRef,
+        usingSalesOverride: effectiveLocRef !== microsLocationRef,
+        businessDate,
+        orgIdentifier:    cfg.orgIdentifier,
+        endpoint:         `${cfg.appServer}/bi/v1/${cfg.orgIdentifier}/getGuestChecks`,
       });
-      const raw = await MicrosApiClient.post<{
-        curUTC: string;
-        locRef: string;
-        guestChecks: unknown[] | null;
-      }>("getGuestChecks", {
-        busDt: businessDate,
-        locRef: effectiveLocRef,
-      });
+      let raw: { curUTC: string; locRef: string; guestChecks: unknown[] | null };
+      try {
+        raw = await MicrosApiClient.post<{
+          curUTC: string;
+          locRef: string;
+          guestChecks: unknown[] | null;
+        }>("getGuestChecks", {
+          busDt: businessDate,
+          locRef: effectiveLocRef,
+        });
+      } catch (apiErr) {
+        // Log full Oracle error context to help diagnose wrong locRef
+        const errMsg = apiErr instanceof Error ? apiErr.message : String(apiErr);
+        logger.error("[MicrosSyncService] Oracle getGuestChecks failed", {
+          siteId,
+          salesLocRef:       effectiveLocRef,
+          labourLocRef:      microsLocationRef,
+          usingSalesOverride: effectiveLocRef !== microsLocationRef,
+          orgIdentifier:     cfg.orgIdentifier,
+          businessDate,
+          endpoint:          `${cfg.appServer}/bi/v1/${cfg.orgIdentifier}/getGuestChecks`,
+          oracleError:       errMsg,
+          hint: effectiveLocRef === microsLocationRef
+            ? `loc_ref=${effectiveLocRef} rejected. Set sales_location_ref on the connection row to the correct Oracle revenue-centre enterprise location ID.`
+            : `sales_location_ref=${effectiveLocRef} rejected. Check Oracle BI admin for the correct revenue-centre location ID.`,
+        });
+        throw apiErr;
+      }
 
       const checkCount = raw?.guestChecks?.length ?? 0;
       logger.info("Guest checks received", { checkCount, businessDate });
