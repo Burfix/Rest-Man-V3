@@ -70,6 +70,10 @@ interface Props {
   connection:        MicrosConnection | null;
   microsHealth:      MicrosIntegrationStatus;
   labourLastSyncAt?: string | null;
+  /** The site this card belongs to — passed to all API calls to prevent cross-site sync */
+  siteId:            string;
+  /** Display name for the site (shown in multi-site layout) */
+  siteName?:         string;
 }
 
 type SaveState =
@@ -86,7 +90,7 @@ type TestState =
 
 // ── Component ─────────────────────────────────────────────────────────────
 
-export default function MicrosSettingsCard({ connection: initial, microsHealth, labourLastSyncAt }: Props) {
+export default function MicrosSettingsCard({ connection: initial, microsHealth, labourLastSyncAt, siteId, siteName }: Props) {
   const router  = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -106,6 +110,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
     const fd = new FormData(e.currentTarget);
     const payload = {
       id:              connection?.id,
+      siteId,
       location_name:   (fd.get("location_name") as string).trim(),
       loc_ref:         (fd.get("loc_ref") as string).trim(),
       auth_server_url: (fd.get("auth_server_url") as string).trim(),
@@ -142,7 +147,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       const res  = await fetch("/api/micros/test-connection", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({}),
+        body:    JSON.stringify({ siteId }),
       });
       const json = await res.json();
       if (json.ok) {
@@ -175,7 +180,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       const res = await fetch("/api/micros/sync", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({}),
+        body:    JSON.stringify({ siteId }),
         signal:  controller.signal,
       });
       clearTimeout(timeout);
@@ -214,7 +219,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       const res = await fetch("/api/micros/labour-sync", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ mode: "delta" }),
+        body:    JSON.stringify({ mode: "delta", siteId }),
         signal:  controller.signal,
       });
       clearTimeout(timeout);
@@ -269,7 +274,7 @@ export default function MicrosSettingsCard({ connection: initial, microsHealth, 
       <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="text-base font-semibold text-stone-800">
-            Oracle MICROS BI
+            Oracle MICROS BI{siteName ? ` — ${siteName}` : ""}
           </h2>
           <p className="mt-0.5 text-xs text-stone-500">
             Oracle MICROS BI API integration.

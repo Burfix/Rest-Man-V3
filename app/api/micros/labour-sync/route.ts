@@ -46,6 +46,13 @@ export async function POST(req: NextRequest) {
 
   const traceId = (rawBody.trace_id as string | undefined) ?? crypto.randomUUID();
 
+  // Resolve siteId: body overrides cookie, must be within user's accessible sites
+  const bodySiteId = rawBody.siteId as string | undefined;
+  if (bodySiteId && !ctx.siteIds.includes(bodySiteId)) {
+    return NextResponse.json({ ok: false, message: "Access denied: site not in your accessible sites" }, { status: 403 });
+  }
+  const resolvedSiteId = bodySiteId ?? ctx.siteId;
+
   // New contract path
   if (rawBody.sync_type === "labour") {
     const parsed = SyncRequestSchema.safeParse({
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ ok: false, message: "Invalid request", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
-    const result = await dispatchSync(parsed.data, ctx.siteId, traceId);
+    const result = await dispatchSync(parsed.data, resolvedSiteId, traceId);
     return NextResponse.json({ ...result, source: "manual", checkedAt: new Date().toISOString() });
   }
 

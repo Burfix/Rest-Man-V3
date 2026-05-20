@@ -36,6 +36,13 @@ export async function POST(req: NextRequest) {
 
   const traceId = (rawBody.trace_id as string | undefined) ?? crypto.randomUUID();
 
+  // Resolve siteId: body overrides cookie, must be within user's accessible sites
+  const bodySiteId = rawBody.siteId as string | undefined;
+  if (bodySiteId && !ctx.siteIds.includes(bodySiteId)) {
+    return NextResponse.json({ ok: false, message: "Access denied: site not in your accessible sites" }, { status: 403 });
+  }
+  const resolvedSiteId = bodySiteId ?? ctx.siteId;
+
   // If the caller supplied sync_type, use the new orchestrator path
   if (rawBody.sync_type) {
     const parsed = SyncRequestSchema.safeParse({
@@ -50,7 +57,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "Invalid request", errors: parsed.error.flatten().fieldErrors }, { status: 400 });
     }
 
-    const result = await dispatchSync(parsed.data, ctx.siteId, traceId);
+    const result = await dispatchSync(parsed.data, resolvedSiteId, traceId);
     return NextResponse.json({ ...result, source: "manual", checkedAt: new Date().toISOString() });
   }
 
@@ -58,17 +65,17 @@ export async function POST(req: NextRequest) {
   const date = rawBody.date as string | undefined;
   try {
     // Resolve tenant-scoped connection for this user's site
-    const connection = await getMicrosConnectionBySiteId(ctx.siteId);
+    const connection = await getMicrosConnectionBySiteId(resolvedSiteId);
     if (!connection?.loc_ref) {
       return NextResponse.json({
         ok: false,
-        message: `No MICROS connection found for site ${ctx.siteId}`,
+        message: `No MICROS connection found for site ${resolvedSiteId}`,
       }, { status: 404 });
     }
 
     const svc = new MicrosSyncService();
     const result = await svc.runFullSync({
-      siteId:            ctx.siteId,
+      siteId:            resolvedSiteId,
       organisationId:    ctx.orgId ?? "",
       microsLocationRef: connection.loc_ref,
     }, date ?? todayISO());

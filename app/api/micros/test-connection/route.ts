@@ -8,7 +8,7 @@
  * On failure: returns detailed, stage-specific error info.
  */
 
-import { NextResponse }       from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { getMicrosIdToken, MicrosAuthError, clearMicrosTokenCache } from "@/lib/micros/auth";
 import { getMicrosConfigStatus } from "@/lib/micros/config";
@@ -18,9 +18,19 @@ import { PERMISSIONS } from "@/lib/rbac/roles";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const guard = await apiGuard(PERMISSIONS.MANAGE_INTEGRATIONS, "POST /api/micros/test-connection");
   if (guard.error) return guard.error;
+  const { ctx } = guard;
+
+  // Optional siteId — scope DB updates to the specific connection being tested
+  let rawBody: Record<string, unknown> = {};
+  try { rawBody = await req.json().catch(() => ({})) as Record<string, unknown>; } catch { /* fine */ }
+  const bodySiteId = rawBody.siteId as string | undefined;
+  if (bodySiteId && !ctx.siteIds.includes(bodySiteId)) {
+    return NextResponse.json({ ok: false, status: "forbidden", message: "Access denied: site not in your accessible sites" }, { status: 403 });
+  }
+  const resolvedSiteId = bodySiteId ?? ctx.siteId;
 
   const cfgStatus = getMicrosConfigStatus();
 
@@ -52,7 +62,7 @@ export async function POST() {
     // If we get here, auth succeeded
     const tokenPreview = `${idToken.slice(0, 20)}...${idToken.slice(-10)}`;
 
-    // Update DB status to "connected" and clear any stale errors
+    // Update DB status to "connected" and clear any stale errors — scoped to the tested site
     try {
       const supabase = createServerClient();
       await supabase
@@ -62,7 +72,7 @@ export async function POST() {
           last_sync_error: null,
           last_successful_sync_at: new Date().toISOString(),
         })
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+        .eq("site_id" as never, resolvedSiteId);
     } catch { /* best-effort DB update */ }
 
     return NextResponse.json({
@@ -80,7 +90,7 @@ export async function POST() {
     const detail    = isAuthErr ? err.detail : undefined;
     const code      = isAuthErr ? err.reasonCode : undefined;
 
-    // Persist error to DB
+    // Persist error to DB — scoped to the tested site
     try {
       const supabase = createServerClient();
       await supabase
@@ -89,7 +99,7 @@ export async function POST() {
           status: "error",
           last_sync_error: `[${stage}] ${message}`,
         })
-        .neq("id", "00000000-0000-0000-0000-000000000000");
+        .eq("site_id" as never, resolvedSiteId);
     } catch { /* best-effort */ }
 
     return NextResponse.json({
