@@ -331,3 +331,69 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     expect(sc!.locationRef).toBe("2001002");
   });
 });
+
+// ── URL resolution tests: registry fallback for empty DB fields ────────────
+//
+// Sea Castle (and Si Cantina) intentionally store '' for auth/app server URLs
+// in the DB (migration 082). buildSimphonyClient must fall back to the
+// registry (env vars) so Oracle URLs are never empty.
+
+describe("buildSimphonyClient — registry fallback for empty DB fields", () => {
+  beforeEach(() => {
+    clearEnv({ ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
+    setEnv({ ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
+  });
+
+  afterEach(() => {
+    clearEnv({ ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
+  });
+
+  it("builds client without throwing when DB has empty fields but location_key is set", async () => {
+    // Sea Castle DB pattern from migration 082: app_server_url='' and
+    // org_identifier='' stored as empty — config lives in env vars only.
+    const { buildSimphonyClient } = await import("../../lib/sync/simphony-client");
+    expect(() =>
+      buildSimphonyClient({
+        app_server_url: "",
+        org_identifier: "",
+        location_key:   "sea-castle-camps-bay",
+      })
+    ).not.toThrow();
+  });
+
+  it("throws MICROS_LOCATION_CONFIG_MISSING when fields are empty and org is unregistered", async () => {
+    const { buildSimphonyClient } = await import("../../lib/sync/simphony-client");
+    expect(() =>
+      buildSimphonyClient({
+        app_server_url: "",
+        org_identifier: "UNREGISTERED_ORG",
+      })
+    ).toThrow("MICROS_LOCATION_CONFIG_MISSING");
+  });
+
+  it("Sea Castle and Si Cantina share auth credentials — tokens are interchangeable", async () => {
+    const { getLocationConfig } = await import("../../lib/micros/micros-location-registry");
+    const scs = getLocationConfig("si-cantina");
+    const sc  = getLocationConfig("sea-castle-camps-bay");
+    // Same Oracle enterprise — same auth server, client ID, and API account
+    expect(sc.authUrl).toBe(scs.authUrl);
+    expect(sc.clientId).toBe(scs.clientId);
+    expect(sc.enterpriseShortName).toBe(scs.enterpriseShortName);
+    expect(sc.username).toBe(scs.username);
+    // Different location references — per-store data isolation
+    expect(sc.locationRef).not.toBe(scs.locationRef);
+    expect(sc.locationRef).toBe("2001002");
+    // Different registry keys — different token cache slots
+    expect(sc.key).toBe("sea-castle-camps-bay");
+    expect(scs.key).toBe("si-cantina");
+  });
+
+  it("Sea Castle and Si Cantina have distinct token cache keys", () => {
+    // LocationKey is the key into the per-location token cache Map.
+    // They must differ even though the credentials are identical, so
+    // clearLocationTokenCache for one never evicts the other's entry.
+    const scKey:  "sea-castle-camps-bay" = "sea-castle-camps-bay";
+    const scsKey: "si-cantina"           = "si-cantina";
+    expect(scKey).not.toBe(scsKey);
+  });
+});

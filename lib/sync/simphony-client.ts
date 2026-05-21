@@ -349,6 +349,24 @@ export function buildSimphonyClient(connection: {
     location_key:   connection.location_key,
   });
 
+  // Registry fallback for app_server_url / org_identifier:
+  // Sea Castle (and Si Cantina) intentionally store '' in the DB for these
+  // fields — migration 082 comment: "shared: read from MICROS_* at runtime".
+  // The registry (env vars) is the authoritative source for Oracle endpoints.
+  const appServerUrl  = connection.app_server_url?.trim()  || locationConfig?.baseUrl              || "";
+  const orgIdentifier = connection.org_identifier?.trim()  || locationConfig?.enterpriseShortName  || "";
+
+  if (!appServerUrl || !orgIdentifier) {
+    throw new SimphonyError(
+      `MICROS_LOCATION_CONFIG_MISSING: Cannot build Oracle URL — appServerUrl and ` +
+        `orgIdentifier are empty for location_key="${connection.location_key ?? "none"}", ` +
+        `org_identifier="${connection.org_identifier}". ` +
+        `Check the micros_connections DB row and micros-location-registry.ts env vars.`,
+      "MICROS_LOCATION_CONFIG_MISSING",
+      false,
+    );
+  }
+
   if (!locationConfig) {
     logger.warn("[buildSimphonyClient] org_identifier not found in location registry", {
       org_identifier: connection.org_identifier,
@@ -363,8 +381,8 @@ export function buildSimphonyClient(connection: {
   }
 
   return new SimphonyClient({
-    appServerUrl:   connection.app_server_url,
-    orgIdentifier:  connection.org_identifier,
+    appServerUrl,
+    orgIdentifier,
     locationConfig: locationConfig ?? undefined,
   });
 }

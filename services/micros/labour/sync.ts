@@ -196,11 +196,15 @@ export async function runLabourFullSync(
   const businessDate = date ?? todayISO();
   const errors: string[] = [];
 
-  // Build per-connection context when caller supplies org/server values.
-  // Prevents Oracle error 33109 when the connection's Oracle org differs from
-  // the global MICROS_ORG_SHORT_NAME env var (e.g. Primi=PRI vs Si Cantina=SCN).
+  // Build per-connection context when caller supplies org/server values OR a
+  // location_key. When the DB row has empty app_server_url / org_identifier
+  // (Sea Castle pattern — shared credentials stored only in env vars), the
+  // locationKey alone is enough: perConnectionPost resolves the Oracle URL
+  // and org from the registry.
   const connectionCtx = (appServer && orgIdentifier)
     ? { appServerUrl: appServer, orgIdentifier, locationKey: locationKey ?? null }
+    : locationKey
+    ? { appServerUrl: appServer ?? "", orgIdentifier: orgIdentifier ?? "", locationKey }
     : undefined;
 
   logger.info("[LabourSync] runLabourFullSync starting", {
@@ -324,8 +328,15 @@ export async function runLabourDeltaSync(
   const resolvedLocRef = effectiveLocRef;
   const errors: string[] = [];
 
+  // Build per-connection context when caller supplies org/server values OR a
+  // location_key. When the DB row has empty app_server_url / org_identifier
+  // (Sea Castle pattern — shared credentials stored only in env vars), the
+  // locationKey alone is enough: perConnectionPost resolves the Oracle URL
+  // and org from the registry.
   const connectionCtx = (appServer && orgIdentifier)
     ? { appServerUrl: appServer, orgIdentifier, locationKey: locationKey ?? null }
+    : locationKey
+    ? { appServerUrl: appServer ?? "", orgIdentifier: orgIdentifier ?? "", locationKey }
     : undefined;
 
   logger.info("[LabourSync] runLabourDeltaSync starting", {

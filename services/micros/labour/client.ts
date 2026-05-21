@@ -149,11 +149,27 @@ async function perConnectionPost<T>(
     org_identifier: cx.orgIdentifier,
     location_key:   cx.locationKey,
   });
+
+  // Registry fallback for appServerUrl / orgIdentifier:
+  // Sea Castle (and Si Cantina) store '' in the DB — all config lives in the
+  // registry (env vars). Use registry values when the DB row is empty.
+  const resolvedAppServerUrl  = cx.appServerUrl?.trim()  || locationCfg?.baseUrl              || "";
+  const resolvedOrgIdentifier = cx.orgIdentifier?.trim() || locationCfg?.enterpriseShortName  || "";
+
+  if (!resolvedAppServerUrl || !resolvedOrgIdentifier) {
+    throw new Error(
+      `MICROS_LOCATION_CONFIG_MISSING: Cannot build Oracle URL for ` +
+        `locationKey="${cx.locationKey ?? "none"}", orgIdentifier="${cx.orgIdentifier}". ` +
+        `appServerUrl and orgIdentifier are empty in ConnectionContext AND not resolvable ` +
+        `from the location registry. Check micros-location-registry.ts and env vars.`,
+    );
+  }
+
   let idToken: string;
 
   if (locationCfg?.configured) {
     logger.info("[LabourClient] Using per-org token for Oracle request", {
-      orgIdentifier: cx.orgIdentifier,
+      orgIdentifier: resolvedOrgIdentifier,
       locationKey:   locationCfg.key,
       authFlow:      locationCfg.authFlow,
       endpoint,
@@ -162,13 +178,13 @@ async function perConnectionPost<T>(
   } else {
     if (!locationCfg) {
       logger.warn("[LabourClient] org_identifier not in location registry — using global token (TOKEN_ORG_MISMATCH_RISK)", {
-        orgIdentifier: cx.orgIdentifier,
+        orgIdentifier: resolvedOrgIdentifier,
         endpoint,
         hint: "Register the org in micros-location-registry.ts for token isolation.",
       });
     } else {
       logger.warn("[LabourClient] LocationConfig not fully configured — using global token", {
-        orgIdentifier: cx.orgIdentifier,
+        orgIdentifier: resolvedOrgIdentifier,
         locationKey:   locationCfg.key,
         endpoint,
       });
@@ -176,8 +192,8 @@ async function perConnectionPost<T>(
     idToken = await getMicrosIdToken();
   }
 
-  const base = cx.appServerUrl.replace(/\/$/, "");
-  const url = `${base}/bi/v1/${cx.orgIdentifier}/${endpoint}`;
+  const base = resolvedAppServerUrl.replace(/\/$/, "");
+  const url = `${base}/bi/v1/${resolvedOrgIdentifier}/${endpoint}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
