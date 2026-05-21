@@ -281,7 +281,7 @@ export async function GET(req: NextRequest) {
           status:            connection.status,
           locationName:      connection.location_name,
           locRef:            connection.loc_ref,
-          salesLocationRef:  (connection as Record<string, unknown>).sales_location_ref ?? null,
+          salesLocationRef:  connection.sales_location_ref ?? null,
           orgIdentifier:     connection.org_identifier,
           lastSyncAt:        connection.last_sync_at,
           lastSyncError:     connection.last_sync_error,
