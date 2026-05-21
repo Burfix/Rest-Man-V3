@@ -7,6 +7,7 @@
 
 import { createServerClient }   from "@/lib/supabase/server";
 import { sanitizeMicrosError }  from "@/lib/integrations/status";
+import { logger }               from "@/lib/logger";
 import type { MicrosStatusSummary, MicrosConnection, MicrosSyncRun, MicrosSalesDaily } from "@/types/micros";
 
 const SAFE_CONNECTION_COLUMNS =
