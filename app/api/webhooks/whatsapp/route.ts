@@ -31,6 +31,8 @@ import {
 import { CONVERSATION_HISTORY_LIMIT } from "@/lib/constants";
 import { sendBookingConfirmationEmail } from "@/services/notifications/confirmations";
 import { createServerClient } from "@/lib/supabase/server";
+import { parseAckReply } from "@/lib/whatsapp/format";
+import { acknowledgeViaWebhook } from "@/services/alerts/manager-alert-service";
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 
@@ -193,6 +195,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     // Mark as read (non-blocking)
     markMessageAsRead(messageId).catch(() => {});
+
+    // ── 7a. Alert ACK routing ────────────────────────────────────────────────
+    // If the message is an ACK reply for a manager alert, handle it and return.
+    // This short-circuits the booking AI pipeline for alert acknowledgements.
+    const { isAck, shortId } = parseAckReply(userMessage);
+    if (isAck) {
+      const normalised = phoneNumber.startsWith("+") ? phoneNumber : `+${phoneNumber}`;
+      const ackResult = await acknowledgeViaWebhook(normalised, shortId);
+      console.info("[webhook] Alert ACK processed", {
+        requestId,
+        shortId,
+        ok:      ackResult.ok,
+        alertId: ackResult.alertId,
+      });
+      // Optionally send a confirmation reply (non-blocking, best-effort)
+      if (ackResult.ok) {
+        sendWhatsAppMessage(
+          phoneNumber,
+          "✅ Alert acknowledged. Thank you.",
+        ).catch(() => {});
+      }
+      return NextResponse.json({ status: "ack" }, { status: 200 });
+    }
 
     // ── 7. Retrieve conversation history ────────────────────────────────────
     const rawHistory = await getConversationHistory(phoneNumber, CONVERSATION_HISTORY_LIMIT);

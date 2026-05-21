@@ -112,6 +112,9 @@ function StatPill({
 }
 
 function QueueRow({ row }: { row: IncidentSlaRow }) {
+  // Build a prefill URL so users can open the alerts page with incident context
+  const notifyHref = `/dashboard/alerts?incident_id=${row.id}&title=${encodeURIComponent(row.summary)}&severity=${row.severity}&source=incident`;
+
   return (
     <div className="flex items-center gap-2 py-1.5">
       <span
@@ -136,6 +139,13 @@ function QueueRow({ row }: { row: IncidentSlaRow }) {
           {row.escalationLevel}
         </span>
       )}
+      <a
+        href={notifyHref}
+        title="Notify manager via WhatsApp"
+        className="flex-shrink-0 text-[10px] text-indigo-500 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
+      >
+        Notify
+      </a>
     </div>
   );
 }
