@@ -15,6 +15,7 @@
 
 import { getMicrosIdToken, MicrosAuthError, clearMicrosTokenCache } from "./auth";
 import { getMicrosEnvConfig } from "./config";
+import { logger } from "@/lib/logger";
 
 export { MicrosAuthError } from "./auth";
 
@@ -76,6 +77,22 @@ async function request<T = unknown>(
       const elapsed = Date.now() - t0;
 
       if (!res.ok) {
+        // Log full Oracle diagnostic context — locRef mismatches show up here
+        logger.error("[MicrosClient] Oracle API error", {
+          method,
+          path,
+          url,
+          status:         res.status,
+          elapsed,
+          attempt,
+          oracleResponse: text.slice(0, 1000),
+          requestBody:    body !== undefined
+            ? JSON.stringify(body).slice(0, 500)
+            : undefined,
+          orgIdentifier:  getMicrosEnvConfig().orgIdentifier,
+          appServer:      getMicrosEnvConfig().appServer,
+        });
+
         // On 401, clear cached token so next attempt re-authenticates
         if (res.status === 401) {
           clearMicrosTokenCache();
