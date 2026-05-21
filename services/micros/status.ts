@@ -125,11 +125,39 @@ export async function getMicrosConnectionBySiteId(
 ): Promise<MicrosConnection | null> {
   if (!siteId) throw new Error("[micros/status] siteId is required in getMicrosConnectionBySiteId");
   const supabase = createServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("micros_connections")
     .select(SAFE_CONNECTION_COLUMNS)
     .eq("site_id" as never, siteId)
     .maybeSingle();
+
+  if (error) {
+    const msg = error.message ?? "";
+    const missingSalesRef  = msg.includes("sales_location_ref");
+    const isMissingColumn  = msg.toLowerCase().includes("column") && msg.includes("does not exist");
+
+    logger.error("[MICROS_CONNECTION_LOOKUP_FAILED]", {
+      siteId,
+      selectedColumns: SAFE_CONNECTION_COLUMNS,
+      dbError:  msg,
+      code:     error.code,
+      hint: missingSalesRef
+        ? "Migration 092 (supabase/migrations/092_micros_sales_location_ref.sql) has not been applied. " +
+          "Run: SUPABASE_ACCESS_TOKEN=... bash scripts/deploy_migration.sh supabase/migrations/092_micros_sales_location_ref.sql"
+        : isMissingColumn
+        ? "A required column is missing — verify all migrations have been applied to production."
+        : "Unexpected DB error querying micros_connections.",
+    });
+
+    throw new Error(
+      missingSalesRef
+        ? "[MICROS] DB schema out of date: column micros_connections.sales_location_ref missing. " +
+          "Deploy migration 092 before syncing. " +
+          "(supabase/migrations/092_micros_sales_location_ref.sql)"
+        : `[MICROS] getMicrosConnectionBySiteId failed for site ${siteId}: ${msg}`,
+    );
+  }
+
   return (data as MicrosConnection | null) ?? null;
 }
 

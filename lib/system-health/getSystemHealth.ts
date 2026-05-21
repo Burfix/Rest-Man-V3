@@ -508,6 +508,39 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     updatedAt:       row.updated_at       ?? null,
   }));
 
+  // ── DB schema health: verify required migrations ────────────────────────────
+  // Probe for columns added in recent migrations. Any missing column indicates
+  // the migration has not been applied and syncs will fail with schema errors.
+  try {
+    const { error: schemaErr } = await supabase
+      .from("micros_connections")
+      .select("sales_location_ref")
+      .limit(0);
+
+    if (schemaErr?.message?.includes("sales_location_ref")) {
+      // Migration 092 not applied — inject a critical synthetic incident so
+      // it surfaces in the System Health console rather than failing silently.
+      incidents.unshift({
+        id:              "schema-micros-sales-location-ref-missing",
+        source:          "schema_check",
+        severity:        "critical",
+        summary:
+          "DB migration 092 not applied — micros_connections.sales_location_ref column missing. " +
+          "Both sales and labour sync will fail until this migration is deployed. " +
+          "Run: bash scripts/deploy_migration.sh supabase/migrations/092_micros_sales_location_ref.sql",
+        status:          "open",
+        createdAt:       checkedAt,
+        resolvedAt:      null,
+        escalationLevel: "urgent",
+      });
+      logger.error("[system-health] Migration 092 not applied — sales_location_ref column missing", {
+        siteId, dbError: schemaErr.message,
+      });
+    }
+  } catch {
+    // Non-fatal — schema probe should never crash the health endpoint
+  }
+
   // ── Overall status ─────────────────────────────────────────────────────────
   const { status: overallStatus, summary } = calculateOverallStatus(dataSources, failedJobs24h);
 
