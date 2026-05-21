@@ -186,6 +186,8 @@ async function upsertJobCodes(codes: NormalizedJobCode[]): Promise<number> {
 export async function runLabourFullSync(
   date?: string,
   locRef?: string,
+  appServer?: string,
+  orgIdentifier?: string,
 ): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
   // Use caller-supplied locRef (per-site DB value) or fall back to env var (legacy)
@@ -193,9 +195,18 @@ export async function runLabourFullSync(
   const businessDate = date ?? todayISO();
   const errors: string[] = [];
 
+  // Build per-connection context when caller supplies org/server values.
+  // Prevents Oracle error 33109 when the connection's Oracle org differs from
+  // the global MICROS_ORG_SHORT_NAME env var (e.g. Primi=PRI vs Si Cantina=SCN).
+  const connectionCtx = (appServer && orgIdentifier)
+    ? { appServerUrl: appServer, orgIdentifier }
+    : undefined;
+
   logger.info("[LabourSync] runLabourFullSync starting", {
     businessDate, locRef: effectiveLocRef,
     usingPerSiteRef: !!(locRef?.trim()),
+    usingPerConnectionCtx: !!connectionCtx,
+    orgIdentifier: connectionCtx?.orgIdentifier ?? cfg.orgIdentifier,
   });
   // Shadow outer `locRef` so all code below uses effectiveLocRef
   const resolvedLocRef = effectiveLocRef;
@@ -224,7 +235,7 @@ export async function runLabourFullSync(
     // 1. Sync job codes
     let jobCodeCount = 0;
     try {
-      const jcRes = await getJobCodeDimensions({ locRef: resolvedLocRef });
+      const jcRes = await getJobCodeDimensions({ locRef: resolvedLocRef, connectionContext: connectionCtx });
       const normalized = normalizeJobCodes(jcRes.jobCodes, resolvedLocRef);
       jobCodeCount = await upsertJobCodes(normalized);
     } catch (err) {
@@ -234,7 +245,7 @@ export async function runLabourFullSync(
     }
 
     // 2. Fetch timecards
-    const tcRes = await getTimeCardDetails({ busDt: businessDate, locRef: resolvedLocRef });
+    const tcRes = await getTimeCardDetails({ busDt: businessDate, locRef: resolvedLocRef, connectionContext: connectionCtx });
     const rawCards = flattenTimeCards(tcRes);
     const cards = normalizeTimecards(rawCards, tcRes.locRef || resolvedLocRef);
     const upserted = await upsertTimecards(cards);
@@ -300,16 +311,26 @@ export async function runLabourFullSync(
 
 // ── Delta sync ────────────────────────────────────────────────────────────
 
-export async function runLabourDeltaSync(locRef?: string): Promise<LabourSyncResult> {
+export async function runLabourDeltaSync(
+  locRef?: string,
+  appServer?: string,
+  orgIdentifier?: string,
+): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
   // Use caller-supplied locRef (per-site DB value) or fall back to env var (legacy)
   const effectiveLocRef = locRef?.trim() || cfg.locRef;
   const resolvedLocRef = effectiveLocRef;
   const errors: string[] = [];
 
+  const connectionCtx = (appServer && orgIdentifier)
+    ? { appServerUrl: appServer, orgIdentifier }
+    : undefined;
+
   logger.info("[LabourSync] runLabourDeltaSync starting", {
     locRef: resolvedLocRef,
     usingPerSiteRef: !!(locRef?.trim()),
+    usingPerConnectionCtx: !!connectionCtx,
+    orgIdentifier: connectionCtx?.orgIdentifier ?? cfg.orgIdentifier,
   });
   // Seed in-memory token cache from DB (same as full sync)
   try {
@@ -336,13 +357,14 @@ export async function runLabourDeltaSync(locRef?: string): Promise<LabourSyncRes
 
     // If no previous sync state, fall back to full sync for today
     if (!state?.lastCurUTC) {
-      return runLabourFullSync(undefined, resolvedLocRef);
+      return runLabourFullSync(undefined, resolvedLocRef, appServer, orgIdentifier);
     }
 
     // Fetch timecards changed since last curUTC
     const tcRes = await getTimeCardDetails({
       changedSinceUTC: state.lastCurUTC,
       locRef: resolvedLocRef,
+      connectionContext: connectionCtx,
     });
 
     const cards = normalizeTimecards(flattenTimeCards(tcRes), tcRes.locRef || resolvedLocRef);

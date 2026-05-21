@@ -12,8 +12,7 @@
  */
 
 import { createServerClient } from "@/lib/supabase/server";
-import { MicrosApiClient } from "@/lib/micros/client";
-import { getMicrosEnvConfig } from "@/lib/micros/config";
+import { buildSimphonyClient } from "@/lib/sync/simphony-client";
 import { seedMicrosTokenCache, getCachedMicrosToken } from "@/lib/micros/auth";
 import { getMicrosConnectionBySiteId } from "@/services/micros/status";
 import { aggregateGuestChecksToDailySales } from "./normalize";
@@ -60,7 +59,6 @@ export class MicrosSyncService {
     if (!microsLocationRef) throw new Error("[MicrosSyncService] microsLocationRef is required");
     const businessDate = date ?? todayISO();
     const t0 = Date.now();
-    const cfg = getMicrosEnvConfig();
 
     // ── Tenant-scoped connection lookup ───────────────────────────────────
     const connection = await getMicrosConnectionBySiteId(siteId);
@@ -79,7 +77,7 @@ export class MicrosSyncService {
     // ── Resolve effective locRef for sales (getGuestChecks) ──────────────
     // sales_location_ref overrides loc_ref when Oracle uses a different
     // revenue-centre hierarchy (e.g. Primi Camps Bay: labour=101003, sales=different).
-    const effectiveLocRef = (connection as { sales_location_ref?: string | null }).sales_location_ref?.trim()
+    const effectiveLocRef = connection.sales_location_ref?.trim()
       || microsLocationRef;
 
     const supabase = createServerClient();
@@ -176,25 +174,27 @@ export class MicrosSyncService {
 
     try {
       // Fetch guest checks from Oracle BIAPI
+      // Use per-connection app_server_url + org_identifier from the DB row to
+      // build the correct Oracle endpoint URL. Using global env vars here would
+      // send Primi's locRef to Si Cantina's Oracle org → error 33109.
+      const connAppServer     = connection.app_server_url;
+      const connOrgIdentifier = connection.org_identifier;
       logger.info("[MicrosSyncService] Calling getGuestChecks", {
         siteId,
         labourLocRef:      microsLocationRef,
         salesLocRef:       effectiveLocRef,
         usingSalesOverride: effectiveLocRef !== microsLocationRef,
         businessDate,
-        orgIdentifier:    cfg.orgIdentifier,
-        endpoint:         `${cfg.appServer}/bi/v1/${cfg.orgIdentifier}/getGuestChecks`,
+        orgIdentifier:    connOrgIdentifier,
+        endpoint:         `${connAppServer}/bi/v1/${connOrgIdentifier}/getGuestChecks`,
       });
-      let raw: { curUTC: string; locRef: string; guestChecks: unknown[] | null };
+      let raw: { curUTC?: string; locRef?: string; guestChecks?: unknown[] | null };
       try {
-        raw = await MicrosApiClient.post<{
-          curUTC: string;
-          locRef: string;
-          guestChecks: unknown[] | null;
-        }>("getGuestChecks", {
-          busDt: businessDate,
-          locRef: effectiveLocRef,
+        const apiClient = buildSimphonyClient({
+          app_server_url: connAppServer,
+          org_identifier: connOrgIdentifier,
         });
+        raw = await apiClient.getGuestChecks(effectiveLocRef, businessDate);
       } catch (apiErr) {
         // Log full Oracle error context to help diagnose wrong locRef
         const errMsg = apiErr instanceof Error ? apiErr.message : String(apiErr);
@@ -203,9 +203,9 @@ export class MicrosSyncService {
           salesLocRef:       effectiveLocRef,
           labourLocRef:      microsLocationRef,
           usingSalesOverride: effectiveLocRef !== microsLocationRef,
-          orgIdentifier:     cfg.orgIdentifier,
+          orgIdentifier:     connOrgIdentifier,
           businessDate,
-          endpoint:          `${cfg.appServer}/bi/v1/${cfg.orgIdentifier}/getGuestChecks`,
+          endpoint:          `${connAppServer}/bi/v1/${connOrgIdentifier}/getGuestChecks`,
           oracleError:       errMsg,
           hint: effectiveLocRef === microsLocationRef
             ? `loc_ref=${effectiveLocRef} rejected. Set sales_location_ref on the connection row to the correct Oracle revenue-centre enterprise location ID.`

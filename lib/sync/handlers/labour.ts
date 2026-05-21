@@ -61,10 +61,19 @@ export async function runLabourHandler(
     let inner: Awaited<ReturnType<typeof runLabourFullSync>>;
 
     if (req.mode === "delta") {
-      inner = await runLabourDeltaSync();
+      inner = await runLabourDeltaSync(
+        ctx.connection.loc_ref,
+        ctx.connection.app_server_url,
+        ctx.connection.org_identifier,
+      );
     } else {
       // mode: 'full' or 'backfill' — pass the specific date
-      inner = await runLabourFullSync(business_date);
+      inner = await runLabourFullSync(
+        business_date,
+        ctx.connection.loc_ref,
+        ctx.connection.app_server_url,
+        ctx.connection.org_identifier,
+      );
     }
 
     const records_written = inner.timecardsUpserted ?? 0;

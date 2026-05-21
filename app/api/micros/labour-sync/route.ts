@@ -78,11 +78,13 @@ export async function POST(req: NextRequest) {
   const connection = resolvedSiteId
     ? await getMicrosConnectionBySiteId(resolvedSiteId).catch(() => null)
     : null;
-  const siteLocRef = connection?.loc_ref ?? undefined;
+  const siteLocRef    = connection?.loc_ref         ?? undefined;
+  const siteAppServer = connection?.app_server_url  ?? undefined;
+  const siteOrgId     = connection?.org_identifier  ?? undefined;
 
   const result = mode === "full"
-    ? await runLabourFullSync(date ?? todayISO(), siteLocRef)
-    : await runLabourDeltaSync(siteLocRef);
+    ? await runLabourFullSync(date ?? todayISO(), siteLocRef, siteAppServer, siteOrgId)
+    : await runLabourDeltaSync(siteLocRef, siteAppServer, siteOrgId);
 
   return NextResponse.json({
     ok: result.success,
