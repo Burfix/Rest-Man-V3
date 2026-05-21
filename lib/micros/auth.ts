@@ -545,6 +545,43 @@ async function doFullAuth(): Promise<OracleTokenSet> {
   return tokens;
 }
 
+// -- JWT helpers (for org validation logging only) ─────────────────────────
+
+/**
+ * Decodes a JWT payload without verifying the signature.
+ * Used ONLY for logging and defensive org mismatch detection.
+ * Never make security decisions based on an unverified JWT.
+ */
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+    const padded = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const json = Buffer.from(padded, "base64").toString("utf8");
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extracts the Oracle org name from a decoded JWT payload.
+ * Oracle may encode the org in different claim names depending on the tenant.
+ */
+function extractOrgFromClaims(claims: Record<string, unknown>): string | null {
+  // Oracle uses different claim names across tenant configurations
+  for (const field of ["org_name", "orgName", "tenant", "iss_org", "enterprise"]) {
+    const val = claims[field];
+    if (typeof val === "string" && val.trim()) return val.trim();
+  }
+  // Some Oracle tokens encode the org in the "sub" as "USERNAME@ORG"
+  const sub = claims["sub"];
+  if (typeof sub === "string" && sub.includes("@")) {
+    return sub.split("@").pop()?.trim() ?? null;
+  }
+  return null;
+}
+
 // -- Public API -------------------------------------------------------------
 
 /**
@@ -552,25 +589,36 @@ async function doFullAuth(): Promise<OracleTokenSet> {
  *
  * Uses cached token if valid, refreshes if possible, or does full auth.
  * Per Oracle docs: use id_token (NOT access_token) for Bearer auth.
+ *
+ * NOTE: This function always uses global MICROS_* env vars (SCS/Si Cantina).
+ * For Primi or other Oracle orgs, callers MUST use acquireLocationToken()
+ * from lib/micros/location-auth.ts with the correct LocationConfig.
+ * Using this function for a non-SCS org will cause Oracle error 33102.
  */
 export async function getMicrosIdToken(): Promise<string> {
+  const cfg = getMicrosEnvConfig();
   // Check cached token -- refresh 3 days before expiry
   const REFRESH_BUFFER_MS = 3 * 24 * 60 * 60 * 1000;
 
   if (cachedTokens) {
     if (cachedTokens.expiresAt > Date.now() + REFRESH_BUFFER_MS) {
+      console.debug(
+        `[MicrosAuth] token cache HIT org=${cfg.orgIdentifier} ` +
+        `expiresIn=${Math.round((cachedTokens.expiresAt - Date.now()) / 3_600_000)}h`,
+      );
       return cachedTokens.idToken;
     }
 
     // Try refresh
     if (cachedTokens.refreshToken) {
       try {
-        const cfg = getMicrosEnvConfig();
+        console.debug(`[MicrosAuth] Refreshing token for org=${cfg.orgIdentifier}`);
         cachedTokens = await refreshTokens(
           cfg.authServer,
           cfg.clientId,
           cachedTokens.refreshToken
         );
+        console.debug(`[MicrosAuth] Token refreshed for org=${cfg.orgIdentifier}`);
         return cachedTokens.idToken;
       } catch (refreshErr) {
         // Refresh failed -- fall through to full auth
@@ -586,7 +634,32 @@ export async function getMicrosIdToken(): Promise<string> {
     }
   }
 
+  console.debug(`[MicrosAuth] token cache MISS — running full PKCE for org=${cfg.orgIdentifier}`);
   const tokens = await doFullAuth();
+
+  // Validate the token's org claims match the expected org.
+  // This is a defense-in-depth check — primary org isolation is achieved
+  // by routing each org through its own LocationConfig + acquireLocationToken().
+  const claims = decodeJwtPayload(tokens.idToken);
+  if (claims) {
+    const tokenOrg = extractOrgFromClaims(claims);
+    const issuer   = typeof claims["iss"] === "string" ? claims["iss"] : "(unknown)";
+    const subject  = typeof claims["sub"] === "string" ? claims["sub"] : "(unknown)";
+    const expSec   = typeof claims["exp"] === "number" ? claims["exp"] : 0;
+
+    console.debug(`[MicrosAuth] New token: org=${cfg.orgIdentifier} tokenOrg=${tokenOrg ?? "(not in claims)"} iss=${issuer} sub=${subject} exp=${new Date(expSec * 1000).toISOString()}`);
+
+    if (tokenOrg && tokenOrg.toUpperCase() !== cfg.orgIdentifier.toUpperCase()) {
+      // The token's encoded org doesn't match what we expect.
+      // Clear cache so the next call retries full auth.
+      cachedTokens = null;
+      console.error(
+        `[MicrosAuth] TOKEN_ORG_MISMATCH: token org="${tokenOrg}" ≠ expected org="${cfg.orgIdentifier}". ` +
+        `Clearing cache. This should not happen — check MICROS_ORG_SHORT_NAME env var.`,
+      );
+    }
+  }
+
   return tokens.idToken;
 }
 

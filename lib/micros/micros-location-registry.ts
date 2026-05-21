@@ -281,3 +281,30 @@ export function safeConfigSummary(cfg: LocationConfig) {
 export function isValidLocationKey(key: string): key is LocationKey {
   return key === "si-cantina" || key === "primi-camps-bay" || key === "sea-castle-camps-bay";
 }
+
+/**
+ * Finds the LocationConfig whose `enterpriseShortName` matches the given
+ * Oracle org identifier (case-insensitive).
+ *
+ * Returns null when the org is not registered — callers should fall back
+ * to the global token in that case and log a TOKEN_ORG_MISMATCH_RISK warning.
+ *
+ * Used by SimphonyClient and perConnectionPost() to resolve per-org
+ * credentials from env vars when only `org_identifier` (from the DB
+ * micros_connections row) is available.
+ *
+ * @example
+ *   getLocationConfigByOrgIdentifier("PRI")  // → Primi config
+ *   getLocationConfigByOrgIdentifier("SCS")  // → Si Cantina config
+ *   getLocationConfigByOrgIdentifier("UNK")  // → null
+ */
+export function getLocationConfigByOrgIdentifier(
+  orgIdentifier: string,
+): LocationConfig | null {
+  const norm = orgIdentifier.trim().toUpperCase();
+  return (
+    getAllLocationConfigs().find(
+      (cfg) => cfg.enterpriseShortName.trim().toUpperCase() === norm,
+    ) ?? null
+  );
+}

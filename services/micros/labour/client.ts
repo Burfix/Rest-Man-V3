@@ -8,6 +8,13 @@
 import { MicrosApiClient } from "@/lib/micros/client";
 import { getMicrosEnvConfig } from "@/lib/micros/config";
 import { getMicrosIdToken } from "@/lib/micros/auth";
+import {
+  acquireLocationToken,
+} from "@/lib/micros/location-auth";
+import {
+  getLocationConfigByOrgIdentifier,
+} from "@/lib/micros/micros-location-registry";
+import { logger } from "@/lib/logger";
 import type {
   OracleTimeCardResponse,
   OracleJobCodeResponse,
@@ -115,15 +122,50 @@ export async function getJobCodeDimensions(
 
 /**
  * Makes a direct POST to the Oracle BI API using per-connection URL/org
- * instead of the global env vars. Uses the same global id_token (since
- * Oracle 33109 confirms token is accepted; the mismatch is in the URL org).
+ * instead of the global env vars.
+ *
+ * Token acquisition priority:
+ *   1. Per-org LocationConfig → acquireLocationToken() (per-org cache, isolated)
+ *   2. Global getMicrosIdToken() fallback (single-org / unconfigured orgs)
+ *
+ * Using the per-org token prevents Oracle 33102 "org identity mismatch"
+ * when the global token belongs to a different Oracle org (e.g. SCS token
+ * used against PRI endpoint).
  */
 async function perConnectionPost<T>(
   cx: ConnectionContext,
   endpoint: string,
   body: Record<string, string>,
 ): Promise<T> {
-  const idToken = await getMicrosIdToken();
+  // Resolve per-org credentials from the location registry
+  const locationCfg = getLocationConfigByOrgIdentifier(cx.orgIdentifier);
+  let idToken: string;
+
+  if (locationCfg?.configured) {
+    logger.info("[LabourClient] Using per-org token for Oracle request", {
+      orgIdentifier: cx.orgIdentifier,
+      locationKey:   locationCfg.key,
+      authFlow:      locationCfg.authFlow,
+      endpoint,
+    });
+    idToken = await acquireLocationToken(locationCfg);
+  } else {
+    if (!locationCfg) {
+      logger.warn("[LabourClient] org_identifier not in location registry — using global token (TOKEN_ORG_MISMATCH_RISK)", {
+        orgIdentifier: cx.orgIdentifier,
+        endpoint,
+        hint: "Register the org in micros-location-registry.ts for token isolation.",
+      });
+    } else {
+      logger.warn("[LabourClient] LocationConfig not fully configured — using global token", {
+        orgIdentifier: cx.orgIdentifier,
+        locationKey:   locationCfg.key,
+        endpoint,
+      });
+    }
+    idToken = await getMicrosIdToken();
+  }
+
   const base = cx.appServerUrl.replace(/\/$/, "");
   const url = `${base}/bi/v1/${cx.orgIdentifier}/${endpoint}`;
 

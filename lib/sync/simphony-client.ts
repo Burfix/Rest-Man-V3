@@ -7,6 +7,14 @@
  */
 
 import { getMicrosIdToken } from "@/lib/micros/auth";
+import {
+  acquireLocationToken,
+  clearLocationTokenCache,
+} from "@/lib/micros/location-auth";
+import {
+  getLocationConfigByOrgIdentifier,
+  type LocationConfig,
+} from "@/lib/micros/micros-location-registry";
 import { logger } from "@/lib/logger";
 import { scrubTokens } from "./observability";
 
@@ -53,20 +61,58 @@ interface SimphonyClientOptions {
   orgIdentifier: string;
   /** Pre-fetched id_token; if absent, will be fetched via PKCE */
   idToken?: string;
+  /**
+   * Per-location config resolved from the registry.
+   * When present, acquireLocationToken() is used so each Oracle org gets
+   * its own isolated token (prevents error 33102 org identity mismatch).
+   * When absent, falls back to the global getMicrosIdToken() for backward
+   * compatibility with single-org deployments.
+   */
+  locationConfig?: LocationConfig;
 }
 
 export class SimphonyClient {
   private readonly baseUrl: string;
   private readonly orgIdentifier: string;
   private idToken: string | null;
+  private readonly locationConfig: LocationConfig | null;
 
   constructor(opts: SimphonyClientOptions) {
     this.baseUrl = opts.appServerUrl.replace(/\/$/, "");
     this.orgIdentifier = opts.orgIdentifier;
     this.idToken = opts.idToken ?? null;
+    this.locationConfig = opts.locationConfig ?? null;
   }
 
   private async getToken(): Promise<string> {
+    // When a per-org LocationConfig is available, use the per-location token
+    // cache (location-auth.ts). This prevents Oracle error 33102 caused by a
+    // global cached token belonging to a different Oracle org.
+    if (this.locationConfig) {
+      if (!this.locationConfig.configured) {
+        logger.warn("[SimphonyClient] LocationConfig not fully configured — falling back to global token", {
+          orgIdentifier: this.orgIdentifier,
+          locationKey:   this.locationConfig.key,
+        });
+      } else {
+        logger.info("[SimphonyClient] Acquiring per-org token", {
+          orgIdentifier: this.orgIdentifier,
+          locationKey:   this.locationConfig.key,
+          authFlow:      this.locationConfig.authFlow,
+        });
+        return acquireLocationToken(this.locationConfig);
+      }
+    } else {
+      // No LocationConfig found for this org — log a warning and fall back.
+      // This is expected for orgs not yet in the registry but is a known
+      // token isolation risk when multiple Oracle orgs are in use.
+      logger.warn("[SimphonyClient] No LocationConfig for org — using global token (TOKEN_ORG_MISMATCH_RISK)", {
+        orgIdentifier: this.orgIdentifier,
+        hint: "Register the org in micros-location-registry.ts to enable per-org token isolation.",
+      });
+    }
+
+    // Global fallback path (single-org deployments / unconfigured orgs)
     if (!this.idToken) {
       this.idToken = await getMicrosIdToken();
     }
@@ -104,8 +150,12 @@ export class SimphonyClient {
       clearTimeout(timer);
 
       if (res.status === 401) {
-        // Token expired — invalidate and retry once
-        this.idToken = null;
+        // Token rejected — clear the right cache and retry once
+        if (this.locationConfig) {
+          clearLocationTokenCache(this.locationConfig.key);
+        } else {
+          this.idToken = null;
+        }
         if (attempt <= 1) {
           return this.request<T>(method, path, body, attempt + 1);
         }
@@ -289,9 +339,29 @@ export function buildSimphonyClient(connection: {
   app_server_url: string;
   org_identifier: string;
 }): SimphonyClient {
+  // Resolve per-org credentials from the location registry.
+  // When found: SimphonyClient uses acquireLocationToken() → isolated per-org
+  // token cache → prevents Oracle 33102 "org identity mismatch" across tenants.
+  // When null: falls back to global getMicrosIdToken() with a warning.
+  const locationConfig = getLocationConfigByOrgIdentifier(connection.org_identifier);
+
+  if (!locationConfig) {
+    logger.warn("[buildSimphonyClient] org_identifier not found in location registry", {
+      org_identifier: connection.org_identifier,
+      hint: "Add the org to micros-location-registry.ts to enable token isolation.",
+    });
+  } else if (!locationConfig.configured) {
+    logger.warn("[buildSimphonyClient] LocationConfig found but not fully configured", {
+      org_identifier: connection.org_identifier,
+      locationKey:    locationConfig.key,
+      hint: "Check that all required env vars are set for this location.",
+    });
+  }
+
   return new SimphonyClient({
-    appServerUrl: connection.app_server_url,
-    orgIdentifier: connection.org_identifier,
+    appServerUrl:   connection.app_server_url,
+    orgIdentifier:  connection.org_identifier,
+    locationConfig: locationConfig ?? undefined,
   });
 }
 
