@@ -223,3 +223,111 @@ describe("Token isolation — per-location cache (location-auth.ts)", () => {
     clearLocationTokenCache("si-cantina");
   });
 });
+
+// ── Sea Castle / SCS disambiguation tests ─────────────────────────────────
+//
+// Si Cantina and Sea Castle share the same Oracle enterprise (SCS) and
+// identical credentials. getLocationConfigForConnection() must disambiguate
+// them via location_key and fall back gracefully when location_key is absent.
+
+const SEA_CASTLE_ENV: Record<string, string> = {
+  MICROS_SEA_CASTLE_ENABLED:      "true",
+  MICROS_SEA_CASTLE_LOCATION_REF: "2001002",
+};
+
+describe("SCS disambiguation — getLocationConfigForConnection", () => {
+  beforeEach(() => {
+    clearEnv({ ...PRIMI_ENV, ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
+    setEnv({ ...PRIMI_ENV, ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
+  });
+
+  afterEach(() => {
+    clearEnv({ ...PRIMI_ENV, ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
+  });
+
+  it("explicit location_key=sea-castle-camps-bay returns Sea Castle config", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    const cfg = getLocationConfigForConnection({
+      org_identifier: "SCS",
+      location_key:   "sea-castle-camps-bay",
+    });
+    expect(cfg).not.toBeNull();
+    expect(cfg!.key).toBe("sea-castle-camps-bay");
+    expect(cfg!.locationRef).toBe("2001002");
+  });
+
+  it("explicit location_key=si-cantina returns Si Cantina config", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    const cfg = getLocationConfigForConnection({
+      org_identifier: "SCS",
+      location_key:   "si-cantina",
+    });
+    expect(cfg).not.toBeNull();
+    expect(cfg!.key).toBe("si-cantina");
+    expect(cfg!.locationRef).toBe("200100");
+  });
+
+  it("SCS + no location_key returns a valid SCS config (shared credentials)", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    // Both Si Cantina and Sea Castle are SCS with identical credentials.
+    // The resolver must NOT throw — it should return one of them.
+    const cfg = getLocationConfigForConnection({ org_identifier: "SCS" });
+    expect(cfg).not.toBeNull();
+    expect(cfg!.enterpriseShortName).toBe("SCS");
+    // Token produced by either config is identical (same Oracle org + credentials).
+  });
+
+  it("PRI + no location_key returns Primi config unambiguously", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    const cfg = getLocationConfigForConnection({ org_identifier: "PRI" });
+    expect(cfg).not.toBeNull();
+    expect(cfg!.key).toBe("primi-camps-bay");
+    expect(cfg!.enterpriseShortName).toBe("PRI");
+  });
+
+  it("unknown org + no location_key returns null", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    const cfg = getLocationConfigForConnection({ org_identifier: "UNKNOWN_ORG" });
+    expect(cfg).toBeNull();
+  });
+
+  it("invalid location_key falls back to org_identifier disambiguation", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    // 'not-a-real-key' is not a valid LocationKey → isValidLocationKey returns false
+    // → falls through to org_identifier path
+    const cfg = getLocationConfigForConnection({
+      org_identifier: "PRI",
+      location_key:   "not-a-real-key",
+    });
+    expect(cfg).not.toBeNull();
+    expect(cfg!.key).toBe("primi-camps-bay");
+  });
+
+  it("Sea Castle config has locationRef distinct from Si Cantina", async () => {
+    const { getLocationConfigForConnection } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    const scs = getLocationConfigForConnection({
+      org_identifier: "SCS",
+      location_key:   "si-cantina",
+    });
+    const sc = getLocationConfigForConnection({
+      org_identifier: "SCS",
+      location_key:   "sea-castle-camps-bay",
+    });
+    expect(scs!.locationRef).not.toBe(sc!.locationRef);
+    expect(sc!.locationRef).toBe("2001002");
+  });
+});

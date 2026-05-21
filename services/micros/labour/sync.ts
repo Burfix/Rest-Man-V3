@@ -188,6 +188,7 @@ export async function runLabourFullSync(
   locRef?: string,
   appServer?: string,
   orgIdentifier?: string,
+  locationKey?: string | null,
 ): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
   // Use caller-supplied locRef (per-site DB value) or fall back to env var (legacy)
@@ -199,7 +200,7 @@ export async function runLabourFullSync(
   // Prevents Oracle error 33109 when the connection's Oracle org differs from
   // the global MICROS_ORG_SHORT_NAME env var (e.g. Primi=PRI vs Si Cantina=SCN).
   const connectionCtx = (appServer && orgIdentifier)
-    ? { appServerUrl: appServer, orgIdentifier }
+    ? { appServerUrl: appServer, orgIdentifier, locationKey: locationKey ?? null }
     : undefined;
 
   logger.info("[LabourSync] runLabourFullSync starting", {
@@ -315,6 +316,7 @@ export async function runLabourDeltaSync(
   locRef?: string,
   appServer?: string,
   orgIdentifier?: string,
+  locationKey?: string | null,
 ): Promise<LabourSyncResult> {
   const cfg = getMicrosEnvConfig();
   // Use caller-supplied locRef (per-site DB value) or fall back to env var (legacy)
@@ -323,7 +325,7 @@ export async function runLabourDeltaSync(
   const errors: string[] = [];
 
   const connectionCtx = (appServer && orgIdentifier)
-    ? { appServerUrl: appServer, orgIdentifier }
+    ? { appServerUrl: appServer, orgIdentifier, locationKey: locationKey ?? null }
     : undefined;
 
   logger.info("[LabourSync] runLabourDeltaSync starting", {

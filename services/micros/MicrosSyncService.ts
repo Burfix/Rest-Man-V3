@@ -193,6 +193,7 @@ export class MicrosSyncService {
         const apiClient = buildSimphonyClient({
           app_server_url: connAppServer,
           org_identifier: connOrgIdentifier,
+          location_key:   connection.location_key ?? null,
         });
         raw = await apiClient.getGuestChecks(effectiveLocRef, businessDate);
       } catch (apiErr) {

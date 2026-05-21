@@ -81,10 +81,11 @@ export async function POST(req: NextRequest) {
   const siteLocRef    = connection?.loc_ref         ?? undefined;
   const siteAppServer = connection?.app_server_url  ?? undefined;
   const siteOrgId     = connection?.org_identifier  ?? undefined;
+  const siteLocKey    = connection?.location_key    ?? undefined;
 
   const result = mode === "full"
-    ? await runLabourFullSync(date ?? todayISO(), siteLocRef, siteAppServer, siteOrgId)
-    : await runLabourDeltaSync(siteLocRef, siteAppServer, siteOrgId);
+    ? await runLabourFullSync(date ?? todayISO(), siteLocRef, siteAppServer, siteOrgId, siteLocKey)
+    : await runLabourDeltaSync(siteLocRef, siteAppServer, siteOrgId, siteLocKey);
 
   return NextResponse.json({
     ok: result.success,

@@ -65,6 +65,7 @@ export async function runLabourHandler(
         ctx.connection.loc_ref,
         ctx.connection.app_server_url,
         ctx.connection.org_identifier,
+        ctx.connection.location_key,
       );
     } else {
       // mode: 'full' or 'backfill' — pass the specific date
@@ -73,6 +74,7 @@ export async function runLabourHandler(
         ctx.connection.loc_ref,
         ctx.connection.app_server_url,
         ctx.connection.org_identifier,
+        ctx.connection.location_key,
       );
     }
 

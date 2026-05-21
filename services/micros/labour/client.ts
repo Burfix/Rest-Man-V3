@@ -12,7 +12,7 @@ import {
   acquireLocationToken,
 } from "@/lib/micros/location-auth";
 import {
-  getLocationConfigByOrgIdentifier,
+  getLocationConfigForConnection,
 } from "@/lib/micros/micros-location-registry";
 import { logger } from "@/lib/logger";
 import type {
@@ -33,6 +33,13 @@ import type {
 export interface ConnectionContext {
   appServerUrl: string;
   orgIdentifier: string;
+  /**
+   * Stable registry key from micros_connections.location_key.
+   * When set, drives exact LocationConfig selection (bypasses the
+   * org_identifier-only lookup which is ambiguous for SCS — shared by
+   * Si Cantina and Sea Castle).
+   */
+  locationKey?: string | null;
 }
 
 // ── Request parameter types ───────────────────────────────────────────────
@@ -137,8 +144,11 @@ async function perConnectionPost<T>(
   endpoint: string,
   body: Record<string, string>,
 ): Promise<T> {
-  // Resolve per-org credentials from the location registry
-  const locationCfg = getLocationConfigByOrgIdentifier(cx.orgIdentifier);
+  // Resolve per-org credentials using location_key (exact) or org_identifier (fallback)
+  const locationCfg = getLocationConfigForConnection({
+    org_identifier: cx.orgIdentifier,
+    location_key:   cx.locationKey,
+  });
   let idToken: string;
 
   if (locationCfg?.configured) {

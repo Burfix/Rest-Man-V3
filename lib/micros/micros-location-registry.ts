@@ -289,13 +289,13 @@ export function isValidLocationKey(key: string): key is LocationKey {
  * Returns null when the org is not registered — callers should fall back
  * to the global token in that case and log a TOKEN_ORG_MISMATCH_RISK warning.
  *
- * Used by SimphonyClient and perConnectionPost() to resolve per-org
- * credentials from env vars when only `org_identifier` (from the DB
- * micros_connections row) is available.
+ * NOTE: org_identifier is NOT unique across all locations (e.g. Si Cantina
+ * and Sea Castle both use SCS). Prefer getLocationConfigForConnection() when
+ * you have the full connection row, which uses location_key for exact routing.
  *
  * @example
  *   getLocationConfigByOrgIdentifier("PRI")  // → Primi config
- *   getLocationConfigByOrgIdentifier("SCS")  // → Si Cantina config
+ *   getLocationConfigByOrgIdentifier("SCS")  // → Si Cantina config (first match)
  *   getLocationConfigByOrgIdentifier("UNK")  // → null
  */
 export function getLocationConfigByOrgIdentifier(
@@ -306,5 +306,80 @@ export function getLocationConfigByOrgIdentifier(
     getAllLocationConfigs().find(
       (cfg) => cfg.enterpriseShortName.trim().toUpperCase() === norm,
     ) ?? null
+  );
+}
+
+/**
+ * Resolves the LocationConfig for a micros_connections row.
+ *
+ * Resolution priority:
+ *   1. Explicit `location_key` — direct registry lookup (most reliable).
+ *      Set micros_connections.location_key in the DB to opt into this path.
+ *   2. Disambiguate by org_identifier.
+ *      - If exactly one location matches → return it.
+ *      - If multiple locations share the same org (e.g. Si Cantina + Sea Castle
+ *        both use SCS) and they all share identical credentials (same Oracle
+ *        enterprise) → return the first configured one. They produce identical
+ *        tokens, so either works.
+ *      - If multiple locations share the same org with DIFFERENT credentials
+ *        (different auth servers or client IDs) → throws AMBIGUOUS_MICROS_LOCATION_CONFIG
+ *        because it is impossible to select the correct token safely without
+ *        an explicit location_key.
+ *
+ * @throws {Error} AMBIGUOUS_MICROS_LOCATION_CONFIG — same org, different credentials, no location_key set.
+ *
+ * @example
+ *   // SCS + explicit key → Sea Castle config
+ *   getLocationConfigForConnection({ org_identifier: "SCS", location_key: "sea-castle-camps-bay" })
+ *
+ *   // SCS + no key → Si Cantina config (first configured SCS; credentials identical)
+ *   getLocationConfigForConnection({ org_identifier: "SCS" })
+ *
+ *   // PRI → Primi config
+ *   getLocationConfigForConnection({ org_identifier: "PRI" })
+ */
+export function getLocationConfigForConnection(connection: {
+  org_identifier: string;
+  location_key?: string | null;
+}): LocationConfig | null {
+  // ── 1. Explicit location_key ───────────────────────────────────────────
+  if (connection.location_key && isValidLocationKey(connection.location_key)) {
+    return getLocationConfig(connection.location_key);
+  }
+
+  // ── 2. Disambiguate by org_identifier ─────────────────────────────────
+  const norm = connection.org_identifier.trim().toUpperCase();
+  const all = getAllLocationConfigs();
+  const orgMatches = all.filter(
+    (c) => c.enterpriseShortName.trim().toUpperCase() === norm,
+  );
+
+  if (orgMatches.length === 0) return null;
+  if (orgMatches.length === 1) return orgMatches[0];
+
+  // Multiple configs share this org — check whether credentials are identical.
+  // Si Cantina + Sea Castle are the canonical case: same Oracle enterprise,
+  // same PKCE account, same auth server. Their tokens are interchangeable.
+  const first = orgMatches[0];
+  const allShareCredentials = orgMatches.every(
+    (c) =>
+      c.clientId  === first.clientId &&
+      c.authUrl   === first.authUrl  &&
+      c.username  === first.username,
+  );
+
+  if (allShareCredentials) {
+    // Credentials are identical → tokens are interchangeable.
+    // Use the first configured location; all produce the same Oracle token.
+    const configured = orgMatches.find((c) => c.configured) ?? orgMatches[0];
+    return configured;
+  }
+
+  // Different credentials → cannot choose safely without an explicit key.
+  throw new Error(
+    `AMBIGUOUS_MICROS_LOCATION_CONFIG: org_identifier="${connection.org_identifier}" ` +
+      `maps to ${orgMatches.length} LocationConfigs with different credentials. ` +
+      `Set location_key on the micros_connections row to disambiguate ` +
+      `(valid values: ${orgMatches.map((c) => `"${c.key}"`).join(", ")}).`,
   );
 }

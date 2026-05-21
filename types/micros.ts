@@ -36,6 +36,14 @@ export interface MicrosConnectionConfig {
   app_server_url:  string;
   client_id:       string;
   org_identifier:  string;
+  /**
+   * Stable registry key matching lib/micros/micros-location-registry.ts
+   * (e.g. 'si-cantina', 'primi-camps-bay', 'sea-castle-camps-bay').
+   * When set, bypasses the ambiguous org_identifier-only lookup so the
+   * correct LocationConfig (and token cache slot) is always selected.
+   * When null, the resolver falls back to org_identifier disambiguation.
+   */
+  location_key?: string | null;
 }
 
 /** Full DB row — access_token / token_expires_at excluded from all API responses */

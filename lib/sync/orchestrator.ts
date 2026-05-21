@@ -71,7 +71,7 @@ export async function dispatchSync(
   const db = supabase as unknown as { from: (t: string) => ReturnType<typeof supabase.from> };
   const { data: connection, error: connErr } = await (db.from("micros_connections") as ReturnType<typeof supabase.from>)
     .select(
-      "id, loc_ref, site_id, auth_server_url, app_server_url, client_id, org_identifier, status",
+      "id, loc_ref, site_id, auth_server_url, app_server_url, client_id, org_identifier, location_key, status",
     )
     .eq("loc_ref", req.loc_ref)
     .eq("site_id", callerSiteId) // <-- multi-tenant isolation
@@ -103,6 +103,7 @@ export async function dispatchSync(
       app_server_url: typedConn.app_server_url,
       client_id: typedConn.client_id,
       org_identifier: typedConn.org_identifier,
+      location_key: (typedConn as MicrosConnection & { location_key?: string | null }).location_key ?? null,
     },
     dry_run: DRY_RUN,
   };

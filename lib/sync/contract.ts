@@ -138,6 +138,12 @@ export interface SyncContext {
     app_server_url: string;
     client_id: string;
     org_identifier: string;
+    /**
+     * Stable registry key from micros_connections.location_key.
+     * When set, drives exact LocationConfig selection (bypasses org_identifier
+     * disambiguation which is ambiguous for SCS — shared by Si Cantina + Sea Castle).
+     */
+    location_key?: string | null;
   };
   /** Whether to skip writes (shadow/gate mode) */
   dry_run: boolean;

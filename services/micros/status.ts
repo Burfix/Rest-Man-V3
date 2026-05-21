@@ -11,7 +11,7 @@ import { logger }               from "@/lib/logger";
 import type { MicrosStatusSummary, MicrosConnection, MicrosSyncRun, MicrosSalesDaily } from "@/types/micros";
 
 const SAFE_CONNECTION_COLUMNS =
-  "id, location_name, loc_ref, sales_location_ref, auth_server_url, app_server_url, client_id, org_identifier, status, last_sync_at, last_sync_error, last_successful_sync_at, created_at, updated_at";
+  "id, location_name, location_key, loc_ref, sales_location_ref, auth_server_url, app_server_url, client_id, org_identifier, status, last_sync_at, last_sync_error, last_successful_sync_at, created_at, updated_at";
 
 /**
  * Returns the full status summary for the dashboard freshness bar and settings page.

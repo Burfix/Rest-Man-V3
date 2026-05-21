@@ -12,7 +12,7 @@ import {
   clearLocationTokenCache,
 } from "@/lib/micros/location-auth";
 import {
-  getLocationConfigByOrgIdentifier,
+  getLocationConfigForConnection,
   type LocationConfig,
 } from "@/lib/micros/micros-location-registry";
 import { logger } from "@/lib/logger";
@@ -338,12 +338,16 @@ export interface SimphonySalesIntervalsResponse {
 export function buildSimphonyClient(connection: {
   app_server_url: string;
   org_identifier: string;
+  location_key?: string | null;
 }): SimphonyClient {
-  // Resolve per-org credentials from the location registry.
-  // When found: SimphonyClient uses acquireLocationToken() → isolated per-org
-  // token cache → prevents Oracle 33102 "org identity mismatch" across tenants.
-  // When null: falls back to global getMicrosIdToken() with a warning.
-  const locationConfig = getLocationConfigByOrgIdentifier(connection.org_identifier);
+  // Resolve per-org credentials using location_key when available (exact routing),
+  // otherwise falls back to org_identifier disambiguation.
+  // This prevents Oracle 33102 "org identity mismatch" and handles the SCS
+  // ambiguity (Si Cantina + Sea Castle both have org_identifier=SCS).
+  const locationConfig = getLocationConfigForConnection({
+    org_identifier: connection.org_identifier,
+    location_key:   connection.location_key,
+  });
 
   if (!locationConfig) {
     logger.warn("[buildSimphonyClient] org_identifier not found in location registry", {
