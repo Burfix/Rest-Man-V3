@@ -5,17 +5,16 @@ describe("formatAlertMessage", () => {
   const base = {
     siteName:  "Test Site",
     severity:  "critical" as const,
-    alertType: "labour" as const,
     title:     "Labour over threshold",
     message:   "Labour cost at 45%, threshold is 38%.",
-    shortId:   "abc12345",
+    alertId:   "abc12345-0000-0000-0000-000000000000",
   };
 
   it("includes all required sections", () => {
     const text = formatAlertMessage(base);
     expect(text).toContain("[ForgeStack Alert]");
     expect(text).toContain("Test Site");
-    expect(text).toContain("CRITICAL");
+    expect(text).toContain("Critical");
     expect(text).toContain("Labour over threshold");
     expect(text).toContain("Labour cost at 45%");
     expect(text).toContain("ACK-abc12345");
@@ -43,7 +42,7 @@ describe("parseAckReply", () => {
   it("parses bare ACK (no id)", () => {
     const r = parseAckReply("ACK");
     expect(r.isAck).toBe(true);
-    expect(r.shortId).toBeUndefined();
+    expect(r.shortId).toBeNull();
   });
 
   it("returns isAck=false for non-ACK messages", () => {
