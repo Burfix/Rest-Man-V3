@@ -45,7 +45,7 @@ export default async function AlertsPage({
   const [contactsRes, alertsRes, sitesRes] = await Promise.allSettled([
     db
       .from("manager_contacts")
-      .select("id, name, role, phone_whatsapp, is_active, alert_preferences")
+      .select("id, site_id, name, role, phone_whatsapp, is_active, alert_preferences, created_at, updated_at")
       .eq("site_id",   siteId)
       .eq("is_active", true)
       .order("name"),
