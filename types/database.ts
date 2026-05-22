@@ -2392,6 +2392,106 @@ export interface Database {
         };
         Relationships: [];
       };
+
+      manager_contacts: {
+        Row: {
+          id: string;
+          site_id: string;
+          name: string;
+          role: string;
+          phone_whatsapp: string;
+          is_active: boolean;
+          alert_preferences: Record<string, unknown> | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          name: string;
+          role: string;
+          phone_whatsapp: string;
+          is_active?: boolean;
+          alert_preferences?: Record<string, unknown> | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          site_id?: string;
+          name?: string;
+          role?: string;
+          phone_whatsapp?: string;
+          is_active?: boolean;
+          alert_preferences?: Record<string, unknown> | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+
+      manager_alerts: {
+        Row: {
+          id: string;
+          site_id: string;
+          manager_id: string;
+          alert_type: string;
+          severity: string;
+          source: string;
+          title: string;
+          message: string;
+          incident_id: string | null;
+          status: string;
+          whatsapp_message_id: string | null;
+          sent_at: string | null;
+          failed_reason: string | null;
+          retry_count: number;
+          acknowledged_at: string | null;
+          acknowledged_by: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          manager_id: string;
+          alert_type: string;
+          severity?: string;
+          source?: string;
+          title: string;
+          message: string;
+          incident_id?: string | null;
+          status?: string;
+          whatsapp_message_id?: string | null;
+          sent_at?: string | null;
+          failed_reason?: string | null;
+          retry_count?: number;
+          acknowledged_at?: string | null;
+          acknowledged_by?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          site_id?: string;
+          manager_id?: string;
+          alert_type?: string;
+          severity?: string;
+          source?: string;
+          title?: string;
+          message?: string;
+          incident_id?: string | null;
+          status?: string;
+          whatsapp_message_id?: string | null;
+          sent_at?: string | null;
+          failed_reason?: string | null;
+          retry_count?: number;
+          acknowledged_at?: string | null;
+          acknowledged_by?: string | null;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
