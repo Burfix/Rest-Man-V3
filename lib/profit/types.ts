@@ -41,6 +41,8 @@ export interface ProfitBridgeLine {
   /** true = revenue (positive bar), false = deduction (negative bar) */
   isRevenue: boolean;
   isEstimated: boolean;
+  /** Optional tooltip shown on the bridge row (e.g. for allocated overhead lines) */
+  tooltip?: string;
 }
 
 export interface ProfitBridge {
@@ -115,6 +117,10 @@ export interface ProfitIntelligenceResult {
   profitBridge: ProfitBridge;
   keyDrivers: ProfitLeak[];
   recommendedActions: ProfitAction[];
+
+  // ── Overhead metadata
+  /** 'allocation' when overhead comes from site_overhead_allocations; 'estimate' from profit_settings */
+  overheadSource: 'allocation' | 'estimate';
 
   // ── Data quality
   confidenceLevel: ConfidenceLevel;

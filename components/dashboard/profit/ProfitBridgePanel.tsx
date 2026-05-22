@@ -40,6 +40,15 @@ function BridgeRow({
               Est
             </span>
           )}
+          {line.tooltip && (
+            <span
+              title={line.tooltip}
+              className="inline-flex items-center justify-center w-3.5 h-3.5 rounded-full border border-stone-400 dark:border-stone-500 text-[9px] font-bold text-stone-500 dark:text-stone-400 cursor-help leading-none shrink-0"
+              aria-label={line.tooltip}
+            >
+              i
+            </span>
+          )}
         </div>
       </div>
 

@@ -299,6 +299,81 @@ async function loadFoodCostData(
   return { estimatedFoodCost: null, foodCostPct: null, estimatedWaste: null, inventoryAvailable: false, isEstimated: true };
 }
 
+// ── Overhead allocation loader ────────────────────────────────────────────────
+// Reads site_overhead_allocations and returns a period-scaled overhead amount.
+// Returns null when the site has no allocation rows — engine falls back to
+// profit_settings.daily_overhead_estimate in that case.
+
+interface OverheadAllocation {
+  periodAmount: number;
+  monthlyTotal: number;
+  overheadLabel: 'Fixed Overheads';
+  source: 'allocation';
+}
+
+/**
+ * Pure helper: given a monthly overhead total, compute the period-scaled amount.
+ * Exported for unit-test convenience.
+ */
+export function computeOverheadForRange(
+  monthlyTotal: number,
+  monthNumber: number,   // 1-12
+  year: number,
+  dateRange: ProfitDateRange,
+): number {
+  // Actual calendar days in this month for the given year (handles leap years)
+  const daysInMonth = new Date(year, monthNumber, 0).getDate();
+  const dailyRate   = monthlyTotal / daysInMonth;
+
+  switch (dateRange) {
+    case 'today':
+    case 'yesterday':
+      return Math.round(dailyRate * 100) / 100;
+    case '7d':
+      return Math.round(dailyRate * 7 * 100) / 100;
+    case 'mtd': {
+      const today = new Date();
+      return Math.round(dailyRate * today.getDate() * 100) / 100;
+    }
+    default:
+      return Math.round(monthlyTotal * 100) / 100;
+  }
+}
+
+async function loadOverheadAllocation(
+  siteId: string,
+  dateRange: ProfitDateRange,
+  from: string,
+): Promise<OverheadAllocation | null> {
+  const supabase = createServerClient();
+
+  // Determine the reference month from the 'from' date
+  const fromDate    = new Date(from + 'T00:00:00');
+  const monthNumber = fromDate.getMonth() + 1; // 1-based
+  const year        = fromDate.getFullYear();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
+    .from('site_overhead_allocations')
+    .select('monthly_amount')
+    .eq('site_id', siteId)
+    .eq('month_number', monthNumber) as { data: Array<{ monthly_amount: number }> | null; error: unknown };
+
+  if (error || !data || data.length === 0) return null;
+
+  const monthlyTotal = data.reduce((s, r) => s + Number(r.monthly_amount), 0);
+  if (monthlyTotal <= 0) return null;
+
+  const periodAmount = computeOverheadForRange(monthlyTotal, monthNumber, year, dateRange);
+
+  return {
+    periodAmount,
+    monthlyTotal:  Math.round(monthlyTotal  * 100) / 100,
+    overheadLabel: 'Fixed Overheads',
+    source:        'allocation',
+  };
+}
+
 // ── Profit at risk ────────────────────────────────────────────────────────────
 
 function calcProfitAtRisk(
@@ -338,8 +413,10 @@ function buildProfitBridge(
   labourCost: number | null,
   estimatedFoodCost: number | null,
   estimatedWaste: number | null,
-  dailyOverhead: number,
+  effectiveOverhead: number,
   foodCostIsEstimated: boolean,
+  overheadLabel: string,
+  overheadTooltip: string | undefined,
 ): ProfitBridge {
   const lines: ProfitBridgeLine[] = [];
 
@@ -352,11 +429,12 @@ function buildProfitBridge(
   if (estimatedFoodCost != null) {
     lines.push({ label: foodCostIsEstimated ? "Food Cost (Estimated)" : "Food Cost", amount: -estimatedFoodCost, isRevenue: false, isEstimated: foodCostIsEstimated });
   }
+  // Order: Net Revenue / Labour Cost / Food Cost / Fixed Overheads / Waste Estimate
+  if (effectiveOverhead > 0) {
+    lines.push({ label: overheadLabel, amount: -effectiveOverhead, isRevenue: false, isEstimated: false, tooltip: overheadTooltip });
+  }
   if (estimatedWaste != null && estimatedWaste > 0) {
     lines.push({ label: "Waste Estimate", amount: -estimatedWaste, isRevenue: false, isEstimated: true });
-  }
-  if (dailyOverhead > 0) {
-    lines.push({ label: "Daily Overhead", amount: -dailyOverhead, isRevenue: false, isEstimated: false });
   }
 
   const operatingProfitEstimate =
@@ -364,7 +442,7 @@ function buildProfitBridge(
     (labourCost ?? 0) -
     (estimatedFoodCost ?? 0) -
     (estimatedWaste ?? 0) -
-    dailyOverhead;
+    effectiveOverhead;
 
   return { lines, operatingProfitEstimate };
 }
@@ -474,6 +552,15 @@ export async function getProfitIntelligence(
     loadProfitSettings(siteId),
   ]);
 
+  // Resolve overhead: allocation table takes priority over profit_settings estimate
+  const overheadAlloc = await loadOverheadAllocation(siteId, dateRange, from);
+  const effectiveOverhead = overheadAlloc?.periodAmount ?? settings.dailyOverheadEstimate;
+  const overheadLabel     = overheadAlloc ? 'Fixed Overheads'  : 'Daily Overhead';
+  const overheadSource    = overheadAlloc ? 'allocation' as const : 'estimate' as const;
+  const overheadTooltip   = overheadAlloc
+    ? 'Overheads are based on monthly allocation from annual cost plan.'
+    : undefined;
+
   const sales = await loadSalesData(siteId, from, to);
   const labour = await loadLabourData(sales.locRef, siteId, from, to, sales.revenue);
   const foodCost = await loadFoodCostData(siteId, from, to, sales.revenue, settings.targetFoodCostPct);
@@ -495,7 +582,7 @@ export async function getProfitIntelligence(
         (labour.labourCost ?? 0) -
         (foodCost.estimatedFoodCost ?? 0) -
         (foodCost.estimatedWaste ?? 0) -
-        settings.dailyOverheadEstimate
+        effectiveOverhead
       : null;
 
   // Profit at risk
@@ -509,7 +596,7 @@ export async function getProfitIntelligence(
     targetRevenue,
     labour.labourCost,
     foodCost.estimatedFoodCost,
-    settings.dailyOverheadEstimate,
+    effectiveOverhead,
   );
 
   const profitBridge = buildProfitBridge(
@@ -517,8 +604,10 @@ export async function getProfitIntelligence(
     labour.labourCost,
     foodCost.estimatedFoodCost,
     foodCost.estimatedWaste,
-    settings.dailyOverheadEstimate,
+    effectiveOverhead,
     foodCost.isEstimated,
+    overheadLabel,
+    overheadTooltip,
   );
 
   const leaks = detectProfitLeaks({
@@ -564,7 +653,8 @@ export async function getProfitIntelligence(
     foodCostPct: foodCost.foodCostPct,
     estimatedWaste: foodCost.estimatedWaste,
     discountsComps: sales.discountsComps,
-    dailyOverhead: settings.dailyOverheadEstimate > 0 ? settings.dailyOverheadEstimate : null,
+    dailyOverhead: effectiveOverhead > 0 ? effectiveOverhead : null,
+    overheadSource,
     grossProfit,
     grossMarginPct,
     operatingProfitEstimate,

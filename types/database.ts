@@ -2492,6 +2492,61 @@ export interface Database {
         };
         Relationships: [];
       };
+      site_overhead_allocations: {
+        Row: {
+          id: string;
+          site_id: string;
+          cost_bucket: string;
+          annual_amount: number;
+          month_number: number;
+          month_name: string;
+          monthly_amount: number;
+          daily_amount: number;
+          weekly_amount: number;
+          is_fixed: boolean;
+          source: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          site_id: string;
+          cost_bucket: string;
+          annual_amount: number;
+          month_number: number;
+          month_name: string;
+          monthly_amount: number;
+          daily_amount: number;
+          weekly_amount: number;
+          is_fixed?: boolean;
+          source?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          site_id?: string;
+          cost_bucket?: string;
+          annual_amount?: number;
+          month_number?: number;
+          month_name?: string;
+          monthly_amount?: number;
+          daily_amount?: number;
+          weekly_amount?: number;
+          is_fixed?: boolean;
+          source?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "site_overhead_allocations_site_id_fkey";
+            columns: ["site_id"];
+            referencedRelation: "sites";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;
