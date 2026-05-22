@@ -117,7 +117,9 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
     return { ok: false, error: "Alert not found" };
   }
 
-  const manager = (alert as { manager?: { name: string; phone_whatsapp: string; is_active: boolean } }).manager;
+  // Cast to include all ManagerAlert fields plus the nested manager relationship
+  const typedAlert = alert as ManagerAlert & { manager?: { name: string; phone_whatsapp: string; is_active: boolean } };
+  const manager = typedAlert.manager;
 
   if (!manager) {
     return { ok: false, error: "Manager contact not found" };
@@ -126,7 +128,7 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
   if (!manager.is_active) {
     logger.info("[ManagerAlertService] manager is inactive — skipping delivery", {
       alertId,
-      manager_id: alert.manager_id,
+      manager_id: typedAlert.manager_id,
     });
     await db
       .from("manager_alerts")
@@ -136,11 +138,11 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
   }
 
   // 2. Dedup check — same manager + alert_type + site within 30 minutes
-  if (alert.status !== "pending" && alert.status !== "failed") {
+  if (typedAlert.status !== "pending" && typedAlert.status !== "failed") {
     return {
       ok:      false,
       skipped: true,
-      reason:  `Alert already in status '${alert.status}'`,
+      reason:  `Alert already in status '${typedAlert.status}'`,
     };
   }
 
@@ -151,18 +153,18 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
   const { count: recentCount } = await db
     .from("manager_alerts")
     .select("id", { count: "exact", head: true })
-    .eq("manager_id",  alert.manager_id)
-    .eq("alert_type",  alert.alert_type)
-    .eq("site_id",     alert.site_id)
+    .eq("manager_id",  typedAlert.manager_id)
+    .eq("alert_type",  typedAlert.alert_type)
+    .eq("site_id",     typedAlert.site_id)
     .eq("status",      "sent")
     .neq("id",         alertId)
     .gte("sent_at",    dedupSince);
 
-  if ((recentCount ?? 0) > 0 && alert.retry_count === 0) {
+  if ((recentCount ?? 0) > 0 && typedAlert.retry_count === 0) {
     logger.info("[ManagerAlertService] dedup — skipping re-send within window", {
       alertId,
-      manager_id: alert.manager_id,
-      alert_type: alert.alert_type,
+      manager_id: typedAlert.manager_id,
+      alert_type: typedAlert.alert_type,
       window_minutes: DEDUP_WINDOW_MINUTES,
     });
     return {
@@ -176,7 +178,7 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
   const { data: site } = await db
     .from("sites")
     .select("name")
-    .eq("id", alert.site_id)
+    .eq("id", typedAlert.site_id)
     .single();
 
   const siteName = site?.name ?? "Your Site";
@@ -184,10 +186,10 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
   // 4. Format message
   const body = formatAlertMessage({
     siteName,
-    severity:  alert.severity as "info" | "warning" | "critical",
-    title:     alert.title,
-    message:   alert.message,
-    alertId:   alert.id,
+    severity:  typedAlert.severity as "info" | "warning" | "critical",
+    title:     typedAlert.title,
+    message:   typedAlert.message,
+    alertId:   typedAlert.id,
     timestamp: new Date().toISOString(),
   });
 
@@ -203,7 +205,7 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
       .update({
         status:        "failed",
         failed_reason: "WHATSAPP_NOT_CONFIGURED: Missing env vars",
-        retry_count:   (alert.retry_count ?? 0) + 1,
+        retry_count:   (typedAlert.retry_count ?? 0) + 1,
       })
       .eq("id", alertId);
     return { ok: false, error: "WhatsApp provider not configured" };
@@ -242,7 +244,7 @@ export async function sendManagerAlert(alertId: string): Promise<SendAlertResult
       .update({
         status:        "failed",
         failed_reason: errMsg.slice(0, 500),
-        retry_count:   (alert.retry_count ?? 0) + 1,
+        retry_count:   (typedAlert.retry_count ?? 0) + 1,
       })
       .eq("id", alertId);
 
