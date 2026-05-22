@@ -52,6 +52,9 @@ export const PERMISSIONS = {
 
   // Reviews
   RESPOND_TO_REVIEWS:       "respond_to_reviews",
+
+  // Daily operations (alerts, ops console)
+  MANAGE_DAILY_OPS:         "manage_daily_ops",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -68,6 +71,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.VIEW_COMPLIANCE,
     PERMISSIONS.VIEW_CONTRACTOR_TICKETS,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.MANAGE_DAILY_OPS,
   ],
 
   head_office: [
@@ -91,6 +95,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.RUN_INTEGRATION_SYNC,
     PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.MANAGE_DAILY_OPS,
   ],
 
   auditor: [
@@ -121,6 +126,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.RUN_INTEGRATION_SYNC,
     PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.MANAGE_DAILY_OPS,
   ],
 
   gm: [
@@ -139,6 +145,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     PERMISSIONS.RUN_INTEGRATION_SYNC,
     PERMISSIONS.SYNC_INVENTORY,
     PERMISSIONS.RESPOND_TO_REVIEWS,
+    PERMISSIONS.MANAGE_DAILY_OPS,
   ],
 
   supervisor: [
