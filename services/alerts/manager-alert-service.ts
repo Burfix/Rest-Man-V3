@@ -63,15 +63,17 @@ export async function createManagerAlert(
     throw new Error(`Failed to create manager alert: ${error?.message ?? "unknown"}`);
   }
 
+  const alertRow = data as ManagerAlert;
+
   logger.info("[ManagerAlertService] alert created", {
-    id:         data.id,
-    site_id:    data.site_id,
-    manager_id: data.manager_id,
-    alert_type: data.alert_type,
-    severity:   data.severity,
+    id:         alertRow.id,
+    site_id:    alertRow.site_id,
+    manager_id: alertRow.manager_id,
+    alert_type: alertRow.alert_type,
+    severity:   alertRow.severity,
   });
 
-  return data as ManagerAlert;
+  return alertRow;
 }
 
 // ── Send alert via WhatsApp ────────────────────────────────────────────────────
@@ -380,7 +382,8 @@ export async function acknowledgeViaWebhook(
       .limit(1)
       .single();
 
-    alertId = data?.id ?? null;
+    const alert = data as { id: string; manager_id: string } | null;
+    alertId = alert?.id ?? null;
   }
 
   if (!alertId) {
@@ -393,17 +396,19 @@ export async function acknowledgeViaWebhook(
       .limit(1)
       .single();
 
-    if (contact) {
+    const contactRow = contact as { id: string } | null;
+    if (contactRow) {
       const { data: recentAlert } = await db
         .from("manager_alerts")
         .select("id")
-        .eq("manager_id", contact.id)
+        .eq("manager_id", contactRow.id)
         .in("status", ["sent", "pending"])
         .order("sent_at", { ascending: false })
         .limit(1)
         .single();
 
-      alertId = recentAlert?.id ?? null;
+      const alertRow = recentAlert as { id: string } | null;
+      alertId = alertRow?.id ?? null;
     }
   }
 
