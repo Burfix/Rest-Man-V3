@@ -125,14 +125,14 @@ CREATE POLICY manager_alerts_hq_all
   FOR ALL
   TO authenticated
   USING (
-    fs_user_can_access_site(auth.uid(), site_id)
+    fs_user_can_access_site(site_id)
     AND (
       (auth.jwt() -> 'user_metadata' ->> 'role') IN
         ('super_admin', 'executive', 'head_office', 'area_manager')
     )
   )
   WITH CHECK (
-    fs_user_can_access_site(auth.uid(), site_id)
+    fs_user_can_access_site(site_id)
     AND (
       (auth.jwt() -> 'user_metadata' ->> 'role') IN
         ('super_admin', 'executive', 'head_office', 'area_manager')
@@ -146,7 +146,7 @@ CREATE POLICY manager_alerts_site_read
   FOR SELECT
   TO authenticated
   USING (
-    fs_user_can_access_site(auth.uid(), site_id)
+    fs_user_can_access_site(site_id)
     AND (
       (auth.jwt() -> 'user_metadata' ->> 'role') IN ('gm', 'supervisor')
     )
