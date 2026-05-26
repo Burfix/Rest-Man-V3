@@ -21,9 +21,17 @@
 -- Tenant isolation: RLS enforced by site_id.
 -- ============================================================
 
+-- ── Idempotent teardown (safe re-run after any partial failure) ───────────────
+
+drop policy if exists "action_events_site_select" on public.action_events;
+drop policy if exists "action_events_site_insert" on public.action_events;
+drop policy if exists "action_events_own_update"  on public.action_events;
+drop trigger if exists action_events_set_updated_at on public.action_events;
+drop table if exists public.action_events cascade;
+
 -- ── Table ────────────────────────────────────────────────────────────────────
 
-create table if not exists public.action_events (
+create table public.action_events (
   id               uuid        primary key default gen_random_uuid(),
   site_id          uuid        not null references public.sites(id) on delete cascade,
   risk_id          text        not null,          -- e.g. "risk-revenue", "risk-labour"
@@ -38,13 +46,13 @@ create table if not exists public.action_events (
 -- ── Indexes ───────────────────────────────────────────────────────────────────
 
 -- Primary query patterns: by site for daily review, by risk_id for effectiveness
-create index if not exists action_events_site_id_idx
+create index action_events_site_id_idx
   on public.action_events (site_id, created_at desc);
 
-create index if not exists action_events_risk_id_idx
+create index action_events_risk_id_idx
   on public.action_events (site_id, risk_id, created_at desc);
 
-create index if not exists action_events_actioned_by_idx
+create index action_events_actioned_by_idx
   on public.action_events (actioned_by, created_at desc);
 
 -- ── Auto-update updated_at ─────────────────────────────────────────────────
@@ -64,6 +72,14 @@ create trigger action_events_set_updated_at
 -- ── Row Level Security ────────────────────────────────────────────────────────
 
 alter table public.action_events enable row level security;
+
+-- service_role bypass (required for server-side writes)
+create policy "action_events_service_role"
+  on public.action_events
+  for all
+  to service_role
+  using (true)
+  with check (true);
 
 -- GMs can see and insert action events for their own site
 create policy "action_events_site_select"
