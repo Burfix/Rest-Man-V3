@@ -7,11 +7,11 @@
   "crons": [
     {
       "path": "/api/cron/sync-orchestrator",
-      "schedule": "*/30 * * * *"
+      "schedule": "0 2 * * *"
     },
     {
       "path": "/api/cron/brain-dispatch",
-      "schedule": "15,45 * * * *"
+      "schedule": "0 3 * * *"
     },
     {
       "path": "/api/cron/daily-sync",
