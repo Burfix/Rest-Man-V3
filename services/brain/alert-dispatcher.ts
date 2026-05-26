@@ -266,13 +266,13 @@ export async function dispatchBrainAlerts(
   // ── Guard: no alert needed ────────────────────────────────────────────────
   const alertNeeded = brain.primaryThreat.severity === "critical" || brain.primaryThreat.severity === "high";
   if (!alertNeeded) {
-    logger.debug("[BrainDispatcher] alertNeeded=false — skipping", { siteId });
+    logger.info("[BrainDispatcher] alertNeeded=false — skipping", { siteId });
     return { ...base, alertType: null, dispatched: 0, skipped: 0, errors: 0, outcome: "no_alert_needed" };
   }
 
   // ── Guard: sentinel titles ────────────────────────────────────────────────
   if (SENTINEL_TITLES.has(brain.primaryThreat.title)) {
-    logger.debug("[BrainDispatcher] sentinel title — skipping", {
+    logger.info("[BrainDispatcher] sentinel title — skipping", {
       siteId, title: brain.primaryThreat.title,
     });
     return { ...base, alertType: null, dispatched: 0, skipped: 0, errors: 0, outcome: "sentinel_title" };
@@ -280,7 +280,7 @@ export async function dispatchBrainAlerts(
 
   // ── Guard: severity threshold ─────────────────────────────────────────────
   if (!DISPATCH_THRESHOLD.includes(brain.primaryThreat.severity)) {
-    logger.debug("[BrainDispatcher] severity below threshold", {
+    logger.info("[BrainDispatcher] severity below threshold", {
       siteId, severity: brain.primaryThreat.severity,
     });
     return { ...base, alertType: null, dispatched: 0, skipped: 0, errors: 0, outcome: "severity_below_threshold" };
