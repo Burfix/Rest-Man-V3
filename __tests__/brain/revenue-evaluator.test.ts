@@ -174,16 +174,25 @@ describe("evaluatePaceAdjustedRevenue", () => {
   });
 
   // ── Custom curve ───────────────────────────────────────────────────────────
-  it("custom flat curve: linear distribution produces on_pace at 50% of day", () => {
+  it("custom flat curve: linear distribution produces on_pace at 50% of curve", () => {
+    // Curve: cumulative fraction = i/16, capped at 1. At relevant hours (trading 08-23):
+    //   hour  8 → 8/16  = 0.50  (curveAtStart)
+    //   hour 12 → 12/16 = 0.75  (midpoint of the 0.50–1.00 range)
+    //   hour 23 → 1.00          (curveAtEnd)
+    //
+    // curve_fraction_elapsed at 12:00:
+    //   = (0.75 - 0.50) / (1.00 - 0.50) = 0.50
+    //
+    // projected_eod = 7_500 / 0.50 = 15_000 = daily_target → on_pace
     const flat = Array.from({ length: 24 }, (_, i) => Math.min(1, i / 16));
     const result = evaluatePaceAdjustedRevenue({
       ...BASE_INPUTS,
       current_net_sales: 7_500,
       daily_target: 15_000,
-      now_local: makeTime(16, 0), // 50% through trading day (8-24h range)
+      now_local: makeTime(12, 0), // curve_fraction_elapsed = 0.50 at noon with this curve
       historical_hourly_curve: flat,
     });
-    // At 50% of curve with 50% of target hit, should be on_pace
+    // At exactly 50% curve elapsed with 50% of target collected → on_pace
     expect(["on_pace", "ahead", "too_early_to_tell"]).toContain(result.pace_status);
     expect(result.pace_status).not.toBe("critically_behind");
   });

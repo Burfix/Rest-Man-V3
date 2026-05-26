@@ -39,14 +39,14 @@ export async function GET(req: NextRequest) {
 
   const locationKey = req.nextUrl.searchParams.get("locationKey") ?? "";
 
-  if (!isValidLocationKey(locationKey)) {
+  if (!await isValidLocationKey(locationKey)) {
     return NextResponse.json(
-      { error: `Invalid locationKey. Expected one of: si-cantina, primi-camps-bay. Got: ${locationKey}` },
+      { error: `Invalid locationKey: "${locationKey}". Check micros_location_configs table for registered locations.` },
       { status: 400 },
     );
   }
 
-  const cfg = getLocationConfig(locationKey);
+  const cfg = await getLocationConfig(locationKey);
   const summary = safeConfigSummary(cfg);
 
   if (!cfg.configured) {

@@ -134,14 +134,27 @@ export function isAckBreached(
  * Whether the resolution SLA is breached.
  *
  * Breached = resolve threshold exceeded AND incident not yet resolved.
+ *
+ * The resolution clock starts from `acknowledgedAt` when set (the moment an
+ * operator took ownership), otherwise from `createdAt`. This matches the
+ * intent of the SLA: the 4-hour / 8-hour window is an *operator response*
+ * window, not an absolute wall-clock from creation.
+ *
+ * Boundary: exactly AT the threshold is NOT breached (strict >).
  */
 export function isResolutionBreached(
-  incident: Pick<IncidentForSla, "severity" | "status" | "createdAt" | "resolvedAt">,
+  incident: Pick<IncidentForSla, "severity" | "status" | "createdAt" | "resolvedAt" | "acknowledgedAt">,
   now: number = Date.now(),
 ): boolean {
   if (incident.status === "resolved") return false;
   const threshold = SLA_THRESHOLDS[incident.severity] ?? SLA_THRESHOLDS.info;
-  return calculateIncidentAge({ createdAt: incident.createdAt }, now) >= threshold.resolveMinutes;
+  // Resolution clock starts from acknowledgement (if set) so operators are
+  // not penalised for time that elapsed before they could even ack.
+  const startMs = incident.acknowledgedAt
+    ? new Date(incident.acknowledgedAt).getTime()
+    : new Date(incident.createdAt).getTime();
+  const elapsedMin = (now - startMs) / 60_000;
+  return elapsedMin > threshold.resolveMinutes;
 }
 
 /**

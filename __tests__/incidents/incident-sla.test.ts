@@ -138,13 +138,14 @@ describe("isResolutionBreached", () => {
     expect(isResolutionBreached(inc, T0 + 250 * 60_000)).toBe(false);
   });
 
-  it("critical: acknowledged at 10min, now 241min → breached (over 240min)", () => {
+  it("critical: acknowledged at 10min, now 251min → breached (241min since ack, over 240min limit)", () => {
     const inc = {
       ...openIncident("critical"),
       status:         "acknowledged",
       acknowledgedAt: minsAfterT0(10),
     };
-    expect(isResolutionBreached(inc, T0 + 241 * 60_000)).toBe(true);
+    // 251 - 10 = 241 min since ack > 240 min SLA threshold → breached
+    expect(isResolutionBreached(inc, T0 + 251 * 60_000)).toBe(true);
   });
 
   it("resolved incident is never resolution-breached", () => {

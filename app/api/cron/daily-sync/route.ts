@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   if (cfgStatus.enabled && cfgStatus.configured) {
     Promise.resolve().then(async () => {
       // Use per-location configs — each location has its own credentials
-      const allConfigs = getAllLocationConfigs();
+      const allConfigs = await getAllLocationConfigs();
       const enabledConfigs = allConfigs.filter((c) => c.enabled && c.configured);
 
       await Promise.allSettled(

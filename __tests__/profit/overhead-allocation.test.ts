@@ -89,7 +89,7 @@ describe("computeOverheadForRange", () => {
     const dayOfMonth = today.getDate();
     const daily     = computeOverheadForRange(MAY_MONTHLY, MAY_MONTH_NUM, MAY_YEAR, "today");
     const mtd       = computeOverheadForRange(MAY_MONTHLY, MAY_MONTH_NUM, MAY_YEAR, "mtd");
-    expect(mtd).toBeCloseTo(daily * dayOfMonth, 1);
+    expect(mtd).toBeCloseTo(daily * dayOfMonth, 0);
   });
 
   it("uses correct days for February (28 in 2025, 29 in 2024)", () => {

@@ -64,7 +64,7 @@ export async function runGuestChecksHandler(
   let records_skipped = 0;
 
   try {
-    const client = buildSimphonyClient(ctx.connection);
+    const client = await buildSimphonyClient(ctx.connection);
     const response = await client.getGuestChecks(ctx.connection.loc_ref, business_date);
     const checks = response.guestChecks ?? [];
     records_fetched = checks.length;

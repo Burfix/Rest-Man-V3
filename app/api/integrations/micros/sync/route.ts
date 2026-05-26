@@ -35,8 +35,9 @@ export const runtime    = "nodejs";
 export const maxDuration = 60;
 
 const SyncBodySchema = z.object({
-  locationKey:  z.string().refine(isValidLocationKey, {
-    message: "locationKey must be one of: si-cantina, primi-camps-bay",
+  // async refine — isValidLocationKey now queries the DB-backed registry
+  locationKey:  z.string().refine(async (key) => isValidLocationKey(key), {
+    message: "Unknown locationKey. Check micros_location_configs table for registered locations.",
   }),
   businessDate: z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "businessDate must be YYYY-MM-DD format")
@@ -54,7 +55,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const parsed = SyncBodySchema.safeParse(rawBody);
+  // safeParseAsync required because the locationKey refine is async (DB lookup)
+  const parsed = await SyncBodySchema.safeParseAsync(rawBody);
   if (!parsed.success) {
     return NextResponse.json(
       { ok: false, error: "Validation failed", details: parsed.error.flatten().fieldErrors },
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { locationKey, businessDate } = parsed.data;
-  const cfg = getLocationConfig(locationKey);
+  const cfg = await getLocationConfig(locationKey);
 
   if (!cfg.enabled) {
     return NextResponse.json({

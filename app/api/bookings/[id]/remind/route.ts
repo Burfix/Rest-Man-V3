@@ -4,13 +4,16 @@
  * Sends a WhatsApp reminder to the guest for a specific booking.
  * Intended for manual "send reminder now" from the dashboard.
  *
- * Auth: Supabase session (dashboard staff only)
+ * Auth: Requires MANAGE_DAILY_OPS permission (gm, supervisor, head_office,
+ *       area_manager, super_admin). Read-only roles (viewer, contractor,
+ *       auditor) cannot trigger outbound guest communications.
  *
  * Returns: { sent: boolean, reason?: string }
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@/lib/supabase/server";
+import { apiGuard } from "@/lib/auth/api-guard";
+import { PERMISSIONS } from "@/lib/rbac/roles";
 import { getReservationById } from "@/services/bookings/service";
 import { sendBookingReminder } from "@/services/notifications/whatsappBookings";
 
@@ -18,15 +21,12 @@ export async function POST(
   _request: NextRequest,
   { params }: { params: { id: string } }
 ): Promise<NextResponse> {
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const supabase = createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // ── Auth + RBAC ────────────────────────────────────────────────────────────
+  const guard = await apiGuard(PERMISSIONS.MANAGE_DAILY_OPS, "POST /api/bookings/[id]/remind");
+  if (guard.error) return guard.error as unknown as NextResponse;
 
   const reservationId = params.id;
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!reservationId || !UUID_RE.test(reservationId)) {
     return NextResponse.json({ error: "Invalid reservation ID" }, { status: 400 });
   }

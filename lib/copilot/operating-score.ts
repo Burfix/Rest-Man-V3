@@ -74,11 +74,6 @@ export function getCopilotOperatingScore(input: ScoreInput): CopilotOperatingSco
     openIssues:      maintenanceOpenCount,
     criticalIssues:  criticalCount,
   };
-  console.log("SCORE INPUT [lib/copilot/operating-score]:", {
-    ...scoreInput,
-    serviceRawSource: `svcPts=${svcPts}/25 → ${serviceRaw}/100`,
-    revenueTargetZero: revenueTarget === 0,
-  });
   const result = calculateOperatingScore(scoreInput);
 
   const totalScore = result.score;

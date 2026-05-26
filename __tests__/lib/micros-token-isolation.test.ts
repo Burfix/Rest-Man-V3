@@ -8,6 +8,12 @@
  *   "Organization identifier does not match the identity provided"
  *   Caused by global cachedTokens (SCS token) being reused for PRI org.
  *
+ * NOTE (Week 3a — DB-backed registry):
+ *   The registry moved from hardcoded TypeScript to a Supabase table
+ *   (migration 101). This test mocks @supabase/supabase-js so unit tests
+ *   run without a real DB connection. The mock returns the 3 seed rows
+ *   from migration 101. Credential fields still come from env vars.
+ *
  * Tests:
  *   1. getLocationConfigByOrgIdentifier resolves PRI → Primi config
  *   2. getLocationConfigByOrgIdentifier resolves SCS → Si Cantina config
@@ -21,30 +27,124 @@
  *  10. Primo config: authFlow=pkce, username from env, password from CLIENT_SECRET alias
  */
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
+// ── Supabase mock ──────────────────────────────────────────────────────────
+//
+// Mirrors the 3 rows seeded in migration 101_micros_location_registry.sql.
+// Credential fields (username, password, clientSecret) are never stored in
+// the DB — they come from env vars via buildConfigFromRow().
+
+const MOCK_LOCATION_ROWS = [
+  {
+    location_key: "si-cantina",
+    display_name: "Si Cantina Sociale",
+    auth_flow:    "pkce",
+    env_prefix:   "MICROS_",
+    location_ref: null,
+    enabled:      true,
+  },
+  {
+    location_key: "primi-camps-bay",
+    display_name: "Primi Camps Bay",
+    auth_flow:    "pkce",
+    env_prefix:   "MICROS_PRIMI_CAMPS_BAY_",
+    location_ref: null,
+    enabled:      true,
+  },
+  {
+    location_key: "sea-castle-camps-bay",
+    display_name: "Sea Castle Hotel Camps Bay",
+    auth_flow:    "pkce",
+    env_prefix:   "MICROS_",
+    location_ref: "2001002",
+    enabled:      true,
+  },
+];
+
+/**
+ * Chainable Supabase query mock.
+ * Handles the two patterns used by the registry:
+ *   a) .from().select().order()      → awaited directly → { data: rows[], error }
+ *   b) .from().select().eq().maybeSingle() → awaited via method → { data: row|null, error }
+ *   c) .from().select("location_key") → awaited directly → { data: [{location_key}][], error }
+ */
+class MockQueryChain {
+  private rows: typeof MOCK_LOCATION_ROWS;
+  private keysOnly = false;
+
+  constructor(rows: typeof MOCK_LOCATION_ROWS) {
+    this.rows = [...rows];
+  }
+
+  select(cols: string) {
+    // getRegisteredLocationKeys only selects "location_key"
+    if (cols === "location_key") this.keysOnly = true;
+    return this;
+  }
+
+  eq(col: string, val: string) {
+    if (col === "location_key") {
+      this.rows = this.rows.filter((r) => r.location_key === val);
+    }
+    return this;
+  }
+
+  order(_col: string, _opts?: unknown) {
+    return this;
+  }
+
+  // Explicit .maybeSingle() call (getLocationConfig, getRegisteredLocationKeys via isValidLocationKey)
+  async maybeSingle(): Promise<{ data: (typeof MOCK_LOCATION_ROWS)[0] | null; error: null }> {
+    return { data: this.rows[0] ?? null, error: null };
+  }
+
+  // Implicit await (getAllLocationConfigs, getRegisteredLocationKeys)
+  then(
+    resolve: (val: { data: unknown[]; error: null }) => unknown,
+    _reject?: (reason: unknown) => unknown,
+  ) {
+    const data = this.keysOnly
+      ? this.rows.map((r) => ({ location_key: r.location_key }))
+      : (this.rows as unknown[]);
+    return Promise.resolve({ data, error: null }).then(resolve);
+  }
+}
+
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({
+    from: (_table: string) => new MockQueryChain(MOCK_LOCATION_ROWS),
+  })),
+}));
 
 // ── Env fixture helpers ────────────────────────────────────────────────────
 
 const PRIMI_ENV: Record<string, string> = {
-  MICROS_PRIMI_CAMPS_BAY_ENABLED:       "true",
-  MICROS_PRIMI_CAMPS_BAY_ENTERPRISE:    "PRI",
-  MICROS_PRIMI_CAMPS_BAY_AUTH_URL:      "https://pri-ors-idm.msaf.oraclerestaurants.com",
-  MICROS_PRIMI_CAMPS_BAY_BASE_URL:      "https://pri-simphony.msaf.oraclerestaurants.com",
-  MICROS_PRIMI_CAMPS_BAY_CLIENT_ID:     "PRI.d5f87b3e-c82b-434d-996e-c975ef5c7eaa",
-  MICROS_PRIMI_CAMPS_BAY_USERNAME:      "PRI_BIAPI_USER",
-  MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET: "pri-secret-value",
-  MICROS_PRIMI_CAMPS_BAY_LOCATION_REF:  "101003",
+  MICROS_PRIMI_CAMPS_BAY_ENABLED:         "true",
+  MICROS_PRIMI_CAMPS_BAY_ORG_SHORT_NAME:  "PRI",
+  MICROS_PRIMI_CAMPS_BAY_AUTH_URL:        "https://pri-ors-idm.msaf.oraclerestaurants.com",
+  MICROS_PRIMI_CAMPS_BAY_BI_SERVER:       "https://pri-simphony.msaf.oraclerestaurants.com",
+  MICROS_PRIMI_CAMPS_BAY_CLIENT_ID:       "PRI.d5f87b3e-c82b-434d-996e-c975ef5c7eaa",
+  MICROS_PRIMI_CAMPS_BAY_USERNAME:        "PRI_BIAPI_USER",
+  // PKCE flow reads {prefix}PASSWORD — never CLIENT_SECRET (that is OAuth2 client_credentials only)
+  MICROS_PRIMI_CAMPS_BAY_PASSWORD:        "pri-secret-value",
+  MICROS_PRIMI_CAMPS_BAY_LOCATION_REF:    "101003",
 };
 
 const SI_CANTINA_ENV: Record<string, string> = {
-  MICROS_ENABLED:       "true",
-  MICROS_AUTH_SERVER:   "https://scs-ors-idm.msaf.oraclerestaurants.com",
-  MICROS_BI_SERVER:     "https://scs-simphony.msaf.oraclerestaurants.com",
-  MICROS_CLIENT_ID:     "SCS.a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-  MICROS_ORG_SHORT_NAME:"SCS",
-  MICROS_USERNAME:      "SCS_BIAPI_USER",
-  MICROS_PASSWORD:      "scs-api-password",
-  MICROS_LOCATION_REF:  "200100",
+  MICROS_ENABLED:        "true",
+  MICROS_AUTH_URL:       "https://scs-ors-idm.msaf.oraclerestaurants.com",
+  MICROS_BI_SERVER:      "https://scs-simphony.msaf.oraclerestaurants.com",
+  MICROS_CLIENT_ID:      "SCS.a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  MICROS_ORG_SHORT_NAME: "SCS",
+  MICROS_USERNAME:       "SCS_BIAPI_USER",
+  MICROS_PASSWORD:       "scs-api-password",
+  MICROS_LOCATION_REF:   "200100",
+};
+
+const SEA_CASTLE_ENV: Record<string, string> = {
+  MICROS_SEA_CASTLE_ENABLED:      "true",
+  MICROS_SEA_CASTLE_LOCATION_REF: "2001002",
 };
 
 function setEnv(vars: Record<string, string>) {
@@ -71,7 +171,7 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigByOrgIdentifier("PRI");
+    const cfg = await getLocationConfigByOrgIdentifier("PRI");
     expect(cfg).not.toBeNull();
     expect(cfg!.key).toBe("primi-camps-bay");
     expect(cfg!.enterpriseShortName).toBe("PRI");
@@ -82,7 +182,7 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigByOrgIdentifier("SCS");
+    const cfg = await getLocationConfigByOrgIdentifier("SCS");
     expect(cfg).not.toBeNull();
     expect(cfg!.key).toBe("si-cantina");
     expect(cfg!.enterpriseShortName).toBe("SCS");
@@ -92,7 +192,7 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigByOrgIdentifier("pri");
+    const cfg = await getLocationConfigByOrgIdentifier("pri");
     expect(cfg).not.toBeNull();
     expect(cfg!.key).toBe("primi-camps-bay");
   });
@@ -101,7 +201,7 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigByOrgIdentifier("UNKNOWN_ORG");
+    const cfg = await getLocationConfigByOrgIdentifier("UNKNOWN_ORG");
     expect(cfg).toBeNull();
   });
 
@@ -109,19 +209,19 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const primi = getLocationConfigByOrgIdentifier("PRI");
-    const scs   = getLocationConfigByOrgIdentifier("SCS");
+    const primi = await getLocationConfigByOrgIdentifier("PRI");
+    const scs   = await getLocationConfigByOrgIdentifier("SCS");
     expect(primi!.key).not.toBe(scs!.key);
   });
 
-  it("Primi credentials use MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET as password", async () => {
+  it("Primi credentials use MICROS_PRIMI_CAMPS_BAY_PASSWORD as password (not CLIENT_SECRET)", async () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigByOrgIdentifier("PRI");
-    // password field holds the PKCE account password (stored as CLIENT_SECRET for compat)
+    const cfg = await getLocationConfigByOrgIdentifier("PRI");
+    // password field is read from {prefix}PASSWORD — PKCE account credential
     expect(cfg!.password).toBe("pri-secret-value");
-    // clientSecret should be null for PKCE flow (no OAuth2 client secret needed)
+    // clientSecret is null for PKCE flow — CLIENT_SECRET env var is for client_credentials only
     expect(cfg!.clientSecret).toBeNull();
   });
 
@@ -129,7 +229,7 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const scs = getLocationConfigByOrgIdentifier("SCS");
+    const scs = await getLocationConfigByOrgIdentifier("SCS");
     expect(scs!.username).toBe("SCS_BIAPI_USER");
     expect(scs!.username).not.toBe("PRI_BIAPI_USER");
     expect(scs!.authUrl).not.toContain("pri-");
@@ -138,10 +238,10 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
 
 describe("Token isolation — per-location cache (location-auth.ts)", () => {
   it("cache keys for SCS and PRI are different (different LocationKey strings)", () => {
-    // LocationKey is the cache key for location-auth.ts tokenCache Map.
+    // LocationKey = string (was union of 3 literals in pre-Week3 code).
     // Verify the keys are distinct so clearing one never affects the other.
-    const priKey:  "primi-camps-bay"       = "primi-camps-bay";
-    const scsKey:  "si-cantina"            = "si-cantina";
+    const priKey  = "primi-camps-bay";
+    const scsKey  = "si-cantina";
     expect(priKey).not.toBe(scsKey);
   });
 
@@ -230,11 +330,6 @@ describe("Token isolation — per-location cache (location-auth.ts)", () => {
 // identical credentials. getLocationConfigForConnection() must disambiguate
 // them via location_key and fall back gracefully when location_key is absent.
 
-const SEA_CASTLE_ENV: Record<string, string> = {
-  MICROS_SEA_CASTLE_ENABLED:      "true",
-  MICROS_SEA_CASTLE_LOCATION_REF: "2001002",
-};
-
 describe("SCS disambiguation — getLocationConfigForConnection", () => {
   beforeEach(() => {
     clearEnv({ ...PRIMI_ENV, ...SI_CANTINA_ENV, ...SEA_CASTLE_ENV });
@@ -249,7 +344,7 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     const { getLocationConfigForConnection } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigForConnection({
+    const cfg = await getLocationConfigForConnection({
       org_identifier: "SCS",
       location_key:   "sea-castle-camps-bay",
     });
@@ -262,7 +357,7 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     const { getLocationConfigForConnection } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigForConnection({
+    const cfg = await getLocationConfigForConnection({
       org_identifier: "SCS",
       location_key:   "si-cantina",
     });
@@ -277,7 +372,7 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     );
     // Both Si Cantina and Sea Castle are SCS with identical credentials.
     // The resolver must NOT throw — it should return one of them.
-    const cfg = getLocationConfigForConnection({ org_identifier: "SCS" });
+    const cfg = await getLocationConfigForConnection({ org_identifier: "SCS" });
     expect(cfg).not.toBeNull();
     expect(cfg!.enterpriseShortName).toBe("SCS");
     // Token produced by either config is identical (same Oracle org + credentials).
@@ -287,7 +382,7 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     const { getLocationConfigForConnection } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigForConnection({ org_identifier: "PRI" });
+    const cfg = await getLocationConfigForConnection({ org_identifier: "PRI" });
     expect(cfg).not.toBeNull();
     expect(cfg!.key).toBe("primi-camps-bay");
     expect(cfg!.enterpriseShortName).toBe("PRI");
@@ -297,7 +392,7 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     const { getLocationConfigForConnection } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const cfg = getLocationConfigForConnection({ org_identifier: "UNKNOWN_ORG" });
+    const cfg = await getLocationConfigForConnection({ org_identifier: "UNKNOWN_ORG" });
     expect(cfg).toBeNull();
   });
 
@@ -305,9 +400,9 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     const { getLocationConfigForConnection } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    // 'not-a-real-key' is not a valid LocationKey → isValidLocationKey returns false
+    // 'not-a-real-key' is not a registered LocationKey → isValidLocationKey returns false
     // → falls through to org_identifier path
-    const cfg = getLocationConfigForConnection({
+    const cfg = await getLocationConfigForConnection({
       org_identifier: "PRI",
       location_key:   "not-a-real-key",
     });
@@ -319,11 +414,11 @@ describe("SCS disambiguation — getLocationConfigForConnection", () => {
     const { getLocationConfigForConnection } = await import(
       "../../lib/micros/micros-location-registry"
     );
-    const scs = getLocationConfigForConnection({
+    const scs = await getLocationConfigForConnection({
       org_identifier: "SCS",
       location_key:   "si-cantina",
     });
-    const sc = getLocationConfigForConnection({
+    const sc = await getLocationConfigForConnection({
       org_identifier: "SCS",
       location_key:   "sea-castle-camps-bay",
     });
@@ -352,29 +447,29 @@ describe("buildSimphonyClient — registry fallback for empty DB fields", () => 
     // Sea Castle DB pattern from migration 082: app_server_url='' and
     // org_identifier='' stored as empty — config lives in env vars only.
     const { buildSimphonyClient } = await import("../../lib/sync/simphony-client");
-    expect(() =>
+    await expect(
       buildSimphonyClient({
         app_server_url: "",
         org_identifier: "",
         location_key:   "sea-castle-camps-bay",
       })
-    ).not.toThrow();
+    ).resolves.toBeDefined();
   });
 
   it("throws MICROS_LOCATION_CONFIG_MISSING when fields are empty and org is unregistered", async () => {
     const { buildSimphonyClient } = await import("../../lib/sync/simphony-client");
-    expect(() =>
+    await expect(
       buildSimphonyClient({
         app_server_url: "",
         org_identifier: "UNREGISTERED_ORG",
       })
-    ).toThrow("MICROS_LOCATION_CONFIG_MISSING");
+    ).rejects.toThrow("MICROS_LOCATION_CONFIG_MISSING");
   });
 
   it("Sea Castle and Si Cantina share auth credentials — tokens are interchangeable", async () => {
     const { getLocationConfig } = await import("../../lib/micros/micros-location-registry");
-    const scs = getLocationConfig("si-cantina");
-    const sc  = getLocationConfig("sea-castle-camps-bay");
+    const scs = await getLocationConfig("si-cantina");
+    const sc  = await getLocationConfig("sea-castle-camps-bay");
     // Same Oracle enterprise — same auth server, client ID, and API account
     expect(sc.authUrl).toBe(scs.authUrl);
     expect(sc.clientId).toBe(scs.clientId);
@@ -389,11 +484,10 @@ describe("buildSimphonyClient — registry fallback for empty DB fields", () => 
   });
 
   it("Sea Castle and Si Cantina have distinct token cache keys", () => {
-    // LocationKey is the key into the per-location token cache Map.
-    // They must differ even though the credentials are identical, so
-    // clearLocationTokenCache for one never evicts the other's entry.
-    const scKey:  "sea-castle-camps-bay" = "sea-castle-camps-bay";
-    const scsKey: "si-cantina"           = "si-cantina";
+    // LocationKey = string (DB-driven, no longer a union type).
+    // They must differ so clearLocationTokenCache for one never evicts the other.
+    const scKey  = "sea-castle-camps-bay";
+    const scsKey = "si-cantina";
     expect(scKey).not.toBe(scsKey);
   });
 });

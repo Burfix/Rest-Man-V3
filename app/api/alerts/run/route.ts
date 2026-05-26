@@ -25,7 +25,6 @@
 import * as Sentry from "@sentry/nextjs";
 import { NextRequest, NextResponse } from "next/server";
 import { runAlertsEngine } from "@/services/alerts/engine";
-import { getAllLocationConfigs } from "@/lib/micros/micros-location-registry";
 import { cronGuard } from "@/lib/auth/cron-guard";
 import { createServerClient } from "@/lib/supabase/server";
 

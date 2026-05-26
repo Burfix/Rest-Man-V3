@@ -9,8 +9,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // Mock Supabase service-role client
 // ---------------------------------------------------------------------------
 const mockFrom = vi.fn();
-vi.mock("@/lib/supabase/service", () => ({
-  createServiceRoleClient: () => ({ from: mockFrom }),
+vi.mock("@/lib/supabase/server", () => ({
+  createServerClient: () => ({ from: mockFrom }),
 }));
 
 // ---------------------------------------------------------------------------

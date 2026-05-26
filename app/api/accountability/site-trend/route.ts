@@ -8,18 +8,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
 import { apiGuard } from "@/lib/auth/api-guard";
 import { PERMISSIONS } from "@/lib/rbac/roles";
+import { toGrade } from "@/lib/scoring/operatingScore";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+// Uses canonical toGrade() — A≥90, B≥75, C≥60, D≥40. Do NOT redefine thresholds here.
 function gradeFromScore(score: number): string {
-  if (score >= 90) return "A";
-  if (score >= 80) return "B";
-  if (score >= 65) return "C";
-  if (score >= 50) return "D";
-  return "F";
+  return toGrade(score);
 }
 
 function formatDate(iso: string): string {

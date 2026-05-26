@@ -84,7 +84,7 @@ async function main() {
       "../lib/micros/location-auth"
     );
 
-    const cfg = getLocationConfig("primi-camps-bay");
+    const cfg = await getLocationConfig("primi-camps-bay");
 
     if (!cfg.configured) {
       console.log("  ❌ Config reports configured=false");

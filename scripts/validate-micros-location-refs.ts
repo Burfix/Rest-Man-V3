@@ -26,86 +26,88 @@ import {
   safeConfigSummary,
 } from "../lib/micros/micros-location-registry";
 
-console.log("\n══════════════════════════════════════════════════════════");
-console.log("  MICROS Multi-Location Validation");
-console.log("══════════════════════════════════════════════════════════\n");
+void (async () => {
+  console.log("\n══════════════════════════════════════════════════════════");
+  console.log("  MICROS Multi-Location Validation");
+  console.log("══════════════════════════════════════════════════════════\n");
 
-const configs = getAllLocationConfigs();
-let exitCode = 0;
+  const configs = await getAllLocationConfigs();
+  let exitCode = 0;
 
-// ── 1. Print summary table ────────────────────────────────────────────────
+  // ── 1. Print summary table ────────────────────────────────────────────────
 
-for (const cfg of configs) {
-  const summary = safeConfigSummary(cfg);
-  const status  =
-    !summary.configured ? "⚠️  NOT CONFIGURED" :
-    !summary.enabled    ? "⏸  DISABLED" :
-                          "✅  ENABLED";
+  for (const cfg of configs) {
+    const summary = safeConfigSummary(cfg);
+    const status  =
+      !summary.configured ? "⚠️  NOT CONFIGURED" :
+      !summary.enabled    ? "⏸  DISABLED" :
+                            "✅  ENABLED";
 
-  console.log(`  [${summary.key}]`);
-  console.log(`    Display name  : ${summary.displayName}`);
-  console.log(`    Location ref  : ${summary.locationRef || "(none)"}`);
-  console.log(`    Enterprise    : ${summary.enterpriseShortName || "(none)"}`);
-  console.log(`    Auth URL      : ${summary.authUrl || "(none)"}`);
-  console.log(`    Has credentials: username=${summary.hasUsername} password=${summary.hasPassword}`);
-  console.log(`    Status        : ${status}`);
-  console.log();
+    console.log(`  [${summary.key}]`);
+    console.log(`    Display name  : ${summary.displayName}`);
+    console.log(`    Location ref  : ${summary.locationRef || "(none)"}`);
+    console.log(`    Enterprise    : ${summary.enterpriseShortName || "(none)"}`);
+    console.log(`    Auth URL      : ${summary.authUrl || "(none)"}`);
+    console.log(`    Has credentials: username=${summary.hasUsername} password=${summary.hasPassword}`);
+    console.log(`    Status        : ${status}`);
+    console.log();
 
-  if (summary.enabled && !summary.configured) {
-    console.error(`  ❌ ERROR: ${summary.key} is enabled but NOT configured (missing env vars)`);
+    if (summary.enabled && !summary.configured) {
+      console.error(`  ❌ ERROR: ${summary.key} is enabled but NOT configured (missing env vars)`);
+      exitCode = 1;
+    }
+  }
+
+  // ── 2. Check for duplicate location refs ─────────────────────────────────
+
+  const conflicts = await validateLocationRefUniqueness();
+
+  if (conflicts.length === 0) {
+    console.log("  ✅ Location ref uniqueness: PASS — no conflicts detected");
+  } else {
+    for (const c of conflicts) {
+      console.error(
+        `  ❌ MICROS location ref conflict detected: locRef "${c.locationRef}" is shared by: ${c.keys.join(", ")}`,
+      );
+      console.error("     This would cause data from different stores to be written to the same DB rows.");
+      console.error("     Fix: Assign a unique MICROS locRef to each location.");
+    }
     exitCode = 1;
   }
-}
 
-// ── 2. Check for duplicate location refs ─────────────────────────────────
+  // ── 3. Verify expected refs ───────────────────────────────────────────────
 
-const conflicts = validateLocationRefUniqueness();
+  const expectedRefs: Record<string, string> = {
+    "si-cantina":           process.env.MICROS_LOCATION_REF ?? "",
+    "primi-camps-bay":      process.env.MICROS_PRIMI_CAMPS_BAY_LOCATION_REF ?? "101003",
+    "sea-castle-camps-bay": process.env.MICROS_SEA_CASTLE_LOCATION_REF ?? "2001002",
+  };
 
-if (conflicts.length === 0) {
-  console.log("  ✅ Location ref uniqueness: PASS — no conflicts detected");
-} else {
-  for (const c of conflicts) {
-    console.error(
-      `  ❌ MICROS location ref conflict detected: locRef "${c.locationRef}" is shared by: ${c.keys.join(", ")}`,
-    );
-    console.error("     This would cause data from different stores to be written to the same DB rows.");
-    console.error("     Fix: Assign a unique MICROS locRef to each location.");
+  for (const cfg of configs) {
+    const expected = expectedRefs[cfg.key];
+    if (!expected) continue; // Not set in env — skip check
+    if (cfg.locationRef && cfg.locationRef !== expected) {
+      console.warn(
+        `  ⚠️  WARNING: ${cfg.key} has locRef "${cfg.locationRef}" but env var says "${expected}"`,
+      );
+    }
   }
-  exitCode = 1;
-}
 
-// ── 3. Verify expected refs ───────────────────────────────────────────────
+  // ── 4. Summary ────────────────────────────────────────────────────────────
 
-const expectedRefs: Record<string, string> = {
-  "si-cantina":           process.env.MICROS_LOCATION_REF ?? "",
-  "primi-camps-bay":      process.env.MICROS_PRIMI_CAMPS_BAY_LOCATION_REF ?? "101003",
-  "sea-castle-camps-bay": process.env.MICROS_SEA_CASTLE_LOCATION_REF ?? "2001002",
-};
+  const enabled    = configs.filter((c) => c.enabled && c.configured).length;
+  const disabled   = configs.filter((c) => !c.enabled).length;
+  const badConfig  = configs.filter((c) => c.enabled && !c.configured).length;
 
-for (const cfg of configs) {
-  const expected = expectedRefs[cfg.key];
-  if (!expected) continue; // Not set in env — skip check
-  if (cfg.locationRef && cfg.locationRef !== expected) {
-    console.warn(
-      `  ⚠️  WARNING: ${cfg.key} has locRef "${cfg.locationRef}" but env var says "${expected}"`,
-    );
+  console.log(`\n══════════════════════════════════════════════════════════`);
+  console.log(`  Summary: ${enabled} active, ${disabled} disabled, ${badConfig} misconfigured`);
+
+  if (exitCode === 0) {
+    console.log(`  Result : ✅  All checks passed`);
+  } else {
+    console.log(`  Result : ❌  Validation FAILED — see errors above`);
   }
-}
+  console.log(`══════════════════════════════════════════════════════════\n`);
 
-// ── 4. Summary ────────────────────────────────────────────────────────────
-
-const enabled    = configs.filter((c) => c.enabled && c.configured).length;
-const disabled   = configs.filter((c) => !c.enabled).length;
-const badConfig  = configs.filter((c) => c.enabled && !c.configured).length;
-
-console.log(`\n══════════════════════════════════════════════════════════`);
-console.log(`  Summary: ${enabled} active, ${disabled} disabled, ${badConfig} misconfigured`);
-
-if (exitCode === 0) {
-  console.log(`  Result : ✅  All checks passed`);
-} else {
-  console.log(`  Result : ❌  Validation FAILED — see errors above`);
-}
-console.log(`══════════════════════════════════════════════════════════\n`);
-
-process.exit(exitCode);
+  process.exit(exitCode);
+})();

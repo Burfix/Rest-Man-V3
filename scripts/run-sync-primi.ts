@@ -27,19 +27,19 @@ console.log("  Primi Camps Bay — MICROS Sync");
 console.log("══════════════════════════════════════════════");
 console.log(`  Business date: ${businessDate}\n`);
 
-const cfg = getLocationConfig(KEY);
-
-if (!cfg.configured) {
-  console.error("❌ Location not configured — missing env vars.");
-  process.exit(1);
-}
-
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local");
-  process.exit(1);
-}
-
 async function main() {
+  const cfg = await getLocationConfig(KEY);
+
+  if (!cfg.configured) {
+    console.error("❌ Location not configured — missing env vars.");
+    process.exit(1);
+  }
+
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("❌ Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local");
+    process.exit(1);
+  }
+
   const result = await runLocationSync(cfg, businessDate);
 
   console.log(`  Sales synced:    ${result.salesSynced ? "✅" : "❌"}  (${result.salesChecks ?? 0} checks)`);

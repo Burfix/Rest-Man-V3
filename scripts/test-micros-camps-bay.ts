@@ -25,14 +25,14 @@ console.log("  Primi Camps Bay — Full BIAPI Connection Test");
 console.log("══════════════════════════════════════════════\n");
 console.log(`  Business date under test: ${businessDate}\n`);
 
-const cfg = getLocationConfig(KEY);
-
-if (!cfg.configured) {
-  console.error("❌ Location not configured — missing env vars. Run: npm run micros:check:primi");
-  process.exit(1);
-}
-
 async function main() {
+  const cfg = await getLocationConfig(KEY);
+
+  if (!cfg.configured) {
+    console.error("❌ Location not configured — missing env vars. Run: npm run micros:check:primi");
+    process.exit(1);
+  }
+
   // ── Step 1: Token ─────────────────────────────────────────────────────────
   process.stdout.write("── Step 1: Token acquisition … ");
   try {

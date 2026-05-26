@@ -145,7 +145,7 @@ async function perConnectionPost<T>(
   body: Record<string, string>,
 ): Promise<T> {
   // Resolve per-org credentials using location_key (exact) or org_identifier (fallback)
-  const locationCfg = getLocationConfigForConnection({
+  const locationCfg = await getLocationConfigForConnection({
     org_identifier: cx.orgIdentifier,
     location_key:   cx.locationKey,
   });

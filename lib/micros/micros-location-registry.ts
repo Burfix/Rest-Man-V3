@@ -3,26 +3,48 @@
  *
  * Server-only multi-location MICROS config resolver.
  *
- * Maps location keys to their full integration config.
- * Credentials are read exclusively from server-side environment variables.
+ * ── Architecture ─────────────────────────────────────────────────────────────
+ * Non-secret metadata (location_key, display_name, auth_flow, env_prefix,
+ * location_ref, enabled) is stored in the micros_location_configs DB table
+ * (migration 101). Adding a new client requires a DB row + Vercel env vars —
+ * no code change, no recompile, no deployment.
+ *
+ * Credentials (username, password, clientSecret) are NEVER stored in the DB.
+ * They are read from environment variables using the location's env_prefix:
+ *   username    = env[{prefix}USERNAME]       or env[{prefix}API_ACCOUNT_NAME]
+ *   password    = env[{prefix}PASSWORD]       or env[{prefix}API_ACCOUNT_PASSWORD]
+ *   clientSecret= env[{prefix}CLIENT_SECRET]  (client_credentials flow only)
+ *   authUrl     = env[{prefix}AUTH_URL]       or env[{prefix}AUTH_SERVER]
+ *   baseUrl     = env[{prefix}BI_SERVER]      or env[{prefix}APP_SERVER]
+ *   clientId    = env[{prefix}CLIENT_ID]
+ *   enterprise  = env[{prefix}ORG_SHORT_NAME] or env[{prefix}ORG_IDENTIFIER]
+ *   locRef      = DB location_ref             or env[{prefix}LOCATION_REF]
  *
  * SECURITY:
  *   - Never import this in client components or NEXT_PUBLIC code.
- *   - clientSecret and password are read from env vars and never logged.
+ *   - clientSecret and password are never logged.
+ *   - The DB table stores no secrets.
  *
- * Supported locations:
- *   si-cantina            → PKCE auth (username + password), env: MICROS_*
- *   primi-camps-bay       → PKCE auth (username + password), env: MICROS_PRIMI_CAMPS_BAY_*
- *   sea-castle-camps-bay  → PKCE auth — shares Si Cantina credentials, own loc ref: env: MICROS_SEA_CASTLE_*
+ * Migration from typed union:
+ *   LocationKey is now `string` (was a union of 3 literals). All functions
+ *   that previously returned synchronously are now async (DB lookup).
+ *   Call sites: `const cfg = await getLocationConfig(key)`.
  */
 
-export type LocationKey = "si-cantina" | "primi-camps-bay" | "sea-castle-camps-bay";
+import { createClient } from "@supabase/supabase-js";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Previously a union of 3 hardcoded literals. Now `string` — the valid values
+ * live in micros_location_configs.location_key (DB).
+ */
+export type LocationKey = string;
 
 /**
  * Auth flow used by the location.
- *
- * pkce               — 4-step PKCE flow (username + password). Used by Si Cantina.
- * client_credentials — OAuth2 client credentials grant (clientId + clientSecret). Used by Primi.
+ * pkce               — 4-step PKCE flow (username + password).
+ * client_credentials — OAuth2 client credentials grant.
  */
 export type MicrosAuthFlow = "pkce" | "client_credentials";
 
@@ -41,8 +63,7 @@ export interface LocationConfig {
   clientId: string;
   /**
    * OAuth client secret. Only populated for client_credentials flow.
-   * Null for PKCE locations (Si Cantina uses username+password instead).
-   * NEVER log this value.
+   * Null for PKCE locations. NEVER log this value.
    */
   clientSecret: string | null;
   /**
@@ -68,179 +89,160 @@ export interface LocationConfig {
   configured: boolean;
 }
 
-/**
- * Strips CR/LF and surrounding whitespace from an env var value.
- * Values pasted into Vercel panels often carry invisible characters.
- */
-function n(v: string | undefined): string {
-  return (v ?? "").replace(/[\r\n]/g, "").trim();
-}
-
-function buildSiCantinaConfig(): LocationConfig {
-  const authUrl   = n(process.env.MICROS_AUTH_SERVER).replace(/\/$/, "");
-  const baseUrl   = n(process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER).replace(/\/$/, "");
-  const clientId  = n(process.env.MICROS_CLIENT_ID);
-  const enterprise= n(process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER);
-  const username  = n(process.env.MICROS_USERNAME ?? process.env.MICROS_API_ACCOUNT_NAME);
-  const password  = n(process.env.MICROS_PASSWORD ?? process.env.MICROS_API_ACCOUNT_PASSWORD);
-  const locRef    = n(process.env.MICROS_LOCATION_REF ?? process.env.MICROS_LOC_REF);
-  const enabled   = n(process.env.MICROS_ENABLED).toLowerCase() === "true";
-
-  const configured =
-    !!authUrl && !!baseUrl && !!clientId && !!enterprise &&
-    !!username && !!password && !!locRef;
-
-  return {
-    key:                "si-cantina",
-    displayName:        "Si Cantina Sociale",
-    enterpriseShortName: enterprise,
-    authUrl,
-    baseUrl,
-    clientId,
-    clientSecret:       null,      // PKCE flow — no client secret
-    username,
-    password,
-    locationRef:        locRef,
-    authFlow:           "pkce",
-    enabled,
-    configured,
-  };
-}
-
-function buildPrimiCampsBayConfig(): LocationConfig {
-  const authUrl   = n(process.env.MICROS_PRIMI_CAMPS_BAY_AUTH_URL).replace(/\/$/, "");
-  const baseUrl   = n(process.env.MICROS_PRIMI_CAMPS_BAY_BASE_URL).replace(/\/$/, "");
-  const clientId  = n(process.env.MICROS_PRIMI_CAMPS_BAY_CLIENT_ID);
-  const enterprise= n(process.env.MICROS_PRIMI_CAMPS_BAY_ENTERPRISE);
-  // USERNAME = API account name (e.g. PRI_THAMSANQA_BIAPI)
-  const username  = n(process.env.MICROS_PRIMI_CAMPS_BAY_USERNAME);
-  // PASSWORD = API account password — stored as CLIENT_SECRET in env for backward compat
-  const password  = n(process.env.MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET);
-  const locRef    = n(process.env.MICROS_PRIMI_CAMPS_BAY_LOCATION_REF);
-  const enabled   = n(process.env.MICROS_PRIMI_CAMPS_BAY_ENABLED).toLowerCase() === "true";
-
-  const configured =
-    !!authUrl && !!baseUrl && !!clientId && !!enterprise &&
-    !!username && !!password && !!locRef;
-
-  return {
-    key:                "primi-camps-bay",
-    displayName:        "Primi Camps Bay",
-    enterpriseShortName: enterprise,
-    authUrl,
-    baseUrl,
-    clientId,
-    clientSecret:       null,   // PKCE flow — no OAuth client secret
-    username,
-    password,                   // API account password — never log
-    locationRef:        locRef,
-    authFlow:           "pkce",
-    enabled,
-    configured,
-  };
-}
-
-/**
- * Sea Castle Hotel Camps Bay
- *
- * Shares all Oracle MICROS auth credentials with Si Cantina (same enterprise,
- * same PKCE flow, same API account).  Only the location reference differs.
- *
- * Required env vars (shared — already set for Si Cantina):
- *   MICROS_AUTH_SERVER, MICROS_BI_SERVER, MICROS_CLIENT_ID,
- *   MICROS_USERNAME, MICROS_PASSWORD, MICROS_ORG_SHORT_NAME
- *
- * Sea-Castle-specific env vars:
- *   MICROS_SEA_CASTLE_ENABLED         "true" | "false"
- *   MICROS_SEA_CASTLE_LOCATION_REF    Oracle locRef for Sea Castle (e.g. "2001002")
- *
- * SECURITY: No secrets are duplicated.  Credential env vars are referenced
- * once (in buildSiCantinaConfig) and reused here by reading the same vars.
- */
-function buildSeaCastleConfig(): LocationConfig {
-  // ── Shared credentials (same as Si Cantina) ──────────────────────────────
-  const authUrl   = n(process.env.MICROS_AUTH_SERVER).replace(/\/$/, "");
-  const baseUrl   = n(process.env.MICROS_BI_SERVER ?? process.env.MICROS_APP_SERVER).replace(/\/$/, "");
-  const clientId  = n(process.env.MICROS_CLIENT_ID);
-  const enterprise= n(process.env.MICROS_ORG_SHORT_NAME ?? process.env.MICROS_ORG_IDENTIFIER);
-  const username  = n(process.env.MICROS_USERNAME ?? process.env.MICROS_API_ACCOUNT_NAME);
-  const password  = n(process.env.MICROS_PASSWORD ?? process.env.MICROS_API_ACCOUNT_PASSWORD);
-
-  // ── Sea-Castle-specific ──────────────────────────────────────────────────
-  const locRef    = n(process.env.MICROS_SEA_CASTLE_LOCATION_REF ?? "2001002");
-  const enabled   = n(process.env.MICROS_SEA_CASTLE_ENABLED).toLowerCase() === "true";
-
-  const configured =
-    !!authUrl && !!baseUrl && !!clientId && !!enterprise &&
-    !!username && !!password && !!locRef;
-
-  return {
-    key:                "sea-castle-camps-bay",
-    displayName:        "Sea Castle Hotel Camps Bay",
-    enterpriseShortName: enterprise,
-    authUrl,
-    baseUrl,
-    clientId,
-    clientSecret:       null,   // PKCE — no client secret
-    username,
-    password,
-    locationRef:        locRef,
-    authFlow:           "pkce",
-    enabled,
-    configured,
-  };
-}
-
-/**
- * Returns the config for a specific location key.
- * Throws if the key is unknown.
- * Does NOT throw for unconfigured or disabled locations — callers must check
- * the `configured` and `enabled` fields before calling auth/sync functions.
- */
-export function getLocationConfig(key: LocationKey): LocationConfig {
-  switch (key) {
-    case "si-cantina":           return buildSiCantinaConfig();
-    case "primi-camps-bay":      return buildPrimiCampsBayConfig();
-    case "sea-castle-camps-bay": return buildSeaCastleConfig();
-    default: {
-      const _exhaustive: never = key;
-      throw new Error(`[MICROS] Unknown location key: ${_exhaustive}`);
-    }
-  }
-}
-
-/**
- * Returns configs for all known location keys.
- * Safe to iterate for health checks and admin dashboards.
- */
-export function getAllLocationConfigs(): LocationConfig[] {
-  return [buildSiCantinaConfig(), buildPrimiCampsBayConfig(), buildSeaCastleConfig()];
-}
-
-// ── Location-ref uniqueness validation ───────────────────────────────────
-
 export interface LocationRefConflict {
   locationRef: string;
   keys: LocationKey[];
 }
 
+// ── Internal helpers ──────────────────────────────────────────────────────────
+
+/** Strips CR/LF and surrounding whitespace from env var values. */
+function n(v: string | undefined): string {
+  return (v ?? "").replace(/[\r\n]/g, "").trim();
+}
+
+/** Service-role DB client — bypasses RLS for server-side registry reads. */
+function serviceDb() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } },
+  );
+}
+
+/**
+ * Builds a LocationConfig by combining a DB row (non-secret metadata)
+ * with credentials from environment variables (via env_prefix).
+ */
+function buildConfigFromRow(row: {
+  location_key:  string;
+  display_name:  string;
+  auth_flow:     string;
+  env_prefix:    string;
+  location_ref:  string | null;
+  enabled:       boolean;
+}): LocationConfig {
+  const p = row.env_prefix; // e.g. "MICROS_" or "MICROS_PRIMI_CAMPS_BAY_"
+
+  // ── Non-secret fields from env (shared for locations with same prefix) ─────
+  const authUrl   = n(process.env[`${p}AUTH_URL`]       ?? process.env[`${p}AUTH_SERVER`]).replace(/\/$/, "");
+  const baseUrl   = n(process.env[`${p}BI_SERVER`]      ?? process.env[`${p}APP_SERVER`]).replace(/\/$/, "");
+  const clientId  = n(process.env[`${p}CLIENT_ID`]);
+  const enterprise= n(process.env[`${p}ORG_SHORT_NAME`] ?? process.env[`${p}ORG_IDENTIFIER`]);
+
+  // ── Credential fields from env (secret — never logged) ────────────────────
+  const username     = n(process.env[`${p}USERNAME`]       ?? process.env[`${p}API_ACCOUNT_NAME`])     || null;
+  const password     = n(process.env[`${p}PASSWORD`]       ?? process.env[`${p}API_ACCOUNT_PASSWORD`]) || null;
+  const clientSecret = n(process.env[`${p}CLIENT_SECRET`]) || null;
+
+  // ── Location ref: DB wins (allows multiple locations to share env_prefix) ──
+  const locRef = row.location_ref
+    ?? n(process.env[`${p}LOCATION_REF`] ?? process.env[`${p}LOC_REF`]);
+
+  const authFlow = (row.auth_flow === "client_credentials" ? "client_credentials" : "pkce") as MicrosAuthFlow;
+
+  const configured =
+    !!authUrl && !!baseUrl && !!clientId && !!enterprise && !!locRef &&
+    (authFlow === "pkce"
+      ? !!username && !!password
+      : !!clientSecret);
+
+  return {
+    key:                 row.location_key,
+    displayName:         row.display_name,
+    enterpriseShortName: enterprise,
+    authUrl,
+    baseUrl,
+    clientId,
+    clientSecret:        authFlow === "client_credentials" ? clientSecret : null,
+    username:            authFlow === "pkce" ? username : null,
+    password:            authFlow === "pkce" ? password : null,
+    locationRef:         locRef,
+    authFlow,
+    enabled:             row.enabled,
+    configured,
+  };
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
+
+/**
+ * Returns the config for a specific location key.
+ * Throws if the key is not found in the DB registry.
+ */
+export async function getLocationConfig(key: LocationKey): Promise<LocationConfig> {
+  const db = serviceDb();
+  const { data, error } = await db
+    .from("micros_location_configs")
+    .select("location_key, display_name, auth_flow, env_prefix, location_ref, enabled")
+    .eq("location_key", key)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`[MICROS] Registry DB error for key "${key}": ${error.message}`);
+  }
+  if (!data) {
+    throw new Error(
+      `[MICROS] Unknown location key: "${key}". ` +
+      `Add a row to micros_location_configs to register this location.`,
+    );
+  }
+
+  return buildConfigFromRow(data);
+}
+
+/**
+ * Returns configs for all registered locations.
+ * Safe to iterate for health checks and admin dashboards.
+ */
+export async function getAllLocationConfigs(): Promise<LocationConfig[]> {
+  const db = serviceDb();
+  const { data, error } = await db
+    .from("micros_location_configs")
+    .select("location_key, display_name, auth_flow, env_prefix, location_ref, enabled")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    throw new Error(`[MICROS] Registry DB error (getAllLocationConfigs): ${error.message}`);
+  }
+
+  return (data ?? []).map(buildConfigFromRow);
+}
+
+/**
+ * Returns all location keys registered in the DB.
+ * Use for validation instead of `isValidLocationKey` when you need async.
+ */
+export async function getRegisteredLocationKeys(): Promise<string[]> {
+  const db = serviceDb();
+  const { data } = await db
+    .from("micros_location_configs")
+    .select("location_key");
+  return (data ?? []).map((r: { location_key: string }) => r.location_key);
+}
+
+/**
+ * Returns true if the given key exists in the DB registry.
+ * Async — use in route handlers and Zod `.refine(async ...)`.
+ */
+export async function isValidLocationKey(key: string): Promise<boolean> {
+  const keys = await getRegisteredLocationKeys();
+  return keys.includes(key);
+}
+
 /**
  * Checks that no two ENABLED + CONFIGURED locations share the same
- * MICROS location reference.  Duplicate refs would cause data from
- * different stores to be written to the same DB rows.
- *
- * Call this at startup or in a health-check route to surface conflicts.
+ * MICROS location reference. Duplicate refs cause data from different
+ * stores to be written to the same DB rows.
  *
  * Returns an array of conflicts (empty = all clear).
- *
- * WARNING if conflicts detected:
- *   "MICROS location ref conflict detected"
  */
-export function validateLocationRefUniqueness(): LocationRefConflict[] {
-  const configs = getAllLocationConfigs().filter((c) => c.configured && c.enabled && !!c.locationRef);
+export async function validateLocationRefUniqueness(): Promise<LocationRefConflict[]> {
+  const configs = await getAllLocationConfigs();
+  const active  = configs.filter((c) => c.configured && c.enabled && !!c.locationRef);
   const refMap  = new Map<string, LocationKey[]>();
 
-  for (const c of configs) {
+  for (const c of active) {
     const existing = refMap.get(c.locationRef) ?? [];
     existing.push(c.key);
     refMap.set(c.locationRef, existing);
@@ -252,8 +254,7 @@ export function validateLocationRefUniqueness(): LocationRefConflict[] {
 }
 
 /**
- * Returns a safe (non-secret) summary of a location config for
- * logging, API responses, and admin UIs.
+ * Returns a safe (non-secret) summary of a location config.
  * clientSecret and password are NEVER included.
  */
 export function safeConfigSummary(cfg: LocationConfig) {
@@ -275,81 +276,40 @@ export function safeConfigSummary(cfg: LocationConfig) {
 }
 
 /**
- * Validates that a string is a known LocationKey.
- * Use this to sanitize user-supplied locationKey query params.
- */
-export function isValidLocationKey(key: string): key is LocationKey {
-  return key === "si-cantina" || key === "primi-camps-bay" || key === "sea-castle-camps-bay";
-}
-
-/**
- * Finds the LocationConfig whose `enterpriseShortName` matches the given
+ * Finds the LocationConfig whose enterpriseShortName matches the given
  * Oracle org identifier (case-insensitive).
- *
- * Returns null when the org is not registered — callers should fall back
- * to the global token in that case and log a TOKEN_ORG_MISMATCH_RISK warning.
- *
- * NOTE: org_identifier is NOT unique across all locations (e.g. Si Cantina
- * and Sea Castle both use SCS). Prefer getLocationConfigForConnection() when
- * you have the full connection row, which uses location_key for exact routing.
- *
- * @example
- *   getLocationConfigByOrgIdentifier("PRI")  // → Primi config
- *   getLocationConfigByOrgIdentifier("SCS")  // → Si Cantina config (first match)
- *   getLocationConfigByOrgIdentifier("UNK")  // → null
  */
-export function getLocationConfigByOrgIdentifier(
+export async function getLocationConfigByOrgIdentifier(
   orgIdentifier: string,
-): LocationConfig | null {
+): Promise<LocationConfig | null> {
   const norm = orgIdentifier.trim().toUpperCase();
-  return (
-    getAllLocationConfigs().find(
-      (cfg) => cfg.enterpriseShortName.trim().toUpperCase() === norm,
-    ) ?? null
-  );
+  const all  = await getAllLocationConfigs();
+  return all.find((cfg) => cfg.enterpriseShortName.trim().toUpperCase() === norm) ?? null;
 }
 
 /**
  * Resolves the LocationConfig for a micros_connections row.
  *
  * Resolution priority:
- *   1. Explicit `location_key` — direct registry lookup (most reliable).
- *      Set micros_connections.location_key in the DB to opt into this path.
+ *   1. Explicit location_key  — direct registry lookup (most reliable).
  *   2. Disambiguate by org_identifier.
- *      - If exactly one location matches → return it.
- *      - If multiple locations share the same org (e.g. Si Cantina + Sea Castle
- *        both use SCS) and they all share identical credentials (same Oracle
- *        enterprise) → return the first configured one. They produce identical
- *        tokens, so either works.
- *      - If multiple locations share the same org with DIFFERENT credentials
- *        (different auth servers or client IDs) → throws AMBIGUOUS_MICROS_LOCATION_CONFIG
- *        because it is impossible to select the correct token safely without
- *        an explicit location_key.
- *
- * @throws {Error} AMBIGUOUS_MICROS_LOCATION_CONFIG — same org, different credentials, no location_key set.
- *
- * @example
- *   // SCS + explicit key → Sea Castle config
- *   getLocationConfigForConnection({ org_identifier: "SCS", location_key: "sea-castle-camps-bay" })
- *
- *   // SCS + no key → Si Cantina config (first configured SCS; credentials identical)
- *   getLocationConfigForConnection({ org_identifier: "SCS" })
- *
- *   // PRI → Primi config
- *   getLocationConfigForConnection({ org_identifier: "PRI" })
+ *      - Exactly one match → return it.
+ *      - Multiple matches, identical credentials → return first configured.
+ *      - Multiple matches, different credentials → throws AMBIGUOUS_MICROS_LOCATION_CONFIG.
  */
-export function getLocationConfigForConnection(connection: {
+export async function getLocationConfigForConnection(connection: {
   org_identifier: string;
-  location_key?: string | null;
-}): LocationConfig | null {
-  // ── 1. Explicit location_key ───────────────────────────────────────────
-  if (connection.location_key && isValidLocationKey(connection.location_key)) {
-    return getLocationConfig(connection.location_key);
+  location_key?:  string | null;
+}): Promise<LocationConfig | null> {
+  // ── 1. Explicit location_key ───────────────────────────────────────────────
+  if (connection.location_key) {
+    const valid = await isValidLocationKey(connection.location_key);
+    if (valid) return getLocationConfig(connection.location_key);
   }
 
-  // ── 2. Disambiguate by org_identifier ─────────────────────────────────
-  const norm = connection.org_identifier.trim().toUpperCase();
-  const all = getAllLocationConfigs();
+  // ── 2. Disambiguate by org_identifier ─────────────────────────────────────
+  const norm       = connection.org_identifier.trim().toUpperCase();
+  const all        = await getAllLocationConfigs();
   const orgMatches = all.filter(
     (c) => c.enterpriseShortName.trim().toUpperCase() === norm,
   );
@@ -358,8 +318,6 @@ export function getLocationConfigForConnection(connection: {
   if (orgMatches.length === 1) return orgMatches[0];
 
   // Multiple configs share this org — check whether credentials are identical.
-  // Si Cantina + Sea Castle are the canonical case: same Oracle enterprise,
-  // same PKCE account, same auth server. Their tokens are interchangeable.
   const first = orgMatches[0];
   const allShareCredentials = orgMatches.every(
     (c) =>
@@ -369,17 +327,13 @@ export function getLocationConfigForConnection(connection: {
   );
 
   if (allShareCredentials) {
-    // Credentials are identical → tokens are interchangeable.
-    // Use the first configured location; all produce the same Oracle token.
-    const configured = orgMatches.find((c) => c.configured) ?? orgMatches[0];
-    return configured;
+    return orgMatches.find((c) => c.configured) ?? orgMatches[0];
   }
 
-  // Different credentials → cannot choose safely without an explicit key.
   throw new Error(
     `AMBIGUOUS_MICROS_LOCATION_CONFIG: org_identifier="${connection.org_identifier}" ` +
-      `maps to ${orgMatches.length} LocationConfigs with different credentials. ` +
-      `Set location_key on the micros_connections row to disambiguate ` +
-      `(valid values: ${orgMatches.map((c) => `"${c.key}"`).join(", ")}).`,
+    `maps to ${orgMatches.length} LocationConfigs with different credentials. ` +
+    `Set location_key on the micros_connections row to disambiguate ` +
+    `(valid values: ${orgMatches.map((c) => `"${c.key}"`).join(", ")}).`,
   );
 }

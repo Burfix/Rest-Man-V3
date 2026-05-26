@@ -63,10 +63,7 @@
     "@next/swc-darwin-x64": "^14.2.5"
   },
   "lint-staged": {
-    "app/api/**/*.{ts,tsx}": [
-      "eslint"
-    ],
-    "lib/mappers/**/*.ts": [
+    "**/*.{ts,tsx}": [
       "eslint"
     ]
   }

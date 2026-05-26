@@ -17,6 +17,13 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
+// ── Global: stub @sentry/nextjs so native-binary resolution doesn't fail ───────
+vi.mock("@sentry/nextjs", () => ({
+  withScope:        vi.fn((cb: (scope: unknown) => void) => cb({ setTag: vi.fn(), setContext: vi.fn() })),
+  captureException: vi.fn(),
+  captureMessage:   vi.fn(),
+}));
+
 // ── Tenant fixture constants ──────────────────────────────────────────────────
 
 const SITE_SI_CANTINA   = "00000000-0000-0000-0000-000000000002";
@@ -538,6 +545,8 @@ describe("syncInventoryFromMicros — requires explicit siteId", () => {
         };
       }),
       insert:      vi.fn().mockReturnThis(),
+      // finalizeBatch calls .update().eq() even when MICROS is disabled (status="skipped")
+      update:      vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ data: null, error: null }) }),
       limit:       vi.fn().mockReturnThis(),
       maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
       single:      vi.fn().mockResolvedValue({ data: null, error: null }),
@@ -580,6 +589,14 @@ describe("syncInventoryFromMicros — requires explicit siteId", () => {
 
 describe("Tier-2 — Labour dashboard MICROS config isolation", () => {
   beforeEach(() => {
+    // vi.unmock() does not reliably clear vi.doMock factory registrations in
+    // Vitest 1.x.  Override the stale Tier-1 factory by re-registering with a
+    // pass-through to importOriginal.  This forces the next dynamic import to
+    // resolve the REAL module (status.ts) rather than the mock stub that was
+    // left behind by the "locRef mismatch" test above.
+    vi.doMock("@/services/micros/status", async (importOriginal) => {
+      return importOriginal();
+    });
     vi.resetModules();
   });
 

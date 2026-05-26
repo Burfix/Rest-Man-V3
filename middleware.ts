@@ -37,8 +37,9 @@ const WEBHOOK_PATHS = [
 // Called by non-browser clients (WordPress, external tools) or uptime monitors.
 // No Supabase session. Route-level verification is mandatory (API key, or public by design).
 const EXTERNAL_API_PATHS = [
-  "/api/compliance/status",
-  "/api/health",           // public health check — no auth required for uptime monitors
+  "/api/compliance/status",  // WordPress plugin — verified via IMPORT_API_KEY at route level
+  "/api/bookings/import",    // WordPress contact form → booking — verified via IMPORT_API_KEY at route level
+  "/api/health",             // public health check — no auth required for uptime monitors
 ];
 
 function isWebhook(pathname: string): boolean {

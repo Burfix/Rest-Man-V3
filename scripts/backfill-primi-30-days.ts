@@ -10,27 +10,27 @@ dotenv.config({ path: ".env.production.local" });
 import { getLocationConfig } from "../lib/micros/micros-location-registry";
 import { runLocationSync }   from "../services/micros/location-sync";
 
-const cfg = getLocationConfig("primi-camps-bay");
-
-if (!cfg.configured) { console.error("❌ Not configured"); process.exit(1); }
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("❌ Missing Supabase keys"); process.exit(1);
-}
-
-const DAYS = 30;
-const dates: string[] = [];
-for (let i = 1; i <= DAYS; i++) {
-  const d = new Date();
-  d.setDate(d.getDate() - i);
-  dates.push(d.toISOString().slice(0, 10));
-}
-
-console.log(`\n═══════════════════════════════════════════════`);
-console.log(`  Primi Camps Bay — 30-day backfill`);
-console.log(`  Dates: ${dates[dates.length-1]} → ${dates[0]}`);
-console.log(`═══════════════════════════════════════════════\n`);
-
 async function main() {
+  const cfg = await getLocationConfig("primi-camps-bay");
+
+  if (!cfg.configured) { console.error("❌ Not configured"); process.exit(1); }
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("❌ Missing Supabase keys"); process.exit(1);
+  }
+
+  const DAYS = 30;
+  const dates: string[] = [];
+  for (let i = 1; i <= DAYS; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    dates.push(d.toISOString().slice(0, 10));
+  }
+
+  console.log(`\n═══════════════════════════════════════════════`);
+  console.log(`  Primi Camps Bay — 30-day backfill`);
+  console.log(`  Dates: ${dates[dates.length-1]} → ${dates[0]}`);
+  console.log(`═══════════════════════════════════════════════\n`);
+
   let ok = 0, fail = 0;
   for (const date of dates.reverse()) { // oldest first
     process.stdout.write(`  ${date} … `);

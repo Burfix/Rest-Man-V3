@@ -335,16 +335,16 @@ export interface SimphonySalesIntervalsResponse {
 
 // ── Factory: build a client from a connection row ─────────────────────────────
 
-export function buildSimphonyClient(connection: {
+export async function buildSimphonyClient(connection: {
   app_server_url: string;
   org_identifier: string;
   location_key?: string | null;
-}): SimphonyClient {
+}): Promise<SimphonyClient> {
   // Resolve per-org credentials using location_key when available (exact routing),
   // otherwise falls back to org_identifier disambiguation.
   // This prevents Oracle 33102 "org identity mismatch" and handles the SCS
   // ambiguity (Si Cantina + Sea Castle both have org_identifier=SCS).
-  const locationConfig = getLocationConfigForConnection({
+  const locationConfig = await getLocationConfigForConnection({
     org_identifier: connection.org_identifier,
     location_key:   connection.location_key,
   });

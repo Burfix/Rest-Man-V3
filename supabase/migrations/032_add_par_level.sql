@@ -1,8 +1,6 @@
--- Add par_level to inventory_items (ideal restock level, above minimum_threshold)
-ALTER TABLE inventory_items
-  ADD COLUMN IF NOT EXISTS par_level numeric DEFAULT 0;
-
--- Backfill: set par_level to 2x minimum_threshold for existing rows
-UPDATE inventory_items
-  SET par_level = minimum_threshold * 2
-  WHERE par_level = 0 AND minimum_threshold > 0;
+-- ============================================================
+-- SUPERSEDED — DO NOT EDIT
+-- This file was a duplicate of migration 032 (alongside 032_actions_upgrade.sql).
+-- Its content has been moved to 097_add_par_level.sql.
+-- This stub is intentionally a no-op so Supabase does not re-run the migration.
+-- ============================================================

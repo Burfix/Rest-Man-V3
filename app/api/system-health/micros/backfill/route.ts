@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard }                  from "@/lib/auth/api-guard";
 import { PERMISSIONS }               from "@/lib/rbac/roles";
-import { getLocationConfig }         from "@/lib/micros/micros-location-registry";
+import { getLocationConfig, type LocationConfig } from "@/lib/micros/micros-location-registry";
 import { runLocationSync }           from "@/services/micros/location-sync";
 import { logger }                    from "@/lib/logger";
 
@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "locationKey, fromDate, toDate required" }, { status: 400 });
   }
 
-  let cfg: ReturnType<typeof getLocationConfig>;
-  try { cfg = getLocationConfig(locationKey as Parameters<typeof getLocationConfig>[0]); }
+  let cfg: LocationConfig;
+  try { cfg = await getLocationConfig(locationKey); }
   catch { return NextResponse.json({ error: `Unknown location: ${locationKey}` }, { status: 400 }); }
 
   if (!cfg.configured || !cfg.enabled) {

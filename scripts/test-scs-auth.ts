@@ -10,7 +10,7 @@ import { getLocationConfig } from "../lib/micros/micros-location-registry";
 import { acquireLocationToken } from "../lib/micros/location-auth";
 
 async function main() {
-  const cfg = getLocationConfig("si-cantina");
+  const cfg = await getLocationConfig("si-cantina");
   console.log("─── Si Cantina config ───────────────────────────────────");
   console.log("  configured     :", cfg.configured);
   console.log("  enabled        :", cfg.enabled);

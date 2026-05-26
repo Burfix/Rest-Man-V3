@@ -192,7 +192,7 @@ export async function GET(): Promise<Response> {
   const sync = micros?.micros_last_sync_minutes_ago;
 
   // ── Location ref conflict check ────────────────────────────────────────────
-  const locRefConflicts = validateLocationRefUniqueness();
+  const locRefConflicts = await validateLocationRefUniqueness();
   const hasLocRefConflict = locRefConflicts.length > 0;
   if (hasLocRefConflict) {
     logger.error("MICROS location ref conflict detected", { conflicts: locRefConflicts });

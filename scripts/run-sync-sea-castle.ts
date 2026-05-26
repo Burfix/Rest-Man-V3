@@ -35,38 +35,38 @@ console.log("  Sea Castle Hotel Camps Bay — MICROS Sync");
 console.log("══════════════════════════════════════════════");
 console.log(`  Business date: ${businessDate}\n`);
 
-// Validate no duplicate location refs before proceeding
-const conflicts = validateLocationRefUniqueness();
-if (conflicts.length > 0) {
-  for (const c of conflicts) {
-    console.error(
-      `❌  MICROS location ref conflict detected: locRef "${c.locationRef}" shared by ${c.keys.join(", ")}`,
-    );
-  }
-  process.exit(1);
-}
-
-const cfg = getLocationConfig(KEY);
-
-if (!cfg.configured) {
-  console.error("❌ Location not configured — missing env vars.");
-  console.error("   Required: MICROS_AUTH_SERVER, MICROS_BI_SERVER, MICROS_CLIENT_ID,");
-  console.error("             MICROS_USERNAME, MICROS_PASSWORD, MICROS_ORG_SHORT_NAME,");
-  console.error("             MICROS_SEA_CASTLE_LOCATION_REF");
-  process.exit(1);
-}
-
-if (!cfg.enabled) {
-  console.warn("⚠️  Sea Castle is disabled (MICROS_SEA_CASTLE_ENABLED != true). Exiting.");
-  process.exit(0);
-}
-
-console.log(`  Location ref : ${cfg.locationRef}`);
-console.log(`  Enterprise   : ${cfg.enterpriseShortName}`);
-console.log(`  Auth URL     : ${cfg.authUrl}`);
-console.log();
-
 async function main() {
+  // Validate no duplicate location refs before proceeding
+  const conflicts = await validateLocationRefUniqueness();
+  if (conflicts.length > 0) {
+    for (const c of conflicts) {
+      console.error(
+        `❌  MICROS location ref conflict detected: locRef "${c.locationRef}" shared by ${c.keys.join(", ")}`,
+      );
+    }
+    process.exit(1);
+  }
+
+  const cfg = await getLocationConfig(KEY);
+
+  if (!cfg.configured) {
+    console.error("❌ Location not configured — missing env vars.");
+    console.error("   Required: MICROS_AUTH_SERVER, MICROS_BI_SERVER, MICROS_CLIENT_ID,");
+    console.error("             MICROS_USERNAME, MICROS_PASSWORD, MICROS_ORG_SHORT_NAME,");
+    console.error("             MICROS_SEA_CASTLE_LOCATION_REF");
+    process.exit(1);
+  }
+
+  if (!cfg.enabled) {
+    console.warn("⚠️  Sea Castle is disabled (MICROS_SEA_CASTLE_ENABLED != true). Exiting.");
+    process.exit(0);
+  }
+
+  console.log(`  Location ref : ${cfg.locationRef}`);
+  console.log(`  Enterprise   : ${cfg.enterpriseShortName}`);
+  console.log(`  Auth URL     : ${cfg.authUrl}`);
+  console.log();
+
   const result = await runLocationSync(cfg, businessDate);
 
   if (result.success) {

@@ -190,7 +190,7 @@ export class MicrosSyncService {
       });
       let raw: { curUTC?: string; locRef?: string; guestChecks?: unknown[] | null };
       try {
-        const apiClient = buildSimphonyClient({
+        const apiClient = await buildSimphonyClient({
           app_server_url: connAppServer,
           org_identifier: connOrgIdentifier,
           location_key:   connection.location_key ?? null,

@@ -55,7 +55,7 @@ export async function runSalesDailyHandler(
   let records_written = 0;
 
   try {
-    const client = buildSimphonyClient(ctx.connection);
+    const client = await buildSimphonyClient(ctx.connection);
 
     // Fetch guest checks — this is the source of truth for daily revenue
     const response = await client.getGuestChecks(ctx.connection.loc_ref, business_date);

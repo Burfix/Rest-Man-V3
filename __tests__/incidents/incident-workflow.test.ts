@@ -14,6 +14,34 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// ── Stub next/server before any import that touches it ────────────────────────
+// next/server cannot resolve in the Vitest Node sandbox. We provide lightweight
+// stubs that satisfy NextRequest / NextResponse usage in the route handlers.
+vi.mock("next/server", () => {
+  class FakeNextRequest {
+    url:     string;
+    method:  string;
+    headers: Headers;
+    private _body: string;
+    constructor(url: string, init?: { method?: string; headers?: HeadersInit; body?: string }) {
+      this.url    = url;
+      this.method = init?.method ?? "GET";
+      this.headers = new Headers(init?.headers);
+      this._body  = init?.body ?? "";
+    }
+    async json() { return JSON.parse(this._body || "{}"); }
+  }
+  const FakeNextResponse = {
+    json: (body: unknown, init?: ResponseInit) =>
+      new Response(JSON.stringify(body), {
+        ...init,
+        headers: { "Content-Type": "application/json", ...((init?.headers as Record<string, string>) ?? {}) },
+      }),
+  };
+  return { NextRequest: FakeNextRequest, NextResponse: FakeNextResponse };
+});
+
 import { NextRequest, NextResponse }             from "next/server";
 
 // ── Module mocks (hoisted before imports) ─────────────────────────────────────

@@ -18,6 +18,15 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+
+// Stub @sentry/nextjs — its native binary (modern-browserslist-target) is a
+// macOS .node file that does not exist in the Vitest Linux sandbox.
+vi.mock("@sentry/nextjs", () => ({
+  withScope:        vi.fn((cb: (scope: unknown) => void) => cb({ setTag: vi.fn(), setContext: vi.fn() })),
+  captureException: vi.fn(),
+  captureMessage:   vi.fn(),
+}));
+
 import { MockQueue, createMockSupabase } from "./helpers/MockQueue";
 import {
   SITE_A,

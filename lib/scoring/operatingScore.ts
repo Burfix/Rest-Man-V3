@@ -321,25 +321,7 @@ export function calculateOperatingScore(input: OperatingScoreInput): OperatingSc
   const total = clamp(revWeighted + labWeighted + svcWeighted + compWeighted + maintWeighted);
   const grade = toGrade(total);
 
-  // ── Debug log — full input so bad values are immediately visible ──────────
-  console.log("SCORE INPUT:", {
-    actualRevenue:    input.actualRevenue,
-    targetRevenue:    input.targetRevenue,
-    labourPct:        input.labourPct,
-    targetLabourPct,
-    serviceScore:     input.serviceScore ?? null,
-    expiredItems:     input.expiredItems ?? null,
-    dueSoonItems:     input.dueSoonItems ?? null,
-    openIssues:       input.openIssues ?? null,
-    criticalIssues:   input.criticalIssues ?? null,
-    // derived weighted scores
-    revWeighted,
-    labWeighted,
-    svcWeighted,
-    compWeighted,
-    maintWeighted,
-    total,
-  });
+  // (debug logging removed — use structured logger at call sites if needed)
 
   // ── Confidence ─────────────────────────────────────────────────────────────
   const hasRevenue = input.actualRevenue !== null && input.targetRevenue !== null;

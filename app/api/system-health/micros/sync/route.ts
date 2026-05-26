@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse }  from "next/server";
 import { apiGuard }                   from "@/lib/auth/api-guard";
 import { PERMISSIONS }                from "@/lib/rbac/roles";
-import { getLocationConfig }          from "@/lib/micros/micros-location-registry";
+import { getLocationConfig, type LocationConfig } from "@/lib/micros/micros-location-registry";
 import { runLocationSync }            from "@/services/micros/location-sync";
 import { writeSyncLog }               from "@/lib/system-health/micros-sync-log";
 import { logMicrosSync }              from "@/lib/security/audit-log";
@@ -39,9 +39,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "locationKey is required" }, { status: 400 });
   }
 
-  let cfg: ReturnType<typeof getLocationConfig>;
+  let cfg: LocationConfig;
   try {
-    cfg = getLocationConfig(locationKey as Parameters<typeof getLocationConfig>[0]);
+    cfg = await getLocationConfig(locationKey);
   } catch {
     return NextResponse.json({ error: `Unknown location key: ${locationKey}` }, { status: 400 });
   }

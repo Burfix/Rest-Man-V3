@@ -16,19 +16,17 @@ import { NextResponse } from "next/server";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { toGrade } from "@/lib/scoring/operatingScore";
 
 export const dynamic = "force-dynamic";
 
-
 // ── Grade helper ──────────────────────────────────────────────────────────────
+// Uses the canonical toGrade() from lib/scoring/operatingScore — single source
+// of truth (A≥90, B≥75, C≥60, D≥40). Do NOT redefine thresholds here.
 
 function gradeFromScore(score: number | null): string {
   if (score === null) return "F";
-  if (score >= 90) return "A";
-  if (score >= 80) return "B";
-  if (score >= 65) return "C";
-  if (score >= 50) return "D";
-  return "F";
+  return toGrade(score);
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
