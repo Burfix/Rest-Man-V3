@@ -264,7 +264,8 @@ export async function dispatchBrainAlerts(
   };
 
   // ── Guard: no alert needed ────────────────────────────────────────────────
-  if (!brain.alertNeeded) {
+  const alertNeeded = brain.primaryThreat.severity === "critical" || brain.primaryThreat.severity === "high";
+  if (!alertNeeded) {
     logger.debug("[BrainDispatcher] alertNeeded=false — skipping", { siteId });
     return { ...base, alertType: null, dispatched: 0, skipped: 0, errors: 0, outcome: "no_alert_needed" };
   }
