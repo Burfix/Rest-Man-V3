@@ -103,7 +103,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const brain = await runOperatingBrain(siteId, today, { caller: "scheduler" });
 
       const brainSummary = {
-        alertNeeded: brain.alertNeeded,
+        alertNeeded: (["critical", "high"] as const).includes(brain.primaryThreat.severity),
         severity:    brain.primaryThreat.severity,
         title:       brain.primaryThreat.title,
       };
