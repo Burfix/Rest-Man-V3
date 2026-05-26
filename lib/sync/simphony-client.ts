@@ -112,7 +112,19 @@ export class SimphonyClient {
       });
     }
 
-    // Global fallback path (single-org deployments / unconfigured orgs)
+    // Hard-block: known non-SCS orgs must never use the global token.
+    // The global token is a Si Cantina / SCS PKCE token. Sending it to any
+    // other org causes Oracle error 33102 (identity mismatch). Throw here so
+    // the failure is loud and immediate rather than a silent wrong-org request.
+    const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
+    if (NON_GLOBAL_ORGS.includes(this.orgIdentifier.toUpperCase())) {
+      throw new SimphonyAuthError(
+        `Primi requires configured per-location credentials; refusing global token fallback for org=${this.orgIdentifier}. ` +
+        `Ensure micros_location_configs.auth_flow='client_credentials' and MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET is set.`,
+      );
+    }
+
+    // Global fallback path (single-org SCS deployments only)
     if (!this.idToken) {
       this.idToken = await getMicrosIdToken();
     }

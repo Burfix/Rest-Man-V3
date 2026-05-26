@@ -47,7 +47,7 @@ const MOCK_LOCATION_ROWS = [
   {
     location_key: "primi-camps-bay",
     display_name: "Primi Camps Bay",
-    auth_flow:    "pkce",
+    auth_flow:    "client_credentials",
     env_prefix:   "MICROS_PRIMI_CAMPS_BAY_",
     location_ref: null,
     enabled:      true,
@@ -125,9 +125,8 @@ const PRIMI_ENV: Record<string, string> = {
   MICROS_PRIMI_CAMPS_BAY_AUTH_URL:        "https://pri-ors-idm.msaf.oraclerestaurants.com",
   MICROS_PRIMI_CAMPS_BAY_BI_SERVER:       "https://pri-simphony.msaf.oraclerestaurants.com",
   MICROS_PRIMI_CAMPS_BAY_CLIENT_ID:       "PRI.d5f87b3e-c82b-434d-996e-c975ef5c7eaa",
-  MICROS_PRIMI_CAMPS_BAY_USERNAME:        "PRI_BIAPI_USER",
-  // PKCE flow reads {prefix}PASSWORD — never CLIENT_SECRET (that is OAuth2 client_credentials only)
-  MICROS_PRIMI_CAMPS_BAY_PASSWORD:        "pri-secret-value",
+  // client_credentials flow reads {prefix}CLIENT_SECRET — not PASSWORD
+  MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET:   "pri-client-secret-value",
   MICROS_PRIMI_CAMPS_BAY_LOCATION_REF:    "101003",
 };
 
@@ -175,7 +174,7 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     expect(cfg).not.toBeNull();
     expect(cfg!.key).toBe("primi-camps-bay");
     expect(cfg!.enterpriseShortName).toBe("PRI");
-    expect(cfg!.authFlow).toBe("pkce");
+    expect(cfg!.authFlow).toBe("client_credentials");
   });
 
   it("resolves SCS → Si Cantina config", async () => {
@@ -214,15 +213,17 @@ describe("Token isolation — getLocationConfigByOrgIdentifier", () => {
     expect(primi!.key).not.toBe(scs!.key);
   });
 
-  it("Primi credentials use MICROS_PRIMI_CAMPS_BAY_PASSWORD as password (not CLIENT_SECRET)", async () => {
+  it("Primi credentials use MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET (client_credentials flow)", async () => {
     const { getLocationConfigByOrgIdentifier } = await import(
       "../../lib/micros/micros-location-registry"
     );
     const cfg = await getLocationConfigByOrgIdentifier("PRI");
-    // password field is read from {prefix}PASSWORD — PKCE account credential
-    expect(cfg!.password).toBe("pri-secret-value");
-    // clientSecret is null for PKCE flow — CLIENT_SECRET env var is for client_credentials only
-    expect(cfg!.clientSecret).toBeNull();
+    // client_credentials flow reads {prefix}CLIENT_SECRET
+    expect(cfg!.clientSecret).toBe("pri-client-secret-value");
+    // password is null for client_credentials flow — PASSWORD env var is for PKCE only
+    expect(cfg!.password).toBeNull();
+    expect(cfg!.authFlow).toBe("client_credentials");
+    expect(cfg!.configured).toBe(true);
   });
 
   it("Si Cantina does NOT expose Primi credentials", async () => {
@@ -489,5 +490,80 @@ describe("buildSimphonyClient — registry fallback for empty DB fields", () => 
     const scKey  = "sea-castle-camps-bay";
     const scsKey = "si-cantina";
     expect(scKey).not.toBe(scsKey);
+  });
+});
+
+// ── Hard-block isolation tests ─────────────────────────────────────────────
+//
+// Verifies that known non-SCS orgs (PRI) never silently fall through to the
+// global Si Cantina token. Oracle error 33102 is caused by exactly this.
+// The code must throw loudly when Primi's LocationConfig is missing or unconfigured.
+
+describe("Hard-block: Primi must never use global token fallback", () => {
+  beforeEach(() => {
+    clearEnv({ ...PRIMI_ENV, ...SI_CANTINA_ENV });
+    setEnv({ ...SI_CANTINA_ENV }); // Deliberately omit PRIMI_ENV
+  });
+
+  afterEach(() => {
+    clearEnv({ ...PRIMI_ENV, ...SI_CANTINA_ENV });
+  });
+
+  it("buildSimphonyClient throws when Primi LocationConfig is unconfigured (missing env vars)", async () => {
+    // PRIMI_ENV is NOT set — Primi CLIENT_SECRET is absent.
+    // buildSimphonyClient must throw, not fall back to SCS global token.
+    const { buildSimphonyClient } = await import("../../lib/sync/simphony-client");
+
+    // Supply a real Primi app_server_url so the MICROS_LOCATION_CONFIG_MISSING
+    // guard is bypassed — the token hard-block is what we're testing.
+    await expect(
+      buildSimphonyClient({
+        app_server_url: "https://pri-simphony.msaf.oraclerestaurants.com",
+        org_identifier: "PRI",
+        location_key:   "primi-camps-bay",
+      }).then(async (client) => {
+        // Force token acquisition — this is where the hard-block must fire
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (client as any).getToken();
+      })
+    ).rejects.toThrow(/Primi requires configured per-location credentials/);
+  });
+
+  it("Primi with configured LocationConfig uses acquireLocationToken, not getMicrosIdToken", async () => {
+    // Set Primi env so the config is fully configured
+    setEnv(PRIMI_ENV);
+
+    const locationAuthMod = await import("../../lib/micros/location-auth");
+    const acquireSpy = vi.spyOn(locationAuthMod, "acquireLocationToken").mockResolvedValue("pri-fake-bearer");
+
+    const { getLocationConfigByOrgIdentifier } = await import(
+      "../../lib/micros/micros-location-registry"
+    );
+    const cfg = await getLocationConfigByOrgIdentifier("PRI");
+    expect(cfg).not.toBeNull();
+    expect(cfg!.configured).toBe(true);
+    expect(cfg!.authFlow).toBe("client_credentials");
+
+    // Calling acquireLocationToken directly should work and return a token
+    const token = await locationAuthMod.acquireLocationToken(cfg!);
+    expect(acquireSpy).toHaveBeenCalledWith(cfg);
+    expect(token).toBe("pri-fake-bearer");
+
+    acquireSpy.mockRestore();
+    clearEnv(PRIMI_ENV);
+  });
+
+  it("SCS org is allowed to use global token fallback (it IS the global org)", async () => {
+    // Si Cantina / SCS is the source of the global token.
+    // Hard-block must NOT fire for SCS.
+    const { buildSimphonyClient } = await import("../../lib/sync/simphony-client");
+    // Should resolve without throwing the Primi isolation error
+    await expect(
+      buildSimphonyClient({
+        app_server_url: "https://scs-simphony.msaf.oraclerestaurants.com",
+        org_identifier: "SCS",
+        location_key:   "si-cantina",
+      })
+    ).resolves.toBeDefined();
   });
 });

@@ -132,8 +132,7 @@ function buildConfigFromRow(row: {
 
   // ── Credential fields from env (secret — never logged) ────────────────────
   const username     = n(process.env[`${p}USERNAME`]       ?? process.env[`${p}API_ACCOUNT_NAME`])     || null;
-  // For PKCE locations, password may be stored under CLIENT_SECRET (legacy Vercel env naming for Primi).
-  const password     = n(process.env[`${p}PASSWORD`]       ?? process.env[`${p}API_ACCOUNT_PASSWORD`] ?? process.env[`${p}CLIENT_SECRET`]) || null;
+  const password     = n(process.env[`${p}PASSWORD`]       ?? process.env[`${p}API_ACCOUNT_PASSWORD`]) || null;
   const clientSecret = n(process.env[`${p}CLIENT_SECRET`]) || null;
 
   // ── Location ref: DB wins (allows multiple locations to share env_prefix) ──

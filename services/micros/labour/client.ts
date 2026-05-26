@@ -176,6 +176,14 @@ async function perConnectionPost<T>(
     });
     idToken = await acquireLocationToken(locationCfg);
   } else {
+    // Hard-block: known non-SCS orgs must never use the global token.
+    const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
+    if (NON_GLOBAL_ORGS.includes(resolvedOrgIdentifier.toUpperCase())) {
+      throw new Error(
+        `[LabourClient] Primi requires configured per-location credentials; refusing global token fallback for org=${resolvedOrgIdentifier}. ` +
+        `Ensure micros_location_configs.auth_flow='client_credentials' and MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET is set.`,
+      );
+    }
     if (!locationCfg) {
       logger.warn("[LabourClient] org_identifier not in location registry — using global token (TOKEN_ORG_MISMATCH_RISK)", {
         orgIdentifier: resolvedOrgIdentifier,
