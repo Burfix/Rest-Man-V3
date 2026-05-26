@@ -660,8 +660,12 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
               const dutiesSubLine = driver.module === "DUTIES" && dutiesData
                 ? `${dutiesData.completedCount} of ${dutiesData.totalCount} duties complete (${pct}%) · Full 20 pts at 100%`
                 : null;
-              // Compliance debug sub-line (temporary — remove once score confirmed working)
+              // Compliance sub-line
               const complianceDebugLine = driver.module === "COMPLIANCE"
+                ? driver.reason
+                : null;
+              // Revenue sub-line
+              const revenueSubLine = driver.module === "REVENUE" && !inactive
                 ? driver.reason
                 : null;
 
@@ -699,6 +703,11 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                   {!inactive && complianceDebugLine && (
                     <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
                       {complianceDebugLine}
+                    </p>
+                  )}
+                  {!inactive && revenueSubLine && (
+                    <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
+                      {revenueSubLine}
                     </p>
                   )}
                 </div>
