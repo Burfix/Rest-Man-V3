@@ -1,134 +1,53 @@
 /**
- * ForgeStack Operating Brain v2 — Real-Time Operational Control System
+ * ForgeStack Operating Brain v3 — Command Center (Single Source of Truth)
+ *
+ * ALL data flows through buildCommandCenterState().
+ * NO panel calculates its own score, grade, or risk values.
  *
  * Layout:
- *   1. ControlBar           — revenue risk + time pressure + score strip
- *   2. OperatingScoreHero   — dominant visual center
- *   3. SinceLastCheck       — delta strip
- *   4. MainGrid:
- *      Primary:  CommandFeed (with execute buttons) → ServicePulse
- *      Secondary: BusinessStatusRail → FeedbackLoop → DataHealthWarning
- *   5. SecondaryDrilldowns  — reviews, maintenance, sales analytics
+ *   1. HeroStrip            — operating score + KPI pills + sync status
+ *   2. PriorityActionBoard  — duty tasks + action queue
+ *   3. CommandFeed          — ranked operational decisions
+ *   4. ServicePulse         — revenue pacing
+ *   5. BusinessStatusRail   — module status overview
+ *   6. FeedbackLoop         — score progress + trend
+ *   7. SecondaryInsights    — reviews + maintenance drilldowns
+ *
+ * Architecture rule:
+ *   buildCommandCenterState() is the ONLY function that may compute:
+ *     - Operating score / grade
+ *     - Revenue gap or variance
+ *     - Labour risk status
+ *     - Compliance status
+ *     - Maintenance status
+ *     - Hero severity
+ *   This file extracts from `result` and passes to components. Zero local derivation.
  */
 
-import { getTodayBookingsSummary } from "@/services/ops/bookingsSummary";
-import { getSevenDayReviewSummary } from "@/services/ops/reviewsSummary";
-import { getLatestSalesSummary } from "@/services/ops/salesSummary";
-import { getMaintenanceSummary } from "@/services/ops/maintenanceSummary";
-import { getUpcomingEvents } from "@/services/ops/eventsSummary";
-import { getDataFreshnessSummary } from "@/services/ops/dataFreshness";
-import { generateRevenueForecast } from "@/services/revenue/forecast";
-import { getComplianceSummary } from "@/services/ops/complianceSummary";
-import { getMicrosStatus } from "@/services/micros/status";
-import { getMicrosConfigStatus } from "@/lib/micros/config";
-import { deriveMicrosIntegrationStatus, canUseMicrosLiveData } from "@/lib/integrations/status";
-import { getOperatingScore } from "@/services/ops/operatingScore";
-import { getCurrentSalesSnapshot, snapshotToProvenance } from "@/lib/sales/service";
-import { getInventoryIntelligence, inventoryToProvenance } from "@/services/inventory/intelligence";
-import { getStoredDailySummary } from "@/services/micros/labour/summary";
-import { evaluateOperations } from "@/services/decision-engine";
-import { getServicePeriod } from "@/lib/commandCenter";
-import { getSiteConfig } from "@/lib/config/site";
 import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
 import { resolvePageSite }           from "@/lib/auth/resolve-site";
-import { runOperatingBrain } from "@/services/brain/operating-brain";
-import { createServerClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
-import AccountabilityAlert from "@/components/accountability/AccountabilityAlert";
-import HeroStrip         from "@/components/brain/HeroStrip";
-import PriorityActionBoard, { type DutiesData } from "@/components/brain/PriorityActionBoard";
-import CommandFeed            from "@/components/operating-brain/CommandFeedV2";
-import ServicePulse           from "@/components/operating-brain/ServicePulse";
-import BusinessStatusRail, { type PredictiveSignals } from "@/components/operating-brain/BusinessStatusRail";
-import FeedbackLoop, { type FeedbackLoopProps }  from "@/components/operating-brain/FeedbackLoop";
-import DataHealthWarning      from "@/components/operating-brain/DataHealthWarning";
-import SecondaryInsights      from "@/components/dashboard/SecondaryInsights";
+import { redirect }                  from "next/navigation";
+import { buildCommandCenterState }   from "@/lib/command-center/build-command-center-state";
 
-import type {
-  TodayBookingsSummary,
-  SevenDayReviewSummary,
-  SalesSummary,
-  MaintenanceSummary,
-  VenueEvent,
-  RevenueForecast,
-  ComplianceSummary,
-} from "@/types";
-import type { MicrosStatusSummary } from "@/types/micros";
-import { todayISO } from "@/lib/utils";
+import AccountabilityAlert  from "@/components/accountability/AccountabilityAlert";
+import HeroStrip            from "@/components/brain/HeroStrip";
+import PriorityActionBoard  from "@/components/brain/PriorityActionBoard";
+import CommandFeed          from "@/components/operating-brain/CommandFeedV2";
+import ServicePulse         from "@/components/operating-brain/ServicePulse";
+import BusinessStatusRail   from "@/components/operating-brain/BusinessStatusRail";
+import FeedbackLoop         from "@/components/operating-brain/FeedbackLoop";
+import DataHealthWarning    from "@/components/operating-brain/DataHealthWarning";
+import SecondaryInsights    from "@/components/dashboard/SecondaryInsights";
 
-export const dynamic = "force-dynamic";
+export const dynamic   = "force-dynamic";
 export const revalidate = 0;
-
-// ─── Settle helpers ─────────────────────────────────────────────────────────
-
-function settled<T>(
-  result: PromiseSettledResult<T>,
-  fallback: T
-): { value: T; error: string | null } {
-  if (result.status === "fulfilled") return { value: result.value, error: null };
-  const msg =
-    result.reason instanceof Error ? result.reason.message : String(result.reason);
-  return { value: fallback, error: msg };
-}
-
-const EMPTY_TODAY: TodayBookingsSummary = {
-  total: 0,
-  totalCovers: 0,
-  largeBookings: 0,
-  eventLinked: 0,
-  escalationsToday: 0,
-  bookings: [],
-};
-
-const EMPTY_REVIEWS: SevenDayReviewSummary = {
-  byPlatform: [],
-  overallAverage: 0,
-  totalReviews: 0,
-  positiveCount: 0,
-  neutralCount: 0,
-  negativeCount: 0,
-  flaggedReviews: [],
-};
-
-const EMPTY_SALES: SalesSummary = { upload: null, topItems: [], bottomItems: [] };
-
-const EMPTY_COMPLIANCE: ComplianceSummary = {
-  total: 0,
-  compliant: 0,
-  scheduled: 0,
-  due_soon: 0,
-  expired: 0,
-  unknown: 0,
-  compliance_pct: 0,
-  critical_items: [],
-  due_soon_items: [],
-  scheduled_items: [],
-};
-
-const EMPTY_MAINTENANCE: MaintenanceSummary = {
-  totalEquipment: 0,
-  openRepairs: 0,
-  inProgress: 0,
-  awaitingParts: 0,
-  outOfService: 0,
-  urgentIssues: [],
-  resolvedThisWeek: 0,
-  avgFixTimeDays: null,
-  monthlyActualCost: null,
-  topProblemAsset: null,
-  foodSafetyRisks: 0,
-  serviceDisruptions: 0,
-  complianceRisks: 0,
-};
-
-// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function OperationsDashboard({
   searchParams,
 }: {
   searchParams?: { site_id?: string };
 }) {
-  // ─── User context (site + org) ──────────────────────────────────────────
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const ctx = await getUserContext().catch((err: unknown) => {
     if (err instanceof AuthError && err.statusCode === 401) redirect("/login");
     return null;
@@ -137,352 +56,64 @@ export default async function OperationsDashboard({
   if (!ctx?.siteId) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <p className="text-sm text-muted-foreground">No site assigned. Contact your administrator.</p>
+        <p className="text-sm text-muted-foreground">
+          No site assigned. Contact your administrator.
+        </p>
       </div>
     );
   }
 
-  // URL param overrides cookie — supports shared links & SiteSwitcher navigation
   const { siteId } = resolvePageSite(ctx, searchParams?.site_id);
-  const { orgId } = ctx;
+  const { orgId }  = ctx;
 
-  // Start brain in parallel (runs alongside main data fetches)
-  const brainPromise = runOperatingBrain(siteId, todayISO());
+  // ── ONE call — all data, ONE canonical state ──────────────────────────────
+  // buildCommandCenterState:
+  //   • fetches all raw data in parallel
+  //   • runs the brain (canonical scorer: Rev 30 | Lab 20 | Duties 20 | Maint 15 | Comp 15)
+  //   • runs evaluateOperations with the SAME inputs as the brain → no divergence
+  //   • derives hero, businessStatus, systemPulse, commandFeed from ONE score
+  //
+  // Extract from `result`. Do NOT re-derive any risk values in this file.
+  const result = await buildCommandCenterState(siteId, orgId ?? undefined);
+  const { state, extras } = result;
 
-  const [
-    todayResult,
-    reviewsResult,
-    salesResult,
-    maintenanceResult,
-    eventsResult,
-    freshnessResult,
-    forecastResult,
-    complianceResult,
-    microsResult,
-    inventoryResult,
-    labourResult,
-  ] = await Promise.allSettled([
-    getTodayBookingsSummary(),
-    getSevenDayReviewSummary(siteId),
-    getLatestSalesSummary(),
-    getMaintenanceSummary(siteId),
-    getUpcomingEvents(),
-    getDataFreshnessSummary(),
-    generateRevenueForecast(todayISO(), orgId ?? ""),
-    getComplianceSummary(siteId),
-    getMicrosStatus(siteId),
-    getInventoryIntelligence(siteId),
-    // locRef resolved after micros status is fetched — use placeholder
-    Promise.resolve(null as any),
-  ]);
-
-  const { value: today }                             = settled(todayResult, EMPTY_TODAY);
-  const { value: reviews }                           = settled(reviewsResult, EMPTY_REVIEWS);
-  const { value: maintenance }                       = settled(maintenanceResult, EMPTY_MAINTENANCE);
-  const { value: events }                            = settled(eventsResult, [] as VenueEvent[]);
-  const { value: freshness }                         = settled(freshnessResult, null);
-  const { value: forecast }                          = settled(forecastResult, null as RevenueForecast | null);
-  const { value: complianceSummary }                 = settled(complianceResult, EMPTY_COMPLIANCE);
-  const { value: microsStatus }                      = settled(microsResult, null);
-  const { value: inventoryIntel }                    = settled(inventoryResult, null);
-
-  // Resolve MICROS locRef from DB connection (not env var).
-  // getMicrosStatus(siteId) already scoped this to the user's site — no fallback.
-  const msConn = microsStatus as MicrosStatusSummary | null;
-  const locRef = msConn?.connection?.loc_ref ?? null;
-  let labourSummary = locRef
-    ? await getStoredDailySummary(locRef).catch(() => null)
-    : null;
-  // Fall back up to 3 days if today has no data (handles multi-day sync gaps)
-  if (locRef && (!labourSummary || (labourSummary.totalLabourHours === 0 && labourSummary.activeStaffCount === 0))) {
-    for (let i = 1; i <= 3; i++) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const fb = await getStoredDailySummary(locRef, d.toISOString().split("T")[0]).catch(() => null);
-      if (fb && fb.totalLabourHours > 0) { labourSummary = fb; break; }
-    }
-  }
-
-  // ─── Unified sales snapshot (single source of truth for revenue) ─────────
-  const today_iso = todayISO();
-  const ms = microsStatus as MicrosStatusSummary | null;
-
-  const salesSnapshot = await getCurrentSalesSnapshot(
-    today_iso,
-    ms,
+  const {
+    brain,
+    salesSnapshot,
+    salesProvenance,
+    inventoryProvenance,
+    dutiesData,
+    engineOutput,
+    predictive,
+    feedbackProps,
     forecast,
-    today.total,
-    today.totalCovers,
-    siteId,
-  );
-
-  // Build canonical provenance for the revenue section
-  const salesProvenance = snapshotToProvenance(salesSnapshot, siteId, msConn?.connection?.loc_ref);
-
-  // ─── Operating score ────────────────────────────────────────────────────
-  const salesOverride = salesSnapshot.source !== "forecast"
-    ? { netSales: salesSnapshot.netSales, targetSales: salesSnapshot.targetSales, dataDate: salesSnapshot.businessDate }
-    : null;
-
-  // Build labour override from labour_daily_summary (primary source)
-  const labourScoreOverride = labourSummary?.labourPercentOfSales != null
-    ? {
-        labourPct:   labourSummary.labourPercentOfSales,
-        totalPay:    labourSummary.totalLabourCost,
-        totalHours:  labourSummary.totalLabourHours,
-        activeStaff: labourSummary.activeStaffCount,
-      }
-    : null;
-
-  // Await brain early so we can use its connection flags in BOTH the score engine
-  // AND the decision engine — single source of truth for POS connection state.
-  // Brain was started in parallel at the top of the function, so this adds no latency.
-  const brain = await brainPromise.catch(() => null);
-
-  // POS connection flags (from brain's context-builder, which is site-specific).
-  // Used to show "Not connected" in the HeroStrip top bar AND the score breakdown.
-  const revDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "REVENUE");
-  const labDriver = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "LABOUR");
-  const revenueConnected = revDriver?.connected !== false;   // true when connected or brain unavailable
-  const labourConnected  = labDriver?.connected  !== false;
-  // posConnected = true whenever micros_connections has a row for this site.
-  // Passed to getOperatingScore so null overrides (forecast mode, late labour sync)
-  // never trigger "No POS connection" — the two panels share one source of truth.
-  const posConnected = revenueConnected || labourConnected;
-
-  const operatingScore = await getOperatingScore(
-    siteId,
-    salesOverride,
-    labourScoreOverride,
-    null,
-    orgId ?? undefined,
-    posConnected,
-  ).catch(() => null);
-
-  // ─── Integration health ──────────────────────────────────────────────────
-  const cfgStatus = getMicrosConfigStatus();
-  const microsHealth = deriveMicrosIntegrationStatus(ms, cfgStatus.configured, cfgStatus.enabled);
-  const microsLiveData = canUseMicrosLiveData(microsHealth);
-
-  const servicePeriod = getServicePeriod("Africa/Johannesburg");
-
-  // ─── Site config (single source of truth for targets) ────────────────────
-  const siteConfig = await getSiteConfig(siteId);
-
-  // ─── Compute freshness ages ──────────────────────────────────────────────
-  const now = Date.now();
-  const salesAgeMinutes = salesSnapshot.freshnessMinutes ?? undefined;
-  const labourAgeMinutes = labourSummary?.lastSyncAt
-    ? Math.round((now - new Date(labourSummary.lastSyncAt).getTime()) / 60_000)
-    : undefined;
-  // Only report inventory freshness when automated sync is active;
-  // otherwise stale manual-count timestamps permanently trigger "critical"
-  const imEnabled = process.env.MICROS_IM_ENABLED === "true";
-  const inventoryAgeMinutes = imEnabled && inventoryIntel?.lastSynced
-    ? Math.round((now - new Date(inventoryIntel.lastSynced).getTime()) / 60_000)
-    : undefined;
-
-  // Build canonical provenance for the inventory section
-  const inventoryProvenance = inventoryToProvenance(inventoryIntel, siteId, imEnabled);
-
-  // ─── Labour % ─────────────────────────────────────────────────────────────────
-  // Primary source: labour_daily_summary.labour_pct (via getStoredDailySummary)
-  // Derived fallback: totalLabourCost / netSales when labour_pct is null but cost is known
-  // We do NOT fall back to micros_sales_daily.labor_pct — that field is often 0 or unreliable.
-  const derivedLabourPct =
-    labourSummary && labourSummary.totalLabourCost > 0 && salesSnapshot.netSales > 0
-      ? +(labourSummary.totalLabourCost / salesSnapshot.netSales * 100).toFixed(1)
-      : null;
-  const labourPct = labourSummary?.labourPercentOfSales ?? derivedLabourPct ?? 0;
-
-  // brain, revDriver, labDriver, revenueConnected, labourConnected and posConnected
-  // are declared above (before getOperatingScore) so the score breakdown and
-  // HeroStrip top bar share exactly the same flag and cannot diverge.
-
-  // ─── Decision Engine — single evaluation pass ───────────────────────────
-  const engineOutput = evaluateOperations({
-    revenue: {
-      actual: salesSnapshot.netSales,
-      target: salesSnapshot.targetSales ?? 0,
-      variancePercent: (salesSnapshot.targetSales ?? 0) > 0
-        ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
-        : 0,
-      covers: salesSnapshot.covers,
-      avgSpend: salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0,
-      connected: revenueConnected,
-    },
-    labour: {
-      labourPercent: labourPct,
-      targetPercent: siteConfig.target_labour_pct,
-      activeStaff: labourSummary?.activeStaffCount ?? undefined,
-      syncAgeMinutes: labourAgeMinutes,
-      connected: labourConnected,
-    },
-    inventory: {
-      criticalCount: inventoryIntel?.criticalItems.length ?? 0,
-      lowCount: inventoryIntel?.lowItems.length ?? 0,
-      noOpenPOCount: inventoryIntel?.noPOItems.length ?? 0,
-      atRiskItems: inventoryIntel
-        ? [...inventoryIntel.criticalItems, ...inventoryIntel.lowItems].slice(0, 5).map((item) => {
-            const mi = (inventoryIntel.menuImpact ?? []).find((m) => m.ingredientId === item.id);
-            return {
-              name: item.name,
-              affectedMenuItems: mi?.affectedDishes,
-              severity: item.risk_level === "critical" ? "critical" as const : "warning" as const,
-            };
-          })
-        : undefined,
-      syncAgeMinutes: inventoryAgeMinutes,
-    },
-    maintenance: {
-      openIssues: maintenance.openRepairs,
-      urgentIssues: maintenance.urgentIssues.length,
-      topIssue: maintenance.topProblemAsset ?? maintenance.urgentIssues[0]?.unit_name ?? undefined,
-      serviceBlocking: maintenance.serviceDisruptions > 0,
-    },
-    compliance: {
-      score: complianceSummary.compliance_pct,
-      currentPercent: complianceSummary.compliance_pct,
-      renewalsScheduled: complianceSummary.scheduled,
-      criticalMissing: complianceSummary.expired,
-    },
-    forecast: {
-      peakWindow: undefined,
-      forecastSales: forecast?.forecast_sales ?? undefined,
-      forecastCovers: forecast?.forecast_covers ?? undefined,
-      actualVsForecastPercent: forecast?.sales_gap_pct != null ? -forecast.sales_gap_pct : undefined,
-      confidence: forecast?.confidence,
-      timeToPeakMinutes: undefined,
-    },
-    bookings: {
-      lunchBookings: today.total > 0 ? Math.floor(today.total * 0.4) : undefined,
-      dinnerBookings: today.total > 0 ? Math.ceil(today.total * 0.6) : undefined,
-    },
-    freshness: {
-      salesAgeMinutes,
-      labourAgeMinutes,
-      inventoryAgeMinutes,
-    },
-  });
-
-  const scoreTotal = operatingScore?.total ?? engineOutput.operatingScoreBreakdown.reduce((s, b) => s + b.score, 0);
-
-  const revenueVariance = (salesSnapshot.targetSales ?? 0) > 0
-    ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
-    : 0;
-
-  // brain was already awaited above (before evaluateOperations)
-
-  // ─── Duty tasks — inline drilldown for PriorityActionBoard ──────────────
-  let dutiesData: DutiesData | undefined;
-  try {
-    const supabase = createServerClient() as any;
-    const today_date_local = new Date().toLocaleDateString("en-CA");
-    const { data: taskRows } = await supabase
-      .from("daily_ops_tasks")
-      .select("id, action_name, status, assigned_to, due_time")
-      .eq("site_id", siteId)
-      .eq("task_date", today_date_local)
-      .order("sort_order", { ascending: true });
-
-    if (taskRows && taskRows.length > 0) {
-      // Resolve assigned_to names
-      const userIds = Array.from(new Set(
-        (taskRows as any[]).map((t: any) => t.assigned_to).filter(Boolean)
-      )) as string[];
-      const profileMap: Record<string, string> = {};
-      if (userIds.length > 0) {
-        const { data: profiles } = await supabase
-          .from("profiles")
-          .select("id, full_name, email")
-          .in("id", userIds);
-        for (const p of (profiles ?? []) as any[]) {
-          profileMap[p.id] = p.full_name || p.email;
-        }
-      }
-      const allTasks = (taskRows as any[]).map((t: any) => ({
-        id:               t.id as string,
-        action_name:      t.action_name as string,
-        status:           t.status as string,
-        assigned_to_name: t.assigned_to ? (profileMap[t.assigned_to] ?? null) : null,
-        due_time:         t.due_time as string | null,
-      }));
-      const completedCount = allTasks.filter((t) => t.status === "completed").length;
-      dutiesData = {
-        tasks:          allTasks,
-        totalCount:     allTasks.length,
-        completedCount,
-      };
-    }
-  } catch {
-    // non-fatal — PriorityActionBoard degrades without dutiesData
-  }
-
-  // ─── Predictive signals for BusinessStatusRail ───────────────────────────
-  const dutiesDriver   = brain?.systemHealth.allScoreDrivers.find((d) => d.module === "DUTIES");
-  const dutiesCompPct  = dutiesDriver ? Math.round((dutiesDriver.pts / 20) * 100) : 100;
-
-  const dinnerRisk: PredictiveSignals["dinnerRisk"] =
-    (revenueVariance < -10 && dutiesCompPct < 70)  ? "High"   :
-    (maintenance.serviceDisruptions > 0)            ? "High"   :
-    (revenueVariance < -5  || dutiesCompPct < 80)   ? "Medium" : "Low";
-
-  const bookingPace: PredictiveSignals["bookingPace"] =
-    today.total >= 8 ? "Strong" :
-    today.total >= 3 ? "Moderate" : "Slow";
-
-  const staffOnFloor   = labourSummary?.activeStaffCount ?? 0;
-  const forecastCovers = forecast?.forecast_covers ?? 0;
-  const staffingPressure: PredictiveSignals["staffingPressure"] =
-    (staffOnFloor > 0 && forecastCovers > staffOnFloor * 15) ? "High"   :
-    (staffOnFloor > 0 && forecastCovers > staffOnFloor * 8)  ? "Medium" : "Low";
-
-  const predictive: PredictiveSignals = {
-    dinnerRisk,
-    bookingPace,
-    peakWindow: "19:00 – 21:00",
-    staffingPressure,
-  };
-
-  // ─── FeedbackLoop props ──────────────────────────────────────────────────
-  const gradeOrder    = ["D", "C", "B", "A"] as const;
-  const feedScore     = brain?.systemHealth.score ?? scoreTotal;
-  const feedGrade     = brain?.systemHealth.grade ?? "?";
-  const feedNextGrade = gradeOrder.find((g) =>
-    feedScore < ({ D: 50, C: 65, B: 80, A: 90 } as const)[g]
-  ) ?? null;
-  const feedPtsToNext = feedNextGrade
-    ? ({ D: 50, C: 65, B: 80, A: 90 } as const)[feedNextGrade] - feedScore
-    : 0;
-  const feedbackProps: FeedbackLoopProps = {
-    score:          feedScore,
-    grade:          feedGrade,
-    nextGrade:      feedNextGrade,
-    ptsToNextGrade: feedPtsToNext,
-    tradingTrend:   brain?.systemHealth.trend ?? "stable",
-    gmTier:         brain?.gmSituation.tier ?? "Unknown",
-    gmName:         brain?.gmSituation.name ?? "",
-  };
+    servicePeriod,
+    salesAgeMinutes,
+    reviews,
+    maintenance,
+  } = extras;
 
   return (
     <div className="space-y-0">
 
-      {/* ── LAYER 1 — Hero Strip (score · KPIs · sync) ── */}
+      {/* ── LAYER 1 — Hero Strip (score · KPIs · sync) ─────────────────────── */}
+      {/* Score comes from brain.systemHealth — same engine as canonical state. */}
       {brain && (
         <HeroStrip
           brain={brain}
           salesSnapshot={salesSnapshot}
-          revenueVariance={revenueVariance}
+          revenueVariance={state.revenue.gapPct}
           servicePeriod={servicePeriod}
           freshnessMinutes={salesAgeMinutes}
         />
       )}
 
-      {/* ── LAYER 2 — Priority Action Board ── */}
+      {/* ── LAYER 2 — Priority Action Board ─────────────────────────────────── */}
       {brain && (
         <PriorityActionBoard brain={brain} siteId={siteId} dutiesData={dutiesData} />
       )}
 
-      {/* ── LAYER 3 — Detail layer (below fold) ── */}
+      {/* ── LAYER 3 — Detail layer (below fold) ─────────────────────────────── */}
       <div className="space-y-4 pt-4">
 
         <AccountabilityAlert />
@@ -492,13 +123,21 @@ export default async function OperationsDashboard({
 
           {/* Primary Column */}
           <div className="lg:col-span-8 space-y-4">
+
+            {/* CommandFeed — decisions from evaluateOperations (same inputs as brain). */}
             <CommandFeed decisions={engineOutput.commandFeed} />
+
+            {/* ServicePulse — reads from canonical state.revenue — no local derivation. */}
             <ServicePulse
-              actual={salesSnapshot.netSales}
-              target={salesSnapshot.targetSales ?? 0}
-              variancePercent={revenueVariance}
+              actual={state.revenue.actual}
+              target={state.revenue.target}
+              variancePercent={state.revenue.gapPct}
               covers={salesSnapshot.covers}
-              avgSpend={salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0}
+              avgSpend={
+                salesSnapshot.covers > 0
+                  ? state.revenue.actual / salesSnapshot.covers
+                  : 0
+              }
               peakWindow={undefined}
               timeToPeakMinutes={null}
               forecastCovers={forecast?.forecast_covers}
@@ -513,15 +152,25 @@ export default async function OperationsDashboard({
 
           {/* Secondary Column */}
           <div className="lg:col-span-4 space-y-4">
-            <BusinessStatusRail status={engineOutput.businessStatus} predictive={predictive} />
+
+            {/* BusinessStatusRail — evaluateOperations.businessStatus (same inputs). */}
+            <BusinessStatusRail
+              status={engineOutput.businessStatus}
+              predictive={predictive}
+            />
+
+            {/* FeedbackLoop — canonical grade thresholds from spec (A≥85 B≥70 C≥55 D≥40). */}
             <FeedbackLoop {...feedbackProps} />
           </div>
         </div>
 
-        {/* ── Partial data gaps banner (below fold) ── */}
-        <DataHealthWarning health={engineOutput.dataHealth} inventoryProvenance={inventoryProvenance} />
+        {/* ── Data health / partial-data banner ── */}
+        <DataHealthWarning
+          health={engineOutput.dataHealth}
+          inventoryProvenance={inventoryProvenance}
+        />
 
-        {/* ── Secondary Drilldowns ── */}
+        {/* ── Secondary Drilldowns (display-only; not part of score engine) ── */}
         <SecondaryInsights
           reviews={reviews}
           maintenance={maintenance}
@@ -531,7 +180,3 @@ export default async function OperationsDashboard({
     </div>
   );
 }
-
-
-
-
