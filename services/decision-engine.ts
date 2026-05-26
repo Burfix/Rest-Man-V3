@@ -620,23 +620,40 @@ export function evaluateOperations(
           : "positive",
       supportingText: input.maintenance.topIssue ?? "No issues",
     },
-    compliance: {
-      label:
-        (input.compliance.criticalMissing ?? 0) > 0
-          ? `${input.compliance.criticalMissing} expired`
-          : `${input.compliance.currentPercent.toFixed(0)}% compliant`,
-      tone:
-        (input.compliance.criticalMissing ?? 0) > 0
-          ? "critical"
-          : input.compliance.currentPercent >= 90
-            ? "positive"
-            : "warning",
-      supportingText:
-        input.compliance.renewalsScheduled != null &&
-        input.compliance.renewalsScheduled > 0
-          ? `${input.compliance.renewalsScheduled} renewal${input.compliance.renewalsScheduled > 1 ? "s" : ""} scheduled`
-          : "No upcoming renewals",
-    },
+    compliance: (() => {
+      // Guard: 0% + no expired items = nothing configured yet (not a compliance failure).
+      // Prevents the "0% compliant" / warning display when no items have been set up.
+      const notConfigured =
+        input.compliance.currentPercent === 0 &&
+        (input.compliance.criticalMissing ?? 0) === 0;
+
+      if (notConfigured) {
+        return {
+          label: "Not configured",
+          tone: "neutral" as BusinessStatusTone,
+          supportingText: "No compliance items set up",
+        };
+      }
+
+      return {
+        label:
+          (input.compliance.criticalMissing ?? 0) > 0
+            ? `${input.compliance.criticalMissing} expired`
+            : `${input.compliance.currentPercent.toFixed(0)}% compliant`,
+        tone: (
+          (input.compliance.criticalMissing ?? 0) > 0
+            ? "critical"
+            : input.compliance.currentPercent >= 90
+              ? "positive"
+              : "warning"
+        ) as BusinessStatusTone,
+        supportingText:
+          input.compliance.renewalsScheduled != null &&
+          input.compliance.renewalsScheduled > 0
+            ? `${input.compliance.renewalsScheduled} renewal${input.compliance.renewalsScheduled > 1 ? "s" : ""} scheduled`
+            : "No upcoming renewals",
+      };
+    })(),
   };
 
   // ── Data Health ───────────────────────────────────────────────────────
