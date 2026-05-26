@@ -71,8 +71,14 @@ create policy "action_events_site_select"
   for select
   using (
     site_id in (
-      select site_id from public.profiles
-      where id = auth.uid()
+      select site_id from public.user_roles
+      where user_id = auth.uid() and is_active = true
+    )
+    or exists (
+      select 1 from public.user_roles
+      where user_id = auth.uid()
+        and is_active = true
+        and role in ('super_admin', 'head_office')
     )
   );
 
@@ -81,8 +87,8 @@ create policy "action_events_site_insert"
   for insert
   with check (
     site_id in (
-      select site_id from public.profiles
-      where id = auth.uid()
+      select site_id from public.user_roles
+      where user_id = auth.uid() and is_active = true
     )
   );
 
