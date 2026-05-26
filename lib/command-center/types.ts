@@ -212,6 +212,13 @@ export interface ServiceSession {
  * panel must read from.
  *
  * Frontend: display only. This object: truth engine.
+ *
+ * Reading contract:
+ *   score / grade / status   → score field (and riskVector.overallScore / grade)
+ *   ranked operational risks  → riskVector.governed
+ *   all narrative copy        → riskVector.narrative
+ *   projections               → riskVector.projections
+ *   raw domain data           → revenue / labour / compliance / maintenance
  */
 export interface CommandCenterState {
   siteId: string;
@@ -231,7 +238,7 @@ export interface CommandCenterState {
 
   /**
    * Business status rows — ordered for display.
-   * Revenue, Labour, Maintenance, Compliance (inventory if tracked).
+   * Revenue, Labour, Maintenance, Compliance.
    */
   businessStatus: BusinessStatusItem[];
 
@@ -240,6 +247,19 @@ export interface CommandCenterState {
 
   /** Command Feed items — derived from same risk signals as score. */
   commandFeed: CommandFeedItem[];
+
+  /**
+   * Governed operational risk vector.
+   *
+   * This is the NEW canonical layer — all panels should prefer reading
+   * from here rather than re-deriving risk, severity, or narrative copy.
+   *
+   * governed.critical (≤ 2) → Requires Action board
+   * governed.high     (≤ 4) → Command Feed top items
+   * narrative               → Hero subline + Recommended Action copy
+   * projections             → Performance Momentum + Service Pulse confidence
+   */
+  riskVector: import("@/lib/ops/risk-vector").OperationalRiskVector;
 }
 
 // ── API Response envelope ─────────────────────────────────────────────────────

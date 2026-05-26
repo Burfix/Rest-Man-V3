@@ -50,6 +50,9 @@ import type { PredictiveSignals }         from "@/components/operating-brain/Bus
 import type { FeedbackLoopProps }         from "@/components/operating-brain/FeedbackLoop";
 import type { DutiesData }                from "@/components/brain/PriorityActionBoard";
 
+import { buildOperationalState }        from "@/lib/ops/build-operational-state";
+import type { ForecastConfidence }       from "@/lib/ops/risk-vector";
+
 import {
   type CommandCenterState,
   type CanonicalScore,
@@ -776,6 +779,27 @@ export async function buildCommandCenterState(
     if (siteRow?.name) siteName = siteRow.name;
   } catch { /* non-fatal */ }
 
+  // ── Step 23: Operational risk vector (governed risk model) ───────────────
+  // This is the new canonical layer — all panels should migrate to reading
+  // from here instead of re-deriving risk, severity, or narrative copy.
+  const serviceMinutesRemaining = Math.max(0, 480 - serviceSession.minutesElapsed);
+  const riskVector = buildOperationalState({
+    score:       canonicalScore,
+    revenue:     canonicalRevenue,
+    labour:      canonicalLabour,
+    compliance:  canonicalCompliance,
+    maintenance: canonicalMaintenance,
+    serviceMinutesRemaining,
+    covers:      salesSnapshot.covers,
+    projectedClose:
+      safeBrain.forecastSummary.projectedClose > 0
+        ? safeBrain.forecastSummary.projectedClose
+        : null,
+    // null until we have ≥30 days of historical service data — NEVER synthesize
+    recoveryLikelihood: null,
+    forecastConfidence: (forecast?.confidence ?? "low") as ForecastConfidence,
+  });
+
   // ── Compose canonical state ───────────────────────────────────────────────
   const state: CommandCenterState = {
     siteId,
@@ -791,6 +815,7 @@ export async function buildCommandCenterState(
     businessStatus,
     systemPulse,
     commandFeed,
+    riskVector,
   };
 
   return {
