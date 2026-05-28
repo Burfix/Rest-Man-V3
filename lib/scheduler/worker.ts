@@ -84,7 +84,7 @@ export async function executeSyncJob(
     let result: Awaited<ReturnType<typeof dispatchSync>>;
 
     try {
-      result = await Sentry.withScope(async (scope) => {
+      result = await Sentry.withScope(async (scope: Sentry.Scope) => {
         scope.setTag("job_type", job.sync_type);
         scope.setTag("site_id", job.site_id);
         scope.setTag("scheduler", "sync");

@@ -1082,7 +1082,7 @@ export async function runOperatingBrain(
   }
 
   // Tag every Sentry event originating from this function with site/module context
-  Sentry.withScope((scope) => {
+  Sentry.withScope((scope: Sentry.Scope) => {
     scope.setTag("module", "operating-brain");
     scope.setTag("site_id", siteId);
   });

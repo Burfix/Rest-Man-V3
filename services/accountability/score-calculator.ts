@@ -232,7 +232,7 @@ export async function calculateDailyScores(
 
   if (upserts.length > 0) {
     // Set Sentry context before the upsert so any error is captured with full detail
-    Sentry.withScope((scope) => {
+    Sentry.withScope((scope: Sentry.Scope) => {
       scope.setTag("module", "score-calculator");
       scope.setTag("site_id", siteId);
       scope.setContext("scores", {

@@ -71,7 +71,7 @@ async function main() {
   const { getAllLocationConfigs, validateLocationRefUniqueness, getMissingEnvNames } =
     await import("../lib/micros/micros-location-registry");
 
-  let configs;
+  let configs: Awaited<ReturnType<typeof getAllLocationConfigs>>;
   try {
     configs = await getAllLocationConfigs();
   } catch (err) {
@@ -159,7 +159,7 @@ async function main() {
 
   // ── Location ref uniqueness check ────────────────────────────────────────
   console.log(bold("── Location Reference Uniqueness Check"));
-  let refConflicts;
+  let refConflicts: Awaited<ReturnType<typeof validateLocationRefUniqueness>>;
   try {
     refConflicts = await validateLocationRefUniqueness();
   } catch (err) {
