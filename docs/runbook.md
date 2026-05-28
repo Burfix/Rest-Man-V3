@@ -140,6 +140,20 @@ Returns connection status, last sync times, and whether sales/labour data exists
 
 **Fix:** Ensure Primi's `auth_flow='pkce'` in `micros_location_configs` (migration 104) and `USERNAME`/`PASSWORD` are set. The hard-block in `SimphonyClient` and `LabourClient` prevents this from happening silently.
 
+### Sea Castle labour cost shows R0 in Profit Intelligence
+
+**Symptom:** `labour_daily_summary` rows for `loc_ref=2001002` (Sea Castle) show `total_pay=0.00` and `total_hours=0.00` even though `active_staff_count > 0` (staff are clocking in). Dashboard shows a `labour_pay_unconfigured` data quality warning.
+
+**Root cause:** Oracle MICROS returns valid attendance timecards (clock-in/clock-out timestamps, employee numbers) but all pay and hours fields are zero. The `job_code_ref` field on every Sea Castle timecard is empty, indicating job codes 4 and 8 at this location have no pay rates configured in Oracle MICROS. Sea Castle is a hotel F&B outlet — the hotel likely runs payroll through a separate system and uses MICROS only for attendance recording.
+
+**This is NOT a ForgeStack bug.** The sync code, normalizer, and summary builder are all working correctly.
+
+**To fix:** Log into the Oracle MICROS Simphony admin for Sea Castle (org SCS) and configure pay rates for job codes 4 and 8. Once pay rates are set, the next labour sync will populate `reg_hrs`, `reg_pay`, `total_hours`, and `total_pay` correctly.
+
+**If pay rates will never be configured** (hotel payroll is always external): The `labour_pay_unconfigured` warning in the dashboard is the intended behaviour. No fix required in ForgeStack.
+
+---
+
 ### `configured=false` with empty `missingEnv` array
 
 **Cause:** The `auth_flow` in the DB does not match the credentials that are set. For example, `auth_flow='client_credentials'` but only `USERNAME/PASSWORD` are present (not `CLIENT_SECRET`).

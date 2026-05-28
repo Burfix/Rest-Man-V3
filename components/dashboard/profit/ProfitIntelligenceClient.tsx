@@ -1,40 +1,45 @@
 /**
  * components/dashboard/profit/ProfitIntelligenceClient.tsx
  *
- * Main client shell for the Profit Intelligence page.
+ * Profit Intelligence — main client shell for store managers and head office.
  *
- * Renders:
- *  - Date range selector
- *  - KPI strip
- *  - Profit Bridge (left) + Profit Leaks (right)
- *  - Recommended Actions
- *  - Data Quality panel
- *  - Head Office multi-store table (conditional on role)
+ * Layout (store manager view):
+ *   Header (store name + date range selector)
+ *   Revenue Mission Bar (KPI strip with progress bar + traffic lights)
+ *   Active Alerts | Profit Bridge (2-col grid)
+ *   Playbook (recommended actions)
+ *   Data Quality
  *
- * Fetches from /api/profit/intelligence and /api/profit/group via
- * client-side fetch on date range change.
+ * Additional for head office / executive:
+ *   All Stores — Profit Overview (HeadOfficeProfitTable)
+ *
+ * Fetches from /api/profit/intelligence and /api/profit/group on range change.
  */
 
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { ProfitKpiStrip }            from "./ProfitKpiStrip";
-import { ProfitBridgePanel }         from "./ProfitBridgePanel";
-import { ProfitLeaksPanel }          from "./ProfitLeaksPanel";
-import { RecommendedActionsPanel }   from "./RecommendedActionsPanel";
-import { DataQualityPanel }          from "./DataQualityPanel";
-import { HeadOfficeProfitTable }     from "./HeadOfficeProfitTable";
-import { ProfitEmptyState }          from "./ProfitEmptyState";
-import type { ProfitIntelligenceResult, GroupProfitIntelligenceResult, ProfitDateRange } from "@/lib/profit/types";
+import { ProfitKpiStrip }          from "./ProfitKpiStrip";
+import { ProfitBridgePanel }        from "./ProfitBridgePanel";
+import { ProfitLeaksPanel }         from "./ProfitLeaksPanel";
+import { RecommendedActionsPanel }  from "./RecommendedActionsPanel";
+import { DataQualityPanel }         from "./DataQualityPanel";
+import { HeadOfficeProfitTable }    from "./HeadOfficeProfitTable";
+import { ProfitEmptyState }         from "./ProfitEmptyState";
+import type {
+  ProfitIntelligenceResult,
+  GroupProfitIntelligenceResult,
+  ProfitDateRange,
+} from "@/lib/profit/types";
 
-// ── Date range tab ────────────────────────────────────────────────────────────
+// ── Date range selector ───────────────────────────────────────────────────────
 
 const DATE_RANGES: { value: ProfitDateRange; label: string }[] = [
   { value: "today",     label: "Today" },
   { value: "yesterday", label: "Yesterday" },
   { value: "7d",        label: "7 Days" },
-  { value: "mtd",       label: "Month to Date" },
+  { value: "mtd",       label: "MTD" },
 ];
 
 function DateRangeSelector({
@@ -64,26 +69,14 @@ function DateRangeSelector({
   );
 }
 
-// ── Profit at risk banner ─────────────────────────────────────────────────────
-
-function ProfitAtRiskBanner({ explanation }: { explanation: string }) {
-  return (
-    <div className="rounded-xl bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800/40 px-5 py-3 flex items-start gap-3">
-      <span className="text-red-500 text-lg shrink-0 mt-0.5">⚠</span>
-      <p className="text-sm font-semibold text-red-800 dark:text-red-300 leading-relaxed">
-        {explanation}
-      </p>
-    </div>
-  );
-}
-
 // ── Loading skeleton ──────────────────────────────────────────────────────────
 
 function LoadingSkeleton() {
   return (
-    <div className="flex flex-col gap-5 animate-pulse">
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        {Array.from({ length: 6 }).map((_, i) => (
+    <div className="flex flex-col gap-4 animate-pulse">
+      <div className="h-32 rounded-xl bg-stone-100 dark:bg-stone-800" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="h-20 rounded-xl bg-stone-100 dark:bg-stone-800" />
         ))}
       </div>
@@ -91,7 +84,6 @@ function LoadingSkeleton() {
         <div className="h-72 rounded-xl bg-stone-100 dark:bg-stone-800" />
         <div className="h-72 rounded-xl bg-stone-100 dark:bg-stone-800" />
       </div>
-      <div className="h-48 rounded-xl bg-stone-100 dark:bg-stone-800" />
     </div>
   );
 }
@@ -99,9 +91,7 @@ function LoadingSkeleton() {
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-  /** Pre-fetched on server for initial render */
   initialData: ProfitIntelligenceResult;
-  /** Present only for head office / executive roles */
   initialGroupData?: GroupProfitIntelligenceResult | null;
   isOrgUser: boolean;
   siteId: string;
@@ -117,9 +107,11 @@ export function ProfitIntelligenceClient({
 }: Props) {
   const [range, setRange]         = useState<ProfitDateRange>(initialData.dateRange);
   const [data, setData]           = useState<ProfitIntelligenceResult>(initialData);
-  const [groupData, setGroupData] = useState<GroupProfitIntelligenceResult | null>(initialGroupData ?? null);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState<string | null>(null);
+  const [groupData, setGroupData] = useState<GroupProfitIntelligenceResult | null>(
+    initialGroupData ?? null,
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
   const fetchData = useCallback(async (r: ProfitDateRange) => {
     setLoading(true);
@@ -130,7 +122,7 @@ export function ProfitIntelligenceClient({
         isOrgUser ? fetch(`/api/profit/group?range=${r}`) : Promise.resolve(null),
       ]);
 
-      if (!piRes.ok) throw new Error("Failed to load profit intelligence");
+      if (!piRes.ok) throw new Error("Failed to load profit data");
       const piJson = await piRes.json();
       setData(piJson.data);
 
@@ -145,82 +137,90 @@ export function ProfitIntelligenceClient({
     }
   }, [isOrgUser]);
 
-  // Refetch when range changes (skip initial render since we have SSR data)
+  // Refetch when range changes (skip initial SSR render which already has data)
   useEffect(() => {
     if (range !== initialData.dateRange) {
-      fetchData(range);
+      void fetchData(range);
     }
   }, [range, initialData.dateRange, fetchData]);
 
+  const s = data.currencySymbol || currencySymbol;
+
+  // Empty state: low confidence + no revenue at all
   const isEmpty = data.dataQuality.confidenceLevel === "low" && !data.revenue;
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* ── Header ────────────────────────────────────────────────────── */}
+    <div className="flex flex-col gap-5">
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-extrabold text-stone-900 dark:text-stone-100 tracking-tight">
             Profit Intelligence
           </h1>
           <p className="text-[12px] text-stone-500 mt-0.5">
-            {data.siteName} · {data.dataQuality.summary}
+            {data.siteName && data.siteName !== "Unknown" ? data.siteName : ""}
+            {data.businessDate
+              ? ` · ${new Date(data.businessDate + "T00:00:00").toLocaleDateString("en-ZA", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                })}`
+              : ""}
           </p>
         </div>
         <DateRangeSelector value={range} onChange={setRange} />
       </div>
 
-      {/* ── Loading / error ────────────────────────────────────────────── */}
+      {/* ── Loading ──────────────────────────────────────────────────────── */}
       {loading && <LoadingSkeleton />}
 
+      {/* ── Error ────────────────────────────────────────────────────────── */}
       {!loading && error && (
         <div className="rounded-xl border border-red-200 dark:border-red-800/40 bg-red-50 dark:bg-red-900/15 px-5 py-4">
-          <p className="text-sm text-red-700 dark:text-red-400">{error}</p>
+          <p className="text-sm font-semibold text-red-700 dark:text-red-400">{error}</p>
+          <p className="text-[11px] text-red-600/70 dark:text-red-400/70 mt-1">
+            Try refreshing or selecting a different date range.
+          </p>
         </div>
       )}
 
+      {/* ── Main content ─────────────────────────────────────────────────── */}
       {!loading && !error && (
-        <>
-          {isEmpty ? (
-            <ProfitEmptyState />
-          ) : (
-            <>
-              {/* Profit at risk banner */}
-              {data.profitAtRiskExplanation && (
-                <ProfitAtRiskBanner explanation={data.profitAtRiskExplanation} />
-              )}
+        isEmpty ? (
+          <ProfitEmptyState />
+        ) : (
+          <div className="flex flex-col gap-5">
+            {/* 1. Revenue Mission Bar + traffic-light metric tiles */}
+            <ProfitKpiStrip data={data} />
 
-              {/* KPI strip */}
-              <ProfitKpiStrip data={data} />
+            {/* 2. Active Alerts (left priority) + Profit Bridge (right) */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <ProfitLeaksPanel leaks={data.keyDrivers} symbol={s} />
+              <ProfitBridgePanel bridge={data.profitBridge} symbol={s} />
+            </div>
 
-              {/* Bridge + Leaks */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <ProfitBridgePanel bridge={data.profitBridge} symbol={currencySymbol} />
-                <ProfitLeaksPanel leaks={data.keyDrivers} symbol={currencySymbol} />
+            {/* 3. Playbook — profit-driven recommended actions */}
+            {data.recommendedActions.length > 0 && (
+              <RecommendedActionsPanel
+                actions={data.recommendedActions}
+                siteId={siteId}
+              />
+            )}
+
+            {/* 4. Head office multi-store view (executive / head_office roles) */}
+            {isOrgUser && groupData && (
+              <div>
+                <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 mb-3">
+                  All Stores — Profit Overview
+                </h2>
+                <HeadOfficeProfitTable data={groupData} symbol={s} />
               </div>
+            )}
 
-              {/* Recommended actions */}
-              {data.recommendedActions.length > 0 && (
-                <RecommendedActionsPanel
-                  actions={data.recommendedActions}
-                  siteId={siteId}
-                />
-              )}
-
-              {/* Head office multi-store view */}
-              {isOrgUser && groupData && (
-                <div>
-                  <h2 className="text-sm font-bold text-stone-900 dark:text-stone-100 mb-3">
-                    All Stores — Profit Overview
-                  </h2>
-                  <HeadOfficeProfitTable data={groupData} symbol={currencySymbol} />
-                </div>
-              )}
-
-              {/* Data quality */}
-              <DataQualityPanel quality={data.dataQuality} />
-            </>
-          )}
-        </>
+            {/* 5. Data quality — always last */}
+            <DataQualityPanel quality={data.dataQuality} />
+          </div>
+        )
       )}
     </div>
   );

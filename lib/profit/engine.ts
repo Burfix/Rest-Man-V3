@@ -196,6 +196,15 @@ interface LabourData {
   labourCost: number | null;
   labourPct: number | null;
   available: boolean;
+  /**
+   * true when labour_daily_summary rows exist for the period but every row
+   * has total_pay = 0 (and active_staff_count > 0).  This signals that pay
+   * rates are not configured in Oracle MICROS for this location (e.g. the
+   * hotel uses a separate payroll system).  Surfaced as a data quality flag
+   * so the dashboard shows an informational warning instead of silently
+   * displaying R0 labour.
+   */
+  timecardsPresentWithZeroPay: boolean;
 }
 
 async function loadLabourData(
@@ -212,7 +221,7 @@ async function loadLabourData(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data: labSummary } = await (supabase as any)
       .from("labour_daily_summary")
-      .select("total_pay, labour_pct")
+      .select("total_pay, labour_pct, active_staff_count")
       .eq("loc_ref", locRef)
       .gte("business_date", from)
       .lte("business_date", to) as { data: Array<Record<string, unknown>> | null };
@@ -220,7 +229,18 @@ async function loadLabourData(
     if (labSummary && labSummary.length > 0) {
       const labourCost = labSummary.reduce((s, r) => s + Number(r.total_pay ?? 0), 0);
       const labourPct  = revenue && revenue > 0 ? (labourCost / revenue) * 100 : null;
-      return { labourCost: labourCost > 0 ? labourCost : null, labourPct, available: labourCost > 0 };
+
+      // Detect "timecards present but no pay" — Oracle returned attendance records
+      // but job codes have no pay rates configured (e.g. hotel using separate payroll).
+      const hasStaff = labSummary.some((r) => Number(r.active_staff_count ?? 0) > 0);
+      const timecardsPresentWithZeroPay = labourCost === 0 && hasStaff;
+
+      return {
+        labourCost: labourCost > 0 ? labourCost : null,
+        labourPct,
+        available: labourCost > 0,
+        timecardsPresentWithZeroPay,
+      };
     }
   }
 
@@ -236,10 +256,10 @@ async function loadLabourData(
     const rows = data as Array<Record<string, unknown>>;
     const labourCost = rows.reduce((s, r) => s + Number(r.labour_cost ?? 0), 0);
     const labourPct  = revenue && revenue > 0 ? (labourCost / revenue) * 100 : null;
-    return { labourCost: labourCost > 0 ? labourCost : null, labourPct, available: labourCost > 0 };
+    return { labourCost: labourCost > 0 ? labourCost : null, labourPct, available: labourCost > 0, timecardsPresentWithZeroPay: false };
   }
 
-  return { labourCost: null, labourPct: null, available: false };
+  return { labourCost: null, labourPct: null, available: false, timecardsPresentWithZeroPay: false };
 }
 
 // ── Food cost / inventory loader ──────────────────────────────────────────────
@@ -456,6 +476,7 @@ function assessDataQuality(
   foodCostEstimated: boolean,
   staleSales: boolean,
   dailyOverheadEstimate?: number,
+  timecardsPresentWithZeroPay?: boolean,
 ): DataQuality {
   const flags: DataQualityFlag[] = [];
   let confidenceLevel: ConfidenceLevel = "high";
@@ -468,7 +489,16 @@ function assessDataQuality(
     flags.push({ key: "stale_sales", message: "Sales data is stale. Profit view may not reflect current trading.", severity: "warning" });
   }
 
-  if (!labourAvailable) {
+  if (timecardsPresentWithZeroPay) {
+    // Staff are clocking in but Oracle MICROS has no pay rates configured for this location.
+    // Downgrade to medium but don't block the profit estimate — overhead/food cost still work.
+    confidenceLevel = confidenceLevel === "high" ? "medium" : confidenceLevel;
+    flags.push({
+      key: "labour_pay_unconfigured",
+      message: "Staff attendance is recorded but pay rates are not configured in Oracle MICROS for this location. Labour cost shows as R0 — configure job code pay rates in Oracle to enable labour margin tracking.",
+      severity: "warning",
+    });
+  } else if (!labourAvailable) {
     confidenceLevel = confidenceLevel === "high" ? "medium" : confidenceLevel;
     flags.push({ key: "no_labour", message: "Labour cost unavailable. Margin calculation is partial.", severity: "warning" });
   }
@@ -639,6 +669,7 @@ export async function getProfitIntelligence(
     foodCost.isEstimated,
     sales.isStale,
     settings.dailyOverheadEstimate,
+    labour.timecardsPresentWithZeroPay,
   );
 
   return {
@@ -681,11 +712,13 @@ export async function getGroupProfitIntelligence(
 ): Promise<GroupProfitIntelligenceResult> {
   const supabase = createServerClient();
 
-  // Get all sites for this org
+  // Get all active sites for this org
   const { data: sitesData } = await supabase
     .from("sites")
     .select("id, name")
-    .eq("org_id", orgId);
+    .eq("organisation_id", orgId)
+    .eq("is_active", true)
+    .neq("store_code", "TEST-01");
 
   const sites = (sitesData ?? []) as Array<{ id: string; name: string }>;
 
