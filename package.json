@@ -18,6 +18,7 @@
     "micros:sync:sea-castle": "npx tsx scripts/run-sync-sea-castle.ts",
     "micros:backfill:sea-castle": "npx tsx scripts/backfill-sea-castle-30-days.ts",
     "micros:validate": "npx tsx scripts/validate-micros-location-refs.ts",
+    "micros:doctor": "npx tsx scripts/micros-doctor.ts",
     "verify:sites": "npx tsx scripts/verify-sites.ts"
   },
   "dependencies": {

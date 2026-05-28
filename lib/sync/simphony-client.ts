@@ -13,6 +13,7 @@ import {
 } from "@/lib/micros/location-auth";
 import {
   getLocationConfigForConnection,
+  getMissingEnvNames,
   type LocationConfig,
 } from "@/lib/micros/micros-location-registry";
 import { logger } from "@/lib/logger";
@@ -89,12 +90,7 @@ export class SimphonyClient {
     // cache (location-auth.ts). This prevents Oracle error 33102 caused by a
     // global cached token belonging to a different Oracle org.
     if (this.locationConfig) {
-      if (!this.locationConfig.configured) {
-        logger.warn("[SimphonyClient] LocationConfig not fully configured — falling back to global token", {
-          orgIdentifier: this.orgIdentifier,
-          locationKey:   this.locationConfig.key,
-        });
-      } else {
+      if (this.locationConfig.configured) {
         logger.info("[SimphonyClient] Acquiring per-org token", {
           orgIdentifier: this.orgIdentifier,
           locationKey:   this.locationConfig.key,
@@ -102,26 +98,46 @@ export class SimphonyClient {
         });
         return acquireLocationToken(this.locationConfig);
       }
+
+      // LocationConfig found but not fully configured — determine exactly which
+      // env vars are missing so the operator gets an actionable error message.
+      const missing = getMissingEnvNames(this.locationConfig);
+      logger.warn("[SimphonyClient] LocationConfig not fully configured", {
+        orgIdentifier: this.orgIdentifier,
+        locationKey:   this.locationConfig.key,
+        missingEnv:    missing,
+      });
+
+      // Hard-block: PRI/PRIMI must never fall through to the global SCS token.
+      const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
+      if (NON_GLOBAL_ORGS.includes(this.orgIdentifier.toUpperCase())) {
+        throw new SimphonyAuthError(
+          `Simphony auth failed: org=${this.orgIdentifier} requires per-location credentials ` +
+          `(tokenIsolation=per-location). Global token fallback is refused. ` +
+          `Missing env vars: ${missing.length > 0 ? missing.join(", ") : "(none detected — check DB auth_flow)"}. ` +
+          `Set these in Vercel and ensure micros_location_configs.auth_flow='client_credentials' for location_key='primi-camps-bay'.`,
+        );
+      }
     } else {
       // No LocationConfig found for this org — log a warning and fall back.
       // This is expected for orgs not yet in the registry but is a known
       // token isolation risk when multiple Oracle orgs are in use.
       logger.warn("[SimphonyClient] No LocationConfig for org — using global token (TOKEN_ORG_MISMATCH_RISK)", {
         orgIdentifier: this.orgIdentifier,
-        hint: "Register the org in micros-location-registry.ts to enable per-org token isolation.",
+        hint: "Register the org in micros_location_configs to enable per-org token isolation.",
       });
-    }
 
-    // Hard-block: known non-SCS orgs must never use the global token.
-    // The global token is a Si Cantina / SCS PKCE token. Sending it to any
-    // other org causes Oracle error 33102 (identity mismatch). Throw here so
-    // the failure is loud and immediate rather than a silent wrong-org request.
-    const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
-    if (NON_GLOBAL_ORGS.includes(this.orgIdentifier.toUpperCase())) {
-      throw new SimphonyAuthError(
-        `Primi requires configured per-location credentials; refusing global token fallback for org=${this.orgIdentifier}. ` +
-        `Ensure micros_location_configs.auth_flow='client_credentials' and MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET is set.`,
-      );
+      // Hard-block: known non-SCS orgs must never use the global token even
+      // when no LocationConfig row exists. The global token is a SCS PKCE token.
+      const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
+      if (NON_GLOBAL_ORGS.includes(this.orgIdentifier.toUpperCase())) {
+        throw new SimphonyAuthError(
+          `Simphony auth failed: org=${this.orgIdentifier} has no location registry entry ` +
+          `and global token fallback is refused. ` +
+          `Add a row to micros_location_configs with location_key='primi-camps-bay', ` +
+          `auth_flow='client_credentials', and set MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET.`,
+        );
+      }
     }
 
     // Global fallback path (single-org SCS deployments only)

@@ -13,6 +13,7 @@ import {
 } from "@/lib/micros/location-auth";
 import {
   getLocationConfigForConnection,
+  getMissingEnvNames,
 } from "@/lib/micros/micros-location-registry";
 import { logger } from "@/lib/logger";
 import type {
@@ -167,6 +168,9 @@ async function perConnectionPost<T>(
 
   let idToken: string;
 
+  // Hard-block constant — shared between configured/unconfigured paths
+  const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
+
   if (locationCfg?.configured) {
     logger.info("[LabourClient] Using per-org token for Oracle request", {
       orgIdentifier: resolvedOrgIdentifier,
@@ -175,28 +179,45 @@ async function perConnectionPost<T>(
       endpoint,
     });
     idToken = await acquireLocationToken(locationCfg);
-  } else {
-    // Hard-block: known non-SCS orgs must never use the global token.
-    const NON_GLOBAL_ORGS = ["PRI", "PRIMI"];
+  } else if (locationCfg && !locationCfg.configured) {
+    // LocationConfig exists but is incomplete — surface exactly which env vars are missing.
+    const missing = getMissingEnvNames(locationCfg);
+    logger.warn("[LabourClient] LocationConfig not fully configured", {
+      orgIdentifier: resolvedOrgIdentifier,
+      locationKey:   locationCfg.key,
+      missingEnv:    missing,
+      endpoint,
+    });
     if (NON_GLOBAL_ORGS.includes(resolvedOrgIdentifier.toUpperCase())) {
       throw new Error(
-        `[LabourClient] Primi requires configured per-location credentials; refusing global token fallback for org=${resolvedOrgIdentifier}. ` +
-        `Ensure micros_location_configs.auth_flow='client_credentials' and MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET is set.`,
+        `[LabourClient] org=${resolvedOrgIdentifier} requires per-location credentials ` +
+        `(tokenIsolation=per-location). Global token fallback is refused. ` +
+        `Missing env vars: ${missing.length > 0 ? missing.join(", ") : "(none detected — check DB auth_flow)"}. ` +
+        `Set these in Vercel and ensure micros_location_configs.auth_flow='client_credentials' for location_key='primi-camps-bay'.`,
       );
     }
-    if (!locationCfg) {
-      logger.warn("[LabourClient] org_identifier not in location registry — using global token (TOKEN_ORG_MISMATCH_RISK)", {
-        orgIdentifier: resolvedOrgIdentifier,
-        endpoint,
-        hint: "Register the org in micros-location-registry.ts for token isolation.",
-      });
-    } else {
-      logger.warn("[LabourClient] LocationConfig not fully configured — using global token", {
-        orgIdentifier: resolvedOrgIdentifier,
-        locationKey:   locationCfg.key,
-        endpoint,
-      });
+    // Non-PRI unconfigured location — warn and fall back to global token
+    logger.warn("[LabourClient] Falling back to global token for unconfigured org", {
+      orgIdentifier: resolvedOrgIdentifier,
+      locationKey:   locationCfg.key,
+      endpoint,
+    });
+    idToken = await getMicrosIdToken();
+  } else {
+    // No LocationConfig row at all for this org
+    if (NON_GLOBAL_ORGS.includes(resolvedOrgIdentifier.toUpperCase())) {
+      throw new Error(
+        `[LabourClient] org=${resolvedOrgIdentifier} has no location registry entry ` +
+        `and global token fallback is refused. ` +
+        `Add a row to micros_location_configs with location_key='primi-camps-bay', ` +
+        `auth_flow='client_credentials', and set MICROS_PRIMI_CAMPS_BAY_CLIENT_SECRET.`,
+      );
     }
+    logger.warn("[LabourClient] org_identifier not in location registry — using global token (TOKEN_ORG_MISMATCH_RISK)", {
+      orgIdentifier: resolvedOrgIdentifier,
+      endpoint,
+      hint: "Register the org in micros_location_configs for token isolation.",
+    });
     idToken = await getMicrosIdToken();
   }
 

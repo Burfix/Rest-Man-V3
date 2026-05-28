@@ -87,6 +87,12 @@ export interface LocationConfig {
    * Safe to surface in status APIs (no secret values exposed).
    */
   configured: boolean;
+  /**
+   * The env var prefix used for this location (e.g. "MICROS_PRIMI_CAMPS_BAY_").
+   * Safe to expose — it is not a secret value.
+   * Used by getMissingEnvNames() to report which specific vars are absent.
+   */
+  envPrefix: string;
 }
 
 export interface LocationRefConflict {
@@ -161,6 +167,7 @@ function buildConfigFromRow(row: {
     authFlow,
     enabled:             row.enabled,
     configured,
+    envPrefix:           row.env_prefix,
   };
 }
 
@@ -267,12 +274,68 @@ export function safeConfigSummary(cfg: LocationConfig) {
     clientId:             cfg.clientId,
     locationRef:          cfg.locationRef,
     authFlow:             cfg.authFlow,
+    envPrefix:            cfg.envPrefix,
     enabled:              cfg.enabled,
     configured:           cfg.configured,
+    tokenIsolation:       "per-location" as const,
     hasClientSecret:      cfg.clientSecret !== null && cfg.clientSecret.length > 0,
     hasPassword:          cfg.password !== null && cfg.password.length > 0,
     hasUsername:          cfg.username !== null && cfg.username.length > 0,
+    missingEnv:           getMissingEnvNames(cfg),
   };
+}
+
+/**
+ * Returns the names of required env vars that are currently absent or empty
+ * for the given location config.
+ *
+ * SAFE TO EXPOSE: returns only env var *names*, never values.
+ * The returned array is empty when the location is fully configured.
+ *
+ * Used by:
+ *   - Admin integration health route (non-secret status check)
+ *   - micros:doctor script
+ *   - Error messages in SimphonyClient / LabourClient
+ */
+export function getMissingEnvNames(cfg: LocationConfig): string[] {
+  const p = cfg.envPrefix; // e.g. "MICROS_PRIMI_CAMPS_BAY_"
+  const missing: string[] = [];
+
+  // Non-secret connection vars required for all flows
+  if (!process.env[`${p}AUTH_URL`] && !process.env[`${p}AUTH_SERVER`]) {
+    missing.push(`${p}AUTH_URL`);
+  }
+  if (!process.env[`${p}BI_SERVER`] && !process.env[`${p}APP_SERVER`]) {
+    missing.push(`${p}BI_SERVER`);
+  }
+  if (!process.env[`${p}CLIENT_ID`]) {
+    missing.push(`${p}CLIENT_ID`);
+  }
+  if (!process.env[`${p}ORG_SHORT_NAME`] && !process.env[`${p}ORG_IDENTIFIER`]) {
+    missing.push(`${p}ORG_IDENTIFIER`);
+  }
+
+  // Credential var — differs by flow
+  if (cfg.authFlow === "pkce") {
+    if (!process.env[`${p}USERNAME`] && !process.env[`${p}API_ACCOUNT_NAME`]) {
+      missing.push(`${p}USERNAME`);
+    }
+    if (!process.env[`${p}PASSWORD`] && !process.env[`${p}API_ACCOUNT_PASSWORD`]) {
+      missing.push(`${p}PASSWORD`);
+    }
+  } else {
+    // client_credentials
+    if (!process.env[`${p}CLIENT_SECRET`]) {
+      missing.push(`${p}CLIENT_SECRET`);
+    }
+  }
+
+  // location_ref — only needed from env when DB row has NULL
+  if (!cfg.locationRef) {
+    missing.push(`${p}LOCATION_REF`);
+  }
+
+  return missing;
 }
 
 /**
