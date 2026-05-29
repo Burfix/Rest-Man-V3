@@ -59,6 +59,18 @@ function toDateRange(range: ProfitDateRange): { from: string; to: string } {
   }
 }
 
+// ── Day-count helper ──────────────────────────────────────────────────────────
+
+/**
+ * Returns the number of calendar days covered by [from, to] inclusive.
+ * "today" and "yesterday" = 1; "7d" = 7; "mtd" varies by elapsed month days.
+ */
+function getDayCount(from: string, to: string): number {
+  const fromMs = new Date(from + "T00:00:00").getTime();
+  const toMs   = new Date(to   + "T00:00:00").getTime();
+  return Math.max(1, Math.round((toMs - fromMs) / 86_400_000) + 1);
+}
+
 // ── Profit settings loader ────────────────────────────────────────────────────
 
 async function loadProfitSettings(siteId: string): Promise<ProfitSettings> {
@@ -394,6 +406,57 @@ async function loadOverheadAllocation(
   };
 }
 
+// ── Historical revenue baseline ───────────────────────────────────────────────
+
+interface HistoricalBaseline {
+  /** Average net sales across trading days (net_sales > 0) in the past 60 days. */
+  dailyAvgRevenue: number | null;
+  /** Average guest count across those same trading days. */
+  dailyAvgCovers: number | null;
+  /** Number of trading days found — used to decide whether baseline is reliable. */
+  tradingDays: number;
+}
+
+/**
+ * Computes a 60-day rolling average of daily net sales for this site.
+ * Uses micros_sales_daily.site_id for direct, tenant-isolated lookup.
+ * Excludes days where net_sales = 0 (restaurant closed / no trading data).
+ * Returns null fields when fewer than 7 trading days exist — not enough
+ * signal to build a reliable baseline; engine falls back to the static formula.
+ */
+async function loadHistoricalRevenue(siteId: string): Promise<HistoricalBaseline> {
+  const supabase = createServerClient();
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 60);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data } = await (supabase as any)
+    .from("micros_sales_daily")
+    .select("net_sales, guest_count")
+    .eq("site_id", siteId)
+    .gte("business_date", cutoffStr)
+    .gt("net_sales", 0); // exclude closed days
+
+  const rows = (data ?? []) as Array<Record<string, unknown>>;
+
+  if (rows.length < 7) {
+    // Fewer than 7 trading days → baseline is statistically unreliable.
+    return { dailyAvgRevenue: null, dailyAvgCovers: null, tradingDays: rows.length };
+  }
+
+  const n            = rows.length;
+  const totalRevenue = rows.reduce((s, r) => s + Number(r.net_sales   ?? 0), 0);
+  const totalCovers  = rows.reduce((s, r) => s + Number(r.guest_count ?? 0), 0);
+
+  return {
+    dailyAvgRevenue: totalRevenue / n,
+    dailyAvgCovers:  totalCovers  > 0 ? totalCovers / n : null,
+    tradingDays:     n,
+  };
+}
+
 // ── Profit at risk ────────────────────────────────────────────────────────────
 
 function calcProfitAtRisk(
@@ -577,9 +640,10 @@ export async function getProfitIntelligence(
 ): Promise<ProfitIntelligenceResult> {
   const { from, to } = toDateRange(dateRange);
 
-  const [siteConfig, settings] = await Promise.all([
+  const [siteConfig, settings, historical] = await Promise.all([
     getSiteConfig(siteId),
     loadProfitSettings(siteId),
+    loadHistoricalRevenue(siteId),
   ]);
 
   // Resolve overhead: allocation table takes priority over profit_settings estimate
@@ -615,11 +679,21 @@ export async function getProfitIntelligence(
         effectiveOverhead
       : null;
 
-  // Profit at risk
-  const targetRevenue =
-    siteConfig.target_avg_spend && siteConfig.seating_capacity
-      ? siteConfig.target_avg_spend * siteConfig.seating_capacity * 0.7 // 70% occupancy assumption
-      : null;
+  // ── Target revenue: historical rolling baseline + 10% growth target ──────────
+  // Preferred: 60-day average of actual trading days × 1.10 × period day count.
+  // This adapts to each site's real trading pattern instead of a static formula.
+  // Fallback (insufficient history): target_avg_spend × seating_capacity × 0.70.
+  const dayCount = getDayCount(from, to);
+  const targetRevenue = historical.dailyAvgRevenue != null
+    ? Math.round(historical.dailyAvgRevenue * 1.10 * dayCount)
+    : (siteConfig.target_avg_spend && siteConfig.seating_capacity
+        ? siteConfig.target_avg_spend * siteConfig.seating_capacity * 0.7 * dayCount
+        : null);
+
+  // Period-adjusted cover target (historical avg + 10%, or seating × 70% fallback)
+  const targetCoversComputed = historical.dailyAvgCovers != null
+    ? Math.round(historical.dailyAvgCovers * 1.10 * dayCount)
+    : (siteConfig.seating_capacity ? Math.round(siteConfig.seating_capacity * 0.7 * dayCount) : null);
 
   const { profitAtRisk, explanation: profitAtRiskExplanation } = calcProfitAtRisk(
     sales.revenue,
@@ -652,7 +726,7 @@ export async function getProfitIntelligence(
     estimatedWaste: foodCost.estimatedWaste,
     discountsComps: sales.discountsComps,
     covers: sales.covers,
-    targetCovers: siteConfig.seating_capacity ? siteConfig.seating_capacity * 0.7 : null,
+    targetCovers: targetCoversComputed,
     avgSpend: sales.avgSpend,
     targetAvgSpend: siteConfig.target_avg_spend,
     inventoryAvailable: foodCost.inventoryAvailable,
