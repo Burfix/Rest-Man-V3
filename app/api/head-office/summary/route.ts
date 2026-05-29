@@ -84,7 +84,7 @@ export async function GET() {
     // ── 3. Fetch sites scoped to user's orgs ────────────────────────────────
     let sitesQ = db
       .from("sites")
-      .select("id, name, site_type, organisation_id, deployment_stage")
+      .select("id, name, site_type, organisation_id")
       .eq("is_active", true)
       .neq("store_code", "TEST-01");
 
@@ -116,7 +116,6 @@ export async function GET() {
       name: string;
       site_type: string | null;
       organisation_id: string;
-      deployment_stage: string | null;
     }[];
 
     if (sites.length === 0) {
@@ -138,22 +137,18 @@ export async function GET() {
     const today     = new Date().toISOString().slice(0, 10);
     const sevenAgo  = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
 
-    // Derive POS connection state: a site has live data if it has a recent store_snapshot
-    // with non-null net_sales. Purely from store_snapshots — no external table dependency.
-    const { data: snapshotRows, error: snapshotErr } = await db
-      .from("store_snapshots")
+    // Derive POS connection state: a site has an active MICROS connection or
+    // recent micros_sales_daily data within the last 7 days.
+    const { data: recentSalesRows } = await db
+      .from("micros_sales_daily")
       .select("site_id")
       .in("site_id", siteIds)
       .not("net_sales", "is", null)
-      .gte("snapshot_date", sevenAgo)
+      .gte("business_date", sevenAgo)
       .limit(500);
 
-    if (snapshotErr) {
-      logger.warn("Head Office snapshot query failed — POS detection disabled", { err: snapshotErr.message });
-    }
-
     const sitesWithRecentSales = new Set<string>(
-      ((snapshotRows ?? []) as any[]).map((r: any) => r.site_id as string),
+      ((recentSalesRows ?? []) as any[]).map((r: any) => r.site_id as string),
     );
 
     const [mpsYestResult, mpsWeekResult, tasksResult, maintResult, actionsResult] =
@@ -246,7 +241,7 @@ export async function GET() {
       .map((site) => {
         const score           = scoreMap.get(site.id) ?? null;
         const hasPosConnection = sitesWithRecentSales.has(site.id);
-        const deploymentStage = (site.deployment_stage ?? "live") as "live" | "partial" | "pending";
+        const deploymentStage: "live" | "partial" | "pending" = hasPosConnection ? "live" : "partial";
         return {
           id:                   site.id,
           name:                 site.name,
