@@ -13,8 +13,8 @@
  * called from API routes and server actions without RLS conflicts.
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { writeAuditLog } from "@/lib/audit/auditLog";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 import type {
   Action,
   ActionEvent,
@@ -22,12 +22,13 @@ import type {
   ActionEventType,
 } from "@/lib/ontology/entities";
 
-// Service-role client
-const db = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+// Service-role client — module-level singleton. Bypasses RLS.
+// TENANT SAFETY CONTRACT: Every query in this module MUST include
+//   .eq("site_id", siteId) or .eq("id", actionId) where actionId is
+//   pre-validated to belong to the caller's site.
+// Callers are responsible for validating siteId via getUserContext()
+// or apiGuard() before invoking any function here.
+const db = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

@@ -11,7 +11,6 @@
  */
 
 import { NextResponse }                             from "next/server";
-import { createClient }                             from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse }         from "@/lib/auth/get-user-context";
 import {
   computeWeeklySummary,
@@ -19,6 +18,7 @@ import {
   type WeeklySummary,
 } from "@/lib/incidents/analytics";
 import { logger }                                   from "@/lib/logger";
+import { getServiceRoleClient }                     from "@/lib/supabase/service-role-client";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +28,7 @@ const REPORT_VIEW_ROLES = new Set([
 ]);
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  return getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 function withVisibility(query: any, siteIds: string[]) {

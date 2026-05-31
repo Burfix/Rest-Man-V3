@@ -20,6 +20,7 @@
 import { createServerClient } from "@/lib/supabase/server";
 import { getSiteConfig } from "@/lib/config/site";
 import { detectProfitLeaks } from "./leaks";
+import { SANDBOX_STORE_CODE } from "@/lib/demo/sandbox-config";
 import type {
   ProfitIntelligenceResult,
   GroupProfitIntelligenceResult,
@@ -792,7 +793,7 @@ export async function getGroupProfitIntelligence(
     .select("id, name")
     .eq("organisation_id", orgId)
     .eq("is_active", true)
-    .neq("store_code", "TEST-01");
+    .neq("store_code", SANDBOX_STORE_CODE);
 
   const sites = (sitesData ?? []) as Array<{ id: string; name: string }>;
 

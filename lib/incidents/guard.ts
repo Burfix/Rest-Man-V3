@@ -18,9 +18,9 @@
  */
 
 import { NextResponse }                              from "next/server";
-import { createClient }                              from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse }         from "@/lib/auth/get-user-context";
 import type { UserContext }                          from "@/lib/auth/get-user-context";
+import { getServiceRoleClient }                      from "@/lib/supabase/service-role-client";
 
 // ── Role sets ─────────────────────────────────────────────────────────────────
 
@@ -60,11 +60,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  return getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 // ── Public guard ──────────────────────────────────────────────────────────────

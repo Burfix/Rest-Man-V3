@@ -9,11 +9,10 @@
 import { redirect }                  from "next/navigation";
 import { getUserContext, AuthError }  from "@/lib/auth/get-user-context";
 import SitesGridClient               from "@/components/dashboard/head-office/SitesGridClient";
+import { ELEVATED_ROLES }            from "@/lib/rbac/roles";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
-
-const ELEVATED = new Set(["head_office", "super_admin", "executive", "area_manager", "auditor"]);
 
 export default async function HeadOfficeSitesPage() {
   let ctx;
@@ -24,7 +23,7 @@ export default async function HeadOfficeSitesPage() {
     throw err;
   }
 
-  if (!ELEVATED.has(ctx.role)) {
+  if (!ELEVATED_ROLES.has(ctx.role)) {
     redirect("/dashboard");
   }
 

@@ -8,11 +8,10 @@
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { redirect }       from "next/navigation";
 import HeadOfficeClient   from "@/components/dashboard/head-office/HeadOfficeClient";
+import { ELEVATED_ROLES } from "@/lib/rbac/roles";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
-
-const ELEVATED = ["super_admin", "executive", "head_office", "area_manager", "tenant_owner"];
 
 export default async function HeadOfficePage() {
   let ctx;
@@ -22,7 +21,7 @@ export default async function HeadOfficePage() {
     redirect("/login");
   }
 
-  if (!ELEVATED.includes(ctx.role ?? "")) {
+  if (!ELEVATED_ROLES.has(ctx.role)) {
     redirect("/dashboard");
   }
 

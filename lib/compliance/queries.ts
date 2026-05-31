@@ -11,14 +11,10 @@
  *         v_compliance_summary_by_tenant
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────

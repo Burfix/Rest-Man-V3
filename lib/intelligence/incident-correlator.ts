@@ -18,8 +18,8 @@
  * Uses the service-role client to read across all sites without RLS interference.
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { logger }       from "@/lib/logger";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -76,11 +76,7 @@ export interface CorrelationReport {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient();
 }
 
 /**

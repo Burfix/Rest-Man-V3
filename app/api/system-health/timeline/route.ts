@@ -15,9 +15,9 @@
  */
 
 import { NextResponse }                  from "next/server";
-import { createClient }                  from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import { logger }                        from "@/lib/logger";
+import { getServiceRoleClient }          from "@/lib/supabase/service-role-client";
 
 export const dynamic = "force-dynamic";
 
@@ -56,11 +56,7 @@ export interface TimelinePayload {
 // ── Service client ────────────────────────────────────────────────────────────
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient();
 }
 
 // ── Feed type inference from sync_type ────────────────────────────────────────

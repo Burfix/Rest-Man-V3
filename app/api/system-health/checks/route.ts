@@ -15,12 +15,12 @@
 
 import { NextResponse }           from "next/server";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
-import { createClient }           from "@supabase/supabase-js";
 import { logger }                 from "@/lib/logger";
+import { getServiceRoleClient }   from "@/lib/supabase/service-role-client";
+import { ELEVATED_ROLES }         from "@/lib/rbac/roles";
+import { jsonCompatSuccess, jsonCompatError } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
-
-const ELEVATED = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,12 +43,9 @@ interface ChecksPayload {
 
 // ── Service-role client (bypasses RLS — needed to read micros_connections) ────
 
-function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serviceDb(): any {
+  return getServiceRoleClient();
 }
 
 // ── Individual check runners ──────────────────────────────────────────────────
@@ -272,9 +269,11 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  if (!ELEVATED.has(ctx.role ?? "")) {
-    return NextResponse.json(
-      { error: "Insufficient permissions" },
+  if (!ELEVATED_ROLES.has(ctx.role)) {
+    return jsonCompatError(
+      { ok: false, checks: [] },
+      "FORBIDDEN",
+      "Insufficient permissions",
       { status: 403 },
     );
   }
@@ -307,7 +306,8 @@ export async function GET() {
   });
 
   const payload: ChecksPayload = { ok, generatedAt, checks };
-  return NextResponse.json(payload, {
+  return jsonCompatSuccess(payload as unknown as Record<string, unknown>, payload, {
+    meta: { siteId: ctx.siteId },
     headers: { "Cache-Control": "no-store" },
   });
 }

@@ -18,10 +18,10 @@
  */
 
 import { NextResponse }                     from "next/server";
-import { createClient }                     from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import { correlateIncidents }               from "@/lib/intelligence/incident-correlator";
 import { logger }                           from "@/lib/logger";
+import { getServiceRoleClient }             from "@/lib/supabase/service-role-client";
 
 export const dynamic = "force-dynamic";
 
@@ -30,11 +30,7 @@ const ALLOWED = new Set([
 ]);
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient();
 }
 
 export async function GET() {

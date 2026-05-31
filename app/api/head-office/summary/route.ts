@@ -12,11 +12,13 @@
  *   opsTrend[]       — daily score trend for the OPS SCORE chart
  */
 
-import { NextResponse } from "next/server";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { ELEVATED_ROLES } from "@/lib/rbac/roles";
+import { SANDBOX_STORE_CODE } from "@/lib/demo/sandbox-config";
 import { toGrade } from "@/lib/scoring/operatingScore";
+import { jsonCompatError, jsonCompatSuccess } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 
@@ -31,9 +33,18 @@ function gradeFromScore(score: number | null): string {
 
 // ── Route handler ─────────────────────────────────────────────────────────────
 
-const ELEVATED = ["head_office", "super_admin", "executive", "area_manager", "tenant_owner"];
+
+function emptySummaryPayload() {
+  return {
+    stores: [],
+    accountability: [],
+    actions: [],
+    opsTrend: [],
+  };
+}
 
 export async function GET() {
+  const startedAt = Date.now();
   // ── 1. Auth ────────────────────────────────────────────────────────────────
   let ctx;
   try {
@@ -42,10 +53,15 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  if (!ELEVATED.includes(ctx.role ?? "")) {
-    return NextResponse.json(
+  if (!ELEVATED_ROLES.has(ctx.role)) {
+    return jsonCompatError(
       { error: "Insufficient permissions" },
-      { status: 403 },
+      "FORBIDDEN",
+      "Insufficient permissions",
+      {
+        status: 403,
+        meta: { durationMs: Date.now() - startedAt, source: "head-office-summary" },
+      },
     );
   }
 
@@ -58,7 +74,7 @@ export async function GET() {
       .select("organisation_id, site_id, role")
       .eq("user_id", ctx.userId)
       .eq("is_active", true)
-      .in("role", ELEVATED);
+      .in("role", Array.from(ELEVATED_ROLES));
 
     const isSuperAdmin = (roleRows ?? []).some(
       (r: any) => r.role === "super_admin",
@@ -86,15 +102,13 @@ export async function GET() {
       .from("sites")
       .select("id, name, site_type, organisation_id")
       .eq("is_active", true)
-      .neq("store_code", "TEST-01");
+      .neq("store_code", SANDBOX_STORE_CODE);
 
     if (!isSuperAdmin) {
       if (orgIds.length === 0 && explicitSiteIds.length === 0) {
-        return NextResponse.json({
-          stores: [],
-          accountability: [],
-          actions: [],
-          opsTrend: [],
+        const payload = emptySummaryPayload();
+        return jsonCompatSuccess(payload, payload, {
+          meta: { durationMs: Date.now() - startedAt, source: "head-office-summary" },
         });
       }
       // Explicit site_id grants take priority over org-level scoping.
@@ -108,7 +122,17 @@ export async function GET() {
     const { data: sitesData, error: sitesErr } = await sitesQ;
     if (sitesErr) {
       logger.error("Head Office sites query failed", { err: sitesErr.message });
-      return NextResponse.json({ stores: [], accountability: [], actions: [], opsTrend: [] });
+      const payload = emptySummaryPayload();
+      return jsonCompatError(
+        payload,
+        "HEAD_OFFICE_SITES_QUERY_FAILED",
+        "Head office sites query failed",
+        {
+          status: 200,
+          details: sitesErr.message,
+          meta: { durationMs: Date.now() - startedAt, source: "head-office-summary" },
+        },
+      );
     }
 
     const sites = (sitesData ?? []) as {
@@ -119,11 +143,9 @@ export async function GET() {
     }[];
 
     if (sites.length === 0) {
-      return NextResponse.json({
-        stores: [],
-        accountability: [],
-        actions: [],
-        opsTrend: [],
+      const payload = emptySummaryPayload();
+      return jsonCompatSuccess(payload, payload, {
+        meta: { durationMs: Date.now() - startedAt, source: "head-office-summary" },
       });
     }
 
@@ -400,11 +422,24 @@ export async function GET() {
     const opsTrend = opsTrendRows.sort((a, b) => a.date.localeCompare(b.date));
 
     // ── 9. Return ──────────────────────────────────────────────────────────
-    return NextResponse.json({ stores, accountability, actions, opsTrend });
+    const payload = { stores, accountability, actions, opsTrend };
+    return jsonCompatSuccess(payload, payload, {
+      meta: { durationMs: Date.now() - startedAt, source: "head-office-summary" },
+    });
   } catch (err: any) {
     // NEVER throw — always return a safe empty response
     console.error("HEAD OFFICE ERROR:", err?.message ?? err);
     logger.error("Head Office summary error", { err: err?.message ?? err });
-    return NextResponse.json({ stores: [], accountability: [], actions: [], opsTrend: [] });
+    const payload = emptySummaryPayload();
+    return jsonCompatError(
+      payload,
+      "HEAD_OFFICE_SUMMARY_FAILED",
+      "Head office summary failed",
+      {
+        status: 200,
+        details: err?.message ?? err,
+        meta: { durationMs: Date.now() - startedAt, source: "head-office-summary" },
+      },
+    );
   }
 }

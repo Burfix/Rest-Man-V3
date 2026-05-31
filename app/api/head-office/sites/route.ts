@@ -13,20 +13,18 @@
 
 import { NextResponse }          from "next/server";
 import { apiGuard }              from "@/lib/auth/api-guard";
-import { PERMISSIONS }           from "@/lib/rbac/roles";
-import { createClient }          from "@supabase/supabase-js";
+import { PERMISSIONS, ELEVATED_ROLES } from "@/lib/rbac/roles";
 import { logger }                from "@/lib/logger";
 import { scoreSite }             from "@/lib/head-office/site-health";
 import { applySandboxMirror }    from "@/lib/demo/getSandboxData";
+import { getServiceRoleClient }  from "@/lib/supabase/service-role-client";
+import { isReferenceSite }       from "@/lib/demo/sandbox-config";
 
 export const dynamic = "force-dynamic";
 
-// Si Cantina Sociale — primary live reference site used for sandbox mirroring
-const SI_CANTINA_SITE_IDS = new Set([
-  "00000000-0000-0000-0000-000000000001",  // original Si Cantina Sociale
-  "00000000-0000-0000-0000-000000000002",  // Si Cantina (TENANT_ISOLATION_AUDIT)
-]);
-const SI_CANTINA_STORE_CODES = new Set(["SCS", "SC-CB", "SC-SOC"]);
+// Reference site for sandbox mirroring — identified by store_code via isReferenceSite()
+// from lib/demo/sandbox-config.ts. Store codes are stable business identifiers;
+// UUIDs are not used here (migration-sensitive).
 
 export interface SiteCardData {
   siteId:              string;
@@ -58,23 +56,17 @@ export interface SiteCardData {
   mirroredFrom:        string | null;
 }
 
-const ELEVATED = new Set(["head_office", "super_admin", "executive", "area_manager", "auditor"]);
-
 export async function GET() {
   const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/head-office/sites");
   if (guard.error) return guard.error;
   const { ctx } = guard;
 
-  if (!ELEVATED.has(ctx.role)) {
+  if (!ELEVATED_ROLES.has(ctx.role)) {
     return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
   try {
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } },
-    ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const db = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     // ── 1. Accessible site IDs ──────────────────────────────────────────────
     let siteIds = ctx.siteIds.filter(Boolean);
@@ -347,12 +339,10 @@ export async function GET() {
     });
 
     // ── 9. Sandbox mirror — inject Si Cantina metrics into sandbox site ──────
+    // Reference site identified by store_code via isReferenceSite() —
+    // see lib/demo/sandbox-config.ts. No hardcoded UUIDs here.
     const siCantinaCard =
-      rawSites.find(
-        (s) =>
-          SI_CANTINA_SITE_IDS.has(s.siteId) ||
-          (s.storeCode != null && SI_CANTINA_STORE_CODES.has(s.storeCode)),
-      ) ?? null;
+      rawSites.find((s) => isReferenceSite(s.storeCode)) ?? null;
 
     const sites = rawSites.map((site) => applySandboxMirror(site, siCantinaCard));
 

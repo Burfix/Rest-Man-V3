@@ -205,6 +205,32 @@ export function isRoleAtLeast(role: UserRole, minimum: UserRole): boolean {
   return roleRank(role) >= roleRank(minimum);
 }
 
+// ── Shared role sets — import these instead of defining inline ────────────────
+
+/**
+ * Roles that have org-wide (multi-site) visibility.
+ * Used by: RLS functions, API route guards, layout site switcher.
+ * Single source of truth — do NOT duplicate inline in individual routes.
+ */
+export const ELEVATED_ROLES: ReadonlySet<UserRole> = new Set<UserRole>([
+  "super_admin",
+  "head_office",
+  "executive",
+  "auditor",
+  "area_manager",
+]);
+
+/**
+ * Roles that can switch between multiple sites in the UI.
+ * Superset of ELEVATED_ROLES — includes area_manager who sees a region.
+ */
+export const MULTI_SITE_ROLES: ReadonlySet<UserRole> = ELEVATED_ROLES;
+
+/** Returns true if the given role has org-wide (cross-site) visibility. */
+export function isElevatedRole(role: UserRole): boolean {
+  return ELEVATED_ROLES.has(role);
+}
+
 // ── UI visibility helpers ──────────────────────────────────────────────────────
 
 /** Returns which dashboard surfaces a role can access */

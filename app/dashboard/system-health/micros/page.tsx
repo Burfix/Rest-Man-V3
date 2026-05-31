@@ -9,11 +9,12 @@ import { redirect }             from "next/navigation";
 import { getUserContext, AuthError } from "@/lib/auth/get-user-context";
 import { getMicrosHealth }      from "@/lib/system-health/getMicrosHealth";
 import MicrosCommandCenter      from "@/components/system-health/MicrosCommandCenter";
+import { MULTI_SITE_ROLES }     from "@/lib/rbac/roles";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
 
-const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
+
 
 export default async function MicrosMissionControlPage() {
   // Auth

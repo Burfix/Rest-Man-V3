@@ -1,14 +1,46 @@
 ﻿/**
  * GET /api/cron/daily-sync
  *
- * Vercel-scheduled cron (0 0 * * * â†’ midnight UTC / 2AM SAST).
+ * Vercel-scheduled cron (0 0 * * * → midnight UTC / 2AM SAST).
  *
- * Thin enqueuer â€” enqueues `send_daily_report` async jobs for each active
- * site into async_job_queue. The async worker (runAsyncJobBatch) processes
- * them and calls back /api/cron/daily-sync/run?siteId= with Bearer auth.
+ * PRIMARY RESPONSIBILITY: enqueue `send_daily_report` async jobs for each
+ * active site into async_job_queue. This is its correct, canonical role.
  *
- * POST /api/cron/daily-sync/run?siteId=<id>&date=<YYYY-MM-DD>
- * is the internal handler that does the actual data pull + email send.
+ * ─── SYNC ENGINE OWNERSHIP ─────────────────────────────────────────────────
+ *
+ * ForgeStack has three MICROS sync engine generations:
+ *
+ *   V1 (ORPHANED)   → /api/sync/cron
+ *                      Uses runSync(microsSalesAdapter) — NOT in vercel.json.
+ *                      Not scheduled. Dead code. Safe to delete.
+ *
+ *   V2 (DEPRECATED) → this file (daily-sync, midnight UTC)
+ *                      Directly calls runLocationSync() + runLabourDeltaSync().
+ *                      These V2 calls are superseded by the V3 scheduler below.
+ *
+ *   V3 (CANONICAL)  → /api/cron/sync-orchestrator (2AM UTC)
+ *                      Uses sync_schedules → sync_job_queue → scheduler/tick.
+ *                      Handles: intraday_sales, daily_sales, guest_checks,
+ *                               intervals, labour.
+ *                      THIS is the correct sync ownership layer.
+ *
+ * ─── REMOVAL GATE FOR V2 CALLS ─────────────────────────────────────────────
+ *
+ * The runLocationSync() and runLabourDeltaSync() calls below (step 1) are
+ * DEPRECATED. They will be removed once the following conditions are verified:
+ *
+ *   □  sync_schedules has rows for ALL live site connections
+ *      (Primi Camps Bay, Si Cantina Sociale, Sea Castle Hotel)
+ *   □  sync-orchestrator has been running successfully for ≥ 7 days
+ *   □  v_site_health_summary shows no stale sites post-removal
+ *
+ * DO NOT remove these calls until the above gate conditions are confirmed.
+ * To confirm: SELECT loc_ref, sync_type FROM sync_schedules WHERE is_active = true;
+ *
+ * ─── INTENDED FINAL STATE ──────────────────────────────────────────────────
+ *
+ * After V2 removal, daily-sync should contain ONLY step 2 (report enqueueing).
+ * MICROS sync is fully owned by sync-orchestrator.
  *
  * Protected by Authorization: Bearer ${CRON_SECRET}
  */
@@ -40,7 +72,12 @@ export async function GET(req: NextRequest) {
   // Date in SAST (UTC+2)
   const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Johannesburg" });
 
-  // ── 1. Kick off intraday syncs per active MICROS connection ──────────────
+  // ── 1. [DEPRECATED V2] Kick off intraday syncs per active MICROS connection
+  //
+  // REMOVAL GATE: Remove this block once sync_schedules has confirmed coverage
+  // for ALL live sites AND sync-orchestrator has been stable for ≥ 7 days.
+  // See module-level doc for gate conditions and SQL verification query.
+  // DO NOT REMOVE without production DB confirmation.
   const cfgStatus = getMicrosConfigStatus();
   if (cfgStatus.enabled && cfgStatus.configured) {
     Promise.resolve().then(async () => {
@@ -55,6 +92,7 @@ export async function GET(req: NextRequest) {
       await runLabourDeltaSync();
     }).catch((err) => logger.warn("[DailySync] Background sync error", { err: String(err) }));
   }
+  // ── END DEPRECATED V2 BLOCK ────────────────────────────────────────────────
 
   // â”€â”€ 2. Enqueue send_daily_report async job â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const supabase = createServerClient() as any;

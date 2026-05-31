@@ -11,7 +11,8 @@
 
 import { cookies } from "next/headers";
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
+import { MULTI_SITE_ROLES } from "@/lib/rbac/roles";
 import type { UserRole } from "@/lib/ontology/entities";
 
 export interface UserContext {
@@ -69,11 +70,7 @@ export async function getUserContext(): Promise<UserContext> {
   }
 
   // 2. Fetch role + site assignment via service role client
-  const db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  const db = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const { data: roles } = await db
     .from("user_roles")
@@ -127,7 +124,6 @@ export async function getUserContext(): Promise<UserContext> {
   // Priority: cookie > assigned primary site.
   // (URL-param priority is handled at page level by passing searchParams.site_id
   //  and calling the POST /api/preferences/site to set the cookie.)
-  const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
   let siteId = primarySiteId;
   let hasSelectedSite = false;
 

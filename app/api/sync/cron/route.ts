@@ -1,10 +1,22 @@
 /**
  * GET /api/sync/cron
  *
- * Vercel Cron endpoint — runs the V2 sync engine for ALL active sites.
- * Protected by CRON_SECRET bearer token.
+ * ⚠️  V1 ORPHANED SYNC ENGINE — NOT SCHEDULED ⚠️
  *
- * Iterates all active sites with MICROS connections and runs sales sync.
+ * This endpoint is NOT in vercel.json and is NOT called by any cron job.
+ * It is dead code from the V1 sync engine generation.
+ *
+ * MICROS sync is now owned by:
+ *   V3 (canonical): /api/cron/sync-orchestrator → scheduler/tick
+ *
+ * This file can be safely deleted. It is retained only for reference until
+ * the V2 calls in /api/cron/daily-sync are also removed and V3 is confirmed
+ * as the sole sync engine across all live sites.
+ *
+ * Architecture summary:
+ *   V1 (this file)   → runSync(microsSalesAdapter)   [ORPHANED — NOT SCHEDULED]
+ *   V2 (daily-sync)  → runLocationSync()              [DEPRECATED — pending removal]
+ *   V3 (orchestrator)→ scheduler/tick                 [CANONICAL — owns sync]
  */
 
 import { NextRequest, NextResponse } from "next/server";

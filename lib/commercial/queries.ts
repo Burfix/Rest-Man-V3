@@ -20,14 +20,11 @@
  * module will need a schema change (org_id FK) before scoping can be added.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 
-function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serviceDb(): any {
+  return getServiceRoleClient();
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -71,6 +68,28 @@ export type CommercialClientRow = {
   recent_events:       RevenueEvent[];
 };
 
+type AmountRow = { amount: number | string | null };
+type MonthlyFeeRow = { monthly_fee: number | string | null };
+type ClientStatusRow = { status: string | null };
+type CommercialClientDbRow = {
+  id: string;
+  name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  status: string;
+  onboarded_at: string | null;
+  notes: string | null;
+  site_id: string | null;
+};
+type SiteNameRow = { id: string; name: string };
+type CommercialSubscriptionRow = {
+  client_id: string;
+  plan_name: string | null;
+  monthly_fee: number | string | null;
+  billing_cycle: string | null;
+  status: string | null;
+};
+
 // ── monthStart helper ─────────────────────────────────────────────────────────
 
 function currentMonthStart(): string {
@@ -91,10 +110,14 @@ export async function getCommercialSummary(): Promise<CommercialSummary> {
     db.from("commercial_clients").select("status"),
   ]);
 
-  const mrr          = (mrrRes.data      ?? []).reduce((s, r) => s + Number(r.monthly_fee), 0);
-  const revenue_mtd  = (revenueRes.data  ?? []).reduce((s, r) => s + Number(r.amount), 0);
-  const expenses_mtd = (expensesRes.data ?? []).reduce((s, r) => s + Number(r.amount), 0);
-  const clients      = clientsRes.data   ?? [];
+  const mrrRows      = (mrrRes.data      ?? []) as MonthlyFeeRow[];
+  const revenueRows  = (revenueRes.data  ?? []) as AmountRow[];
+  const expenseRows  = (expensesRes.data ?? []) as AmountRow[];
+  const clients      = (clientsRes.data  ?? []) as ClientStatusRow[];
+
+  const mrr          = mrrRows.reduce((s, r) => s + Number(r.monthly_fee), 0);
+  const revenue_mtd  = revenueRows.reduce((s, r) => s + Number(r.amount), 0);
+  const expenses_mtd = expenseRows.reduce((s, r) => s + Number(r.amount), 0);
 
   return {
     mrr,
@@ -120,12 +143,13 @@ export async function getCommercialClients(): Promise<CommercialClientRow[]> {
     .select("id, name, contact_name, contact_email, status, onboarded_at, notes, site_id")
     .order("created_at", { ascending: false });
 
-  if (!clients || clients.length === 0) return [];
+  const clientRows = (clients ?? []) as CommercialClientDbRow[];
+  if (clientRows.length === 0) return [];
 
-  const clientIds = clients.map((c) => c.id);
+  const clientIds = clientRows.map((c) => c.id);
 
   // 2. Linked site names
-  const siteIds = clients
+  const siteIds = clientRows
     .filter((c) => c.site_id)
     .map((c) => c.site_id as string);
 
@@ -135,7 +159,7 @@ export async function getCommercialClients(): Promise<CommercialClientRow[]> {
       .from("sites")
       .select("id, name")
       .in("id", siteIds);
-    for (const s of sites ?? []) siteMap[s.id] = s.name;
+    for (const s of (sites ?? []) as SiteNameRow[]) siteMap[s.id] = s.name;
   }
 
   // 3. Active subscriptions per client
@@ -145,8 +169,8 @@ export async function getCommercialClients(): Promise<CommercialClientRow[]> {
     .in("client_id", clientIds)
     .eq("status", "active");
 
-  const subMap: Record<string, typeof subs extends (infer T)[] | null ? T : never> = {};
-  for (const s of subs ?? []) {
+  const subMap: Record<string, CommercialSubscriptionRow> = {};
+  for (const s of (subs ?? []) as CommercialSubscriptionRow[]) {
     if (!subMap[s.client_id]) subMap[s.client_id] = s;
   }
 
@@ -170,7 +194,7 @@ export async function getCommercialClients(): Promise<CommercialClientRow[]> {
     }
   }
 
-  return clients.map((c) => {
+  return clientRows.map((c) => {
     const sub = subMap[c.id];
     return {
       id:                  c.id,

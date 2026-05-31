@@ -11,6 +11,7 @@ import { inviteUserDtoToInternal, inviteUserInternalToDb } from "@/lib/mappers/u
 import { logger } from "@/lib/logger";
 import { sendInviteEmail } from "@/services/notifications/inviteEmail";
 import type { VUser } from "@/lib/admin/contractTypes";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 
 export const maxDuration = 30;
 
@@ -109,12 +110,7 @@ export async function POST(req: NextRequest) {
 
           const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
 
-          const { createClient } = await import("@supabase/supabase-js");
-            const adminClient = createClient(
-                        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-                  { auth: { autoRefreshToken: false, persistSession: false } }
-                      );
+          const adminClient = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
           const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
                       redirectTo: `${siteUrl}/reset-password`,

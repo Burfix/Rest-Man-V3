@@ -9,6 +9,7 @@ import Link from "next/link";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { isSuperAdmin } from "@/lib/admin/helpers";
+import { ELEVATED_ROLES } from "@/lib/rbac/roles";
 import { getPerformanceTier } from "@/services/accountability/score-calculator";
 import type { PerformanceTier } from "@/services/accountability/score-calculator";
 import DailyScoreChart from "@/components/accountability/DailyScoreChart";
@@ -21,7 +22,6 @@ export const revalidate = 0;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const ELEVATED = ["super_admin", "head_office", "executive", "area_manager"];
 
 function tierColor(tier: PerformanceTier): string {
   switch (tier) {
@@ -69,7 +69,7 @@ export default async function AccountabilityPage({
   const ctx = await getUserContext();
   const supabase = createServerClient() as any;
 
-  const isElevated = ELEVATED.includes(ctx.role ?? "");
+  const isElevated = ELEVATED_ROLES.has(ctx.role);
   const period     = searchParams?.period === "30d" ? "30d" : "7d";
   const lbDays     = period === "30d" ? 30 : 7;
   const since30    = sinceDate(30);

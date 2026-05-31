@@ -11,11 +11,11 @@ import { NextResponse } from "next/server";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
+import { ELEVATED_ROLES } from "@/lib/rbac/roles";
 import type { VRiskFlag } from "@/lib/admin/contractTypes";
 
 export const dynamic = "force-dynamic";
 
-const ELEVATED = ["head_office", "super_admin", "executive", "area_manager", "tenant_owner"];
 
 export async function GET() {
   let ctx;
@@ -25,7 +25,7 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  if (!ELEVATED.includes(ctx.role ?? "")) {
+  if (!ELEVATED_ROLES.has(ctx.role)) {
     return NextResponse.json({ data: [], error: "Insufficient permissions" }, { status: 403 });
   }
 
@@ -40,7 +40,7 @@ export async function GET() {
       .select("organisation_id")
       .eq("user_id", ctx.userId)
       .eq("is_active", true)
-      .in("role", ELEVATED);
+      .in("role", Array.from(ELEVATED_ROLES));
 
     const orgIds: string[] = Array.from(
       new Set(

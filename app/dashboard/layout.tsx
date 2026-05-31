@@ -8,23 +8,18 @@ import SiteSwitcher from "@/components/dashboard/SiteSwitcher";
 import type { SiteOption } from "@/components/dashboard/SiteSwitcher";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { getSiteConfig } from "@/lib/config/site";
-import { createClient } from "@supabase/supabase-js";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
+import { MULTI_SITE_ROLES } from "@/lib/rbac/roles";
 import type { UserRole } from "@/lib/ontology/entities";
 
 export const metadata = {
   title: "Dashboard — Ops Engine",
 };
 
-const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
-
 async function fetchSiteOptions(siteIds: string[]): Promise<SiteOption[]> {
   if (siteIds.length === 0) return [];
   try {
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      { auth: { persistSession: false } },
-    ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const db = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     const { data } = await db
       .from("sites")
       .select("id, name")
@@ -92,4 +87,3 @@ export default async function DashboardLayout({
     </div>
   );
 }
-

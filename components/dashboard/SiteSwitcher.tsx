@@ -11,6 +11,8 @@
 
 import React, { useTransition } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { MULTI_SITE_ROLES } from "@/lib/rbac/roles";
+import type { UserRole } from "@/lib/ontology/entities";
 
 export interface SiteOption {
   id:   string;  // "all" | uuid
@@ -23,7 +25,7 @@ interface Props {
   role:       string;
 }
 
-const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
+
 
 export default function SiteSwitcher({ sites, currentId, role }: Props) {
   const router       = useRouter();
@@ -31,7 +33,7 @@ export default function SiteSwitcher({ sites, currentId, role }: Props) {
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
 
-  if (!MULTI_SITE_ROLES.has(role)) return null;
+  if (!MULTI_SITE_ROLES.has(role as UserRole)) return null;
 
   const options: SiteOption[] = [
     { id: "all", name: "All Sites" },

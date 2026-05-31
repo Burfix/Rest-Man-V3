@@ -18,7 +18,6 @@
  */
 
 import { NextResponse }                    from "next/server";
-import { createClient }                    from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import {
   getIncidentSlaState,
@@ -26,6 +25,7 @@ import {
   calculateTimeToResolve,
 } from "@/lib/incidents/sla";
 import { logger }                          from "@/lib/logger";
+import { getServiceRoleClient }            from "@/lib/supabase/service-role-client";
 
 export const dynamic = "force-dynamic";
 
@@ -83,11 +83,7 @@ export interface SlaSummaryResponse {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  ) as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  return getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 /** Apply site-visibility filter to a Supabase query. */

@@ -18,25 +18,20 @@
  */
 
 import { NextResponse }                  from "next/server";
-import { createClient }                  from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
 import { computeReliabilityScore }       from "@/lib/reliability/score";
 import type { ReliabilityGrade }         from "@/lib/reliability/score";
 import { logger }                        from "@/lib/logger";
+import { getServiceRoleClient }          from "@/lib/supabase/service-role-client";
+import { ELEVATED_ROLES }                from "@/lib/rbac/roles";
+import {
+  deriveAlertSummary,
+  type SiteAlertSummary,
+} from "@/lib/observability/platform-health";
 
 export const dynamic = "force-dynamic";
 
-const ELEVATED = new Set([
-  "head_office", "super_admin", "executive", "area_manager", "tenant_owner",
-]);
-
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface SiteAlertSummary {
-  critical: number;
-  warning: number;
-  topMessage: string | null;
-}
 
 export interface SiteFeedHealth {
   feedType: "sales" | "labour" | "inventory";
@@ -77,57 +72,7 @@ export interface OpsCenterPayload {
 // ── Service-role client ───────────────────────────────────────────────────────
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
-}
-
-// ── Alert derivation (lightweight — no resolveOperationalContext) ─────────────
-
-function deriveAlerts(
-  staleMinutes: number | null,
-  health: string,
-  reliability: Awaited<ReturnType<typeof computeReliabilityScore>>,
-): SiteAlertSummary {
-  let critical = 0;
-  let warning = 0;
-  const messages: string[] = [];
-
-  // Staleness-based (from v_site_health_summary stale_minutes)
-  if (staleMinutes !== null) {
-    if (staleMinutes > 120) {
-      critical++;
-      messages.push(`Sync stale ${Math.round(staleMinutes / 60 * 10) / 10}h`);
-    } else if (staleMinutes > 30) {
-      warning++;
-      messages.push(`Sync delayed ${staleMinutes}m`);
-    }
-  }
-
-  // Consecutive failure detection (from reliability feed data)
-  for (const feed of reliability.feeds) {
-    if (feed.consecutiveFailures >= 5) {
-      critical++;
-      messages.push(`${feed.feedType} feed: ${feed.consecutiveFailures} consecutive failures`);
-    } else if (feed.consecutiveFailures >= 3) {
-      warning++;
-      messages.push(`${feed.feedType} feed failing`);
-    }
-  }
-
-  // Critical health from view
-  if (health === "critical" && critical === 0) {
-    critical++;
-    messages.push("Critical operational state");
-  }
-
-  return {
-    critical,
-    warning,
-    topMessage: messages[0] ?? null,
-  };
+  return getServiceRoleClient();
 }
 
 // ── Handler ───────────────────────────────────────────────────────────────────
@@ -140,7 +85,7 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  if (!ELEVATED.has(ctx.role ?? "")) {
+  if (!ELEVATED_ROLES.has(ctx.role)) {
     return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
@@ -154,7 +99,7 @@ export async function GET() {
       .select("organisation_id")
       .eq("user_id", ctx.userId)
       .eq("is_active", true)
-      .in("role", Array.from(ELEVATED));
+      .in("role", Array.from(ELEVATED_ROLES));
 
     const orgIds: string[] = Array.from(
       new Set(
@@ -212,7 +157,7 @@ export async function GET() {
         minutesSinceSuccess: f.minutesSinceSuccess,
       }));
 
-      const alerts = deriveAlerts(row.stale_minutes, row.health, reliability);
+      const alerts = deriveAlertSummary(row.stale_minutes, row.health, reliability.feeds);
 
       return {
         siteId:            row.site_id,

@@ -7,25 +7,23 @@
  * Response: { data: SystemHealthRow[], summary: HealthSummary, error: string | null }
  */
 
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
+import { getTokenExpiryReport } from "@/lib/monitoring/token-expiry";
 import { logger } from "@/lib/logger";
+import { ELEVATED_ROLES } from "@/lib/rbac/roles";
 import type { VSiteHealth } from "@/lib/admin/contractTypes";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
+import { jsonCompatError, jsonCompatSuccess } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
 
-const ELEVATED = ["head_office", "super_admin", "executive", "area_manager", "tenant_owner"];
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient();
 }
 
 export async function GET() {
+  const startedAt = Date.now();
   let ctx;
   try {
     ctx = await getUserContext();
@@ -33,8 +31,16 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  if (!ELEVATED.includes(ctx.role ?? "")) {
-    return NextResponse.json({ data: [], summary: null, error: "Insufficient permissions" }, { status: 403 });
+  if (!ELEVATED_ROLES.has(ctx.role)) {
+    return jsonCompatError(
+      { data: [], summary: null, tokenExpiry: null, error: "Insufficient permissions" },
+      "FORBIDDEN",
+      "Insufficient permissions",
+      {
+        status: 403,
+        meta: { durationMs: Date.now() - startedAt, source: "head-office-system-health" },
+      },
+    );
   }
 
   const db = serviceDb() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -48,7 +54,7 @@ export async function GET() {
       .select("organisation_id")
       .eq("user_id", ctx.userId)
       .eq("is_active", true)
-      .in("role", ELEVATED);
+      .in("role", Array.from(ELEVATED_ROLES));
 
     const orgIds: string[] = Array.from(
       new Set(
@@ -73,7 +79,16 @@ export async function GET() {
 
     if (error) {
       logger.error("System health query failed", { err: error });
-      return NextResponse.json({ data: [], summary: null, error: error.message }, { status: 500 });
+      return jsonCompatError(
+        { data: [], summary: null, tokenExpiry: null, error: "System health query failed" },
+        "SYSTEM_HEALTH_QUERY_FAILED",
+        "System health query failed",
+        {
+          status: 500,
+          details: error.message,
+          meta: { durationMs: Date.now() - startedAt, source: "head-office-system-health" },
+        },
+      );
     }
 
     const rows = (data as VSiteHealth[] | null) ?? [];
@@ -108,9 +123,37 @@ export async function GET() {
       failed_runs:      r.failed_runs,
     }));
 
-    return NextResponse.json({ data: stores, summary, error: null });
+    // ── Token expiry monitoring (non-fatal if it fails) ─────────────────────
+    let tokenExpiry = null;
+    try {
+      tokenExpiry = await getTokenExpiryReport();
+    } catch (tokenErr) {
+      logger.warn("System health: token expiry check failed (non-fatal)", {
+        error: tokenErr instanceof Error ? tokenErr.message : String(tokenErr),
+      });
+    }
+
+    return jsonCompatSuccess(
+      { data: stores, summary, tokenExpiry, error: null },
+      { stores, summary, tokenExpiry },
+      {
+        meta: {
+          durationMs: Date.now() - startedAt,
+          organisationId: isSuperAdmin ? undefined : orgIds[0],
+          source: "head-office-system-health",
+        },
+      },
+    );
   } catch (err) {
     logger.error("System health route failed", { err });
-    return NextResponse.json({ data: [], summary: null, error: "Internal server error" }, { status: 500 });
+    return jsonCompatError(
+      { data: [], summary: null, tokenExpiry: null, error: "Internal server error" },
+      "SYSTEM_HEALTH_FAILED",
+      "Internal server error",
+      {
+        status: 500,
+        meta: { durationMs: Date.now() - startedAt, source: "head-office-system-health" },
+      },
+    );
   }
 }

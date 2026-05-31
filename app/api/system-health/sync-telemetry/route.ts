@@ -16,13 +16,13 @@
 
 import { NextResponse }            from "next/server";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
-import { createClient }            from "@supabase/supabase-js";
 import { computeReliabilityScore } from "@/lib/reliability/score";
 import { logger }                  from "@/lib/logger";
+import { getServiceRoleClient }    from "@/lib/supabase/service-role-client";
+import { ELEVATED_ROLES }          from "@/lib/rbac/roles";
+import { jsonCompatSuccess, jsonCompatError } from "@/lib/api/response";
 
 export const dynamic = "force-dynamic";
-
-const ELEVATED = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
 
 const WINDOW_DAYS = 7;
 
@@ -64,11 +64,7 @@ interface SyncTelemetryPayload {
 // ── Service-role client ───────────────────────────────────────────────────────
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient();
 }
 
 // ── Sync type buckets ─────────────────────────────────────────────────────────
@@ -89,8 +85,13 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  if (!ELEVATED.has(ctx.role)) {
-    return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
+  if (!ELEVATED_ROLES.has(ctx.role)) {
+    return jsonCompatError(
+      { ok: false },
+      "FORBIDDEN",
+      "Insufficient permissions",
+      { status: 403 },
+    );
   }
 
   const { siteId } = ctx;
@@ -212,13 +213,16 @@ export async function GET() {
       feeds,
     };
 
-    return NextResponse.json(payload, {
+    return jsonCompatSuccess(payload as unknown as Record<string, unknown>, payload, {
+      meta: { siteId },
       headers: { "Cache-Control": "no-store" },
     });
   } catch (err) {
     logger.error("api.sync-telemetry.failed", { siteId, err: String(err) });
-    return NextResponse.json(
-      { ok: false, error: "Failed to retrieve sync telemetry" },
+    return jsonCompatError(
+      { ok: false },
+      "INTERNAL_ERROR",
+      "Failed to retrieve sync telemetry",
       { status: 500 },
     );
   }

@@ -1,7 +1,498 @@
-# ForgeStack Africa Architecture Fragmentation Audit
+# FORGESTACK AFRICA — ARCHITECTURE FRAGMENTATION AUDIT
 
-Date: 2026-05-31  
-Scope: Phase 1 inventory only. No application code was changed.
+**Sprint:** Architecture Consolidation  
+**Phase:** 1 — Inventory (no code changes in this phase)  
+**Date:** 2026-05-31  
+**Prepared by:** Principal Platform Architect  
+**Scope:** Full codebase — `app/`, `lib/`, `services/`, `components/`
+
+---
+
+## AUDIT SUMMARY
+
+| Category | Total Instances | Critical Risks | Safe Now | Defer |
+|----------|-----------------|----------------|----------|-------|
+| Service-role client construction | 23 call sites | 3 | 20 | 0 |
+| Supabase client patterns | 4 distinct patterns | 2 | 2 | 0 |
+| MICROS sync entry points | 12 | 4 overlaps | 6 | 6 |
+| Scheduler/cron routes | 7 vercel + 2 orphaned | 2 | 5 | 2 |
+| Response envelope formats | 4 distinct patterns | 0 | — | All |
+| `as any` casts | 200+ total | ~25 dangerous | ~175 type-gap | ~25 |
+| Hardcoded pilot references | 14 | 3 | 8 | 3 |
+| Direct site/org filtering | 3 patterns, 20+ sites | 2 | 3 | 0 |
+| Duplicated health/status logic | 7 health endpoints | 2 | 5 | 0 |
+| Tenant access helpers | 3 patterns, 20+ routes | 1 | — | — |
+
+---
+
+## 1. SERVICE-ROLE CLIENT CONSTRUCTION
+
+### Factory (Approved Path)
+
+**File:** `lib/supabase/service-role-client.ts`
+
+```ts
+export function getServiceRoleClient(): ReturnType<typeof createClient<Database>>
+export const createServiceRoleClient = getServiceRoleClient; // alias — same singleton
+```
+
+Singleton pattern — correct. No per-request reconstruction. Validates env vars on first call. Documented allowed callers in header comment.
+
+### Approved Call Sites (all using factory correctly)
+
+| File | Risk |
+|------|------|
+| `app/api/admin/platform-health/route.ts` | ✅ cron/admin only |
+| `app/api/cron/zombie-sync-cleanup/route.ts` | ✅ cron |
+| `lib/monitoring/token-expiry.ts` | ✅ server-only lib |
+| `lib/security/audit-log.ts` | ✅ write-only audit |
+| `app/api/incidents/performance/route.ts` | ✅ admin, elevated roles |
+| `app/api/incidents/sla-summary/route.ts` | ✅ admin |
+| `app/api/incidents/weekly-report/route.ts` | ✅ admin |
+| `app/api/system-health/checks/route.ts` | ✅ elevated roles guard |
+| `app/api/system-health/sync-telemetry/route.ts` | ✅ elevated roles |
+| `app/api/system-health/timeline/route.ts` | ✅ elevated roles |
+| `app/api/intelligence/incident-clusters/route.ts` | ✅ elevated roles |
+| `lib/compliance/queries.ts` | ✅ service layer |
+| `lib/commercial/queries.ts` | ✅ service layer |
+| `lib/incidents/guard.ts` | ✅ guard utility |
+| `lib/micros/micros-location-registry.ts` | ✅ registry lookup |
+| `lib/integrations/base/adapter.ts` | ✅ base class for adapters |
+| `lib/audit/auditLog.ts` | ✅ audit writes |
+| `app/api/admin/users/route.ts` | ✅ admin only |
+| `app/api/head-office/sites/route.ts` | ✅ elevated roles |
+| `app/api/head-office/site/[siteId]/route.ts` | ✅ elevated roles |
+| `app/api/head-office/ops-center/route.ts` | ✅ elevated roles |
+| `app/api/head-office/system-health/route.ts` | ✅ elevated roles |
+
+### RISK ITEMS
+
+**RISK-SR-01 — `services/execution/actionWorkflow.ts:26`**
+```ts
+// Module-level constant — initialized at module load, not per-request
+const db = getServiceRoleClient() as any;
+```
+- **Risk:** Module is imported by user-facing action routes. Service-role in a user action context — every query must have an explicit `site_id` WHERE clause or data leaks cross-tenant.
+- **Current pattern:** `as any` cast means no type enforcement on queries.
+- **Recommended fix:** Audit every query in this module for explicit tenant scoping. Move to lazy init inside functions.
+- **Safe to change now:** Audit only. Code change requires query-by-query review.
+
+**RISK-SR-02 — `app/dashboard/layout.tsx:23`**
+```ts
+// Service-role client in a Next.js Server Component layout
+const db = getServiceRoleClient() as any;
+```
+- **Risk:** Layout runs for every authenticated page render. Service-role bypasses RLS — if the query does not scope by `user_id` / `site_id`, it can surface cross-tenant data. Session-based client (`createServerClient()`) is the correct choice unless this query genuinely requires cross-tenant access.
+- **Recommended fix:** Read the query, determine if it needs service-role. If not, replace with `createServerClient()`.
+- **Safe to change now:** Audit the query first.
+
+**RISK-SR-03 — `lib/rbac/guards.ts:16`**
+```ts
+// Raw import from @supabase/supabase-js with ANON key — bypasses factory
+import { createClient } from "@supabase/supabase-js";
+// Lines 54-55:
+process.env.NEXT_PUBLIC_SUPABASE_URL!,
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+```
+- **Risk:** Bypasses the factory pattern entirely. Not service-role (uses anon key), but it creates its own client construction instead of using `createServerClient()` which handles cookies and auth context correctly.
+- **Recommended fix:** Replace with `createServerClient()` from `@/lib/supabase/server`.
+- **Safe to change now:** Yes — server-only context confirmed; swap is safe.
+
+### Orphaned Script Patterns (Acceptable)
+
+`scripts/probe-im-rna.ts` and `scripts/probe-im-soap.ts` construct raw `createClient` with `SERVICE_ROLE_KEY` directly. Acceptable for one-off diagnostic dev scripts, not production paths.
+
+---
+
+## 2. SUPABASE CLIENT CONSTRUCTION PATTERNS
+
+Four distinct patterns exist:
+
+| Pattern | Factory File | Used For | Correct? |
+|---------|-------------|----------|----------|
+| `createClient()` from `@/lib/supabase/client` | ✅ Browser factory | React client components | ✅ |
+| `createServerClient()` from `@/lib/supabase/server` | ✅ Server factory | API routes, Server Components | ✅ |
+| `getServiceRoleClient()` from `@/lib/supabase/service-role-client` | ✅ Service factory | Cron, admin, sync workers | ✅ |
+| Raw `createClient` from `@supabase/supabase-js` | ❌ No factory | `lib/rbac/guards.ts` | ❌ |
+
+**RISK-SC-01 — `app/api/internal/scheduler/tick/route.ts` uses `createServerClient()` in a cron route**
+```ts
+import { createServerClient } from "@/lib/supabase/server";
+```
+The scheduler tick is called by `sync-orchestrator` cron with `Bearer CRON_SECRET`. There is no user session in scope. `createServerClient()` reads auth cookies — in a cron invocation there are none. RLS policies will reject queries silently or return empty sets. Should use `getServiceRoleClient()` with explicit tenant scoping.
+- **Safe to change now:** Yes — swap `createServerClient()` to `getServiceRoleClient()`. Verify all queries have WHERE clauses.
+
+**RISK-SC-02 — `app/api/sync/cron/route.ts` uses `createServerClient()` in a cron route**
+
+Same issue. Cron route with no user session using a session-based client.
+
+---
+
+## 3. MICROS SYNC ENTRY POINTS
+
+**12 distinct paths** can trigger MICROS data ingestion. This is the single largest architectural risk — overlapping paths create redundant API calls, potential race conditions on upsert writes, and split observability.
+
+### Complete Map
+
+| Route | Trigger | Underlying Engine | Status |
+|-------|---------|-------------------|--------|
+| `GET /api/cron/daily-sync` | Vercel Cron 00:00 UTC | `runLocationSync` (V3) + `runLabourDeltaSync` directly | Active |
+| `POST /api/cron/sync-orchestrator` | Vercel Cron 02:00 UTC | → `/api/internal/scheduler/tick` | Active |
+| `POST /api/internal/scheduler/tick` | Via sync-orchestrator | `runSyncJobBatch` via `lib/scheduler/worker` | Active |
+| `POST /api/micros/sync` | Manual / admin | Branches: `MicrosSyncService` (V1) OR `dispatchSync` (V3) | Active — dual-path |
+| `POST /api/integrations/micros/sync` | Manual / admin | `runLocationSync` (V3) by locationKey | Active |
+| `POST /api/sync/run` | Manual / user | `runSync` V2 adapter per siteId | Active |
+| `GET /api/sync/cron` | NOT in vercel.json | `runSync` V2 per all active sites | Orphaned |
+| `POST /api/system-health/micros/sync` | Admin | (investigate — may delegate) | Unknown |
+| `POST /api/micros/labour-sync` | Admin | Labour delta sync | Active |
+| `POST /api/micros/inventory-sync` | Admin | Inventory via MICROS | Active |
+| `POST /api/inventory/micros-sync` | Admin | Inventory sync | Active |
+| `POST /api/inventory/food-cost-sync` | Admin | Food cost sync | Active |
+
+### Critical Risks
+
+**RISK-SYNC-01 — `daily-sync` and `sync-orchestrator` overlap**
+- `daily-sync` (midnight UTC) directly calls `runLocationSync` for all enabled locations in a background promise.
+- `sync-orchestrator` (2am UTC) triggers scheduler tick which dispatches `runSyncJobBatch` — the same locations.
+- Both write to `micros_sales_daily` via upsert. Data integrity is preserved (upsert), but MICROS API is called twice per site per day in the automated window.
+- **Recommended fix:** `daily-sync` should only enqueue daily report async jobs. Remove the `runLocationSync` call from it. Let `sync-orchestrator` own all MICROS ingestion.
+
+**RISK-SYNC-02 — `GET /api/sync/cron` not in `vercel.json`**
+- This route is cron-protected but never scheduled. It uses the V2 sync engine (`runSync` per site) which is a different path than V3.
+- **Recommended fix:** Confirm it is dead code. If so, remove. If it has manual use, document it clearly.
+
+**RISK-SYNC-03 — Three concurrent sync service layers**
+- V1: `MicrosSyncService` — original sync service with application-level zombie cleanup
+- V2: `lib/sync/` adapters — typed adapter system with `microsSalesAdapter`, `microsLabourAdapter`
+- V3: `lib/scheduler/` + `services/micros/location-sync` — orchestrated, lease-based, queue-driven
+- All three are in active use. V3 is the production path and should be authoritative. V1 and V2 should be limited to manual/diagnostic use.
+- **Do not decommission in this sprint.** Document ownership clearly in Phase 6.
+
+**RISK-SYNC-04 — `/api/micros/sync` has dual-path branching**
+```ts
+if (rawBody.sync_type) {
+  // V3 path: dispatchSync
+} else {
+  // V1 path: MicrosSyncService
+}
+```
+Two code paths with different observability, error handling, and retry semantics depending on whether `sync_type` is supplied. Should be consolidated to always use V3.
+
+---
+
+## 4. SCHEDULER AND CRON ROUTES
+
+### Vercel-Scheduled Crons (from `vercel.json`)
+
+| Path | Schedule (UTC) | SAST Equivalent | Purpose |
+|------|---------------|-----------------|---------|
+| `/api/cron/daily-sync` | `0 0 * * *` | 02:00 | MICROS sync + daily report enqueue |
+| `/api/accountability/calculate` | `0 1 * * *` | 03:00 | MPS score computation |
+| `/api/cron/sync-orchestrator` | `0 2 * * *` | 04:00 | Scheduler tick trigger |
+| `/api/cron/brain-dispatch` | `0 3 * * *` | 05:00 | AI brain dispatch |
+| `/api/reviews/google-sync` | `0 6 * * *` | 08:00 | Google reviews |
+| `/api/reports/weekly` | `0 6 * * 1` | Mon 08:00 | Weekly report |
+| `/api/cron/zombie-sync-cleanup` | `0 * * * *` | Hourly | Zombie sync cleanup |
+
+### Non-Scheduled Routes
+
+| Path | Status |
+|------|--------|
+| `/api/sync/cron` | NOT in vercel.json — never auto-triggered. Orphaned. |
+| `/api/system-health/jobs/run` | Manual admin trigger only |
+
+**RISK-CRON-01 — `accountability/calculate` is outside `app/api/cron/` and uses wrong client**
+- Route lives at `app/api/accountability/calculate/route.ts`, not in the `cron/` directory — visually indistinguishable from user-facing routes.
+- Uses `createServerClient() as any` in a cron context (no session available).
+- **Recommended fix:** Move to `app/api/cron/mps-calculate/route.ts`. Switch to `getServiceRoleClient()`.
+
+**RISK-CRON-02 — Potential schedule conflict**
+`daily-sync` (00:00 UTC) kicks off MICROS sync in a background promise. `sync-orchestrator` (02:00 UTC) triggers scheduler tick. If daily-sync background promise is still running when orchestrator fires, both are writing to MICROS tables simultaneously. Upserts protect correctness but observability shows conflated run counts.
+
+---
+
+## 5. RESPONSE ENVELOPE FORMATS
+
+`lib/api/response.ts` exists with `ApiEnvelope<T>`, `jsonSuccess`, `jsonError`, `jsonCompatSuccess`, `jsonCompatError`. It is partially adopted.
+
+### Pattern Inventory
+
+**Pattern A — `jsonCompatSuccess/jsonCompatError` (partial adoption — backward compat)**
+Routes: `head-office/summary`, `head-office/system-health`, `cron/zombie-sync-cleanup`
+```ts
+// Merges legacy flat keys with envelope:
+return jsonCompatSuccess({ stores, accountability }, envelopedData, { meta });
+// Consumer gets: { stores, accountability, data, error: null, meta }
+```
+
+**Pattern B — `jsonSuccess/jsonError` (clean envelope — new routes)**
+Routes: `admin/platform-health`
+```ts
+return jsonSuccess(data, { meta });
+// Consumer gets: { data, error: null, meta }
+```
+
+**Pattern C — Raw `NextResponse.json` with named keys (majority of routes)**
+```ts
+return NextResponse.json({ ok: true, enqueued, date: today }); // cron routes
+return NextResponse.json({ data: stores, summary, error: null }); // health routes
+return NextResponse.json({ stores: [], accountability: [] }); // summary error path
+```
+No envelope typing. Frontend must know each route's shape independently. Consumer can't distinguish route-level error from empty data.
+
+**Pattern D — Mixed per status code**
+Several routes return Pattern A on success, Pattern C on error — different shapes for different HTTP codes. Frontends must handle both.
+
+### Routes NOT on Envelope (Platform-Critical, Phase 3 targets)
+
+| Route | Current | Priority |
+|-------|---------|----------|
+| `system-health/checks` | Pattern C | HIGH |
+| `system-health/sync-telemetry` | Pattern C | HIGH |
+| `cron/daily-sync` | Pattern C | MEDIUM |
+| `cron/brain-dispatch` | Pattern C | MEDIUM |
+| `health/route.ts` | Pattern C | LOW (public uptime check) |
+| `sync/run` | Pattern C | MEDIUM |
+
+---
+
+## 6. `as any` USAGE — CATEGORISED
+
+Total `as any` in production code (excl. tests, scripts): ~200+
+
+### Category 1 — Supabase Type Gap (~175 instances, harmless)
+
+Pattern: `(supabase as any).from("table")` where table exists in DB but not in generated types.
+
+Expected — generated types lag schema migrations. Safe as long as query result shape is correct.
+
+Highest density: `services/decisions/alertEngine.ts` (28), `services/alerts/engine.ts` (16), `services/reports/weeklyReport.ts` (14), `services/reports/dailyReport.ts` (14).
+
+**Recommended fix:** Regenerate `types/database.ts` after every migration batch. Don't chase individually.
+
+### Category 2 — Unvalidated Result Cast (~25 instances, DANGEROUS)
+
+Pattern: DB result cast to `any[]` then property-accessed without runtime check.
+
+```ts
+return ((data ?? []) as any[]).map((row: any) => ({
+  siteId: row.site_id as string,  // undefined if schema changes — silent
+}));
+```
+
+**Dangerous instances in platform-critical paths:**
+
+| File | Cast | Risk |
+|------|------|------|
+| `app/api/admin/platform-health/route.ts` (lines 77, 124, 176, 182) | Sync staleness, zombie, MPS rows | HIGH |
+| `lib/monitoring/token-expiry.ts` (line 129) | Token expiry connection rows | HIGH |
+| `app/api/head-office/summary/route.ts` (10 casts) | Store rows | HIGH |
+| `app/api/head-office/sites/route.ts` (8 casts) | Site cards | HIGH |
+| `services/execution/actionWorkflow.ts` (module-level) | DB client | MEDIUM |
+| `lib/security/audit-log.ts` (line 65) | Audit writes | MEDIUM |
+| `app/api/accountability/calculate/route.ts` (line 204) | Score rows | MEDIUM |
+
+**Recommended fix (Phase 4):** Add Zod schemas for DB row shapes in these modules. Validate at query boundary.
+
+### Category 3 — Structural Insert/Update Cast (~5 instances, review)
+
+Pattern: `supabase.from("x").insert(payload as any)` — papering over generated type mismatch on insert.
+
+Valid if shape is correct. Should be replaced with typed insert interfaces when types are regenerated.
+
+---
+
+## 7. HARDCODED PILOT REFERENCES
+
+### DANGEROUS — Remove with tests
+
+| File | Line | Reference | Risk |
+|------|------|----------|------|
+| `app/api/head-office/sites/route.ts` | 26–27 | Hardcoded Si Cantina UUIDs for sandbox exclusion | Adding a 4th sandbox site requires code change |
+| `app/api/head-office/summary/route.ts` | 89 | `.neq("store_code", "TEST-01")` | Magic store code in platform query |
+| `lib/profit/engine.ts` | 795 | `.neq("store_code", "TEST-01")` | Same magic code in revenue path |
+
+**Fix:** Add `is_sandbox boolean DEFAULT false` to `sites` table. Replace `.neq("store_code", "TEST-01")` with `.eq("is_sandbox", false)`.
+
+### TEMPORARY OVERRIDE — Move to config
+
+| File | Line | Reference |
+|------|------|----------|
+| `lib/demo/isSandboxSite.ts` | 17 | `storeCode === "TEST-01"` check |
+| `lib/demo/getSandboxData.ts` | entire | Si Cantina as sandbox mirror reference |
+| `components/dashboard/head-office/SiteOverviewCard.tsx` | 85 | `"Si Cantina"` as demo fallback label |
+| `components/dashboard/ops/DashboardTopBar.tsx` | 234 | `"Si Cantina Sociale"` hardcoded in UI |
+
+### SAFE — Document only (comments / examples / non-logic)
+
+| File | Nature |
+|------|--------|
+| `lib/micros/location-auth.ts` lines 107, 292 | Auth flow labels in comments |
+| `lib/micros/auth.ts` line 593 | Dev comment about SCS/Si Cantina vars |
+| `lib/sync/simphony-client.ts` lines 118, 137 | Error message examples referencing `primi-camps-bay` |
+| `app/api/reports/daily-ops/route.ts` lines 491, 493 | Pilot names in LLM prompt examples |
+| `lib/copilot/service-window.ts` line 7 | Comment only |
+| `lib/commandCenter.ts` line 531 | Comment only |
+
+---
+
+## 8. DIRECT SITE/ORG FILTERING LOGIC
+
+Three access-gate patterns co-exist:
+
+### Pattern A — `apiGuard()` (Recommended)
+
+```ts
+const guard = await apiGuard(PERMISSIONS.X, "POST /api/x");
+if (guard.error) return guard.error;
+const { ctx } = guard; // ctx.siteId, ctx.siteIds, ctx.role — validated
+```
+
+Used in: `sync/run`, `micros/sync`, `integrations/micros/sync`, `accountability/*`
+
+### Pattern B — `getUserContext()` + manual role check (Inconsistent)
+
+```ts
+const ctx = await getUserContext();
+if (!new Set(["super_admin", "head_office", ...]).has(ctx.role)) return 403;
+```
+
+Used in: `head-office/summary`, `head-office/system-health`, `admin/platform-health`, `incidents/*`
+
+**RISK-FILTER-01 — `ELEVATED_ROLES` set defined inline in multiple routes**
+
+Every route that uses Pattern B creates its own `Set(["super_admin", "head_office", "executive", ...])`. If `area_manager` is added as an elevated role, it must be updated in every route independently.
+
+**Fix:** Export `ELEVATED_ROLES: ReadonlySet<UserRole>` from `lib/rbac/roles.ts`.
+
+### Pattern C — Service-role query with manual site_id parameter (Risk if caller fails to validate)
+
+Used in service-layer functions that accept a `site_id` arg and trust the caller validated it. Covered by RLS in DB but not in application layer.
+
+**RISK-FILTER-02 — `head-office/summary` bypasses RPC in favour of direct `user_roles` lookup**
+
+```ts
+// head-office/summary/route.ts:6 comment:
+// via a direct user_roles lookup — NOT via user_accessible_sites RPC.
+```
+
+Documented deviation — handles a GM user (Portia) edge case where RPC would over-include or under-include sites. This is pilot-specific logic in a platform route. Should be generalised or moved to the access helper.
+
+---
+
+## 9. DUPLICATED HEALTH/STATUS LOGIC
+
+### Health Endpoint Map
+
+| Endpoint | Auth | Audience | Data Source | Staleness Logic? |
+|----------|------|----------|-------------|-----------------|
+| `/api/health` | None | Uptime monitors | DB + scheduler ping | No |
+| `/api/system-health` | Session | GM | Delegates to `/checks` | No |
+| `/api/system-health/checks` | Elevated | GM/Admin | `micros_connections`, `sync_runs` | Yes (inline) |
+| `/api/system-health/sync-telemetry` | Elevated | Admin | `micros_sync_runs` | Implied |
+| `/api/system-health/timeline` | Elevated | Admin | Timeline events | No |
+| `/api/head-office/system-health` | Head Office | Head Office | `v_site_health_summary` | Yes (inline) |
+| `/api/admin/platform-health` | Admin/Cron | Engineering | All signals aggregated | Yes (inline) |
+
+**RISK-HEALTH-01 — `classifyStaleness()` defined three times**
+
+The GREEN/AMBER/RED staleness classification logic is implemented inline in:
+- `app/api/admin/platform-health/route.ts` — thresholds: <30min GREEN, <120min AMBER, ≥120min RED
+- `app/api/system-health/checks/route.ts` — similar but with different naming
+- `app/api/head-office/system-health/route.ts` — implied via `v_site_health_summary` view logic
+
+If thresholds need to change, they change in multiple places and can drift.
+
+**Fix (Phase 5):** Move to `lib/observability/platform-health.ts` as `classifyStaleness(minutesSince: number | null): "GREEN" | "AMBER" | "RED"`.
+
+**RISK-HEALTH-02 — Token expiry not wired into `system-health/checks`**
+
+`lib/monitoring/token-expiry.ts` exports `getTokenExpiryReport()`. It is consumed by `admin/platform-health` and `head-office/system-health`. The `system-health/checks` endpoint has its own MICROS connection check that does NOT include token expiry — GMs see a different (incomplete) health picture than Head Office users.
+
+### MICROS Status Overlap (3 routes with overlapping purpose)
+
+| Route | Consumer | Purpose |
+|-------|----------|---------|
+| `/api/micros/status` | GM dashboard | Per-site connection status |
+| `/api/integrations/micros/status` | Integration admin | Status by locationKey |
+| `/api/admin/integrations/micros/health` | Engineering | Env var / config health |
+
+These can be unified under a shared MICROS health service in Phase 5.
+
+---
+
+## 10. TENANT ACCESS HELPER USAGE
+
+### Helper Inventory
+
+| Helper | Source | Purpose |
+|--------|--------|---------|
+| `getUserContext()` | `lib/auth/get-user-context` | Reads session cookies, returns role/siteId/orgId/siteIds |
+| `authErrorResponse(e)` | same | Produces 401/403 from `AuthError` |
+| `apiGuard(perm, ctx)` | `lib/auth/api-guard` | `getUserContext()` + permission check in one call |
+| `user_accessible_sites(uid)` | DB RPC | Returns `uuid[]` of sites accessible to user |
+| `fs_user_can_access_site(site_id)` | DB function | Boolean gate for RLS |
+
+### Pattern Inconsistency
+
+20+ routes call `getUserContext()` directly. 10+ routes use `apiGuard()`. They are semantically equivalent but `apiGuard()` is more composable and adds permission checking. New routes should use `apiGuard()`.
+
+**RISK-TENANT-01 — `getUserContext()` called without try/catch in some routes**
+
+```ts
+// RISKY — throws AuthError if session missing, producing 500 instead of 401:
+const ctx = await getUserContext();
+
+// CORRECT pattern:
+try { ctx = await getUserContext(); }
+catch (e) { if (e instanceof AuthError) return authErrorResponse(e); throw e; }
+```
+
+Routes in `incidents/` use the correct pattern. Some routes added recently do not. Fix is low-risk: wrap the call.
+
+---
+
+## CONSOLIDATED RISK REGISTER
+
+| ID | Category | Severity | Phase | Safe Now |
+|----|----------|----------|-------|----------|
+| RISK-SR-02 | layout.tsx service-role | HIGH | 2 | Audit first |
+| RISK-SR-03 | rbac/guards.ts raw createClient | HIGH | 2 | ✅ Yes |
+| RISK-SC-01 | scheduler/tick session client | HIGH | 2 | ✅ Yes |
+| RISK-SC-02 | sync/cron session client | MEDIUM | 2 | ✅ Yes |
+| RISK-SYNC-01 | daily-sync + orchestrator overlap | HIGH | 6 | ✅ Yes |
+| RISK-SYNC-02 | sync/cron orphaned | MEDIUM | 6 | ✅ Deprecate |
+| RISK-SYNC-03 | 3 sync service layers | HIGH | 6 | Doc only |
+| RISK-SYNC-04 | micros/sync dual-path | MEDIUM | 6 | ✅ Yes |
+| RISK-CRON-01 | accountability/calculate session + wrong dir | MEDIUM | 2 | ✅ Yes |
+| RISK-FILTER-01 | ELEVATED_ROLES not shared | HIGH | 3 | ✅ Yes |
+| RISK-FILTER-02 | head-office/summary manual user_roles | LOW | 7 | Defer |
+| RISK-HEALTH-01 | staleness classification duplicated | HIGH | 5 | ✅ Yes |
+| RISK-HEALTH-02 | token expiry not in checks | MEDIUM | 5 | ✅ Yes |
+| RISK-TENANT-01 | getUserContext unguarded | HIGH | 3 | ✅ Yes |
+| Hardcoded TEST-01 filters | Pilot leak | MEDIUM | 7 | ✅ Yes |
+| Hardcoded sandbox UUID array | Pilot leak | MEDIUM | 7 | ✅ Yes |
+| `as any` in platform health/scoring | Type safety | HIGH | 4 | ✅ Yes |
+| Response envelope inconsistency | Contract | MEDIUM | 3 | ✅ Yes |
+
+---
+
+## WHAT MUST NOT CHANGE WITHOUT TESTS
+
+1. Any MICROS auth path (`lib/micros/auth.ts`, `lib/micros/location-auth.ts`)
+2. Per-site credential isolation in `micros_connections` rows
+3. `MicrosSyncService` internal sync flow
+4. `runLocationSync` call chain and registry lookup
+5. Scheduler tick job dispatching (`lib/scheduler/worker`, `lib/scheduler/claim`)
+6. RLS policy `USING` clauses on any table
+7. `fs_user_can_access_site()` DB function body
+8. Revenue ingestion (`micros_sales_daily` write path)
+9. Any route that currently has passing integration tests
+
+---
+
+*Audit complete — zero application code was changed in this phase.*
+*ForgeStack Africa Engineering | Architecture Consolidation Sprint | Phase 1*
 
 ## Executive Summary
 

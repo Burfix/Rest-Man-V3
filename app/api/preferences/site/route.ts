@@ -10,11 +10,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { apiGuard }                  from "@/lib/auth/api-guard";
-import { PERMISSIONS }               from "@/lib/rbac/roles";
+import { PERMISSIONS, MULTI_SITE_ROLES }         from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
-const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
 const COOKIE_NAME      = "fs-site-id";
 const MAX_AGE          = 60 * 60 * 24 * 30; // 30 days
 

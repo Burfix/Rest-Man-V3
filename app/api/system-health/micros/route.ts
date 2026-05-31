@@ -8,13 +8,12 @@
 
 import { NextResponse }        from "next/server";
 import { apiGuard }            from "@/lib/auth/api-guard";
-import { PERMISSIONS }         from "@/lib/rbac/roles";
+import { PERMISSIONS, MULTI_SITE_ROLES } from "@/lib/rbac/roles";
 import { getMicrosHealth }     from "@/lib/system-health/getMicrosHealth";
 import { logger }              from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
 
 export async function GET() {
   const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/system-health/micros");

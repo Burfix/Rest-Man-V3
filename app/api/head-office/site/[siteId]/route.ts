@@ -9,19 +9,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { getUserContext, authErrorResponse } from "@/lib/auth/get-user-context";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
+import { ELEVATED_ROLES } from "@/lib/rbac/roles";
 
 export const dynamic = "force-dynamic";
 
-const ELEVATED = ["head_office", "super_admin", "executive", "area_manager", "tenant_owner"];
 
 function serviceDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  return getServiceRoleClient();
 }
 
 export async function GET(
@@ -33,7 +29,7 @@ export async function GET(
   try { ctx = await getUserContext(); }
   catch (err) { return authErrorResponse(err); }
 
-  if (!ELEVATED.includes(ctx.role ?? "")) {
+  if (!ELEVATED_ROLES.has(ctx.role)) {
     return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
   }
 
@@ -52,7 +48,7 @@ export async function GET(
     .select("organisation_id, site_id, role")
     .eq("user_id", ctx.userId)
     .eq("is_active", true)
-    .in("role", ELEVATED);
+    .in("role", Array.from(ELEVATED_ROLES));
 
   const isSuperAdmin = (roleRows ?? []).some((r: any) => r.role === "super_admin");
 

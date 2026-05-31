@@ -14,6 +14,7 @@ import { deriveMicrosIntegrationStatus } from "@/lib/integrations/status";
 import { sanitizeMicrosError }           from "@/lib/integrations/status";
 import { createServerClient }            from "@/lib/supabase/server";
 import { getUserContext }                from "@/lib/auth/get-user-context";
+import { MULTI_SITE_ROLES }             from "@/lib/rbac/roles";
 import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
 import MicrosDebugPanel                  from "@/components/dashboard/settings/MicrosDebugPanel";
 import SyncHealthPanel                   from "@/components/settings/SyncHealthPanel";
@@ -21,7 +22,7 @@ import SyncHealthPanel                   from "@/components/settings/SyncHealthP
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
 
-const MULTI_SITE_ROLES = new Set(["super_admin", "head_office", "executive", "auditor", "area_manager"]);
+
 
 interface SyncHealthRow {
   sync_type: string;

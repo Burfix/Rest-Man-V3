@@ -11,7 +11,7 @@
  * through raw storage and validation first.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 import type { SyncBatch } from "@/lib/ontology/entities";
 
 export interface AdapterConfig {
@@ -46,11 +46,7 @@ export abstract class BaseIntegrationAdapter<TRaw, TCanonical> {
   protected batchId: string | null = null;
 
   /** Service-role Supabase client — bypasses RLS for ingestion writes. */
-  protected readonly db = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+  protected readonly db = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   constructor(config: AdapterConfig) {
     this.siteId       = config.siteId;

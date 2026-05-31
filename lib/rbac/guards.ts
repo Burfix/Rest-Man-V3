@@ -13,12 +13,12 @@
  *   const { role } = await getUserRoleForSite(userId, siteId);
  */
 
-import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { createServerClient as createSupabaseServerClient } from "@supabase/ssr";
 import type { UserRole } from "@/lib/ontology/entities";
 import type { Permission } from "./roles";
 import { hasPermission, ROLE_PERMISSIONS } from "./roles";
+import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 
 // ── Auth helpers ───────────────────────────────────────────────────────────────
 
@@ -84,7 +84,7 @@ export async function getUserRole(userId: string): Promise<UserRole | null> {
   if (!data || data.length === 0) return null;
 
   // Return highest-ranking role
-  const roles = data.map((r: any) => r.role as UserRole);
+  const roles: UserRole[] = data.map((r: any) => r.role as UserRole);
   const { roleRank } = await import("./roles");
   return roles.reduce((best, r) => (roleRank(r) > roleRank(best) ? r : best));
 }
@@ -232,10 +232,7 @@ export function authErrorResponse(err: unknown): Response {
 
 // ── Internal ──────────────────────────────────────────────────────────────────
 
-function serviceRoleDb() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } }
-  );
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serviceRoleDb(): any {
+  return getServiceRoleClient();
 }
