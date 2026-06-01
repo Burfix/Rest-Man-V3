@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     // org name is used in the invite email body — never rely on env vars for this.
     const { data: site, error: siteErr } = await supabase
       .from("sites")
-      .select("id, name, organisation_id, organisations(name)")
+      .select("id, name, organisation_id")
       .eq("id", user.siteId)
       .single();
 
@@ -105,9 +105,16 @@ export async function POST(req: NextRequest) {
     }
 
     const organisationId = site.organisation_id;
-    // Extract org name from the joined relation; fall back to "ForgeStack" only if
-    // the organisations row is somehow missing — should never happen in practice.
-    const organisationName = (site.organisations as { name: string } | null)?.name ?? "ForgeStack";
+
+    // Look up org name separately — avoids relying on join types which may not
+    // be present in generated Supabase types.
+    let organisationName = "ForgeStack";
+    const { data: orgRow } = await supabase
+      .from("organisations")
+      .select("name")
+      .eq("id", organisationId)
+      .single();
+    if (orgRow?.name) organisationName = orgRow.name;
 
     if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
       return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
