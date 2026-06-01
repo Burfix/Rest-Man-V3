@@ -16,135 +16,171 @@ import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
 export const maxDuration = 30;
 
 export async function GET(req: NextRequest) {
-        const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "GET /api/admin/users");
-        if (guard.error) return guard.error;
-        const { ctx, supabase } = guard;
+  const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "GET /api/admin/users");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
 
   try {
-            const isSuperAdmin = ctx.role === "super_admin";
+    const isSuperAdmin = ctx.role === "super_admin";
 
-          // Read from the contract-layer view v_users (migration 065).
-          // site_ids is a real uuid array; this is the canonical source for team counts.
-          let query = supabase
-              .from("v_users")
-              .select("user_id, email, full_name, status, last_seen_at, joined_at, primary_role, org_id, org_name, role_granted_at, role_is_active, site_ids")
-              .order("joined_at", { ascending: false });
+    // Read from the contract-layer view v_users (migration 065).
+    // site_ids is a real uuid array; this is the canonical source for team counts.
+    let query = supabase
+      .from("v_users")
+      .select("user_id, email, full_name, status, last_seen_at, joined_at, primary_role, org_id, org_name, role_granted_at, role_is_active, site_ids")
+      .order("joined_at", { ascending: false });
 
-          if (!isSuperAdmin) {
-                      query = query.eq("org_id", ctx.orgId!);
-          }
+    if (!isSuperAdmin) {
+      query = query.eq("org_id", ctx.orgId!);
+    }
 
-          const { data: rows, error: fetchErr } = await query;
+    const { data: rows, error: fetchErr } = await query;
 
-          if (fetchErr) {
-                      logger.error("Failed to fetch team members", { err: fetchErr });
-                      return NextResponse.json({ data: [], error: fetchErr.message }, { status: 500 });
-          }
+    if (fetchErr) {
+      logger.error("Failed to fetch team members", { err: fetchErr });
+      return NextResponse.json({ data: [], error: fetchErr.message }, { status: 500 });
+    }
 
-          // Map v_users rows to the UserEntry shape expected by the admin UI.
-          // The roles array is derived from primary_role + role metadata.
-          const users = ((rows as VUser[] | null) ?? []).map((r) => ({
-            id: r.user_id,
-            email: r.email,
-            full_name: r.full_name,
-            status: r.status,
-            last_seen_at: r.last_seen_at,
-            roles: r.primary_role
-              ? [{
-                  role: r.primary_role,
-                  site_id: null as string | null,
-                  region_id: null as string | null,
-                  is_active: r.role_is_active,
-                  granted_at: r.role_granted_at ?? "",
-                }]
-              : [],
-            site_ids: r.site_ids ?? [],
-          }));
+    // Map v_users rows to the UserEntry shape expected by the admin UI.
+    // The roles array is derived from primary_role + role metadata.
+    const users = ((rows as VUser[] | null) ?? []).map((r) => ({
+      id: r.user_id,
+      email: r.email,
+      full_name: r.full_name,
+      status: r.status,
+      last_seen_at: r.last_seen_at,
+      roles: r.primary_role
+        ? [{
+            role: r.primary_role,
+            site_id: null as string | null,
+            region_id: null as string | null,
+            is_active: r.role_is_active,
+            granted_at: r.role_granted_at ?? "",
+          }]
+        : [],
+      site_ids: r.site_ids ?? [],
+    }));
 
-          if (users.length === 0 && !fetchErr) {
-            logger.warn("ADMIN_API_EMPTY_DATA", {
-              route: "GET /api/admin/users",
-              view: "v_users",
-              orgId: ctx.orgId,
-              timestamp: new Date().toISOString(),
-            });
-          }
+    if (users.length === 0 && !fetchErr) {
+      logger.warn("ADMIN_API_EMPTY_DATA", {
+        route: "GET /api/admin/users",
+        view: "v_users",
+        orgId: ctx.orgId,
+        timestamp: new Date().toISOString(),
+      });
+    }
 
-          return NextResponse.json({ data: users, error: null });
+    return NextResponse.json({ data: users, error: null });
   } catch (err) {
-            logger.error("Unexpected error in GET /api/admin/users", { err });
-            return NextResponse.json({ data: [], error: "Internal server error" }, { status: 500 });
+    logger.error("Unexpected error in GET /api/admin/users", { err });
+    return NextResponse.json({ data: [], error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-        const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "POST /api/admin/users");
-        if (guard.error) return guard.error;
-        const { ctx, supabase } = guard;
+  const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "POST /api/admin/users");
+  if (guard.error) return guard.error;
+  const { ctx, supabase } = guard;
 
   const raw = await req.json();
-        const v = validateBody(inviteUserSchema, raw);
-        if (!v.success) return v.response;
-        const user = inviteUserDtoToInternal(v.data);
+  const v = validateBody(inviteUserSchema, raw);
+  if (!v.success) return v.response;
+  const user = inviteUserDtoToInternal(v.data);
 
   try {
-            if (!user.siteId) {
-                      return NextResponse.json({ error: "site_id is required" }, { status: 400 });
-            }
+    if (!user.siteId) {
+      return NextResponse.json({ error: "site_id is required" }, { status: 400 });
+    }
 
-            const { data: site, error: siteErr } = await supabase
-              .from("sites")
-              .select("id, name, organisation_id")
-              .eq("id", user.siteId)
-              .single();
+    // Fetch site + org name in one query.
+    // org name is used in the invite email body — never rely on env vars for this.
+    const { data: site, error: siteErr } = await supabase
+      .from("sites")
+      .select("id, name, organisation_id, organisations(name)")
+      .eq("id", user.siteId)
+      .single();
 
-          if (siteErr || !site) {
-                      return NextResponse.json({ error: `Site not found: ${user.siteId}` }, { status: 404 });
-          }
+    if (siteErr || !site) {
+      return NextResponse.json({ error: `Site not found: ${user.siteId}` }, { status: 404 });
+    }
 
-          const organisationId = site.organisation_id;
+    const organisationId = site.organisation_id;
+    // Extract org name from the joined relation; fall back to "ForgeStack" only if
+    // the organisations row is somehow missing — should never happen in practice.
+    const organisationName = (site.organisations as { name: string } | null)?.name ?? "ForgeStack";
 
-          if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
-                      return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
-          }
+    if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
+      return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
+    }
 
-          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
 
-          const adminClient = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const adminClient = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
-          const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
-                      redirectTo: `${siteUrl}/reset-password`,
-                      data: { full_name: user.fullName || "", invited_to_site: site.name, role: user.role },
-          });
+    // Step 1 — Create the Supabase auth invite.
+    // redirectTo points to /reset-password so the token in the URL hash is consumed
+    // by the set-password form, NOT the login form.
+    // Disable Supabase's own email in Auth → Email Templates (set to disabled) so
+    // only our Resend email is delivered.
+    const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
+      redirectTo: `${siteUrl}/reset-password`,
+      data: {
+        full_name: user.fullName || "",
+        invited_to_site: site.name,
+        organisation_name: organisationName,
+        role: user.role,
+      },
+    });
 
-          if (inviteErr) {
-                      logger.error("Supabase invite failed", { err: inviteErr });
-                      return NextResponse.json({ error: inviteErr.message }, { status: 400 });
-          }
+    if (inviteErr) {
+      logger.error("Supabase invite failed", { err: inviteErr });
+      return NextResponse.json({ error: inviteErr.message }, { status: 400 });
+    }
 
-          const invitedUserId = inviteData.user.id;
+    const invitedUserId = inviteData.user.id;
 
-          const profileDb = inviteUserInternalToDb(user);
-          await adminClient.from("profiles").upsert(
-                { id: invitedUserId, email: profileDb.email, full_name: profileDb.full_name || "", status: "invited", updated_at: new Date().toISOString() },
-                { onConflict: "id" }
-                    );
+    // Step 2 — Upsert profile, role, and site access.
+    const profileDb = inviteUserInternalToDb(user);
 
-          await adminClient.from("user_roles").upsert(
-                { user_id: invitedUserId, organisation_id: organisationId, site_id: profileDb.site_id, role: profileDb.role, is_active: true, granted_by: ctx.userId, granted_at: new Date().toISOString() },
-                { onConflict: "user_id,organisation_id,site_id,role" }
-                    );
+    await adminClient.from("profiles").upsert(
+      { id: invitedUserId, email: profileDb.email, full_name: profileDb.full_name || "", status: "invited", updated_at: new Date().toISOString() },
+      { onConflict: "id" }
+    );
 
-          await adminClient.from("user_site_access").upsert(
-                { user_id: invitedUserId, site_id: profileDb.site_id, granted_by: ctx.userId, created_at: new Date().toISOString() },
-                { onConflict: "user_id,site_id" }
-                    );
+    await adminClient.from("user_roles").upsert(
+      { user_id: invitedUserId, organisation_id: organisationId, site_id: profileDb.site_id, role: profileDb.role, is_active: true, granted_by: ctx.userId, granted_at: new Date().toISOString() },
+      { onConflict: "user_id,organisation_id,site_id,role" }
+    );
 
-          await sendInviteEmail({ to: user.email, name: user.fullName || user.email, role: user.role, inviteLink: `${siteUrl}/login` });
+    await adminClient.from("user_site_access").upsert(
+      { user_id: invitedUserId, site_id: profileDb.site_id, granted_by: ctx.userId, created_at: new Date().toISOString() },
+      { onConflict: "user_id,site_id" }
+    );
 
-          return NextResponse.json({ success: true, userId: invitedUserId, organisationId, siteId: user.siteId, role: user.role });
+    // Step 3 — Send our branded Resend email.
+    // inviteLink points to /reset-password (not /login) so the user lands on the
+    // set-password form where the Supabase token is consumed from the URL hash.
+    // Supabase's own invite email must be DISABLED in Auth → Email Templates to
+    // prevent a second email firing from Supabase simultaneously.
+    await sendInviteEmail({
+      to: user.email,
+      name: user.fullName || user.email,
+      role: user.role,
+      organisationName,                         // e.g. "Primi" or "Si Cantina"
+      inviteLink: `${siteUrl}/reset-password`,  // ← /reset-password, NOT /login
+    });
+
+    logger.info("User invited successfully", {
+      invitedUserId,
+      organisationId,
+      organisationName,
+      siteId: user.siteId,
+      role: user.role,
+    });
+
+    return NextResponse.json({ success: true, userId: invitedUserId, organisationId, siteId: user.siteId, role: user.role });
   } catch (err) {
-            logger.error("Unexpected error in POST /api/admin/users", { err });
-            return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    logger.error("Unexpected error in POST /api/admin/users", { err });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -5,6 +5,7 @@ interface InviteEmailParams {
   to: string;
   name?: string;
   role?: string;
+  organisationName: string;  // required — fetched from DB, never from env
   inviteLink: string;
 }
 
@@ -16,9 +17,9 @@ export async function sendInviteEmail(params: InviteEmailParams): Promise<boolea
   }
 
   const resend = new Resend(apiKey);
-  const venueName = process.env.VENUE_NAME ?? "ForgeStack";
-  const fromAddress = process.env.SMTP_FROM ?? `${venueName} <onboarding@resend.dev>`;
-  const { to, name, role, inviteLink } = params;
+  // ForgeStack is always the sender brand; organisationName is the tenant name shown in the body.
+  const fromAddress = process.env.SMTP_FROM ?? "ForgeStack <onboarding@resend.dev>";
+  const { to, name, role, organisationName, inviteLink } = params;
 
   const greeting = name ? `Hi ${name},` : "Hi,";
   const roleText = role ? ` as <strong>${role.replace(/_/g, " ")}</strong>` : "";
@@ -29,12 +30,12 @@ export async function sendInviteEmail(params: InviteEmailParams): Promise<boolea
 <head><meta charset="utf-8"></head>
 <body style="margin:0;padding:0;background:#0c0a09;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:480px;margin:40px auto;background:#1c1917;border:1px solid #292524;border-radius:12px;padding:32px;">
-    <h2 style="color:#f5f5f4;margin:0 0 16px;font-size:20px;">${venueName}</h2>
+    <h2 style="color:#f5f5f4;margin:0 0 16px;font-size:20px;">ForgeStack</h2>
     <p style="color:#d6d3d1;font-size:14px;line-height:1.6;margin:0 0 12px;">
       ${greeting}
     </p>
     <p style="color:#d6d3d1;font-size:14px;line-height:1.6;margin:0 0 24px;">
-      You've been invited to join <strong style="color:#f5f5f4;">${venueName}</strong>${roleText}. Click the button below to set your password and get started.
+      You've been invited to join <strong style="color:#f5f5f4;">${organisationName}</strong>${roleText}. Click the button below to set your password and get started.
     </p>
     <div style="text-align:center;margin:0 0 24px;">
       <a href="${inviteLink}" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:12px 32px;border-radius:8px;font-size:14px;font-weight:600;">
@@ -59,7 +60,7 @@ export async function sendInviteEmail(params: InviteEmailParams): Promise<boolea
     const { error } = await resend.emails.send({
       from: fromAddress,
       to,
-      subject: `You've been invited to ${venueName}`,
+      subject: `You've been invited to join ${organisationName} on ForgeStack`,
       html,
     });
 
