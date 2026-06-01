@@ -109,12 +109,14 @@ export async function POST(req: NextRequest) {
     // Look up org name separately — avoids relying on join types which may not
     // be present in generated Supabase types.
     let organisationName = "ForgeStack";
-    const { data: orgRow } = await supabase
-      .from("organisations")
-      .select("name")
-      .eq("id", organisationId)
-      .single();
-    if (orgRow?.name) organisationName = orgRow.name;
+    if (organisationId) {
+      const { data: orgRow } = await supabase
+        .from("organisations")
+        .select("name")
+        .eq("id", organisationId)
+        .single();
+      if (orgRow?.name) organisationName = orgRow.name;
+    }
 
     if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
       return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
