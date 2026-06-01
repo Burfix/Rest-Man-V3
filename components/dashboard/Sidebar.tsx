@@ -10,10 +10,11 @@ import type { UserRole } from "@/lib/ontology/entities";
 // ── Nav data ──────────────────────────────────────────────────────────────────
 
 type NavItem = {
-  href:  string;
-  label: string;
-  icon:  string;
-  soon?: boolean;
+  href:           string;
+  label:          string;
+  icon:           string;
+  soon?:          boolean;
+  superAdminOnly?: boolean;
 };
 
 type NavGroup = {
@@ -27,7 +28,7 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard",             label: "Command Center", icon: "⚡" },
       { href: "/dashboard/head-office",         label: "Head Office",    icon: "🏢" },
-      { href: "/dashboard/head-office/sites",   label: "Sites Overview", icon: "🗺️" },
+      { href: "/dashboard/head-office/sites", superAdminOnly: true,   label: "Sites Overview", icon: "🗺️" },
       { href: "/dashboard/head-office/reports", label: "Daily Report",   icon: "📊" },
       { href: "/dashboard/forecast",    label: "GM Co-Pilot",    icon: "🧭" },
     ],
@@ -38,16 +39,16 @@ const NAV: NavGroup[] = [
       { href: "/dashboard/daily-ops",           label: "Daily Ops",         icon: "📋" },
       { href: "/dashboard/accountability",      label: "Accountability",    icon: "🏅" },
       { href: "/dashboard/compliance",          label: "Compliance",        icon: "🛡️" },
-      { href: "/dashboard/compliance-engine",   label: "Compliance Engine", icon: "🔐" },
+      { href: "/dashboard/compliance-engine", superAdminOnly: true,   label: "Compliance Engine", icon: "🔐" },
       { href: "/dashboard/maintenance",         label: "Maintenance",       icon: "🔧" },
     ],
   },
   {
     group: "Service",
     items: [
-      { href: "/dashboard/bookings",    label: "Bookings",    icon: "📅" },
-      { href: "/dashboard/escalations", label: "Escalations", icon: "⚠️" },
-      { href: "/dashboard/events",      label: "Events",      icon: "🎉" },
+      { href: "/dashboard/bookings", superAdminOnly: true,    label: "Bookings",    icon: "📅" },
+      { href: "/dashboard/escalations", superAdminOnly: true, label: "Escalations", icon: "⚠️" },
+      { href: "/dashboard/events", superAdminOnly: true,      label: "Events",      icon: "🎉" },
     ],
   },
   {
@@ -55,22 +56,22 @@ const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard/profit",     label: "Profit Intelligence", icon: "📈" },
       { href: "/dashboard/labour",     label: "Labour",              icon: "👷" },
-      { href: "/dashboard/commercial", label: "Commercial",          icon: "💼" },
+      { href: "/dashboard/commercial", superAdminOnly: true, label: "Commercial",          icon: "💼" },
     ],
   },
   {
     group: "Reputation",
     items: [
-      { href: "/dashboard/reviews", label: "Reviews", icon: "⭐" },
+      { href: "/dashboard/reviews", superAdminOnly: true, label: "Reviews", icon: "⭐" },
     ],
   },
   {
     group: "System",
     items: [
       { href: "/dashboard/system-health",         label: "System Health", icon: "🖥️" },
-      { href: "/dashboard/admin",                label: "Admin",        icon: "🛡️" },
+      { href: "/dashboard/admin", superAdminOnly: true,                label: "Admin",        icon: "🛡️" },
       { href: "/dashboard/settings",              label: "Settings",     icon: "⚙️" },
-      { href: "/dashboard/settings/integrations", label: "Integrations", icon: "🔌" },
+      { href: "/dashboard/settings/integrations", superAdminOnly: true, label: "Integrations", icon: "🔌" },
     ],
   },
 ];
@@ -92,7 +93,10 @@ function NavList({
   const filteredNav = role
     ? NAV.map((group) => ({
         ...group,
-        items: group.items.filter((item) => isNavItemAllowed(role, item.href, siteAllowedRoutes)),
+        items: group.items.filter((item) => {
+          if (item.superAdminOnly && role !== "super_admin") return false;
+          return isNavItemAllowed(role, item.href, siteAllowedRoutes);
+        }),
       })).filter((group) => group.items.length > 0)
     : NAV;
 
