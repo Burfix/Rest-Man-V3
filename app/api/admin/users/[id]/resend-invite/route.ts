@@ -43,7 +43,19 @@ export async function POST(
       );
     }
 
-    // 2. Generate a recovery (password-reset) link — works for both invited and active users
+    // 2. Look up the user's organisation name via user_roles → organisations join
+    const { data: roleRow } = await supabase
+      .from("user_roles")
+      .select("organisations(name)")
+      .eq("user_id", targetId)
+      .eq("is_active", true)
+      .limit(1)
+      .single();
+
+    const organisationName =
+      (roleRow?.organisations as { name: string } | null)?.name ?? "ForgeStack";
+
+    // 3. Generate a recovery (password-reset) link — works for both invited and active users
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
     const { data: linkData, error: linkErr } = await supabase.auth.admin.generateLink({
       type: "recovery",
@@ -58,7 +70,7 @@ export async function POST(
 
     const auditAction = profileData.status === "invited" ? "user.invite_resent" : "user.password_reset_sent";
 
-    // 3. Audit log
+    // 4. Audit log
     await supabase.from("access_audit_log").insert({
       actor_user_id: ctx.userId,
       target_user_id: targetId,
@@ -66,16 +78,17 @@ export async function POST(
       metadata: { email: profileData.email },
     } as any);
 
-    logger.info("Generated new invite link", { email: profileData.email, targetId });
+    logger.info("Generated new invite link", { email: profileData.email, targetId, organisationName });
 
     const inviteLink = linkData?.properties?.action_link;
 
-    // Auto-send invite email via Resend
+    // 5. Send via Resend with correct org name — inviteLink goes to /reset-password
     let emailSent = false;
     if (inviteLink) {
       emailSent = await sendInviteEmail({
         to: profileData.email,
         name: profileData.full_name ?? undefined,
+        organisationName,
         inviteLink,
       });
     }
