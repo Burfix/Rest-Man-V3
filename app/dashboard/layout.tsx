@@ -5,6 +5,7 @@ import AutoRefresh from "@/components/dashboard/AutoRefresh";
 import ImpersonationBanner from "@/components/admin/ImpersonationBanner";
 import RoleGuard from "@/components/dashboard/RoleGuard";
 import SiteSwitcher from "@/components/dashboard/SiteSwitcher";
+import AdoptionTrackerMount from "@/components/admin/adoption/AdoptionTrackerMount";
 import type { SiteOption } from "@/components/dashboard/SiteSwitcher";
 import { getUserContext } from "@/lib/auth/get-user-context";
 import { getSiteConfig } from "@/lib/config/site";
@@ -80,6 +81,7 @@ export default async function DashboardLayout({
           </div>
         )}
         <AutoRefresh />
+        <AdoptionTrackerMount />
         <RoleGuard role={role} siteAllowedRoutes={siteAllowedRoutes}>
           {children}
         </RoleGuard>

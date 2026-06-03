@@ -2,7 +2,6 @@
  * lib/system-health/getSystemHealth.ts
  *
  * Core system health service.
- *
  * Runs all queries in parallel. Every section is individually try/caught so
  * a DB error in one section never prevents the rest from rendering.
  *
@@ -23,31 +22,25 @@ import type {
   SystemIncident,
   ErrorHealth,
   OverallStatus,
+  SystemAlert,
 } from "./types";
 
 // ── Job definitions ───────────────────────────────────────────────────────────
 
 const JOB_DEFINITIONS: { jobType: string; label: string; canRunNow: boolean }[] = [
-  { jobType: "sales_sync",          label: "MICROS Sales Sync",           canRunNow: true },
-  { jobType: "labour_sync",         label: "MICROS Labour Sync",          canRunNow: true },
-  { jobType: "inventory_sync",      label: "Inventory Sync",              canRunNow: true },
-  { jobType: "daily_action_reset",  label: "Daily Action Reset",          canRunNow: false },
-  { jobType: "action_aging",        label: "Action Aging",                canRunNow: false },
-  { jobType: "weekly_report",       label: "Weekly Report Generation",    canRunNow: false },
-  { jobType: "data_health_recompute", label: "Data Health Recompute",     canRunNow: false },
+  { jobType: "sales_sync",           label: "MICROS Sales Sync",         canRunNow: true  },
+  { jobType: "labour_sync",          label: "MICROS Labour Sync",         canRunNow: true  },
+  { jobType: "inventory_sync",       label: "Inventory Sync",             canRunNow: true  },
+  { jobType: "daily_action_reset",   label: "Daily Action Reset",         canRunNow: false },
+  { jobType: "action_aging",         label: "Action Aging",               canRunNow: false },
+  { jobType: "weekly_report",        label: "Weekly Report Generation",   canRunNow: false },
+  { jobType: "data_health_recompute",label: "Data Health Recompute",      canRunNow: false },
 ];
 
 // ── Status derivation ─────────────────────────────────────────────────────────
 
-function dataSourceStatus(
-  key: string,
-  ageMinutes: number | null,
-): DataSourceStatus {
-  if (ageMinutes === null) {
-    // For compliance/maintenance, null means no recent events — that's normal
-    if (["compliance", "maintenance", "reviews"].includes(key)) return "not_configured";
-    return "not_configured";
-  }
+function dataSourceStatus(key: string, ageMinutes: number | null): DataSourceStatus {
+  if (ageMinutes === null) return "not_configured";
   if (ageMinutes <= 15)   return "live";
   if (ageMinutes <= 60)   return "fresh";
   if (ageMinutes <= 180)  return "delayed";
@@ -102,10 +95,9 @@ const STATUS_WEIGHTS: Record<DataSourceStatus, number> = {
   delayed:        0.5,
   stale:          0.2,
   missing:        0.0,
-  not_configured: 0.5, // neutral — not a problem, just not set up
+  not_configured: 0.5,
 };
 
-// Core sources are weighted more heavily
 const SOURCE_WEIGHTS: Record<string, number> = {
   sales:       2.0,
   labour:      2.0,
@@ -193,62 +185,14 @@ function buildChecklist(
     .every(s => s.status !== "missing");
 
   return [
-    {
-      id:       "system_healthy",
-      label:    "System healthy",
-      auto:     true,
-      checked:  overallStatus === "healthy",
-      category: "system",
-    },
-    {
-      id:       "data_synced",
-      label:    "Core data synced within 30 min",
-      auto:     true,
-      checked:  coreSourcesFresh,
-      category: "data",
-    },
-    {
-      id:       "no_critical_gaps",
-      label:    "No critical data gaps",
-      auto:     true,
-      checked:  noCriticalGaps,
-      category: "data",
-    },
-    {
-      id:       "no_failed_jobs",
-      label:    "No failed sync jobs in last 24h",
-      auto:     true,
-      checked:  failedJobs24h === 0,
-      category: "system",
-    },
-    {
-      id:       "gm_actions_reviewed",
-      label:    "GM priority actions reviewed",
-      auto:     false,
-      checked:  false,
-      category: "ops",
-    },
-    {
-      id:       "daily_ops_completed",
-      label:    "Daily ops checklist completed",
-      auto:     false,
-      checked:  false,
-      category: "ops",
-    },
-    {
-      id:       "no_overdue_tasks",
-      label:    "No overdue tasks",
-      auto:     false,
-      checked:  false,
-      category: "ops",
-    },
-    {
-      id:       "reports_generated",
-      label:    "Daily reports generated",
-      auto:     false,
-      checked:  false,
-      category: "reports",
-    },
+    { id: "system_healthy",      label: "System healthy",                   auto: true,  checked: overallStatus === "healthy", category: "system"  },
+    { id: "data_synced",         label: "Core data synced within 30 min",   auto: true,  checked: coreSourcesFresh,            category: "data"    },
+    { id: "no_critical_gaps",    label: "No critical data gaps",             auto: true,  checked: noCriticalGaps,              category: "data"    },
+    { id: "no_failed_jobs",      label: "No failed sync jobs in last 24h",   auto: true,  checked: failedJobs24h === 0,         category: "system"  },
+    { id: "gm_actions_reviewed", label: "GM priority actions reviewed",      auto: false, checked: false,                       category: "ops"     },
+    { id: "daily_ops_completed", label: "Daily ops checklist completed",     auto: false, checked: false,                       category: "ops"     },
+    { id: "no_overdue_tasks",    label: "No overdue tasks",                  auto: false, checked: false,                       category: "ops"     },
+    { id: "reports_generated",   label: "Daily reports generated",           auto: false, checked: false,                       category: "reports" },
   ];
 }
 
@@ -274,6 +218,8 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     maintenanceRes,
     incidentsRes,
     criticalActionsRes,
+    // ✦ NEW — system_alerts query
+    systemAlertsRes,
   ] = await Promise.allSettled([
     supabase
       .from("sync_jobs")
@@ -296,61 +242,26 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
       .limit(1)
       .maybeSingle(),
 
-    supabase
-      .from("revenue_records")
-      .select("created_at")
-      .eq("site_id", siteId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("revenue_records").select("created_at").eq("site_id", siteId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase
-      .from("labour_records")
-      .select("created_at")
-      .eq("site_id", siteId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("labour_records").select("created_at").eq("site_id", siteId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase
-      .from("inventory_items")
-      .select("updated_at")
-      .eq("site_id", siteId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("inventory_items").select("updated_at").eq("site_id", siteId)
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase
-      .from("guest_reviews")
-      .select("created_at")
-      .eq("site_id", siteId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("guest_reviews").select("created_at").eq("site_id", siteId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase
-      .from("daily_tasks")
-      .select("updated_at")
-      .eq("site_id", siteId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("daily_tasks").select("updated_at").eq("site_id", siteId)
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase
-      .from("compliance_items")
-      .select("updated_at")
-      .eq("site_id", siteId)
-      .order("updated_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("compliance_items").select("updated_at").eq("site_id", siteId)
+      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase
-      .from("maintenance_logs")
-      .select("created_at")
-      .eq("site_id", siteId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+    supabase.from("maintenance_logs").select("created_at").eq("site_id", siteId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
 
     supabase
       .from("system_incidents")
@@ -359,12 +270,19 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
       .order("created_at", { ascending: false })
       .limit(20),
 
-    // Count open priority-1 actions
     supabase
       .from("actions")
       .select("id", { count: "exact", head: true })
       .eq("site_id", siteId)
       .eq("status", "open"),
+
+    // ✦ NEW — fetch unresolved platform alerts (no site scoping — these are infra-level)
+    supabase
+      .from("system_alerts")
+      .select("id, alert_type, severity, title, message, context, created_at")
+      .is("resolved_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   // ── Extract sync jobs ──────────────────────────────────────────────────────
@@ -373,15 +291,9 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
   const syncSchedules: any[] =
     syncSchedulesRes.status === "fulfilled" ? (syncSchedulesRes.value?.data ?? []) : [];
 
-  const failedJobs24h = syncJobs.filter(
-    j => j.status === "failed" || j.status === "dead_letter",
-  ).length;
-
-  const deadLetterJobs = syncJobs.filter(j => j.status === "dead_letter").length;
-
-  const lastFailedJob = syncJobs.find(
-    j => j.status === "failed" || j.status === "dead_letter",
-  );
+  const failedJobs24h   = syncJobs.filter(j => j.status === "failed" || j.status === "dead_letter").length;
+  const deadLetterJobs  = syncJobs.filter(j => j.status === "dead_letter").length;
+  const lastFailedJob   = syncJobs.find(j => j.status === "failed" || j.status === "dead_letter");
 
   // ── MICROS health ──────────────────────────────────────────────────────────
   const microsRow = microsRes.status === "fulfilled" ? microsRes.value?.data : null;
@@ -391,21 +303,18 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
   const lastInvSyncJob    = syncJobs.find(j => j.job_type === "inventory_sync" && j.status === "success");
 
   const micros: MicrosHealth = {
-    connected:        !!microsRow,
-    connectionId:     microsRow?.id ?? null,
-    locationRef:      microsRow?.loc_ref ?? null,
-    serverUrl:        microsRow?.base_url ?? null,
-    lastSalesSync:    lastSalesSyncJob?.updated_at ?? microsRow?.last_synced_at ?? null,
-    lastLabourSync:   lastLabourSyncJob?.updated_at ?? null,
+    connected:         !!microsRow,
+    connectionId:      microsRow?.id ?? null,
+    locationRef:       microsRow?.loc_ref ?? null,
+    serverUrl:         microsRow?.base_url ?? null,
+    lastSalesSync:     lastSalesSyncJob?.updated_at ?? microsRow?.last_synced_at ?? null,
+    lastLabourSync:    lastLabourSyncJob?.updated_at ?? null,
     lastInventorySync: lastInvSyncJob?.updated_at ?? null,
-    lastError:        microsRow?.last_error ?? lastFailedJob?.error_message ?? null,
+    lastError:         microsRow?.last_error ?? lastFailedJob?.error_message ?? null,
   };
 
   // ── Data source helper ─────────────────────────────────────────────────────
-  function ageMinutes(
-    res: PromiseSettledResult<any>,
-    field: string,
-  ): number | null {
+  function ageMinutes(res: PromiseSettledResult<any>, field: string): number | null {
     if (res.status === "rejected") return null;
     const row = res.value?.data;
     if (!row) return null;
@@ -444,23 +353,18 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
   });
 
   // ── Last successful sync across all sources ────────────────────────────────
-  const freshTimestamps = dataSources
-    .map(s => s.lastSuccess)
-    .filter(Boolean) as string[];
+  const freshTimestamps = dataSources.map(s => s.lastSuccess).filter(Boolean) as string[];
   const lastSuccessfulSync =
-    freshTimestamps.length > 0
-      ? freshTimestamps.sort().reverse()[0]
-      : null;
+    freshTimestamps.length > 0 ? freshTimestamps.sort().reverse()[0] : null;
 
   // ── Jobs health ────────────────────────────────────────────────────────────
   const scheduleMap = new Map(syncSchedules.map(s => [s.job_type, s]));
 
   const jobs: JobHealth[] = JOB_DEFINITIONS.map(def => {
-    const recent = syncJobs.filter(j => j.job_type === def.jobType);
-    const last   = recent[0] ?? null;
+    const recent   = syncJobs.filter(j => j.job_type === def.jobType);
+    const last     = recent[0] ?? null;
     const schedule = scheduleMap.get(def.jobType);
     const failures = recent.filter(j => j.status === "failed" || j.status === "dead_letter").length;
-
     return {
       id:           last?.id ?? def.jobType,
       label:        def.label,
@@ -476,9 +380,7 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
 
   // ── Error health ───────────────────────────────────────────────────────────
   const errors: ErrorHealth = {
-    sentryConfigured: !!(
-      process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN
-    ),
+    sentryConfigured: !!(process.env.NEXT_PUBLIC_SENTRY_DSN || process.env.SENTRY_DSN),
     syncFailures24h:  failedJobs24h,
     deadLetterJobs,
     lastException:    lastFailedJob?.error_message ?? null,
@@ -486,9 +388,7 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
 
   // ── Open critical actions ──────────────────────────────────────────────────
   const openCriticalActions: number =
-    criticalActionsRes.status === "fulfilled"
-      ? (criticalActionsRes.value?.count ?? 0)
-      : 0;
+    criticalActionsRes.status === "fulfilled" ? (criticalActionsRes.value?.count ?? 0) : 0;
 
   // ── Incidents ──────────────────────────────────────────────────────────────
   const incidentRows: any[] =
@@ -508,9 +408,7 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     updatedAt:       row.updated_at       ?? null,
   }));
 
-  // ── DB schema health: verify required migrations ────────────────────────────
-  // Probe for columns added in recent migrations. Any missing column indicates
-  // the migration has not been applied and syncs will fail with schema errors.
+  // ── DB schema health probe ─────────────────────────────────────────────────
   try {
     const { error: schemaErr } = await supabase
       .from("micros_connections")
@@ -518,8 +416,6 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
       .limit(0);
 
     if (schemaErr?.message?.includes("sales_location_ref")) {
-      // Migration 092 not applied — inject a critical synthetic incident so
-      // it surfaces in the System Health console rather than failing silently.
       incidents.unshift({
         id:              "schema-micros-sales-location-ref-missing",
         source:          "schema_check",
@@ -538,8 +434,22 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
       });
     }
   } catch {
-    // Non-fatal — schema probe should never crash the health endpoint
+    // Non-fatal
   }
+
+  // ── ✦ NEW: System alerts ───────────────────────────────────────────────────
+  const systemAlertRows: any[] =
+    systemAlertsRes.status === "fulfilled" ? (systemAlertsRes.value?.data ?? []) : [];
+
+  const systemAlerts: SystemAlert[] = systemAlertRows.map(row => ({
+    id:        row.id,
+    alertType: row.alert_type,
+    severity:  row.severity,
+    title:     row.title,
+    message:   row.message ?? null,
+    context:   row.context ?? null,
+    createdAt: row.created_at,
+  }));
 
   // ── Overall status ─────────────────────────────────────────────────────────
   const { status: overallStatus, summary } = calculateOverallStatus(dataSources, failedJobs24h);
@@ -555,6 +465,7 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     overallStatus,
     dataFreshnessScore,
     failedJobs24h,
+    systemAlertCount: systemAlerts.length,
     dataSources: dataSources.map(s => `${s.key}:${s.status}`).join(","),
   });
 
@@ -571,6 +482,7 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     errors,
     checklist,
     incidents,
+    systemAlerts,   // ✦ NEW
     checkedAt,
   };
 }

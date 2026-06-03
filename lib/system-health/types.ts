@@ -19,15 +19,27 @@ export type JobStatus = "success" | "running" | "failed" | "idle" | "disabled";
 
 export type TrustLevel = "high" | "medium" | "low" | "none";
 
+export type AlertSeverity = "info" | "warning" | "critical";
+
+export interface SystemAlert {
+  id: string;
+  alertType: string;
+  severity: AlertSeverity;
+  title: string;
+  message: string | null;
+  context: Record<string, unknown> | null;
+  createdAt: string;
+}
+
 export interface DataSourceHealth {
-  key: string;            // internal key: 'sales' | 'labour' | ...
-  label: string;          // display: 'Sales' | 'Labour' | ...
+  key: string;
+  label: string;
   status: DataSourceStatus;
-  lastSuccess: string | null;   // ISO timestamp of last successful record
-  lastAttempt: string | null;   // ISO timestamp of last attempted sync
+  lastSuccess: string | null;
+  lastAttempt: string | null;
   dataAgeMinutes: number | null;
   trust: TrustLevel;
-  action: string;               // recommended operator action
+  action: string;
 }
 
 export interface MicrosHealth {
@@ -56,7 +68,6 @@ export interface JobHealth {
 export interface ChecklistItem {
   id: string;
   label: string;
-  /** true = auto-checked based on live system state */
   auto: boolean;
   checked: boolean;
   category: "system" | "data" | "ops" | "reports";
@@ -70,7 +81,6 @@ export interface SystemIncident {
   status: "open" | "acknowledged" | "investigating" | "resolved";
   createdAt: string;
   resolvedAt: string | null;
-  // Operator workflow fields (added in migration 091)
   acknowledgedAt?: string | null;
   acknowledgedBy?: string | null;
   assignedTo?: string | null;
@@ -90,11 +100,9 @@ export interface ErrorHealth {
 export interface SystemHealthPayload {
   overallStatus: OverallStatus;
   summary: string;
-  /** ISO timestamp of the last successful sync across all sources */
   lastSuccessfulSync: string | null;
   failedJobs24h: number;
   openCriticalActions: number;
-  /** 0–100 weighted freshness score across all data sources */
   dataFreshnessScore: number;
   dataSources: DataSourceHealth[];
   micros: MicrosHealth;
@@ -102,5 +110,7 @@ export interface SystemHealthPayload {
   errors: ErrorHealth;
   checklist: ChecklistItem[];
   incidents: SystemIncident[];
+  /** Platform-level infrastructure alerts from system_alerts table */
+  systemAlerts: SystemAlert[];
   checkedAt: string;
 }
