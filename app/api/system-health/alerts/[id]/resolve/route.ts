@@ -18,7 +18,7 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   const guard = await apiGuard(
-    PERMISSIONS.VIEW_SYSTEM_HEALTH as any,
+    PERMISSIONS.MANAGE_INTEGRATIONS,
     "DELETE /api/system-health/alerts/[id]/resolve",
   );
   if (guard.error) return guard.error;
