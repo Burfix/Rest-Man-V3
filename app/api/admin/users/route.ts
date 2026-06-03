@@ -23,8 +23,6 @@ export async function GET(req: NextRequest) {
   try {
     const isSuperAdmin = ctx.role === "super_admin";
 
-    // Read from the contract-layer view v_users (migration 065).
-    // site_ids is a real uuid array; this is the canonical source for team counts.
     let query = supabase
       .from("v_users")
       .select("user_id, email, full_name, status, last_seen_at, joined_at, primary_role, org_id, org_name, role_granted_at, role_is_active, site_ids")
@@ -41,8 +39,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ data: [], error: fetchErr.message }, { status: 500 });
     }
 
-    // Map v_users rows to the UserEntry shape expected by the admin UI.
-    // The roles array is derived from primary_role + role metadata.
     const users = ((rows as VUser[] | null) ?? []).map((r) => ({
       id: r.user_id,
       email: r.email,
@@ -92,8 +88,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "site_id is required" }, { status: 400 });
     }
 
-    // Fetch site + org name in one query.
-    // org name is used in the invite email body — never rely on env vars for this.
+    // Fetch site + org in two separate queries to avoid Supabase join type narrowing
+    // to 'never' when using .select("organisation_id, organisations(name)").single()
     const { data: site, error: siteErr } = await supabase
       .from("sites")
       .select("id, name, organisation_id")
@@ -104,38 +100,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Site not found: ${user.siteId}` }, { status: 404 });
     }
 
-    const organisationId = site.organisation_id;
+    const organisationId = (site as any).organisation_id as string;
 
-    // Look up org name separately — avoids relying on join types which may not
-    // be present in generated Supabase types.
-    let organisationName = "ForgeStack";
-    if (organisationId) {
-      const { data: orgRow } = await supabase
-        .from("organisations")
-        .select("name")
-        .eq("id", organisationId)
-        .single();
-      if (orgRow?.name) organisationName = orgRow.name;
-    }
+    // Fetch org name separately to avoid the join type narrowing issue
+    const { data: org } = await supabase
+      .from("organisations")
+      .select("name")
+      .eq("id", organisationId)
+      .maybeSingle();
+
+    const organisationName: string = (org as any)?.name ?? "ForgeStack";
 
     if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
       return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
+    const adminClient = getServiceRoleClient() as any;
 
-    const adminClient = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    // Step 1 — Create the Supabase auth invite.
-    // redirectTo points to /reset-password so the token in the URL hash is consumed
-    // by the set-password form, NOT the login form.
-    // Disable Supabase's own email in Auth → Email Templates (set to disabled) so
-    // only our Resend email is delivered.
     const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
       redirectTo: `${siteUrl}/reset-password`,
       data: {
         full_name: user.fullName || "",
-        invited_to_site: site.name,
+        invited_to_site: (site as any).name,
         organisation_name: organisationName,
         role: user.role,
       },
@@ -147,8 +134,6 @@ export async function POST(req: NextRequest) {
     }
 
     const invitedUserId = inviteData.user.id;
-
-    // Step 2 — Upsert profile, role, and site access.
     const profileDb = inviteUserInternalToDb(user);
 
     await adminClient.from("profiles").upsert(
@@ -166,17 +151,12 @@ export async function POST(req: NextRequest) {
       { onConflict: "user_id,site_id" }
     );
 
-    // Step 3 — Send our branded Resend email.
-    // inviteLink points to /reset-password (not /login) so the user lands on the
-    // set-password form where the Supabase token is consumed from the URL hash.
-    // Supabase's own invite email must be DISABLED in Auth → Email Templates to
-    // prevent a second email firing from Supabase simultaneously.
     await sendInviteEmail({
       to: user.email,
       name: user.fullName || user.email,
       role: user.role,
-      organisationName,                         // e.g. "Primi" or "Si Cantina"
-      inviteLink: `${siteUrl}/reset-password`,  // ← /reset-password, NOT /login
+      organisationName,
+      inviteLink: `${siteUrl}/reset-password`,
     });
 
     logger.info("User invited successfully", {

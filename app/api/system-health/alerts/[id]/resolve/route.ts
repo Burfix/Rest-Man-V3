@@ -1,186 +1,71 @@
 /**
- * GET  /api/admin/users      - list users (all orgs for super_admin, scoped for others)
- * POST /api/admin/users      - invite a new user
+ * DELETE /api/system-health/alerts/[id]/resolve
+ *
+ * Marks a system alert as resolved. Used by the Dismiss button in SystemAlertsPanel.
+ * Accessible by: super_admin, head_office roles.
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { apiGuard } from "@/lib/auth/api-guard";
-import { PERMISSIONS } from "@/lib/rbac/roles";
-import { inviteUserSchema, validateBody } from "@/lib/validation/schemas";
-import { inviteUserDtoToInternal, inviteUserInternalToDb } from "@/lib/mappers/userMapper";
-import { logger } from "@/lib/logger";
-import { sendInviteEmail } from "@/services/notifications/inviteEmail";
-import type { VUser } from "@/lib/admin/contractTypes";
-import { getServiceRoleClient } from "@/lib/supabase/service-role-client";
+import { NextResponse }        from "next/server";
+import { apiGuard }            from "@/lib/auth/api-guard";
+import { PERMISSIONS }         from "@/lib/rbac/roles";
+import { createServerClient }  from "@/lib/supabase/server";
+import { logger }              from "@/lib/logger";
 
-export const maxDuration = 30;
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "GET /api/admin/users");
+export async function DELETE(
+  _req: Request,
+  { params }: { params: { id: string } },
+) {
+  const guard = await apiGuard(
+    PERMISSIONS.VIEW_SYSTEM_HEALTH as any,
+    "DELETE /api/system-health/alerts/[id]/resolve",
+  );
   if (guard.error) return guard.error;
-  const { ctx, supabase } = guard;
 
-  try {
-    const isSuperAdmin = ctx.role === "super_admin";
+  const { ctx } = guard;
+  const alertId = params.id;
 
-    // Read from the contract-layer view v_users (migration 065).
-    // site_ids is a real uuid array; this is the canonical source for team counts.
-    let query = supabase
-      .from("v_users")
-      .select("user_id, email, full_name, status, last_seen_at, joined_at, primary_role, org_id, org_name, role_granted_at, role_is_active, site_ids")
-      .order("joined_at", { ascending: false });
-
-    if (!isSuperAdmin) {
-      query = query.eq("org_id", ctx.orgId!);
-    }
-
-    const { data: rows, error: fetchErr } = await query;
-
-    if (fetchErr) {
-      logger.error("Failed to fetch team members", { err: fetchErr });
-      return NextResponse.json({ data: [], error: fetchErr.message }, { status: 500 });
-    }
-
-    // Map v_users rows to the UserEntry shape expected by the admin UI.
-    // The roles array is derived from primary_role + role metadata.
-    const users = ((rows as VUser[] | null) ?? []).map((r) => ({
-      id: r.user_id,
-      email: r.email,
-      full_name: r.full_name,
-      status: r.status,
-      last_seen_at: r.last_seen_at,
-      roles: r.primary_role
-        ? [{
-            role: r.primary_role,
-            site_id: null as string | null,
-            region_id: null as string | null,
-            is_active: r.role_is_active,
-            granted_at: r.role_granted_at ?? "",
-          }]
-        : [],
-      site_ids: r.site_ids ?? [],
-    }));
-
-    if (users.length === 0 && !fetchErr) {
-      logger.warn("ADMIN_API_EMPTY_DATA", {
-        route: "GET /api/admin/users",
-        view: "v_users",
-        orgId: ctx.orgId,
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    return NextResponse.json({ data: users, error: null });
-  } catch (err) {
-    logger.error("Unexpected error in GET /api/admin/users", { err });
-    return NextResponse.json({ data: [], error: "Internal server error" }, { status: 500 });
+  if (!alertId) {
+    return NextResponse.json({ error: "Missing alert id" }, { status: 400 });
   }
-}
-
-export async function POST(req: NextRequest) {
-  const guard = await apiGuard(PERMISSIONS.MANAGE_USERS, "POST /api/admin/users");
-  if (guard.error) return guard.error;
-  const { ctx, supabase } = guard;
-
-  const raw = await req.json();
-  const v = validateBody(inviteUserSchema, raw);
-  if (!v.success) return v.response;
-  const user = inviteUserDtoToInternal(v.data);
 
   try {
-    if (!user.siteId) {
-      return NextResponse.json({ error: "site_id is required" }, { status: 400 });
-    }
+    const supabase = createServerClient() as any;
 
-    // Fetch site + org name in one query.
-    // org name is used in the invite email body — never rely on env vars for this.
-    const { data: site, error: siteErr } = await supabase
-      .from("sites")
-      .select("id, name, organisation_id, organisations(name)")
-      .eq("id", user.siteId)
-      .single();
-
-    if (siteErr || !site) {
-      return NextResponse.json({ error: `Site not found: ${user.siteId}` }, { status: 404 });
-    }
-
-    const organisationId = site.organisation_id;
-    // Extract org name from the joined relation; fall back to "ForgeStack" only if
-    // the organisations row is somehow missing — should never happen in practice.
-    const organisationName = (site.organisations as { name: string } | null)?.name ?? "ForgeStack";
-
-    if (ctx.role !== "super_admin" && ctx.orgId !== organisationId) {
-      return NextResponse.json({ error: "Not authorised to invite users to this organisation" }, { status: 403 });
-    }
-
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://ops.forgestackafrica.dev";
-
-    const adminClient = getServiceRoleClient() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    // Step 1 — Create the Supabase auth invite.
-    // redirectTo points to /reset-password so the token in the URL hash is consumed
-    // by the set-password form, NOT the login form.
-    // Disable Supabase's own email in Auth → Email Templates (set to disabled) so
-    // only our Resend email is delivered.
-    const { data: inviteData, error: inviteErr } = await adminClient.auth.admin.inviteUserByEmail(user.email, {
-      redirectTo: `${siteUrl}/reset-password`,
-      data: {
-        full_name: user.fullName || "",
-        invited_to_site: site.name,
-        organisation_name: organisationName,
-        role: user.role,
-      },
+    const { data, error } = await supabase.rpc("resolve_system_alert", {
+      p_alert_id: alertId,
     });
 
-    if (inviteErr) {
-      logger.error("Supabase invite failed", { err: inviteErr });
-      return NextResponse.json({ error: inviteErr.message }, { status: 400 });
+    if (error) {
+      logger.error("api.system-health.alerts.resolve.db-error", {
+        alertId,
+        siteId: ctx.siteId,
+        error: error.message,
+      });
+      return NextResponse.json({ error: "Failed to resolve alert" }, { status: 500 });
     }
 
-    const invitedUserId = inviteData.user.id;
+    if (!data?.success) {
+      return NextResponse.json(
+        { error: data?.reason ?? "Alert not found or already resolved" },
+        { status: 404 },
+      );
+    }
 
-    // Step 2 — Upsert profile, role, and site access.
-    const profileDb = inviteUserInternalToDb(user);
-
-    await adminClient.from("profiles").upsert(
-      { id: invitedUserId, email: profileDb.email, full_name: profileDb.full_name || "", status: "invited", updated_at: new Date().toISOString() },
-      { onConflict: "id" }
-    );
-
-    await adminClient.from("user_roles").upsert(
-      { user_id: invitedUserId, organisation_id: organisationId, site_id: profileDb.site_id, role: profileDb.role, is_active: true, granted_by: ctx.userId, granted_at: new Date().toISOString() },
-      { onConflict: "user_id,organisation_id,site_id,role" }
-    );
-
-    await adminClient.from("user_site_access").upsert(
-      { user_id: invitedUserId, site_id: profileDb.site_id, granted_by: ctx.userId, created_at: new Date().toISOString() },
-      { onConflict: "user_id,site_id" }
-    );
-
-    // Step 3 — Send our branded Resend email.
-    // inviteLink points to /reset-password (not /login) so the user lands on the
-    // set-password form where the Supabase token is consumed from the URL hash.
-    // Supabase's own invite email must be DISABLED in Auth → Email Templates to
-    // prevent a second email firing from Supabase simultaneously.
-    await sendInviteEmail({
-      to: user.email,
-      name: user.fullName || user.email,
-      role: user.role,
-      organisationName,                         // e.g. "Primi" or "Si Cantina"
-      inviteLink: `${siteUrl}/reset-password`,  // ← /reset-password, NOT /login
+    logger.info("api.system-health.alerts.resolved", {
+      alertId,
+      resolvedBy: ctx.userId,
+      siteId:     ctx.siteId,
     });
 
-    logger.info("User invited successfully", {
-      invitedUserId,
-      organisationId,
-      organisationName,
-      siteId: user.siteId,
-      role: user.role,
-    });
-
-    return NextResponse.json({ success: true, userId: invitedUserId, organisationId, siteId: user.siteId, role: user.role });
+    return NextResponse.json({ success: true, resolved_at: data.resolved_at });
   } catch (err) {
-    logger.error("Unexpected error in POST /api/admin/users", { err });
+    logger.error("api.system-health.alerts.resolve.failed", {
+      alertId,
+      siteId: ctx.siteId,
+      err:    String(err),
+    });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
