@@ -26,15 +26,15 @@ import type {
 } from "./types";
 
 // ── Job definitions ───────────────────────────────────────────────────────────
+// sync_type values must match what lib/sync/engine.ts and lib/sync/orchestrator.ts
+// write into micros_sync_runs.sync_type and sync_runs.sync_type.
 
 const JOB_DEFINITIONS: { jobType: string; label: string; canRunNow: boolean }[] = [
-  { jobType: "sales_sync",           label: "MICROS Sales Sync",         canRunNow: true  },
-  { jobType: "labour_sync",          label: "MICROS Labour Sync",         canRunNow: true  },
-  { jobType: "inventory_sync",       label: "Inventory Sync",             canRunNow: true  },
-  { jobType: "daily_action_reset",   label: "Daily Action Reset",         canRunNow: false },
-  { jobType: "action_aging",         label: "Action Aging",               canRunNow: false },
-  { jobType: "weekly_report",        label: "Weekly Report Generation",   canRunNow: false },
-  { jobType: "data_health_recompute",label: "Data Health Recompute",      canRunNow: false },
+  { jobType: "daily_sales",    label: "MICROS Sales Sync",       canRunNow: true  },
+  { jobType: "labour",         label: "MICROS Labour Sync",      canRunNow: true  },
+  { jobType: "inventory",      label: "Inventory Sync",          canRunNow: true  },
+  { jobType: "intraday_sales", label: "Intraday Sales Sync",     canRunNow: true  },
+  { jobType: "weekly_report",  label: "Weekly Report",           canRunNow: false },
 ];
 
 // ── Status derivation ─────────────────────────────────────────────────────────
@@ -79,11 +79,12 @@ function actionFromStatus(key: string, status: DataSourceStatus): string {
 function jobStatusFromRow(row: any): JobStatus {
   if (!row) return "idle";
   switch (row.status) {
-    case "running":     return "running";
-    case "success":     return "success";
-    case "failed":      return "failed";
-    case "dead_letter": return "failed";
-    default:            return "idle";
+    case "running":  return "running";
+    case "success":  return "success";
+    case "partial":  return "success";   // micros_sync_runs partial = data written
+    case "failed":   return "failed";
+    case "error":    return "failed";    // micros_sync_runs uses "error"
+    default:         return "idle";
   }
 }
 
@@ -95,7 +96,7 @@ const STATUS_WEIGHTS: Record<DataSourceStatus, number> = {
   delayed:        0.5,
   stale:          0.2,
   missing:        0.0,
-  not_configured: 0.5,
+  not_configured: 0.0,  // unconfigured = no operational trust
 };
 
 const SOURCE_WEIGHTS: Record<string, number> = {
@@ -134,6 +135,16 @@ function calculateOverallStatus(
   const anyStale      = sources.some(s => s.status === "stale"   && ["sales", "labour"].includes(s.key));
   const anyDelayed    = sources.some(s => s.status === "delayed" && ["sales", "labour"].includes(s.key));
   const hasFailedJobs = failedJobs > 0;
+
+  // A fully unconfigured site (no MICROS wired up) is degraded, not healthy.
+  const coreSources = sources.filter(s => ["sales", "labour"].includes(s.key));
+  const allCoreUnconfigured = coreSources.every(s => s.status === "not_configured");
+  if (allCoreUnconfigured) {
+    return {
+      status:  "degraded",
+      summary: "Core data sources not configured — connect MICROS to begin receiving sales and labour data.",
+    };
+  }
 
   if (salesMissing || labourMissing) {
     const missing = [salesMissing && "sales", labourMissing && "labour"].filter(Boolean).join(" and ");
@@ -221,41 +232,51 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     // ✦ NEW — system_alerts query
     systemAlertsRes,
   ] = await Promise.allSettled([
+    // micros_sync_runs scoped via inner join to micros_connections.site_id
     supabase
-      .from("sync_jobs")
-      .select("id, job_type, status, created_at, updated_at, attempt_count, error_message")
-      .eq("site_id", siteId)
-      .gte("created_at", oneDayAgo)
-      .order("created_at", { ascending: false })
+      .from("micros_sync_runs")
+      .select("id, sync_type, status, started_at, completed_at, error_message, micros_connections!inner(site_id)")
+      .eq("micros_connections.site_id", siteId)
+      .gte("started_at", oneDayAgo)
+      .order("started_at", { ascending: false })
       .limit(200),
 
+    // sync_schedules uses sync_type (not job_type) and enabled (not is_paused)
     supabase
       .from("sync_schedules")
-      .select("job_type, next_run_at, last_run_at, is_paused")
+      .select("sync_type, next_run_at, last_run_at, last_success_at, enabled")
       .eq("site_id", siteId),
 
+    // micros_connections: fixed column names (app_server_url, last_sync_error, last_sync_at)
     supabase
       .from("micros_connections")
-      .select("id, loc_ref, base_url, last_error, last_synced_at, updated_at")
+      .select("id, loc_ref, app_server_url, last_sync_error, last_sync_at, last_successful_sync_at, status, updated_at")
       .eq("site_id", siteId)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
 
-    supabase.from("revenue_records").select("created_at").eq("site_id", siteId)
+    // Sales: micros_sales_daily scoped via micros_connections.site_id
+    supabase.from("micros_sales_daily")
+      .select("synced_at, micros_connections!inner(site_id)")
+      .eq("micros_connections.site_id", siteId)
+      .order("synced_at", { ascending: false }).limit(1).maybeSingle(),
+
+    // Labour: micros_labor_daily scoped via micros_connections.site_id
+    supabase.from("micros_labor_daily")
+      .select("synced_at, micros_connections!inner(site_id)")
+      .eq("micros_connections.site_id", siteId)
+      .order("synced_at", { ascending: false }).limit(1).maybeSingle(),
+
+    // Inventory: no canonical table available — will resolve as not_configured
+    Promise.resolve({ data: null, error: null }),
+
+    // Reviews: correct table name is "reviews" (not "guest_reviews")
+    supabase.from("reviews").select("created_at").eq("site_id", siteId)
       .order("created_at", { ascending: false }).limit(1).maybeSingle(),
 
-    supabase.from("labour_records").select("created_at").eq("site_id", siteId)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-
-    supabase.from("inventory_items").select("updated_at").eq("site_id", siteId)
-      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
-
-    supabase.from("guest_reviews").select("created_at").eq("site_id", siteId)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle(),
-
-    supabase.from("daily_tasks").select("updated_at").eq("site_id", siteId)
-      .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
+    // Daily ops: daily_operations_reports has no site_id — resolves as not_configured
+    Promise.resolve({ data: null, error: null }),
 
     supabase.from("compliance_items").select("updated_at").eq("site_id", siteId)
       .order("updated_at", { ascending: false }).limit(1).maybeSingle(),
@@ -291,26 +312,27 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
   const syncSchedules: any[] =
     syncSchedulesRes.status === "fulfilled" ? (syncSchedulesRes.value?.data ?? []) : [];
 
-  const failedJobs24h   = syncJobs.filter(j => j.status === "failed" || j.status === "dead_letter").length;
-  const deadLetterJobs  = syncJobs.filter(j => j.status === "dead_letter").length;
-  const lastFailedJob   = syncJobs.find(j => j.status === "failed" || j.status === "dead_letter");
+  const failedJobs24h  = syncJobs.filter(j => j.status === "failed" || j.status === "error").length;
+  const deadLetterJobs = 0; // micros_sync_runs has no dead_letter concept
+  const lastFailedJob  = syncJobs.find(j => j.status === "failed" || j.status === "error");
 
   // ── MICROS health ──────────────────────────────────────────────────────────
   const microsRow = microsRes.status === "fulfilled" ? microsRes.value?.data : null;
 
-  const lastSalesSyncJob  = syncJobs.find(j => j.job_type === "sales_sync"  && j.status === "success");
-  const lastLabourSyncJob = syncJobs.find(j => j.job_type === "labour_sync" && j.status === "success");
-  const lastInvSyncJob    = syncJobs.find(j => j.job_type === "inventory_sync" && j.status === "success");
+  // sync_type values in micros_sync_runs: "daily_sales", "intraday_sales", "labour", "inventory"
+  const lastSalesSyncJob  = syncJobs.find(j => (j.sync_type === "daily_sales" || j.sync_type === "intraday_sales") && (j.status === "success" || j.status === "partial"));
+  const lastLabourSyncJob = syncJobs.find(j => j.sync_type === "labour"    && (j.status === "success" || j.status === "partial"));
+  const lastInvSyncJob    = syncJobs.find(j => j.sync_type === "inventory" && (j.status === "success" || j.status === "partial"));
 
   const micros: MicrosHealth = {
-    connected:         !!microsRow,
+    connected:         !!microsRow && microsRow.status === "connected",
     connectionId:      microsRow?.id ?? null,
     locationRef:       microsRow?.loc_ref ?? null,
-    serverUrl:         microsRow?.base_url ?? null,
-    lastSalesSync:     lastSalesSyncJob?.updated_at ?? microsRow?.last_synced_at ?? null,
-    lastLabourSync:    lastLabourSyncJob?.updated_at ?? null,
-    lastInventorySync: lastInvSyncJob?.updated_at ?? null,
-    lastError:         microsRow?.last_error ?? lastFailedJob?.error_message ?? null,
+    serverUrl:         microsRow?.app_server_url ?? null,
+    lastSalesSync:     lastSalesSyncJob?.completed_at ?? microsRow?.last_successful_sync_at ?? null,
+    lastLabourSync:    lastLabourSyncJob?.completed_at ?? null,
+    lastInventorySync: lastInvSyncJob?.completed_at ?? null,
+    lastError:         microsRow?.last_sync_error ?? lastFailedJob?.error_message ?? null,
   };
 
   // ── Data source helper ─────────────────────────────────────────────────────
@@ -324,9 +346,10 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
   }
 
   const sourceInputs = [
-    { key: "sales",       label: "Sales",       result: revenueRes,     field: "created_at" },
-    { key: "labour",      label: "Labour",      result: labourRes,      field: "created_at" },
-    { key: "inventory",   label: "Inventory",   result: inventoryRes,   field: "updated_at" },
+    // micros_sales_daily and micros_labor_daily use "synced_at"
+    { key: "sales",       label: "Sales",       result: revenueRes,     field: "synced_at"  },
+    { key: "labour",      label: "Labour",      result: labourRes,      field: "synced_at"  },
+    { key: "inventory",   label: "Inventory",   result: inventoryRes,   field: "synced_at"  },
     { key: "reviews",     label: "Reviews",     result: reviewsRes,     field: "created_at" },
     { key: "daily_ops",   label: "Daily Ops",   result: dailyOpsRes,    field: "updated_at" },
     { key: "compliance",  label: "Compliance",  result: complianceRes,  field: "updated_at" },
@@ -358,22 +381,23 @@ export async function getSystemHealth(siteId: string): Promise<SystemHealthPaylo
     freshTimestamps.length > 0 ? freshTimestamps.sort().reverse()[0] : null;
 
   // ── Jobs health ────────────────────────────────────────────────────────────
-  const scheduleMap = new Map(syncSchedules.map(s => [s.job_type, s]));
+  // sync_schedules uses sync_type (not job_type)
+  const scheduleMap = new Map(syncSchedules.map(s => [s.sync_type, s]));
 
   const jobs: JobHealth[] = JOB_DEFINITIONS.map(def => {
-    const recent   = syncJobs.filter(j => j.job_type === def.jobType);
+    const recent   = syncJobs.filter(j => j.sync_type === def.jobType);
     const last     = recent[0] ?? null;
     const schedule = scheduleMap.get(def.jobType);
-    const failures = recent.filter(j => j.status === "failed" || j.status === "dead_letter").length;
+    const failures = recent.filter(j => j.status === "failed" || j.status === "error").length;
     return {
       id:           last?.id ?? def.jobType,
       label:        def.label,
       jobType:      def.jobType,
-      lastRun:      last?.updated_at ?? schedule?.last_run_at ?? null,
+      lastRun:      last?.completed_at ?? schedule?.last_run_at ?? null,
       nextRun:      schedule?.next_run_at ?? null,
       status:       jobStatusFromRow(last),
       failureCount: failures,
-      attemptCount: last?.attempt_count ?? 0,
+      attemptCount: 0, // micros_sync_runs has no attempt_count
       canRunNow:    def.canRunNow,
     };
   });
