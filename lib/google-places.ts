@@ -68,7 +68,7 @@ export async function getPlaceDetails(
         time: r.publishTime
           ? Math.floor(new Date(r.publishTime).getTime() / 1000)
           : 0,
-      })).sort((a, b) => b.time - a.time),
+      })).sort((a: GoogleReview, b: GoogleReview) => b.time - a.time),
     };
   } catch (err) {
     console.error("[GooglePlaces] getPlaceDetails error:", err);
