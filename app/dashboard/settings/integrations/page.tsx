@@ -71,7 +71,8 @@ export default async function IntegrationsPage() {
     // Sync health monitor
     (async () => {
       try {
-        return await (supabase as never as { from: (t: string) => unknown })
+        return await // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (supabase as never as { from: (t: string) => any })
           .from("sync_health_monitor")
           .select("sync_type, last_synced_at, last_outcome, consecutive_failures, is_overdue, total_runs_today, next_run_eta")
           .order("is_overdue", { ascending: false })
