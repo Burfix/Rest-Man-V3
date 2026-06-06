@@ -18,11 +18,10 @@ import { MULTI_SITE_ROLES }             from "@/lib/rbac/roles";
 import MicrosSettingsCard                from "@/components/dashboard/settings/MicrosSettingsCard";
 import MicrosDebugPanel                  from "@/components/dashboard/settings/MicrosDebugPanel";
 import SyncHealthPanel                   from "@/components/settings/SyncHealthPanel";
+import GoogleReviewsSettingsCard         from "@/components/dashboard/settings/GoogleReviewsSettingsCard";
 
 export const dynamic   = "force-dynamic";
 export const revalidate = 0;
-
-
 
 interface SyncHealthRow {
   sync_type: string;
@@ -39,6 +38,7 @@ interface SiteIntegration {
   siteName:        string;
   microsResult:    Awaited<ReturnType<typeof getMicrosStatus>> | null;
   labourLastSyncAt: string | null;
+  googlePlaceId:   string | null;
 }
 
 export default async function IntegrationsPage() {
@@ -59,10 +59,10 @@ export default async function IntegrationsPage() {
   // ── Parallel fetches ──────────────────────────────────────────────────
 
   const [siteRows, userRes, healthRes, labourRes, ...microsResults] = await Promise.all([
-    // Fetch site names for visible sites
+    // Fetch site names + google_place_id for visible sites
     supabase
       .from("sites")
-      .select("id, name")
+      .select("id, name, google_place_id")
       .in("id", visibleSiteIds),
 
     // Auth user (for admin panel)
@@ -71,7 +71,7 @@ export default async function IntegrationsPage() {
     // Sync health monitor
     (async () => {
       try {
-        return await (supabase as never as { from: (t: string) => any })
+        return await (supabase as never as { from: (t: string) => unknown })
           .from("sync_health_monitor")
           .select("sync_type, last_synced_at, last_outcome, consecutive_failures, is_overdue, total_runs_today, next_run_eta")
           .order("is_overdue", { ascending: false })
@@ -99,21 +99,23 @@ export default async function IntegrationsPage() {
     }
   }
 
-  // Build siteId → site name map
-  const siteNameById: Record<string, string> = {};
-  for (const s of (siteRows.data ?? []) as { id: string; name: string }[]) {
-    siteNameById[s.id] = s.name;
+  // Build siteId → site row map
+  const siteById: Record<string, { name: string; google_place_id: string | null }> = {};
+  for (const s of (siteRows.data ?? []) as { id: string; name: string; google_place_id: string | null }[]) {
+    siteById[s.id] = { name: s.name, google_place_id: s.google_place_id };
   }
 
   // Assemble per-site integration data
   const integrations: SiteIntegration[] = visibleSiteIds.map((siteId, i) => {
     const microsResult = microsResults[i] as Awaited<ReturnType<typeof getMicrosStatus>> | null;
     const locRef = microsResult?.connection?.loc_ref ?? null;
+    const site = siteById[siteId];
     return {
       siteId,
-      siteName: siteNameById[siteId] ?? siteId,
+      siteName: site?.name ?? siteId,
       microsResult,
       labourLastSyncAt: locRef ? (labourByLocRef[locRef] ?? null) : null,
+      googlePlaceId: site?.google_place_id ?? null,
     };
   });
 
@@ -139,20 +141,29 @@ export default async function IntegrationsPage() {
         </div>
       )}
 
-      {integrations.map(({ siteId, siteName, microsResult, labourLastSyncAt }) => {
+      {integrations.map(({ siteId, siteName, microsResult, labourLastSyncAt, googlePlaceId }) => {
         const connection   = microsResult?.connection ?? null;
         const microsHealth = deriveMicrosIntegrationStatus(
           microsResult, cfgStatus.configured, cfgStatus.enabled,
         );
         return (
-          <MicrosSettingsCard
-            key={siteId}
-            siteId={siteId}
-            siteName={isMultiSite ? siteName : undefined}
-            connection={connection as never}
-            microsHealth={microsHealth}
-            labourLastSyncAt={labourLastSyncAt}
-          />
+          <div key={siteId} className="space-y-4">
+            {/* MICROS POS */}
+            <MicrosSettingsCard
+              siteId={siteId}
+              siteName={isMultiSite ? siteName : undefined}
+              connection={connection as never}
+              microsHealth={microsHealth}
+              labourLastSyncAt={labourLastSyncAt}
+            />
+
+            {/* Google Reviews */}
+            <GoogleReviewsSettingsCard
+              siteId={siteId}
+              siteName={isMultiSite ? siteName : undefined}
+              currentPlaceId={googlePlaceId}
+            />
+          </div>
         );
       })}
 
@@ -161,7 +172,6 @@ export default async function IntegrationsPage() {
 
       {/* Admin-only: MICROS config diagnostics panel */}
       {isAdmin && integrations.length > 0 && (() => {
-        // Show debug panel for the primary site's connection
         const primary = integrations.find((i) => i.siteId === ctx.siteId) ?? integrations[0];
         const conn = primary?.microsResult?.connection ?? null;
         return (
@@ -180,7 +190,7 @@ export default async function IntegrationsPage() {
       <section className="rounded-lg border border-dashed border-stone-200 bg-stone-50 p-6">
         <h2 className="text-sm font-semibold text-stone-500">More integrations</h2>
         <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-          Upcoming: Google Reviews sync, WhatsApp automation, compliance feed.
+          Upcoming: WhatsApp automation, compliance feed.
         </p>
       </section>
     </div>
