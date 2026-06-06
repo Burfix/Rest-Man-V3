@@ -44,3 +44,4 @@ coverage/
 .env*.local
 .claude/
 .env.vercel
+.env*
