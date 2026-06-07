@@ -3,7 +3,7 @@
  */
 
 import { getAllReviews, getSevenDayReviewSummary } from "@/services/ops/reviewsSummary";
-import { getReviewSummaryForSite } from "@/services/reviews/reviewsSummaryService";
+import { getReviewSummaryForSite, getReplyMetrics } from "@/services/reviews/reviewsSummaryService";
 import { getPlaceDetails } from "@/lib/google-places";
 import { createServerClient } from "@/lib/supabase/server";
 import { getUserContext } from "@/lib/auth/get-user-context";
@@ -16,6 +16,7 @@ import ReviewsSummaryCard from "@/components/dashboard/reviews/ReviewsSummaryCar
 import ReviewRiskPanel from "@/components/dashboard/reviews/ReviewRiskPanel";
 import GuestVoiceFeed from "@/components/dashboard/reviews/GuestVoiceFeed";
 import ReviewActionsPanel from "@/components/dashboard/reviews/ReviewActionsPanel";
+import ReviewResponseKPIs from "@/components/dashboard/reviews/ReviewResponseKPIs";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -40,6 +41,7 @@ export default async function ReviewsPage() {
   let loadError: string | null = null;
   let reviewActions: Array<{ id: string; title: string; description?: string | null; department: string; priority: string; status: string; due_date?: string | null }> = [];
   let intelligenceSummary: Awaited<ReturnType<typeof getReviewSummaryForSite>> | null = null;
+  let replyMetrics: Awaited<ReturnType<typeof getReplyMetrics>> | null = null;
 
   // ── Auth + site context ───────────────────────────────────────────────────
   try {
@@ -86,7 +88,7 @@ export default async function ReviewsPage() {
     };
   };
 
-  const [summaryResult, reviewsResult, googleResult, actionsResult, intelligenceResult] = await Promise.allSettled([
+  const [summaryResult, reviewsResult, googleResult, actionsResult, intelligenceResult, replyMetricsResult] = await Promise.allSettled([
     getSevenDayReviewSummary(siteId),
     getAllReviews(200, siteId),
     fetchGoogle(),
@@ -99,6 +101,7 @@ export default async function ReviewsPage() {
           .order("priority")
       : Promise.resolve({ data: [] }),
     siteId ? getReviewSummaryForSite(siteId) : Promise.resolve(null),
+    siteId ? getReplyMetrics(siteId) : Promise.resolve(null),
   ]);
 
   if (summaryResult.status === "fulfilled") summary = summaryResult.value;
@@ -106,6 +109,7 @@ export default async function ReviewsPage() {
   if (googleResult.status === "fulfilled") googleData = googleResult.value;
   if (actionsResult.status === "fulfilled") reviewActions = (actionsResult.value as { data: typeof reviewActions }).data ?? [];
   if (intelligenceResult.status === "fulfilled") intelligenceSummary = intelligenceResult.value;
+  if (replyMetricsResult.status === "fulfilled") replyMetrics = replyMetricsResult.value;
 
   if (summaryResult.status === "rejected" || reviewsResult.status === "rejected") {
     loadError = "Failed to load some review data. Showing available results.";
@@ -126,6 +130,9 @@ export default async function ReviewsPage() {
           {loadError}
         </div>
       )}
+
+      {/* ── Response time KPIs ──────────────────────────────── */}
+      {replyMetrics && <ReviewResponseKPIs metrics={replyMetrics} />}
 
       {/* ── Intelligence panels ─────────────────────────────── */}
       {intelligenceSummary && (
@@ -191,6 +198,9 @@ export default async function ReviewsPage() {
           category_tags:   (r as unknown as { category_tags?: string[] }).category_tags ?? r.tags,
           review_status:   (r as unknown as { review_status?: string }).review_status,
           urgency:         (r as unknown as { urgency?: string }).urgency,
+          gmb_review_name: (r as unknown as { gmb_review_name?: string | null }).gmb_review_name ?? null,
+          ai_reply_draft:  (r as unknown as { ai_reply_draft?: string | null }).ai_reply_draft ?? null,
+          reply_posted_at: (r as unknown as { reply_posted_at?: string | null }).reply_posted_at ?? null,
         }))} />
       </div>
 

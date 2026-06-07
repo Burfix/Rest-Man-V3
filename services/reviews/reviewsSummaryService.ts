@@ -150,3 +150,97 @@ export async function getReviewSummaryForSite(siteId: string): Promise<ReviewSum
     copilotActions,
   };
 }
+
+// ── Reply KPI metrics ────────────────────────────────────────────────────────
+
+export interface ReplyMetrics {
+  /** Average minutes between review creation and reply_posted_at (last 30d, GMB only) */
+  avgResponseMinutes:  number | null;
+  /** Human-readable label e.g. "12 min" / "2 hr 4 min" / "—" */
+  avgResponseLabel:    string;
+  /** % of GMB reviews (last 30d) that have a posted reply */
+  replyRatePct:        number;
+  /** Count of GMB reviews rated ≤3 with no reply yet */
+  awaitingReplyCount:  number;
+  /** Qualitative band for the KPI card colour */
+  band: "excellent" | "good" | "needs_attention" | "critical" | "no_data";
+}
+
+function formatMinutes(mins: number): string {
+  if (mins < 60)  return `${Math.round(mins)} min`;
+  const h = Math.floor(mins / 60);
+  const m = Math.round(mins % 60);
+  return m > 0 ? `${h} hr ${m} min` : `${h} hr`;
+}
+
+export async function getReplyMetrics(siteId: string): Promise<ReplyMetrics> {
+  const supabase = createServerClient();
+
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const periodStr = thirtyDaysAgo.toISOString().split("T")[0];
+
+  // Only GMB reviews have gmb_review_name set
+  const { data: rows } = await supabase
+    .from("reviews")
+    .select("rating, gmb_review_name, reply_posted_at, response_time_minutes")
+    .eq("site_id", siteId)
+    .not("gmb_review_name", "is", null)
+    .gte("review_date", periodStr);
+
+  type Row = {
+    rating:                  number;
+    gmb_review_name:         string;
+    reply_posted_at:         string | null;
+    response_time_minutes:   number | null;
+  };
+
+  const gmbRows = (rows as unknown as Row[] | null) ?? [];
+
+  if (gmbRows.length === 0) {
+    return {
+      avgResponseMinutes: null,
+      avgResponseLabel:   "—",
+      replyRatePct:       0,
+      awaitingReplyCount: 0,
+      band:               "no_data",
+    };
+  }
+
+  const replied    = gmbRows.filter((r) => r.reply_posted_at !== null);
+  const replyTimes = replied
+    .map((r) => r.response_time_minutes)
+    .filter((m): m is number => m !== null);
+
+  const avgMins = replyTimes.length > 0
+    ? replyTimes.reduce((a, b) => a + b, 0) / replyTimes.length
+    : null;
+
+  const replyRatePct  = Math.round((replied.length / gmbRows.length) * 100);
+  const awaitingCount = gmbRows.filter((r) => r.reply_posted_at === null && Number(r.rating) <= 3).length;
+
+  // Band logic: response time is the primary signal
+  let band: ReplyMetrics["band"] = "no_data";
+  if (awaitingCount >= 3) {
+    band = "critical";
+  } else if (avgMins === null) {
+    band = "no_data";
+  } else if (avgMins <= 30) {
+    band = "excellent";
+  } else if (avgMins <= 120) {
+    band = "good";
+  } else if (avgMins <= 480) {
+    band = "needs_attention";
+  } else {
+    band = "critical";
+  }
+
+  return {
+    avgResponseMinutes: avgMins,
+    avgResponseLabel:   avgMins !== null ? formatMinutes(avgMins) : "—",
+    replyRatePct,
+    awaitingReplyCount: awaitingCount,
+    band,
+  };
+}
+

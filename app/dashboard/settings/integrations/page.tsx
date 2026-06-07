@@ -39,6 +39,8 @@ interface SiteIntegration {
   microsResult:    Awaited<ReturnType<typeof getMicrosStatus>> | null;
   labourLastSyncAt: string | null;
   googlePlaceId:   string | null;
+  gmbConnected:    boolean;
+  gmbLocationSet:  boolean;
 }
 
 export default async function IntegrationsPage() {
@@ -58,12 +60,13 @@ export default async function IntegrationsPage() {
 
   // ── Parallel fetches ──────────────────────────────────────────────────
 
-  const [siteRows, userRes, healthRes, labourRes, ...microsResults] = await Promise.all([
+  const [siteRows, userRes, healthRes, labourRes, gmbTokensRes, ...microsResults] = await Promise.all([
     // Fetch site names + google_place_id for visible sites
     supabase
       .from("sites")
       .select("id, name, google_place_id")
       .in("id", visibleSiteIds),
+
 
     // Auth user (for admin panel)
     supabase.auth.getUser().catch(() => ({ data: { user: null } })),
@@ -88,6 +91,12 @@ export default async function IntegrationsPage() {
       .select("loc_ref, last_sync_at")
       .order("last_sync_at", { ascending: false }),
 
+    // GMB OAuth connection status per visible site
+    supabase
+      .from("site_gmb_tokens")
+      .select("site_id, gmb_location_id")
+      .in("site_id", visibleSiteIds),
+
     // One getMicrosStatus call per visible site
     ...visibleSiteIds.map((id) => getMicrosStatus(id).catch(() => null)),
   ]);
@@ -106,6 +115,14 @@ export default async function IntegrationsPage() {
     siteById[s.id] = { name: s.name, google_place_id: s.google_place_id };
   }
 
+  // Build set of siteIds that have GMB OAuth tokens
+  const gmbLocationSetSites = new Set(
+    ((gmbTokensRes as { data: { site_id: string; gmb_location_id: string | null }[] | null }).data ?? []).filter((r) => Boolean(r.gmb_location_id)).map((r) => r.site_id),
+  );
+  const gmbConnectedSites = new Set(
+    ((gmbTokensRes as { data: { site_id: string }[] | null }).data ?? []).map((r) => r.site_id),
+  );
+
   // Assemble per-site integration data
   const integrations: SiteIntegration[] = visibleSiteIds.map((siteId, i) => {
     const microsResult = microsResults[i] as Awaited<ReturnType<typeof getMicrosStatus>> | null;
@@ -117,6 +134,8 @@ export default async function IntegrationsPage() {
       microsResult,
       labourLastSyncAt: locRef ? (labourByLocRef[locRef] ?? null) : null,
       googlePlaceId: site?.google_place_id ?? null,
+      gmbConnected: gmbConnectedSites.has(siteId),
+      gmbLocationSet: gmbLocationSetSites.has(siteId),
     };
   });
 
@@ -142,7 +161,7 @@ export default async function IntegrationsPage() {
         </div>
       )}
 
-      {integrations.map(({ siteId, siteName, microsResult, labourLastSyncAt, googlePlaceId }) => {
+      {integrations.map(({ siteId, siteName, microsResult, labourLastSyncAt, googlePlaceId, gmbConnected, gmbLocationSet }) => {
         const connection   = microsResult?.connection ?? null;
         const microsHealth = deriveMicrosIntegrationStatus(
           microsResult, cfgStatus.configured, cfgStatus.enabled,
@@ -163,6 +182,8 @@ export default async function IntegrationsPage() {
               siteId={siteId}
               siteName={isMultiSite ? siteName : undefined}
               currentPlaceId={googlePlaceId}
+              gmbConnected={gmbConnected}
+              gmbLocationSet={gmbLocationSet}
             />
           </div>
         );

@@ -12,17 +12,21 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 type ReviewRow = {
-  id:              string;
-  reviewer_name?:  string | null;
-  rating:          number;
-  rating_scale?:   number;
-  review_date:     string;
-  review_text?:    string | null;
-  source?:         string;
-  sentiment_label?: string | null;
-  category_tags?:  string[] | null;
-  review_status?:  string;
-  urgency?:        string;
+  id:                string;
+  reviewer_name?:    string | null;
+  rating:            number;
+  rating_scale?:     number;
+  review_date:       string;
+  review_text?:      string | null;
+  source?:           string;
+  sentiment_label?:  string | null;
+  category_tags?:    string[] | null;
+  review_status?:    string;
+  urgency?:          string;
+  // GMB reply fields
+  gmb_review_name?:  string | null;
+  ai_reply_draft?:   string | null;
+  reply_posted_at?:  string | null;
 };
 
 type Props = {
@@ -78,6 +82,103 @@ function StarRow({ rating, max = 5 }: { rating: number; max?: number }) {
   );
 }
 
+// ── Reply panel (per-card state) ────────────────────────────────────────────
+
+function ReplyPanel({ review }: { review: ReviewRow }) {
+  const [draft, setDraft]       = useState(review.ai_reply_draft ?? "");
+  const [posting, setPosting]   = useState(false);
+  const [posted, setPosted]     = useState(Boolean(review.reply_posted_at));
+  const [error, setError]       = useState<string | null>(null);
+  const [postedAt, setPostedAt] = useState(review.reply_posted_at ?? null);
+
+  if (!review.gmb_review_name) {
+    // Not a GMB review — no reply panel
+    return null;
+  }
+
+  if (posted) {
+    return (
+      <div className="mt-3 rounded border border-emerald-200 bg-emerald-50 px-3 py-2 dark:border-emerald-800 dark:bg-emerald-900/20">
+        <p className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400">
+          ✓ Reply posted to Google
+          {postedAt && (
+            <span className="ml-2 font-normal text-emerald-600">
+              {new Date(postedAt).toLocaleString("en-ZA", { dateStyle: "short", timeStyle: "short" })}
+            </span>
+          )}
+        </p>
+        {draft && (
+          <p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-500 italic">
+            &ldquo;{draft.slice(0, 120)}{draft.length > 120 ? '…' : ''}&rdquo;
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  async function handlePost() {
+    if (!draft.trim()) return;
+    setPosting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/reviews/reply", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ review_id: review.id, reply_text: draft.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Failed to post reply. Please try again.");
+      } else {
+        setPosted(true);
+        setPostedAt(data.reply_posted_at ?? new Date().toISOString());
+      }
+    } catch {
+      setError("Network error. Check your connection and try again.");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  return (
+    <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+      <p className="text-[9px] uppercase tracking-widest font-medium text-stone-400">
+        AI Draft Reply
+      </p>
+      <textarea
+        value={draft}
+        onChange={(e) => { setDraft(e.target.value); setError(null); }}
+        rows={4}
+        placeholder="Edit the draft reply before approving…"
+        className="w-full rounded border border-stone-200 bg-stone-50 px-3 py-2 text-[11px] text-stone-800 placeholder-stone-400 outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-300 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:placeholder-stone-600 resize-none"
+      />
+      {error && (
+        <p className="text-[10px] font-medium text-red-600 dark:text-red-400">✗ {error}</p>
+      )}
+      <div className="flex items-center justify-between">
+        <p className="text-[9px] text-stone-400">{draft.length}/4096</p>
+        <button
+          onClick={handlePost}
+          disabled={posting || !draft.trim()}
+          className="flex items-center gap-1.5 rounded bg-stone-900 px-3 py-1.5 text-[10px] font-medium text-white transition hover:bg-stone-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white dark:text-stone-900 dark:hover:bg-stone-200"
+        >
+          {posting ? (
+            <>
+              <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+              </svg>
+              Posting…
+            </>
+          ) : (
+            "Approve & Post to Google"
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function GuestVoiceFeed({ reviews }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -104,6 +205,8 @@ export default function GuestVoiceFeed({ reviews }: Props) {
         const isExpanded = expanded === r.id;
         const src = r.source ?? "manual";
         const sentiment = r.sentiment_label ?? (r.rating >= 4 ? "positive" : r.rating >= 3 ? "neutral" : "negative");
+        const hasReply   = Boolean(r.reply_posted_at);
+        const hasGmb     = Boolean(r.gmb_review_name);
 
         return (
           <div
@@ -158,12 +261,26 @@ export default function GuestVoiceFeed({ reviews }: Props) {
                       {r.review_status.replace(/_/g, " ")}
                     </span>
                   )}
+                  {/* GMB reply state */}
+                  {hasGmb && !hasReply && r.ai_reply_draft && (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      reply ready
+                    </span>
+                  )}
+                  {hasGmb && hasReply && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      ✓ replied
+                    </span>
+                  )}
                   {(r.category_tags ?? []).slice(0, 3).map((tag) => (
                     <span key={tag} className="rounded-full bg-stone-100 dark:bg-stone-800 px-2 py-0.5 text-[9px] text-stone-500 capitalize">
                       {tag.replace(/_/g, " ")}
                     </span>
                   ))}
                 </div>
+
+                {/* Expanded: AI reply panel */}
+                {isExpanded && <ReplyPanel review={r} />}
               </div>
             </div>
           </div>

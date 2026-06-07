@@ -17,6 +17,7 @@ import { createServerClient } from "@/lib/supabase/server";
 import { logger } from "@/lib/logger";
 import { PERMISSIONS } from "@/lib/rbac/roles";
 import { syncSiteReviews, syncAllSiteReviews } from "@/services/reviews/googleSync";
+import { syncAllGmbReviews }                  from "@/services/reviews/gmbSync";
 import type { GoogleSyncReview, GoogleSyncResult } from "@/services/reviews/googleSync";
 
 export const dynamic = "force-dynamic";
@@ -43,16 +44,30 @@ export async function GET(req: NextRequest) {
     const supabase = createServerClient();
 
     try {
-      const { synced, total, errors } = await syncAllSiteReviews(supabase);
+      const [placesResult, gmbResult] = await Promise.all([
+        syncAllSiteReviews(supabase),
+        syncAllGmbReviews(),
+      ]);
 
-      if (total === 0) {
+      const { synced, total, errors } = placesResult;
+
+      if (total === 0 && gmbResult.synced === 0) {
         return NextResponse.json({
-          ok: true, synced: 0, message: "No sites with google_place_id configured.",
+          ok: true, synced: 0, message: "No sites with google_place_id or GMB tokens configured.",
         });
       }
 
-      logger.info("Cron: Google reviews synced", { synced, total });
-      return NextResponse.json({ ok: true, synced, total, errors });
+      logger.info("Cron: Google reviews synced", {
+        places_synced: synced,
+        places_total:  total,
+        gmb_synced:    gmbResult.synced,
+        gmb_skipped:   gmbResult.skipped,
+      });
+      return NextResponse.json({
+        ok: true,
+        places: { synced, total, errors },
+        gmb:    { synced: gmbResult.synced, skipped: gmbResult.skipped, errors: gmbResult.errors },
+      });
     } catch (err) {
       logger.error("Failed to sync all sites for google-sync", { err });
       return NextResponse.json({ error: "DB error" }, { status: 500 });
