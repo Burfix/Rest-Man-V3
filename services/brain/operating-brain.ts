@@ -345,12 +345,15 @@ function computeSystemHealth(
     : scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0);
 
   // Duty completion: 20 pts
-  // Duties are not expected to start in the first 2 hours of the day (before noon).
-  // Suppress penalty during this window to avoid false F-grade at 11:30.
+  // Before noon: full credit for tasks not yet due, but deduct proportionally
+  // for tasks already past their due_time — prevents gaming via the grace window.
+  // From noon onwards: score purely on overall completion rate.
   const isDutyWindow = minutesElapsed >= 120;
   const dutyPts = isDutyWindow
     ? (ctx.dailyOps.completionRate / 100) * 20
-    : 20; // full credit until duty window opens
+    : ctx.dailyOps.totalTasks > 0
+      ? Math.max(0, 20 - (ctx.dailyOps.overdue / ctx.dailyOps.totalTasks) * 20)
+      : 20; // full credit if no tasks configured yet
 
   // Maintenance: 15 pts — penalty-from-full model (spec v1.0)
   // Component 1: Severity deduction (max –10)
