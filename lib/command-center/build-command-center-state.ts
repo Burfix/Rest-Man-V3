@@ -39,6 +39,7 @@ import { getSiteConfig }              from "@/lib/config/site";
 import { runOperatingBrain }          from "@/services/brain/operating-brain";
 import { createServerClient }         from "@/lib/supabase/server";
 import { todayISO }                   from "@/lib/utils";
+import { resolveRevenueTarget, safeLabourPct } from "@/lib/targets/resolveRevenueTarget";
 
 import type { BrainOutput }               from "@/services/brain/operating-brain";
 import type { NormalizedSalesSnapshot }   from "@/lib/sales/types";
@@ -52,6 +53,7 @@ import type { DutiesData }                from "@/components/brain/PriorityActio
 
 import { buildOperationalState }        from "@/lib/ops/build-operational-state";
 import type { ForecastConfidence }       from "@/lib/ops/risk-vector";
+import { persistOperatingScore }        from "@/lib/scores/persistOperatingScore";
 
 import {
   type CommandCenterState,
@@ -580,16 +582,25 @@ export async function buildCommandCenterState(
   // ── Step 8: Site config ───────────────────────────────────────────────────
   const siteConfig = await getSiteConfig(siteId);
 
-  // ── Step 9: Labour % (canonical calculation) ─────────────────────────────
+  // ── Step 9: Labour % (canonical calculation with revenue gate) ─────────────
+  const rawLabourCost = labourSummary?.totalLabourCost ?? 0;
   const derivedLabourPct =
-    labourSummary && labourSummary.totalLabourCost > 0 && salesSnapshot.netSales > 0
-      ? +(labourSummary.totalLabourCost / salesSnapshot.netSales * 100).toFixed(1)
+    rawLabourCost > 0
+      ? safeLabourPct(rawLabourCost, salesSnapshot.netSales)
       : null;
-  const labourPct = labourSummary?.labourPercentOfSales ?? derivedLabourPct ?? 0;
+  const labourPct = labourSummary?.labourPercentOfSales != null
+    ? safeLabourPct(rawLabourCost, salesSnapshot.netSales) ?? labourSummary.labourPercentOfSales
+    : derivedLabourPct ?? 0;
 
-  // ── Step 10: Revenue variance ─────────────────────────────────────────────
-  const revenueVariance = (salesSnapshot.targetSales ?? 0) > 0
-    ? ((salesSnapshot.netSales - salesSnapshot.targetSales!) / salesSnapshot.targetSales!) * 100
+  // ── Step 10: Revenue target (single source of truth) ─────────────────────
+  const supabase = createServerClient();
+  const resolvedTarget = await resolveRevenueTarget(siteId, today_iso, supabase);
+  // Use resolved target; fall back to forecast's target if resolvedTarget is null
+  const effectiveTarget = resolvedTarget.target ?? salesSnapshot.targetSales ?? 0;
+
+  // ── Step 10b: Revenue variance ────────────────────────────────────────────
+  const revenueVariance = effectiveTarget > 0
+    ? ((salesSnapshot.netSales - effectiveTarget) / effectiveTarget) * 100
     : 0;
 
   // ── Step 11: Freshness ages ───────────────────────────────────────────────
@@ -611,7 +622,7 @@ export async function buildCommandCenterState(
   const engineOutput = evaluateOperations({
     revenue: {
       actual:          salesSnapshot.netSales,
-      target:          salesSnapshot.targetSales ?? 0,
+      target:          effectiveTarget,
       variancePercent: revenueVariance,
       covers:          salesSnapshot.covers,
       avgSpend:        salesSnapshot.covers > 0 ? salesSnapshot.netSales / salesSnapshot.covers : 0,
@@ -676,16 +687,18 @@ export async function buildCommandCenterState(
 
   // ── Step 14: Canonical revenue/labour/compliance/maintenance ──────────────
   const revRelibility = revenueReliability(salesSnapshot);
-  const gapPct = (salesSnapshot.targetSales ?? 0) > 0 ? revenueVariance : 0;
+  const gapPct = effectiveTarget > 0 ? revenueVariance : 0;
 
   const canonicalRevenue: CanonicalRevenue = {
-    actual:         salesSnapshot.netSales,
-    target:         salesSnapshot.targetSales ?? 0,
-    projectedClose: safeBrain.forecastSummary.projectedClose > 0 ? safeBrain.forecastSummary.projectedClose : null,
-    gap:            Math.max((salesSnapshot.targetSales ?? 0) - salesSnapshot.netSales, 0),
+    actual:           salesSnapshot.netSales,
+    target:           effectiveTarget,
+    projectedClose:   safeBrain.forecastSummary.projectedClose > 0 ? safeBrain.forecastSummary.projectedClose : null,
+    gap:              Math.max(effectiveTarget - salesSnapshot.netSales, 0),
     gapPct,
-    status:         revenueStatus(gapPct, revRelibility),
-    reliability:    revRelibility,
+    status:           revenueStatus(gapPct, revRelibility),
+    reliability:      revRelibility,
+    targetEstimated:  resolvedTarget.estimated,
+    targetWarning:    resolvedTarget.warning,
   };
 
   const labRelibility = labourReliability(labourSummary, revRelibility);
@@ -817,6 +830,15 @@ export async function buildCommandCenterState(
     commandFeed,
     riskVector,
   };
+
+  // Persist canonical score — fire-and-forget, never blocks render
+  void persistOperatingScore({
+    storeId:    siteId,
+    scoreDate:  today_iso,
+    totalScore: canonicalScore.value,
+    grade:      canonicalScore.grade,
+    breakdown:  canonicalScore.breakdown as Record<string, unknown>,
+  });
 
   return {
     state,

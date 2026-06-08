@@ -11,6 +11,9 @@
 
 import { createServerClient } from "@/lib/supabase/server";
 import { getOrSet, cacheKey, TTL, registerKey } from "@/lib/cache/redis";
+import { resolveRevenueTarget, safeLabourPct } from "@/lib/targets/resolveRevenueTarget";
+import { calculateOperatingScore } from "@/lib/scoring/operatingScore";
+import { persistOperatingScore } from "@/lib/scores/persistOperatingScore";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -198,14 +201,10 @@ async function _buildOperationsContextUncached(
               .maybeSingle()
           : Promise.resolve({ data: null }),
 
-      // Target from snapshot
-      supabase
-        .from("store_snapshots")
-        .select("revenue_target")
-        .eq("site_id", siteId)
-        .lte("snapshot_date", date)
-        .order("snapshot_date", { ascending: false })
-        .limit(1),
+      // Revenue target — resolved via canonical waterfall (site_id → org_id → capacity estimate)
+      // NOTE: resolveRevenueTarget makes its own sequential DB calls internally;
+      // wrapping in Promise.all still parallelises it with the other queries.
+      resolveRevenueTarget(siteId, date, supabase as any),
 
       // Labour (primary): MICROS labour_daily_summary
       // Uses effectiveLocRef (sites.micros_location_ref as fallback) so the query
@@ -256,10 +255,10 @@ async function _buildOperationsContextUncached(
     ]);
 
   // ── Revenue ────────────────────────────────────────────────────────────────
-  const revRows   = (revRes.data  ?? []) as { net_vat_excl: number | null; net_sales: number | null }[];
-  const snapRows  = (snapRes.data ?? []) as { revenue_target: number | null }[];
-  const manualRow = manualRes.data as { net_sales: number | null; gross_sales: number | null } | null;
-  const microsRow = microsRes.data as { net_sales: number | null; gross_sales: number | null } | null;
+  const revRows      = (revRes.data  ?? []) as { net_vat_excl: number | null; net_sales: number | null }[];
+  const targetResult = snapRes as Awaited<ReturnType<typeof resolveRevenueTarget>>;
+  const manualRow    = manualRes.data as { net_sales: number | null; gross_sales: number | null } | null;
+  const microsRow    = microsRes.data as { net_sales: number | null; gross_sales: number | null } | null;
 
   // Priority: MICROS live daily → manual upload → revenue_records
   // (Identical resolution order to Business Status panel / getCurrentSalesSnapshot)
@@ -277,7 +276,11 @@ async function _buildOperationsContextUncached(
   }
 
   console.log(`[ContextBuilder] Revenue source: R${Math.round(actual)} from ${revenueSource} | date=${date} | site=${siteId}`);
-  const target     = snapRows[0]?.revenue_target ? Number(snapRows[0].revenue_target) : 0;
+  // Use canonical target resolver — same function as ServicePulse and Score Breakdown
+  const target     = targetResult.target ?? 0;
+  if (targetResult.estimated) {
+    console.log(`[ContextBuilder] Revenue target estimated: ${targetResult.warning}`);
+  }
   const variance   = target > 0 ? +((actual - target) / target * 100).toFixed(1) : 0;
   const trend: RevenueContext["trend"] =
     variance > 2 ? "recovering" : variance < -5 ? "declining" : "stable";
@@ -292,9 +295,10 @@ async function _buildOperationsContextUncached(
   const targetLabourPct = ((siteRes.data as any)?.target_labour_pct as number | null) ?? 15;
   const fallbackLabourCost = labRows.reduce((s, r) => s + (r.labour_cost ?? 0), 0);
   const labourCost      = labSummary?.total_pay != null ? Number(labSummary.total_pay) : fallbackLabourCost;
+  // safeLabourPct guard: returns null if revenue < R500 to prevent absurd percentages
   const actualPercent   = labSummary?.labour_pct != null
-    ? +Number(labSummary.labour_pct).toFixed(1)
-    : actual > 0 ? +(labourCost / actual * 100).toFixed(1) : 0;
+    ? safeLabourPct(labourCost, actual) ?? +Number(labSummary.labour_pct).toFixed(1)
+    : safeLabourPct(labourCost, actual) ?? 0;
   const labourVariance  = +(actualPercent - targetLabourPct).toFixed(1);
   const labourNote = actual < 5000
     ? "Labour % unreliable — insufficient revenue data"
@@ -373,6 +377,33 @@ async function _buildOperationsContextUncached(
   const hour      = parseInt(saTime, 10);
   const timeOfDay = getTimeOfDay(hour);
   const sessionPressure = computeSessionPressure(timeOfDay, variance, overdue, urgentCount);
+
+  // Compute and persist operating score — fire-and-forget, never blocks render.
+  // calculateOperatingScore uses the same assembled inputs the brain will receive.
+  const ctxScoreResult = calculateOperatingScore({
+    actualRevenue:  actual,
+    targetRevenue:  target,
+    labourPct:      actualPercent,
+    targetLabourPct,
+    expiredItems:   overdueCount,
+    dueSoonItems:   atRiskCount,
+    criticalIssues: urgentCount,
+    openIssues:     maintRows.length,
+  });
+  void persistOperatingScore({
+    storeId:    siteId,
+    scoreDate:  date,
+    totalScore: ctxScoreResult.score,
+    grade:      ctxScoreResult.grade,
+    breakdown: {
+      revenue:     ctxScoreResult.components.revenue,
+      labour:      ctxScoreResult.components.labour,
+      service:     ctxScoreResult.components.service,
+      compliance:  ctxScoreResult.components.compliance,
+      maintenance: ctxScoreResult.components.maintenance,
+      source:      "context-builder",
+    } as Record<string, unknown>,
+  });
 
   return {
     revenue:     { actual, target, variance, trend, connected: posConnected },

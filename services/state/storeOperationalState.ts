@@ -16,6 +16,8 @@ import {
   calculateOperatingScore,
   toGrade as libToGrade,
 } from "@/lib/scoring/operatingScore";
+import { persistOperatingScore } from "@/lib/scores/persistOperatingScore";
+import { resolveRevenueTarget, safeLabourPct } from "@/lib/targets/resolveRevenueTarget";
 import type {
   StoreOperationalState,
   Store,
@@ -69,12 +71,8 @@ export async function getStoreOperationalState(
         .eq("site_id", storeId)
         .not("status", "in", '("resolved","closed")'),
 
-      supabase.from("store_snapshots")
-        .select("revenue_target")
-        .eq("site_id", storeId)
-        .lte("snapshot_date", date)
-        .order("snapshot_date", { ascending: false })
-        .limit(1),
+      // Revenue target — canonical waterfall (replaces stale store_snapshots.revenue_target)
+      resolveRevenueTarget(storeId, date, supabase as any),
 
       supabase.from("actions")
         .select("id, status, due_at")
@@ -89,26 +87,25 @@ export async function getStoreOperationalState(
   const labourRows    = (labourRes.data ?? []) as { labour_cost: number | null }[];
   const compItems     = compRes.data ?? [];
   const maintTickets  = maintRes.data ?? [];
-  const snapshots     = snapRes.data ?? [];
+  // snapRes is now a RevenueTargetResult from resolveRevenueTarget (not a Supabase response)
+  const targetResult  = snapRes as Awaited<ReturnType<typeof resolveRevenueTarget>>;
   const actionRows    = actionsRes.data ?? [];
 
   // ── Revenue ────────────────────────────────────────────────────────────────
   const salesNetVat = revRows.reduce(
     (sum, r) => sum + (r.net_vat_excl ?? r.net_sales ?? 0), 0
   );
-  const revenueTarget = (snapshots[0] as any)?.revenue_target
-    ? Number((snapshots[0] as any).revenue_target)
-    : 0;
+  // Use canonical target resolver — same function as ServicePulse and context-builder
+  const revenueTarget = targetResult.target ?? 0;
   const revenueGapAbs = revenueTarget > 0 ? salesNetVat - revenueTarget : null;
   const revenueGapPct = revenueTarget > 0
     ? +((salesNetVat - revenueTarget) / revenueTarget * 100).toFixed(2)
     : null;
 
   // ── Labour ─────────────────────────────────────────────────────────────────
-  const labourCost = labourRows.reduce((sum, r) => sum + (r.labour_cost ?? 0), 0);
-  const labourPct  = salesNetVat > 0
-    ? +(labourCost / salesNetVat * 100).toFixed(2)
-    : null;
+  const labourCost      = labourRows.reduce((sum, r) => sum + (r.labour_cost ?? 0), 0);
+  // safeLabourPct guard: returns null if revenue < R500 to prevent inflated percentages
+  const labourPct       = safeLabourPct(labourCost, salesNetVat);
   const targetLabourPct = store.target_labour_pct ?? 30;
 
   // ── Compliance ─────────────────────────────────────────────────────────────
@@ -146,6 +143,23 @@ export async function getStoreOperationalState(
     maintScore: scoreResult.components.maintenance.rawScore,
   };
 
+  // Persist score — fire-and-forget, never blocks render
+  void persistOperatingScore({
+    storeId:    storeId,
+    scoreDate:  date,
+    totalScore: score,
+    grade:      gradeFromScore(score),
+    breakdown: {
+      revenue:     scoreResult.components.revenue,
+      labour:      scoreResult.components.labour,
+      service:     scoreResult.components.service,
+      compliance:  scoreResult.components.compliance,
+      maintenance: scoreResult.components.maintenance,
+      inputs:      scoreInput,
+      source:      "storeOperationalState",
+    } as Record<string, unknown>,
+  });
+
   // ── Actions ────────────────────────────────────────────────────────────────
   const now = Date.now();
   const actionsOpen = actionRows.filter(
@@ -172,7 +186,11 @@ export async function getStoreOperationalState(
       {
         label:  "Target source",
         value:  revenueTarget > 0 ? `R ${revenueTarget.toLocaleString()}` : "Not set",
-        detail: "Based on most recent store_snapshots record for this date",
+        detail: targetResult.estimated
+          ? `Estimated: ${targetResult.warning ?? "capacity-based estimate"}`
+          : targetResult.source === "sales_targets"
+            ? "From sales_targets table (explicit budget)"
+            : "No target configured",
       },
     ],
     labour_pct: [
