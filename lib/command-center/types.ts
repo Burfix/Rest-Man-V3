@@ -92,6 +92,10 @@ export interface CanonicalRevenue {
   gapPct: number;   // (actual − target) / target × 100 (negative = behind)
   status: RevenueStatus;
   reliability: DataReliability;
+  /** true when target was estimated from capacity (no explicit budget set); UI renders "Est." badge */
+  targetEstimated?: boolean;
+  /** Warning message when target is estimated or missing */
+  targetWarning?: string;
 }
 
 // ── Labour ────────────────────────────────────────────────────────────────────
