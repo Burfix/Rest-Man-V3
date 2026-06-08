@@ -668,6 +668,10 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
               const revenueSubLine = driver.module === "REVENUE" && !inactive
                 ? driver.reason
                 : null;
+              // Labour sub-line
+              const labourSubLine = driver.module === "LABOUR" && !inactive
+                ? driver.reason
+                : null;
 
               return (
                 <div key={driver.module}>
@@ -708,6 +712,11 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                   {!inactive && revenueSubLine && (
                     <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
                       {revenueSubLine}
+                    </p>
+                  )}
+                  {!inactive && labourSubLine && (
+                    <p className="text-[9px] font-mono text-stone-500 dark:text-stone-600 mt-0.5 leading-tight">
+                      {labourSubLine}
                     </p>
                   )}
                 </div>
