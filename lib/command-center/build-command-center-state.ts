@@ -583,14 +583,11 @@ export async function buildCommandCenterState(
   const siteConfig = await getSiteConfig(siteId);
 
   // ── Step 9: Labour % (canonical calculation with revenue gate) ─────────────
+  // safeLabourPct returns null when revenue < R500.
+  // Do NOT fall back to labourSummary.labourPercentOfSales when null — that
+  // pre-computed field uses a different revenue basis and produces absurd %s.
   const rawLabourCost = labourSummary?.totalLabourCost ?? 0;
-  const derivedLabourPct =
-    rawLabourCost > 0
-      ? safeLabourPct(rawLabourCost, salesSnapshot.netSales)
-      : null;
-  const labourPct = labourSummary?.labourPercentOfSales != null
-    ? safeLabourPct(rawLabourCost, salesSnapshot.netSales) ?? labourSummary.labourPercentOfSales
-    : derivedLabourPct ?? 0;
+  const labourPct = safeLabourPct(rawLabourCost, salesSnapshot.netSales) ?? 0;
 
   // ── Step 10: Revenue target (single source of truth) ─────────────────────
   const supabase = createServerClient();

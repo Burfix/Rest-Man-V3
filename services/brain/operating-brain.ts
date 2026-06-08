@@ -335,14 +335,20 @@ function computeSystemHealth(
     : scoreRevenue(ctx.revenue.actual ?? 0, ctx.revenue.target ?? 0);
 
   // Labour: 20 pts (band-based)
-  // If this site has no POS connection, award neutral 10 pts.
-  // If connected but no labour data yet today, also award neutral 10 pts.
-  const hasLabourData = ctx.labour.actualPercent > 0;
-  const labPts = !ctx.labour.connected
-    ? 10 // no POS connection — neutral
+  // When revenue is insufficient (actualPercent === null), exclude labour from
+  // the total score and max_possible entirely — scoring 0 would falsely penalise
+  // a GM before a single cover is served.
+  // If no POS connection: neutral 10 pts.
+  // If connected but no data yet today: neutral 10 pts.
+  const labourInsufficient = ctx.labour.connected && ctx.labour.actualPercent === null;
+  const hasLabourData = ctx.labour.actualPercent !== null && ctx.labour.actualPercent > 0;
+  const labPts: number | null = labourInsufficient
+    ? null  // excluded — insufficient revenue to compute a reliable %
+    : !ctx.labour.connected
+    ? 10    // no POS connection — neutral
     : !hasLabourData
-    ? 10 // connected but no data yet today — neutral, not penalised
-    : scoreLabour(ctx.labour.actualPercent ?? 0, ctx.labour.targetPercent ?? 0);
+    ? 10    // connected but no data yet today — neutral, not penalised
+    : scoreLabour(ctx.labour.actualPercent!, ctx.labour.targetPercent ?? 0);
 
   // Duty completion: 20 pts
   // Before noon: full credit for tasks not yet due, but deduct proportionally
@@ -386,12 +392,27 @@ function computeSystemHealth(
 
   console.log(`[Brain] computeSystemHealth compliance: overdueCount=${ctx.compliance.overdueCount} atRiskCount=${ctx.compliance.atRiskCount} → compPts=${compPts}`);
 
-  const score = Math.round(revPts + labPts + dutyPts + maintPts + compPts);
+  // Sum only non-null pillars — excluded pillars don't drag the grade.
+  // max_possible shrinks so grade reflects actual scored pillars only.
+  const pillars = [
+    { pts: revPts,   max: 30 },
+    { pts: labPts,   max: 20 },
+    { pts: dutyPts,  max: 20 },
+    { pts: maintPts, max: 15 },
+    { pts: compPts,  max: 15 },
+  ] as const;
+  const scoredPillars = pillars.filter((p): p is { pts: number; max: number } => p.pts !== null);
+  const score = Math.round(scoredPillars.reduce((s, p) => s + p.pts, 0));
+  const maxPossible = scoredPillars.reduce((s, p) => s + p.max, 0);
+  const gradePct = maxPossible > 0 ? (score / maxPossible) * 100 : 0;
+
+  // Grade thresholds applied to gradePct (score as % of possible max):
+  // A ≥ 90 | B ≥ 75 | C ≥ 60 | D ≥ 45 | F < 45
   let grade =
-    score >= 90 ? "A" :
-    score >= 80 ? "B" :
-    score >= 65 ? "C" :
-    score >= 50 ? "D" : "F";
+    gradePct >= 90 ? "A" :
+    gradePct >= 75 ? "B" :
+    gradePct >= 60 ? "C" :
+    gradePct >= 45 ? "D" : "F";
 
   // Before noon: clamp grade floor at D (duties haven't opened yet)
   if (minutesElapsed < 120 && grade === "F") grade = "D";
@@ -425,17 +446,23 @@ function computeSystemHealth(
     },
     {
       module:    "LABOUR",
-      pts:       Math.round(labPts),
-      direction: labPts >= 20 ? "up" : "down",
+      pts:       labPts !== null ? Math.round(labPts) : 0,
+      direction: (labPts ?? 0) >= 20 ? "up" : "down",
       connected: ctx.labour.connected,
-      hasDataToday: ctx.labour.connected ? hasLabourData : undefined,
-      reason:    !ctx.labour.connected
+      // hasDataToday: false causes the UI to show "—" (inactive bar) — correct
+      // when labour is excluded due to insufficient revenue.
+      hasDataToday: labourInsufficient
+        ? false
+        : ctx.labour.connected ? hasLabourData : undefined,
+      reason:    labourInsufficient
+        ? "No revenue data yet — labour unscored"
+        : !ctx.labour.connected
         ? "No POS connection — neutral 10/20 pts"
         : !hasLabourData
         ? "Connected — no data yet today"
-        : labPts >= 20
-        ? `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target ✓`
-        : `${ctx.labour.actualPercent.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target — ${ctx.labour.variance.toFixed(1)}% over${ctx.labour.note ? ` · ${ctx.labour.note}` : ""}`,
+        : (labPts ?? 0) >= 20
+        ? `${ctx.labour.actualPercent!.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target ✓`
+        : `${ctx.labour.actualPercent!.toFixed(1)}% vs ${ctx.labour.targetPercent.toFixed(1)}% target — ${(ctx.labour.variance ?? 0).toFixed(1)}% over${ctx.labour.note ? ` · ${ctx.labour.note}` : ""}`,
     },
     {
       module:    "DUTIES",

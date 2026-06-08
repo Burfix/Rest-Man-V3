@@ -27,9 +27,11 @@ export type RevenueContext = {
 };
 
 export type LabourContext = {
-  actualPercent: number;
+  /** null when revenue is below R500 — insufficient to compute a reliable % */
+  actualPercent: number | null;
   targetPercent: number;
-  variance: number;        // % over target (positive = over)
+  /** null when actualPercent is null */
+  variance: number | null;
   staffOnFloor: number;
   note: string | null;
   /** false = this site has no POS/MICROS connection — show "Not connected" in UI */
@@ -295,11 +297,14 @@ async function _buildOperationsContextUncached(
   const targetLabourPct = ((siteRes.data as any)?.target_labour_pct as number | null) ?? 15;
   const fallbackLabourCost = labRows.reduce((s, r) => s + (r.labour_cost ?? 0), 0);
   const labourCost      = labSummary?.total_pay != null ? Number(labSummary.total_pay) : fallbackLabourCost;
-  // safeLabourPct guard: returns null if revenue < R500 to prevent absurd percentages
-  const actualPercent   = labSummary?.labour_pct != null
-    ? safeLabourPct(labourCost, actual) ?? +Number(labSummary.labour_pct).toFixed(1)
-    : safeLabourPct(labourCost, actual) ?? 0;
-  const labourVariance  = +(actualPercent - targetLabourPct).toFixed(1);
+  // safeLabourPct guard: returns null when revenue < R500.
+  // Do NOT fall back to labSummary.labour_pct when null — that value was
+  // computed against a different revenue basis and produces absurd %s
+  // (e.g. 216.5%) when today's revenue is only R153.
+  const actualPercent: number | null = safeLabourPct(labourCost, actual);
+  const labourVariance: number | null = actualPercent !== null
+    ? +(actualPercent - targetLabourPct).toFixed(1)
+    : null;
   const labourNote = actual < 5000
     ? "Labour % unreliable — insufficient revenue data"
     : null;
