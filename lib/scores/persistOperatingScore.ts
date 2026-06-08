@@ -31,7 +31,10 @@ export async function persistOperatingScore(
 
   try {
     const supabase = getServiceRoleClient();
-    const { error } = await supabase
+    // Cast to any: operating_score_cache is not yet in the generated Database
+    // types. Remove the cast after running `supabase gen types typescript`.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase as any)
       .from("operating_score_cache")
       .upsert(
         {
