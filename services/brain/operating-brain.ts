@@ -394,13 +394,13 @@ function computeSystemHealth(
 
   // Sum only non-null pillars — excluded pillars don't drag the grade.
   // max_possible shrinks so grade reflects actual scored pillars only.
-  const pillars = [
+  const pillars: Array<{ pts: number | null; max: number }> = [
     { pts: revPts,   max: 30 },
     { pts: labPts,   max: 20 },
     { pts: dutyPts,  max: 20 },
     { pts: maintPts, max: 15 },
     { pts: compPts,  max: 15 },
-  ] as const;
+  ];
   const scoredPillars = pillars.filter((p): p is { pts: number; max: number } => p.pts !== null);
   const score = Math.round(scoredPillars.reduce((s, p) => s + p.pts, 0));
   const maxPossible = scoredPillars.reduce((s, p) => s + p.max, 0);
@@ -577,12 +577,16 @@ function buildConsequences(
     }
 
     if (sig.id === "S3_LABOUR_EFFICIENCY_ALERT") {
+      const labourPct = ctx.labour.actualPercent;
+      const labourVariance = ctx.labour.variance;
+      if (labourPct === null || labourVariance === null) continue;
+
       const labourCost  = ctx.revenue.actual > 0
-        ? ctx.revenue.actual * ctx.labour.actualPercent / 100 : 0;
+        ? ctx.revenue.actual * labourPct / 100 : 0;
       const targetCost  = ctx.revenue.actual > 0
         ? ctx.revenue.actual * ctx.labour.targetPercent / 100 : 0;
       const excessCost  = Math.max(0, labourCost - targetCost);
-      const labConsequence = `Labour ${pct(ctx.labour.variance)} over target. ${fmt(excessCost)} unnecessary cost confirmed on P&L if no reduction now.${ctx.labour.note ? ` ${ctx.labour.note}.` : ""}`;
+      const labConsequence = `Labour ${pct(labourVariance)} over target. ${fmt(excessCost)} unnecessary cost confirmed on P&L if no reduction now.${ctx.labour.note ? ` ${ctx.labour.note}.` : ""}`;
       consequences.push({
         timeframe: "By close",
         consequence: labConsequence,
@@ -599,9 +603,12 @@ function buildConsequences(
     }
 
     if (sig.id === "S6_PRE_SERVICE_LABOUR_SURGE") {
+      const labourVariance = ctx.labour.variance;
+      if (labourVariance === null) continue;
+
       consequences.push({
         timeframe: "Start of service",
-        consequence: `Labour enters service session ${pct(ctx.labour.variance)} over budget with no revenue yet to absorb it.${ctx.labour.note ? ` ${ctx.labour.note}.` : ""}`,
+        consequence: `Labour enters service session ${pct(labourVariance)} over budget with no revenue yet to absorb it.${ctx.labour.note ? ` ${ctx.labour.note}.` : ""}`,
         financialImpact: null,
       });
     }
@@ -764,6 +771,9 @@ function buildIfIgnored(
     return "Service disruption compounds into guest complaints, review score impact, and confirmed revenue loss.";
   }
   if (sig.id === "S3_LABOUR_EFFICIENCY_ALERT") {
+    if (ctx.labour.variance === null) {
+      return "Labour efficiency cannot be confirmed until reliable revenue-linked labour data is available.";
+    }
     const excess = ctx.revenue.actual > 0
       ? ctx.revenue.actual * (ctx.labour.variance / 100) : 0;
     return `${fmt(excess)} in excess labour cost confirmed on P&L by close.`;
@@ -880,12 +890,14 @@ function buildFinancialImpact(
     if (atRisk > 0) return `~${fmt(atRisk)} revenue exposure`;
   }
   if (sig.id === "S3_LABOUR_EFFICIENCY_ALERT") {
+    if (ctx.labour.actualPercent === null) return null;
     const labourCost = ctx.revenue.actual * ctx.labour.actualPercent / 100;
     const targetCost = ctx.revenue.actual * ctx.labour.targetPercent / 100;
     const excess     = Math.max(0, labourCost - targetCost);
     if (excess > 0) return `${fmt(excess)} excess cost`;
   }
   if (sig.id === "S6_PRE_SERVICE_LABOUR_SURGE") {
+    if (ctx.labour.variance === null) return null;
     const projRev = runRate > 0 ? runRate * 11 : 0;
     if (projRev > 0) {
       const excess = projRev * (ctx.labour.variance / 100);
@@ -927,7 +939,7 @@ function buildRecoveryMeter(
     minutesRemaining,
     avgTurnMinutes:          45,
     serviceCapacityCovers:   null, // not available here; engine falls back to turn-based estimate
-    labourPct:               ctx.labour.actualPercent,
+    labourPct:               ctx.labour.actualPercent ?? 0,
     targetLabourPct:         ctx.labour.targetPercent,
   });
 

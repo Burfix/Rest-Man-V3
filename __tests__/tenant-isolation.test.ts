@@ -674,7 +674,8 @@ describe("Tier-2 — Labour dashboard MICROS config isolation", () => {
   it("labour page: no_connection state returned when site has no MICROS connection", () => {
     // Simulates what app/dashboard/labour/page.tsx does:
     // If getMicrosConnectionBySiteId returns null → dataSource = "no_connection"
-    const connection: null = null;
+    const resolveConnection = (): { loc_ref: string } | null => null;
+    const connection = resolveConnection();
     const dataSource = !connection?.loc_ref ? "no_connection" : "live_micros";
     expect(dataSource).toBe("no_connection");
   });
@@ -715,4 +716,3 @@ describe("Tier-2 — Labour dashboard MICROS config isolation", () => {
     await expect(getMicrosStatus("")).rejects.toThrow("siteId is required");
   });
 });
-

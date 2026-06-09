@@ -33,6 +33,7 @@ import {
   type CommandFeedItem,
   type CommandCenterState,
 } from "@/lib/command-center/types";
+import type { OperationalRiskVector } from "@/lib/ops/risk-vector";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,35 @@ function makeSystemPulse(score: CanonicalScore): SystemPulse {
     },
     fastestPathToNextGrade: null,
     projectedClose: null,
+  };
+}
+
+function makeRiskVector(score: CanonicalScore): OperationalRiskVector {
+  return {
+    generatedAt: new Date().toISOString(),
+    overallScore: score.value,
+    grade: score.grade,
+    risks: [],
+    governed: {
+      critical: [],
+      high:     [],
+      medium:   [],
+      all:      [],
+    },
+    narrative: {
+      currentSituation:        "Test situation",
+      primaryRisk:             "Test risk",
+      likelyOutcome:           "Test outcome",
+      recommendedIntervention: "Test intervention",
+      confidence:              "high",
+    },
+    projections: {
+      projectedClose:     null,
+      recoveryLikelihood: null,
+      forecastConfidence: "high",
+      projectedGrade:     null,
+      minutesToNextGrade: null,
+    },
   };
 }
 
@@ -136,6 +166,7 @@ function makeState(scoreValue: number, overrides: Partial<CommandCenterState> = 
         ifIgnored: null, owner: null, deadline: null, impact: "R2,000 gap", status: "pending",
       },
     ],
+    riskVector: makeRiskVector(score),
     ...overrides,
   };
 }

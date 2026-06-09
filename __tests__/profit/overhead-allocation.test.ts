@@ -127,8 +127,7 @@ describe("overhead allocation — Supabase integration path", () => {
    * site_overhead_allocations queries, and empty results for everything else.
    */
   function buildSupabaseMock(overheadRows: Array<{ monthly_amount: number }> | null) {
-    const chainEnd   = vi.fn().mockResolvedValue({ data: overheadRows, error: null });
-    const eqMonth    = vi.fn().mockReturnValue({ then: chainEnd.bind(null), ...makeResolvable(overheadRows) });
+    const eqMonth    = vi.fn().mockReturnValue(makeResolvable(overheadRows));
     const eqSite     = vi.fn().mockReturnValue({ eq: eqMonth });
     const selectMock = vi.fn().mockReturnValue({ eq: eqSite });
 

@@ -116,6 +116,12 @@ vi.mock("@supabase/supabase-js", () => ({
   })),
 }));
 
+vi.mock("@/lib/supabase/service-role-client", () => ({
+  getServiceRoleClient: vi.fn(() => ({
+    from: (_table: string) => new MockQueryChain(MOCK_LOCATION_ROWS),
+  })),
+}));
+
 // -- Env fixture helpers ------------------------------------------------------
 
 // Primi uses PKCE: Oracle account PRI_THAMSANQA_BIAPI + password + client_id.

@@ -53,8 +53,8 @@ vi.mock("@/lib/auth/get-user-context", () => ({
   ),
 }));
 
-vi.mock("@supabase/supabase-js", () => ({
-  createClient: vi.fn(),
+vi.mock("@/lib/supabase/service-role-client", () => ({
+  getServiceRoleClient: vi.fn(),
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -64,7 +64,7 @@ vi.mock("@/lib/logger", () => ({
 // ── Deferred imports (after mocks) ────────────────────────────────────────────
 
 import { getUserContext }                         from "@/lib/auth/get-user-context";
-import { createClient }                          from "@supabase/supabase-js";
+import { getServiceRoleClient }                   from "@/lib/supabase/service-role-client";
 import { POST as acknowledge }                   from "@/app/api/incidents/[id]/acknowledge/route";
 import { POST as assign }                        from "@/app/api/incidents/[id]/assign/route";
 import { POST as resolve }                       from "@/app/api/incidents/[id]/resolve/route";
@@ -73,7 +73,7 @@ import { POST as escalate }                      from "@/app/api/incidents/[id]/
 import type { UserContext }                      from "@/lib/auth/get-user-context";
 
 const mockGetUserContext = getUserContext as ReturnType<typeof vi.fn>;
-const mockCreateClient   = createClient as ReturnType<typeof vi.fn>;
+const mockCreateClient   = getServiceRoleClient as ReturnType<typeof vi.fn>;
 
 // ── Test fixtures ─────────────────────────────────────────────────────────────
 

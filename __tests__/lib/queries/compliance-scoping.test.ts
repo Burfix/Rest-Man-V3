@@ -39,6 +39,10 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({ from: fromMock }),
 }));
 
+vi.mock("@/lib/supabase/service-role-client", () => ({
+  getServiceRoleClient: () => ({ from: fromMock }),
+}));
+
 // ── Import under test (after mock is registered) ──────────────────────────────
 
 import {

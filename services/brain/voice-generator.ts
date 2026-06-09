@@ -23,6 +23,7 @@ function pct(n: number, showPlus = false): string {
 export function generateVoice(brain: BrainOutput, ctx: OperationsContext): string {
   const { primaryThreat, forecastSummary, gmSituation, systemHealth, recoveryMeter } = brain;
   const sev = primaryThreat.severity;
+  const labourVariance = ctx.labour.variance;
 
   // ── 1. After hours — sync pending ─────────────────────────────────────────
   if (forecastSummary.isDayClosed && forecastSummary.syncPending) {
@@ -36,8 +37,8 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
 
     if (vt >= 0) {
       // Good day
-      const labNote = ctx.labour.variance > 0
-        ? ` Labour ${pct(ctx.labour.variance, true)} over — review roster before tomorrow.`
+      const labNote = labourVariance !== null && labourVariance > 0
+        ? ` Labour ${pct(labourVariance, true)} over — review roster before tomorrow.`
         : " Labour on budget.";
       const compNote = ctx.compliance.overdueCount > 0
         ? ` ${ctx.compliance.overdueCount} compliance item${ctx.compliance.overdueCount > 1 ? "s" : ""} expired — renew tomorrow to reach Grade A.`
@@ -45,14 +46,14 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
       return `Strong close at ${closeRevenue}, ${pct(vt, true)} vs target.${labNote}${compNote}`;
     } else if (vt < -15) {
       // Weak day — flag for tomorrow
-      const labNote = ctx.labour.variance > 0
-        ? ` Labour ${pct(ctx.labour.variance, true)} over target adds further cost pressure.`
+      const labNote = labourVariance !== null && labourVariance > 0
+        ? ` Labour ${pct(labourVariance, true)} over target adds further cost pressure.`
         : "";
       return `Day closed at ${closeRevenue}, ${pct(vt)} vs target. Review covers and conversion gaps before tomorrow's prep.${labNote}`;
     } else {
       // Slightly behind
-      const labNote = ctx.labour.variance > 0
-        ? ` Labour ${pct(ctx.labour.variance, true)} over target.`
+      const labNote = labourVariance !== null && labourVariance > 0
+        ? ` Labour ${pct(labourVariance, true)} over target.`
         : "";
       return `After hours. Today closed at ${closeRevenue}, ${pct(vt)} vs target.${labNote} Review roster for tomorrow.`;
     }
@@ -103,8 +104,8 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
     ) {
       parts.push(`Revenue is ${fmt(primaryThreat.moneyAtRisk)} behind`);
     }
-    if (primaryThreat.modulesInvolved.includes("LABOUR") && ctx.labour.variance > 8) {
-      parts.push(`labour is ${pct(ctx.labour.variance, true)} over target`);
+    if (primaryThreat.modulesInvolved.includes("LABOUR") && labourVariance !== null && labourVariance > 8) {
+      parts.push(`labour is ${pct(labourVariance, true)} over target`);
     }
     if (
       primaryThreat.timeWindowMinutes > 0 &&
@@ -154,9 +155,10 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
   // ── 10. Pre-service labour surge ──────────────────────────────────────────
   if (
     ctx.meta.timeOfDay === "pre-service" &&
-    ctx.labour.variance > 10
+    labourVariance !== null &&
+    labourVariance > 10
   ) {
-    return `Labour entering service ${pct(ctx.labour.variance, true)} over budget. Review roster and send home non-essential staff before opening.`;
+    return `Labour entering service ${pct(labourVariance, true)} over budget. Review roster and send home non-essential staff before opening.`;
   }
 
   // ── 11. Revenue behind + weak duty completion ─────────────────────────────
@@ -169,14 +171,15 @@ export function generateVoice(brain: BrainOutput, ctx: OperationsContext): strin
 
   // ── 12. Labour over target only (no revenue alert) ────────────────────────
   if (
-    ctx.labour.variance > 8 &&
+    labourVariance !== null &&
+    labourVariance > 8 &&
     ctx.revenue.variance > -5 &&
     !primaryThreat.modulesInvolved.includes("REVENUE")
   ) {
     const suggestion = ctx.meta.timeOfDay === "post-service"
       ? "Adjust tomorrow's roster."
       : "Consider early send-home to bring cost back to target.";
-    return `Labour running ${pct(ctx.labour.variance, true)} over target. ${suggestion}`;
+    return `Labour running ${pct(labourVariance, true)} over target. ${suggestion}`;
   }
 
   // ── 13. Compliance overdue (S4 compound or compliance primary) ─────────────

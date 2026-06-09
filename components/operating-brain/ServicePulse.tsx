@@ -38,6 +38,10 @@ type Props = {
   dataSource?: "live" | "estimated" | "none";
   /** Canonical data provenance — renders a provenance footer when provided */
   provenance?: DataProvenance;
+  /** true when the revenue target is capacity-estimated (no explicit budget set) */
+  targetEstimated?: boolean;
+  /** Warning message shown as tooltip/subtext when target is estimated */
+  targetWarning?: string;
 };
 
 export default function ServicePulse({
@@ -55,6 +59,8 @@ export default function ServicePulse({
   sourceNote,
   dataSource,
   provenance,
+  targetEstimated,
+  targetWarning,
 }: Props) {
   const isAhead = variancePercent >= 0;
   const pacePercent = target > 0 ? Math.min((actual / target) * 100, 100) : 0;
@@ -72,6 +78,8 @@ export default function ServicePulse({
           : "MICROS Revenue";
   const showForecastBadge = source === "forecast";
   const showYesterdayBadge = !isLive && source === "micros" && isYesterday;
+  const estimatedTargetMessage =
+    targetWarning ?? "Revenue target is capacity-estimated because no approved budget target is configured.";
 
   // ── "none" state — no POS connected, no data at all ─────────────────────
   if (dataSource === "none") {
@@ -151,8 +159,16 @@ export default function ServicePulse({
               <span className="text-xl font-bold text-stone-900 dark:text-stone-100 font-mono">
                 R{actual.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}
               </span>
-              <span className="text-xs text-stone-500">
+              <span className="text-xs text-stone-500 flex items-center gap-1">
                 / R{target.toLocaleString("en-ZA", { maximumFractionDigits: 0 })}
+                {targetEstimated && (
+                  <span
+                    className="rounded bg-amber-100 dark:bg-amber-950/40 px-1 py-px text-[8px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider"
+                    title={estimatedTargetMessage}
+                  >
+                    Estimated target
+                  </span>
+                )}
               </span>
             </div>
           </div>
@@ -191,6 +207,12 @@ export default function ServicePulse({
             </span>
           )}
         </div>
+
+        {targetEstimated && (
+          <p className="mt-2 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] leading-snug text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-300">
+            {estimatedTargetMessage}
+          </p>
+        )}
 
         {/* Peak window */}
         {(peakWindow || timeToPeakMinutes != null) && (

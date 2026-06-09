@@ -69,13 +69,15 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   } = ctx;
 
   const revGapAbs = rev.target > 0 ? Math.abs(rev.actual - rev.target) : 0;
+  const hasLabourVariance = lab.variance !== null;
+  const labourVariance = lab.variance ?? 0;
 
   // ── SIGNAL 1 — Revenue Recovery Window ─────────────────────────────────────
   // Guard: skip entirely when site has no POS connection — variance is meaningless.
-  if (rev.connected && lab.connected && rev.variance < -20 && lab.variance > 5 && ops.completionRate < 60) {
+  if (rev.connected && lab.connected && hasLabourVariance && rev.variance < -20 && labourVariance > 5 && ops.completionRate < 60) {
     const conditions: string[] = [
       `Revenue ${pct(rev.variance)} vs target`,
-      `Labour ${pct(lab.variance)} over`,
+      `Labour ${pct(labourVariance)} over`,
       `Ops ${ops.completionRate}% complete`,
     ];
     signals.push({
@@ -83,7 +85,7 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
       modules: ["REVENUE", "LABOUR", "OPS"],
       severity: "CRITICAL",
       title: "Revenue Recovery Window — Multi-System Drag",
-      recommendation: `Revenue ${fmt(revGapAbs)} behind. Labour ${pct(lab.variance)} over. Ops ${ops.completionRate}% complete. Cut 1 FOH staff, push walk-in promo, escalate incomplete duties to GM.`,
+      recommendation: `Revenue ${fmt(revGapAbs)} behind. Labour ${pct(labourVariance)} over. Ops ${ops.completionRate}% complete. Cut 1 FOH staff, push walk-in promo, escalate incomplete duties to GM.`,
       moneyAtRisk: revGapAbs,
       timeWindow: meta.timeOfDay === "service" ? "Until session end" : "Next service",
       confidence: 92,
@@ -123,9 +125,9 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
 
   // ── SIGNAL 3 — Labour Efficiency Alert ─────────────────────────────────────
   // Guard: labour % is derived from POS revenue — unreliable without a connection.
-  if (rev.connected && lab.connected && lab.variance > 8 && rev.variance < 0 && ops.completionRate > 80) {
+  if (rev.connected && lab.connected && hasLabourVariance && labourVariance > 8 && rev.variance < 0 && ops.completionRate > 80) {
     const conditions: string[] = [
-      `Labour ${pct(lab.variance)} over target`,
+      `Labour ${pct(labourVariance)} over target`,
       `Revenue ${pct(rev.variance)} behind`,
       `Ops ${ops.completionRate}% complete`,
     ];
@@ -134,7 +136,7 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
       modules: ["LABOUR", "REVENUE"],
       severity: "HIGH",
       title: "Labour Efficiency Alert — Safe Reduction Window",
-      recommendation: `Labour ${pct(lab.variance)} over target while revenue is behind. Ops covered at ${ops.completionRate}%. Safe to reduce floor staff by 1 — duties are covered.`,
+      recommendation: `Labour ${pct(labourVariance)} over target while revenue is behind. Ops covered at ${ops.completionRate}%. Safe to reduce floor staff by 1 — duties are covered.`,
       timeWindow: meta.timeOfDay === "service" ? "This session" : "Next shift",
       confidence: 85,
       triggeredConditions: conditions,
@@ -162,7 +164,8 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
   // ── SIGNAL 5 — Full System Green ───────────────────────────────────────────
   if (
     rev.variance > -5 &&
-    lab.variance < 5 &&
+    hasLabourVariance &&
+    labourVariance < 5 &&
     ops.completionRate > 85 &&
     !maint.serviceBlocking &&
     comp.overdueCount === 0
@@ -176,7 +179,7 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
       confidence: 80,
       triggeredConditions: [
         `Revenue ${pct(rev.variance)} vs target`,
-        `Labour ${pct(lab.variance)} vs target`,
+        `Labour ${pct(labourVariance)} vs target`,
         `Ops ${ops.completionRate}% complete`,
         "No service-blocking maintenance",
         "No overdue compliance",
@@ -186,17 +189,17 @@ export function detectSignals(ctx: OperationsContext): CrossModuleSignal[] {
 
   // ── SIGNAL 6 — Pre-Service Labour Surge ────────────────────────────────────
   // Guard: labour % is only meaningful when connected to POS.
-  if (lab.connected && meta.timeOfDay === "pre-service" && lab.variance > 10) {
+  if (lab.connected && hasLabourVariance && meta.timeOfDay === "pre-service" && labourVariance > 10) {
     const conditions: string[] = [
       "Pre-service window active",
-      `Labour already ${pct(lab.variance)} over target`,
+      `Labour already ${pct(labourVariance)} over target`,
     ];
     signals.push({
       id: "S6_PRE_SERVICE_LABOUR_SURGE",
       modules: ["LABOUR", "OPS"],
       severity: "MEDIUM",
       title: "Pre-Service Labour Surge",
-      recommendation: `Labour already ${pct(lab.variance)} over target before service starts. Review clock-ons and stagger arrivals. Revenue hasn't arrived yet to justify current labour spend.`,
+      recommendation: `Labour already ${pct(labourVariance)} over target before service starts. Review clock-ons and stagger arrivals. Revenue hasn't arrived yet to justify current labour spend.`,
       timeWindow: "Before service",
       confidence: 80,
       triggeredConditions: conditions,

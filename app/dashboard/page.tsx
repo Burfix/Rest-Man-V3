@@ -147,6 +147,8 @@ export default async function OperationsDashboard({
               sourceNote={salesSnapshot.notes?.[0]}
               dataSource={salesSnapshot.data_source}
               provenance={salesProvenance}
+              targetEstimated={state.revenue.targetEstimated}
+              targetWarning={state.revenue.targetWarning}
             />
           </div>
 
