@@ -13,7 +13,7 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: { userId: string } },
 ) {
-  const guard = await apiGuard(PERMISSIONS.VIEW_OWN_STORE, "GET /api/accountability/manager/[userId]");
+    const guard = await apiGuard(PERMISSIONS.VIEW_ALL_STORES, "GET /api/accountability/manager/[userId]");
   if (guard.error) return guard.error;
   const { ctx, supabase: _sb } = guard;
   const supabase = _sb as any;
