@@ -1,4 +1,4 @@
-# ForgeStack
+# ForgeStack 
 
 **The operating brain for restaurant GMs.**
 
