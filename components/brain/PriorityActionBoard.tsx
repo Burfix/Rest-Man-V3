@@ -407,6 +407,9 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
     // Inactive = no bar, grey pts label, sub-label shown
     const inactive = isNotConnected || noDataToday;
     const pct = inactive ? 0 : Math.round((driver.pts / max) * 100);
+    // Keep a tiny visible segment for scored-zero states so it is not mistaken
+    // for missing data. Inactive states still render as no fill.
+    const barWidthPct = inactive ? 0 : (pct === 0 ? 2 : pct);
     const barColor = inactive
       ? "bg-stone-200 dark:bg-stone-700"
       : pct >= 80 ? "bg-emerald-500"
@@ -415,7 +418,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
       ? "text-stone-400 dark:text-stone-600"
       : pct >= 80 ? "text-emerald-700 dark:text-emerald-500"
       : pct >= 50 ? "text-amber-600 dark:text-amber-400"     : "text-red-600 dark:text-red-400";
-    return { driver, max, pct, barColor, textColor, isNotConnected, noDataToday, inactive };
+    return { driver, max, pct, barWidthPct, barColor, textColor, isNotConnected, noDataToday, inactive };
   });
 
   // ── Brain recommendation ───────────────────────────────────────────────────
@@ -655,7 +658,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
           {/* Score breakdown bars */}
           <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-2.5 font-mono">
             <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE BREAKDOWN</span>
-            {scoreBars.map(({ driver, max, pct, barColor, textColor, isNotConnected, noDataToday, inactive }) => {
+            {scoreBars.map(({ driver, max, pct, barWidthPct, barColor, textColor, isNotConnected, noDataToday, inactive }) => {
               // Duties-specific sub-line
               const dutiesSubLine = driver.module === "DUTIES" && dutiesData
                 ? `${dutiesData.completedCount} of ${dutiesData.totalCount} duties complete (${pct}%) · Full 20 pts at 100%`
@@ -686,7 +689,7 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
                   <div className="h-1.5 bg-[#e5e5e5] dark:bg-[#1a1a1a] rounded-full overflow-hidden">
                     <div
                       className={cn("h-full rounded-full", barColor)}
-                      style={{ width: inactive ? "0%" : `${pct}%` }}
+                      style={{ width: `${barWidthPct}%` }}
                     />
                   </div>
                   {isNotConnected && (
