@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   invalidateBrainCacheForSite(ctx.siteId);
 
   try {
-    const brain = await runOperatingBrain(ctx.siteId, todayISO(), { caller: "sync_invalidate" });
+        const brain = await runOperatingBrain(ctx.siteId, todayISO(), { caller: "api" });
     return NextResponse.json({
       ok: true,
       score: brain.systemHealth.score,
