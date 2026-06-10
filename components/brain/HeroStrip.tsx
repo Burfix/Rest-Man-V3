@@ -10,7 +10,7 @@
 import { cn } from "@/lib/utils";
 import type { BrainOutput } from "@/services/brain/operating-brain";
 import type { NormalizedSalesSnapshot } from "@/lib/sales/types";
-import SyncNowButton from "./SyncNowButton";
+import HeroSyncPanel from "./HeroSyncPanel";
 
 type Props = {
   brain: BrainOutput;
@@ -18,8 +18,8 @@ type Props = {
   revenueVariance: number;     // (netSales - target) / target * 100
   servicePeriod: string;       // "DINNER", "LUNCH", etc.
   freshnessMinutes?: number;   // minutes since last data sync
-  siteId: string;        // passed to SyncNowButton for multi-site auth
-  };
+  siteId: string;
+};
 
 // ── Colour helpers ─────────────────────────────────────────────────────────────
 
@@ -68,14 +68,6 @@ function fmtPct(n: number, showPlus = false): string {
   return `${sign}${n.toFixed(1)}%`;
 }
 
-function syncLabel(minutes?: number): { text: string; stale: boolean } {
-  if (minutes == null) return { text: "Status unknown", stale: true };
-  if (minutes === 0)   return { text: "Just synced", stale: false };
-  if (minutes < 60)    return { text: `Synced ${minutes}m ago`, stale: minutes > 15 };
-  const h = Math.round(minutes / 60);
-  return { text: `Synced ${h}h ago`, stale: true };
-}
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function HeroStrip({
@@ -84,7 +76,7 @@ export default function HeroStrip({
   revenueVariance,
   servicePeriod,
   freshnessMinutes,
-    siteId,
+  siteId,
 }: Props) {
   const { systemHealth, voiceLine } = brain;
   const score = systemHealth.score;
@@ -92,17 +84,17 @@ export default function HeroStrip({
   const barWidth = `${Math.round(Math.min(100, Math.max(0, score)))}%`;
 
   // KPI pill sources
+  const revenueDriver    = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "REVENUE");
   const labourDriver     = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "LABOUR");
   const compDriver       = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "COMPLIANCE");
   const maintDriver      = (systemHealth.allScoreDrivers ?? []).find((d) => d.module === "MAINTENANCE");
+  const revenueNoDataToday = revenueDriver?.connected !== false && revenueDriver?.hasDataToday === false;
+  const labourNoDataToday = labourDriver?.connected !== false && labourDriver?.hasDataToday === false;
   const labourPctMatch = labourDriver?.reason.match(/([\d.]+)%\s+vs\s+([\d.]+)%\s+target/i);
   const labourPctText = labourPctMatch ? Number(labourPctMatch[1]).toFixed(1) : null;
   const labourReliabilityNote = labourDriver?.reason.includes("Labour % unreliable — insufficient revenue data")
     ? "Labour % unreliable — insufficient revenue data"
     : null;
-
-  // Sync
-  const { text: syncText, stale } = syncLabel(freshnessMinutes);
 
   // SAST time for session label (server-side — static on each render)
   const saTimeStr = new Date().toLocaleString("en-US", {
@@ -161,8 +153,10 @@ export default function HeroStrip({
           {/* Revenue */}
           <div className={cn(
             "border-l-[3px] border border-[#e2e2e0] dark:border-[#2a2a2a] px-2.5 py-1.5 font-mono text-[10px]",
-            salesSnapshot.data_source === "none"
+            revenueDriver?.connected === false || salesSnapshot.data_source === "none"
               ? "border-l-stone-300 text-stone-400 dark:text-stone-600"
+              : revenueNoDataToday
+              ? "border-l-stone-300 text-stone-500 dark:text-stone-500"
               : salesSnapshot.data_source === "estimated"
               ? "border-l-amber-400 text-amber-700 dark:text-amber-400"
               : revPillClass(revenueVariance),
@@ -182,14 +176,20 @@ export default function HeroStrip({
                   Est.
                 </span>
               )}
-              {salesSnapshot.data_source === "none" && (
+              {revenueDriver?.connected === false || salesSnapshot.data_source === "none" ? (
                 <span className="rounded bg-stone-100 dark:bg-stone-800 px-1 py-px text-[8px] font-bold text-stone-500 dark:text-stone-500 uppercase tracking-wider">
                   Not Connected
                 </span>
-              )}
+              ) : revenueNoDataToday ? (
+                <span className="rounded bg-stone-100 dark:bg-stone-800 px-1 py-px text-[8px] font-bold text-stone-500 dark:text-stone-500 uppercase tracking-wider">
+                  No Data
+                </span>
+              ) : null}
             </div>
-            {salesSnapshot.data_source === "none" ? (
+            {revenueDriver?.connected === false || salesSnapshot.data_source === "none" ? (
               <span className="text-stone-400 dark:text-stone-600">Waiting for POS</span>
+            ) : revenueNoDataToday ? (
+              <span className="text-stone-500 dark:text-stone-500">No data yet today</span>
             ) : (
               <>
                 <span className="font-bold">{fmtZAR(salesSnapshot.netSales)}</span>
@@ -206,7 +206,9 @@ export default function HeroStrip({
           {labourDriver && (
             <div className={cn(
               "border-l-[3px] border border-[#e2e2e0] dark:border-[#2a2a2a] px-2.5 py-1.5 font-mono text-[10px]",
-              labourDriver.direction === "up"
+              labourDriver.connected === false || labourNoDataToday
+                ? "border-l-stone-300 text-stone-500 dark:text-stone-500"
+                : labourDriver.direction === "up"
                 ? "border-l-emerald-500 text-emerald-700 dark:text-emerald-400"
                 : "border-l-red-500 text-red-600 dark:text-red-400",
             )}>
@@ -214,7 +216,11 @@ export default function HeroStrip({
                 LABOUR
               </span>
               <span className="font-bold">
-                {labourPctText
+                {labourDriver.connected === false
+                  ? "Waiting for POS"
+                  : labourNoDataToday
+                  ? "No data yet today"
+                  : labourPctText
                   ? `${labourPctText}% ${labourDriver.direction === "up" ? "✓" : "▲"}`
                   : labourDriver.direction === "up" ? "On target ✓" : "Over target ✕"}
               </span>
@@ -268,25 +274,12 @@ export default function HeroStrip({
           </div>
         )}
 
-        {/* ── RIGHT — Sync + Session + Button ── */}
-        <div className="px-5 py-3 flex flex-col justify-center gap-1.5">
-          {/* Sync indicator */}
-          <div className="flex items-center gap-1.5">
-            <span className={cn(
-              "w-2 h-2 rounded-full shrink-0",
-              stale ? "bg-amber-400" : "bg-emerald-400",
-            )} />
-            <span className="text-[10px] font-mono text-stone-500 dark:text-stone-500">
-              {syncText}
-            </span>
-          </div>
-          {/* Session label */}
-          <span className="text-[10px] font-mono font-semibold text-stone-500 dark:text-stone-400 uppercase tracking-wider">
-            {servicePeriod} · {saTimeStr}
-          </span>
-          {/* Sync button */}
-          <SyncNowButton siteId={siteId} />
-        </div>
+        <HeroSyncPanel
+          siteId={siteId}
+          freshnessMinutes={freshnessMinutes}
+          servicePeriod={servicePeriod}
+          saTimeStr={saTimeStr}
+        />
       </div>
     </div>
   );

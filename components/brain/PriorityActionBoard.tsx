@@ -196,6 +196,9 @@ function makeOperationalTitle(
     }
 
     case "LABOUR": {
+      if (driver.reason.toLowerCase().includes("no data yet")) {
+        return "Labour not scored yet — waiting for today\'s revenue baseline";
+      }
       if (driver.reason.includes("Data sync issue")) {
         return "Data sync issue — check MICROS connection";
       }
@@ -210,6 +213,9 @@ function makeOperationalTitle(
     }
 
     case "REVENUE": {
+      if (driver.reason.toLowerCase().includes("no data yet")) {
+        return "Revenue not scored yet — waiting for first POS data today";
+      }
       const match = driver.reason.match(/([\d.]+)% below/i);
       const varPct = match ? match[1] : "?";
       if (brain.recoveryMeter && brain.recoveryMeter.revenueGap > 0) {
