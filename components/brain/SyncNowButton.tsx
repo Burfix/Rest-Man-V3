@@ -2,15 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-
-type SyncPhase = "idle" | "syncing_pos" | "refreshing" | "done" | "error";
-
-type SyncSectionResult = {
-  section: "sales" | "labour";
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import type { CommandCenterSyncResponse } from "@/lib/command-center/types";
 
