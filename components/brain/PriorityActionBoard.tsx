@@ -11,6 +11,7 @@
 import { cn } from "@/lib/utils";
 import type { BrainOutput, BrainThreatSeverity, ScoreDriver } from "@/services/brain/operating-brain";
 import ActionTakenButton from "./ActionTakenButton";
+import ScoreBreakdownSyncButton from "./ScoreBreakdownSyncButton";
 
 // ── Exported types (consumed by dashboard/page.tsx) ────────────────────────────
 
@@ -667,7 +668,10 @@ export default function PriorityActionBoard({ brain, siteId, dutiesData }: Props
 
           {/* Score breakdown bars */}
           <div className="border-t border-[#e2e2e0] dark:border-[#1a1a1a] pt-3 space-y-2.5 font-mono">
-            <span className="text-[9px] uppercase tracking-wider text-stone-600 block">SCORE BREAKDOWN</span>
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] uppercase tracking-wider text-stone-600">SCORE BREAKDOWN</span>
+              <ScoreBreakdownSyncButton siteId={siteId} />
+            </div>
             {scoreBars.map(({ driver, max, pct, barWidth, barColor, trackColor, textColor, isNotConnected, noDataToday, inactive, isZeroScore }) => {
               // Duties-specific sub-line
               const dutiesSubLine = driver.module === "DUTIES" && dutiesData
