@@ -105,6 +105,7 @@ export default async function OperationsDashboard({
           revenueVariance={state.revenue.gapPct}
           servicePeriod={servicePeriod}
           freshnessMinutes={salesAgeMinutes}
+                    siteId={siteId}
         />
       )}
 
