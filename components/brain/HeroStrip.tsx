@@ -18,7 +18,8 @@ type Props = {
   revenueVariance: number;     // (netSales - target) / target * 100
   servicePeriod: string;       // "DINNER", "LUNCH", etc.
   freshnessMinutes?: number;   // minutes since last data sync
-};
+  siteId: string;        // passed to SyncNowButton for multi-site auth
+  };
 
 // ── Colour helpers ─────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export default function HeroStrip({
   revenueVariance,
   servicePeriod,
   freshnessMinutes,
+    siteId,
 }: Props) {
   const { systemHealth, voiceLine } = brain;
   const score = systemHealth.score;
@@ -283,7 +285,7 @@ export default function HeroStrip({
             {servicePeriod} · {saTimeStr}
           </span>
           {/* Sync button */}
-          <SyncNowButton />
+          <SyncNowButton siteId={siteId} />
         </div>
       </div>
     </div>
