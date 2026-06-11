@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
                 ]);
 
           salesResult = salesSettled.status === "fulfilled"
-            ? { ok: salesSettled.value.ok === true, message: salesSettled.value.message as string | undefined, recordsAffected: salesSettled.value.recordsSynced as number | undefined }
+            ? { ok: salesSettled.value.ok === true, message: (salesSettled.value as any).message as string | undefined, recordsAffected: (salesSettled.value as any).recordsSynced as number | undefined }
             : { ok: false, message: salesSettled.reason instanceof Error ? salesSettled.reason.message : "Sales sync failed" };
 
           labourResult = labourSettled.status === "fulfilled"
