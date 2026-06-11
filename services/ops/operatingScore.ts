@@ -233,6 +233,7 @@ export interface LabourOverride {
   totalPay: number;
   totalHours: number;
   activeStaff: number;
+  targetLabourPct?: number;
 }
 
 export interface InventoryOverride {
@@ -344,7 +345,7 @@ export async function getOperatingScore(
     labRawScore = 50;
     labDetail   = "Awaiting live labour data";
   } else {
-    const lab = calcLabourScore(liveLabourPct, actualSales, targetSales, 30, labourOverride?.totalPay ?? null);
+    const lab = calcLabourScore(liveLabourPct, actualSales, targetSales, labourOverride?.targetLabourPct ?? 30, labourOverride?.totalPay ?? null);
     labRawScore = lab.rawScore;
     labDetail   = lab.explanation;
   }
