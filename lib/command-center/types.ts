@@ -277,3 +277,31 @@ export interface CommandCenterApiResponse {
     cacheHit?: boolean;
   };
 }
+
+// ── Sync Response ───────────────────────────────────────────────────────────────
+
+export type SyncStatus = "success" | "partial" | "failed";
+
+export interface SyncModuleResult {
+    ok: boolean;
+    skipped?: boolean;
+    message?: string;
+    recordsAffected?: number;
+}
+
+export interface CommandCenterSyncResponse {
+    ok: boolean;
+    syncStatus: SyncStatus;
+    syncedAt: string;
+    siteId: string;
+    modules: {
+          sales: SyncModuleResult;
+          labour: SyncModuleResult;
+          brain: SyncModuleResult;
+          state: SyncModuleResult;
+    };
+    /** Full canonical state — undefined only if state build failed */
+    state?: CommandCenterState;
+    warnings: string[];
+    errors: string[];
+}
